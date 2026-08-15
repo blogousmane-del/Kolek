@@ -162,4 +162,15 @@ describe('immuabilité', () => {
     const { error } = await admin.from('mises').delete().eq('id', miseId);
     expect(error!.message).toContain('LIGNE_IMMUABLE');
   });
+
+  it('refuse la suppression d’un collecteur qui a encaissé', async () => {
+    const carteId = await nouvelleCarte();
+    await admin.from('mises').insert(nouvelleMise(carteId));
+
+    const { error } = await admin.auth.admin.deleteUser(col.id);
+    expect(error).not.toBeNull();
+
+    const { data } = await admin.from('collecteurs').select('id').eq('id', col.id);
+    expect(data).toHaveLength(1);
+  });
 });

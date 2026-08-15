@@ -48,9 +48,16 @@ export async function creerCollecteur(nom: string, telephone: string): Promise<C
   return { id, email, client };
 }
 
-/** Supprime les utilisateurs créés — la cascade nettoie toutes leurs données. */
+/**
+ * Nettoyage au mieux : supprime les utilisateurs de test qui n'ont rien encaissé.
+ *
+ * Un collecteur ayant des mises ne peut pas être supprimé — les clés étrangères
+ * de `mises` sont en `restrict` pour ne pas déclencher le trigger d'immuabilité.
+ * C'est l'invariant du journal d'audit, pas un défaut. Le nettoyage complet se
+ * fait par `npm run db:reset`, en tête de la commande de vérification J1.
+ */
 export async function nettoyer(): Promise<void> {
   for (const id of creesDansCeFichier.splice(0)) {
-    await admin.auth.admin.deleteUser(id);
+    await admin.auth.admin.deleteUser(id); // refus attendu si le collecteur a encaissé
   }
 }

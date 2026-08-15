@@ -1,10 +1,16 @@
 -- Kolek — socle : mises, retraits, triggers métier
 -- Réf. Docs/specs/2026-08-15-j1-socle-design.md §3.5
 
+-- `restrict` et non `cascade` : une cascade PostgreSQL exécute un vrai DELETE
+-- sur les lignes filles et déclenche donc le trigger d'immuabilité, qui refuse.
+-- Les deux règles se contredisaient ; l'immuabilité l'emporte. Un collecteur
+-- qui a encaissé ne peut plus être supprimé — c'est l'invariant honnête d'un
+-- journal d'audit : on ne fait pas disparaître de l'argent encaissé en
+-- supprimant un compte.
 create table public.mises (
   id            uuid primary key,     -- généré par le téléphone : clé de l'idempotence
-  collecteur_id uuid not null references public.collecteurs(id) on delete cascade,
-  carte_id      uuid not null references public.cartes(id) on delete cascade,
+  collecteur_id uuid not null references public.collecteurs(id) on delete restrict,
+  carte_id      uuid not null references public.cartes(id) on delete restrict,
   montant       integer not null check (montant > 0),
   est_commission boolean not null default false,
   encaisse_le   timestamptz not null, -- heure du téléphone, heure du geste
@@ -22,8 +28,8 @@ create index mises_collecteur_date_idx on public.mises(collecteur_id, encaisse_l
 
 create table public.retraits (
   id               uuid primary key default gen_random_uuid(),
-  collecteur_id    uuid not null references public.collecteurs(id) on delete cascade,
-  carte_id         uuid not null unique references public.cartes(id) on delete cascade,
+  collecteur_id    uuid not null references public.collecteurs(id) on delete restrict,
+  carte_id         uuid not null unique references public.cartes(id) on delete restrict,
   montant_restitue integer not null check (montant_restitue >= 0),
   commission       integer not null check (commission >= 0),
   effectue_le      timestamptz not null default now()
