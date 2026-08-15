@@ -1,0 +1,11 @@
+{
+  "name": "kolek",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kolek — SaaS de gestion pour banquiers ambulants",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present"
+  }
+}
