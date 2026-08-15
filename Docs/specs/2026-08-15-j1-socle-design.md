@@ -379,7 +379,7 @@ React 19 + Vite + TypeScript. Écran de connexion. Une page authentifiée vide p
 - `supabase/config.toml` versionné, base locale via Docker.
 - Variables d'environnement par application : `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. Fichiers `.env.example` versionnés, `.env` ignorés.
 - `.gitignore` couvrant `node_modules`, `dist`, `.env`, artefacts Supabase locaux.
-- `seed.sql` créant deux collecteurs de test avec leurs clients — indispensable pour tester l'isolation, qui exige deux tenants.
+- Les collecteurs de test sont créés par le harnais de tests via l'API d'administration Auth (`auth.admin.createUser`), pas par un `seed.sql`. Insérer des lignes dans `auth.users` en SQL brut exige de reproduire à la main le format des mots de passe et des identités, qui varie selon les versions de Supabase. Tester l'isolation exige deux tenants ; le harnais en crée autant que chaque fichier de test en demande, puis les supprime.
 
 ---
 
