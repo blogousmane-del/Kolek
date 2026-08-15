@@ -70,3 +70,13 @@ $$;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.creer_collecteur_apres_signup();
+
+-- Privilèges Data API. Les nouvelles tables ne sont plus exposées
+-- automatiquement : on accorde explicitement, table par table, en miroir des
+-- politiques RLS de la migration socle_rls. Sans cela, PostgREST répond
+-- « 42501: permission denied », en local comme sur Supabase Cloud.
+grant select, update         on public.collecteurs to authenticated;
+grant select, insert, update on public.clients     to authenticated;
+grant select, insert         on public.cartes      to authenticated;
+
+grant all on public.collecteurs, public.clients, public.cartes to service_role;
