@@ -97,6 +97,7 @@ create trigger mises_apres_insert
 create or replace function public.interdire_modification()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   raise exception 'LIGNE_IMMUABLE: la table % est append-only', tg_table_name;

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+﻿import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { admin, creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
 
 afterAll(nettoyer);
@@ -86,7 +86,7 @@ describe('compteur de la carte', () => {
   });
 });
 
-describe('validation à l’insertion', () => {
+describe("validation à l'insertion", () => {
   it('refuse un montant différent de la mise de la carte', async () => {
     const carteId = await nouvelleCarte(1000);
     const { error } = await admin.from('mises').insert(nouvelleMise(carteId, 2000));
@@ -116,7 +116,7 @@ describe('validation à l’insertion', () => {
 });
 
 describe('idempotence de la synchronisation', () => {
-  it('rejoue trois fois la même mise et n’en enregistre qu’une', async () => {
+  it("rejoue trois fois la même mise et n'en enregistre qu'une", async () => {
     const carteId = await nouvelleCarte();
     const miseId = crypto.randomUUID();
     const charge = nouvelleMise(carteId, 1000, miseId);
@@ -145,7 +145,7 @@ describe('idempotence de la synchronisation', () => {
 });
 
 describe('immuabilité', () => {
-  it('refuse la modification d’une mise, même avec la clé de service', async () => {
+  it("refuse la modification d'une mise, même avec la clé de service", async () => {
     const carteId = await nouvelleCarte();
     const miseId = crypto.randomUUID();
     await admin.from('mises').insert(nouvelleMise(carteId, 1000, miseId));
@@ -154,7 +154,7 @@ describe('immuabilité', () => {
     expect(error!.message).toContain('LIGNE_IMMUABLE');
   });
 
-  it('refuse la suppression d’une mise, même avec la clé de service', async () => {
+  it("refuse la suppression d'une mise, même avec la clé de service", async () => {
     const carteId = await nouvelleCarte();
     const miseId = crypto.randomUUID();
     await admin.from('mises').insert(nouvelleMise(carteId, 1000, miseId));
@@ -163,7 +163,7 @@ describe('immuabilité', () => {
     expect(error!.message).toContain('LIGNE_IMMUABLE');
   });
 
-  it('refuse la suppression d’un collecteur qui a encaissé', async () => {
+  it("refuse la suppression d'un collecteur qui a encaissé", async () => {
     const carteId = await nouvelleCarte();
     await admin.from('mises').insert(nouvelleMise(carteId));
 
@@ -172,5 +172,58 @@ describe('immuabilité', () => {
 
     const { data } = await admin.from('collecteurs').select('id').eq('id', col.id);
     expect(data).toHaveLength(1);
+  });
+});
+
+describe('retraits', () => {
+  async function carteAvecMises(nombre: number): Promise<string> {
+    const carteId = await nouvelleCarte();
+    for (let i = 0; i < nombre; i++) {
+      await admin.from('mises').insert(nouvelleMise(carteId));
+    }
+    return carteId;
+  }
+
+  it('enregistre un retrait et clôture la carte', async () => {
+    const carteId = await carteAvecMises(15);
+
+    const { error } = await admin.from('retraits').insert({
+      collecteur_id: col.id,
+      carte_id: carteId,
+      montant_restitue: 14000, // (15 - 1) × 1 000
+      commission: 1000,
+    });
+    expect(error).toBeNull();
+  });
+
+  it('refuse un deuxième retrait sur la même carte', async () => {
+    const carteId = await carteAvecMises(3);
+    const retrait = {
+      collecteur_id: col.id,
+      carte_id: carteId,
+      montant_restitue: 2000,
+      commission: 1000,
+    };
+
+    await admin.from('retraits').insert(retrait);
+    const { error } = await admin.from('retraits').insert(retrait);
+
+    expect(error!.code).toBe('23505');
+  });
+
+  it("refuse la modification et la suppression d'un retrait", async () => {
+    const carteId = await carteAvecMises(2);
+    await admin.from('retraits').insert({
+      collecteur_id: col.id,
+      carte_id: carteId,
+      montant_restitue: 1000,
+      commission: 1000,
+    });
+
+    const maj = await admin.from('retraits').update({ montant_restitue: 99 }).eq('carte_id', carteId);
+    expect(maj.error!.message).toContain('LIGNE_IMMUABLE');
+
+    const sup = await admin.from('retraits').delete().eq('carte_id', carteId);
+    expect(sup.error!.message).toContain('LIGNE_IMMUABLE');
   });
 });
