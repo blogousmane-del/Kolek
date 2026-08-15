@@ -1,0 +1,30 @@
+# Dépendances
+node_modules/
+
+# Builds
+dist/
+build/
+.vite/
+
+# Environnement — jamais de secret versionné
+.env
+.env.*
+!.env.example
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
+# Système
+.DS_Store
+Thumbs.db
+
+# Éditeurs
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
