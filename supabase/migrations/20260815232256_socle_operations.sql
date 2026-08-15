@@ -61,10 +61,21 @@ create trigger mises_journal    after insert on public.mises    for each row exe
 create trigger retraits_journal after insert on public.retraits for each row execute function public.journaliser();
 create trigger cartes_journal   after insert on public.cartes   for each row execute function public.journaliser();
 
+-- Le journal est append-only au même titre que les mises : la fonction
+-- interdire_modification couvre aussi les accès par clé de service, que ni RLS
+-- ni les privilèges ne filtrent.
+create trigger audit_log_immuable
+  before update or delete on public.audit_log
+  for each row execute function public.interdire_modification();
+
 -- Privilèges Data API. audit_log et admins n'en reçoivent aucun pour
 -- authenticated : ils restent réservés aux Edge Functions.
 grant select, insert, update on public.caisses_jour   to authenticated;
-grant select, insert, update on public.synchro_rejets to authenticated;
+
+-- Seule la colonne `traite` est modifiable : marquer un rejet comme traité ne
+-- doit jamais pouvoir réécrire la charge utile qu'on a justement conservée.
+grant select, insert   on public.synchro_rejets to authenticated;
+grant update (traite)  on public.synchro_rejets to authenticated;
 
 grant all on public.caisses_jour, public.synchro_rejets, public.audit_log, public.admins
   to service_role;

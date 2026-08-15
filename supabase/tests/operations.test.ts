@@ -92,4 +92,52 @@ describe('journal d’audit', () => {
     const { data } = await admin.from('audit_log').select('table_cible').eq('ligne_id', carteId);
     expect(data![0]!.table_cible).toBe('cartes');
   });
+
+  it('journalise aussi un retrait', async () => {
+    const clientId = crypto.randomUUID();
+    const carteId = crypto.randomUUID();
+
+    await admin.from('clients').insert({ id: clientId, collecteur_id: col.id, nom: 'Drissa' });
+    await admin
+      .from('cartes')
+      .insert({ id: carteId, collecteur_id: col.id, client_id: clientId, mise: 1000 });
+    await admin.from('mises').insert({
+      id: crypto.randomUUID(),
+      collecteur_id: col.id,
+      carte_id: carteId,
+      montant: 1000,
+      encaisse_le: new Date().toISOString(),
+    });
+
+    const { data: retrait } = await admin
+      .from('retraits')
+      .insert({
+        collecteur_id: col.id,
+        carte_id: carteId,
+        montant_restitue: 0,
+        commission: 1000,
+      })
+      .select('id')
+      .single();
+
+    const { data } = await admin
+      .from('audit_log')
+      .select('table_cible, action')
+      .eq('ligne_id', retrait!.id);
+
+    expect(data).toHaveLength(1);
+    expect(data![0]!.table_cible).toBe('retraits');
+  });
+});
+
+describe('immuabilité du journal', () => {
+  it('refuse la modification et la suppression d’une ligne d’audit', async () => {
+    const { data: ligne } = await admin.from('audit_log').select('id').limit(1).single();
+
+    const maj = await admin.from('audit_log').update({ action: 'falsifie' }).eq('id', ligne!.id);
+    expect(maj.error!.message).toContain('LIGNE_IMMUABLE');
+
+    const sup = await admin.from('audit_log').delete().eq('id', ligne!.id);
+    expect(sup.error!.message).toContain('LIGNE_IMMUABLE');
+  });
 });
