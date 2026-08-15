@@ -1,0 +1,72 @@
+-- Kolek — socle : collecteurs, clients, cartes
+-- Réf. Docs/specs/2026-08-15-j1-socle-design.md §3
+
+create table public.collecteurs (
+  id                  uuid primary key references auth.users(id) on delete cascade,
+  nom                 text not null,
+  telephone           text not null unique,
+  zone                text,
+  palier              text not null default 'essai'
+                        check (palier in ('essai','standard','pro','illimite')),
+  abonnement_statut   text not null default 'actif'
+                        check (abonnement_statut in ('actif','suspendu','expire')),
+  abonnement_echeance date not null default (current_date + 30),
+  cree_le             timestamptz not null default now()
+);
+
+comment on table public.collecteurs is
+  'Un compte payant. En correspondance 1-pour-1 avec auth.users.';
+
+create table public.clients (
+  id            uuid primary key,          -- généré par le téléphone (souscription hors-ligne)
+  collecteur_id uuid not null references public.collecteurs(id) on delete cascade,
+  nom           text not null,
+  telephone     text,
+  photo_url     text,
+  marche        text,
+  activite      text,
+  cree_le       timestamptz not null default now()
+);
+
+create index clients_collecteur_idx on public.clients(collecteur_id);
+
+create table public.cartes (
+  id               uuid primary key,       -- généré par le téléphone
+  collecteur_id    uuid not null references public.collecteurs(id) on delete cascade,
+  client_id        uuid not null references public.clients(id) on delete cascade,
+  mise             integer not null check (mise between 500 and 10000),
+  statut           text not null default 'active' check (statut in ('active','cloturee')),
+  mises_encaissees integer not null default 0 check (mises_encaissees between 0 and 31),
+  ouverte_le       timestamptz not null default now(),
+  cloturee_le      timestamptz,
+  constraint cartes_cloture_coherente
+    check ((statut = 'cloturee') = (cloturee_le is not null))
+);
+
+-- Décision de cadrage Phase 1 : un client possède une seule carte active à la fois.
+create unique index cartes_une_active_par_client
+  on public.cartes(client_id) where statut = 'active';
+
+create index cartes_collecteur_idx on public.cartes(collecteur_id);
+
+-- À l'inscription Auth, on matérialise le collecteur.
+create or replace function public.creer_collecteur_apres_signup()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.collecteurs (id, nom, telephone)
+  values (
+    new.id,
+    coalesce(nullif(new.raw_user_meta_data->>'nom', ''), 'Collecteur'),
+    coalesce(nullif(new.raw_user_meta_data->>'telephone', ''), new.id::text)
+  );
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.creer_collecteur_apres_signup();

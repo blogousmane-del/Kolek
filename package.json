@@ -3,9 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "description": "Kolek — SaaS de gestion pour banquiers ambulants",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "db:start": "npx supabase start",
+    "db:stop": "npx supabase stop",
+    "db:reset": "npx supabase db reset",
+    "db:env": "node scripts/env-test.mjs",
+    "test:db": "npm run db:env && vitest run --config supabase/tests/vitest.config.ts"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.112.3",
+    "dotenv": "^17.4.2",
+    "vitest": "^4.1.10"
   }
 }
