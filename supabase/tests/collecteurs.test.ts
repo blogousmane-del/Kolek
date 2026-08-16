@@ -76,4 +76,21 @@ describe('contraintes du schéma cartes', () => {
 
     expect(error?.code).toBe('23514');
   });
+
+  it('refuse une carte dont le client appartient à un autre collecteur', async () => {
+    const a = await creerCollecteur('Moussa Fofana', `+225079${Date.now() % 10000000}`);
+    const b = await creerCollecteur('Rokia Sanogo', `+225080${Date.now() % 10000000}`);
+
+    const clientDeB = crypto.randomUUID();
+    await admin.from('clients').insert({ id: clientDeB, collecteur_id: b.id, nom: 'Client de B' });
+
+    const { error } = await admin.from('cartes').insert({
+      id: crypto.randomUUID(),
+      collecteur_id: a.id,
+      client_id: clientDeB,
+      mise: 1000,
+    });
+
+    expect(error!.code).toBe('23503'); // violation de clé étrangère
+  });
 });

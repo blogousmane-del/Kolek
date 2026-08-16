@@ -30,17 +30,31 @@ create table public.clients (
 
 create index clients_collecteur_idx on public.clients(collecteur_id);
 
+-- Cible de la clé étrangère composite de cartes (voir plus bas). Redondant avec
+-- la clé primaire, mais PostgreSQL exige une contrainte d'unicité sur le couple
+-- exact référencé.
+alter table public.clients add constraint clients_id_collecteur_unique
+  unique (id, collecteur_id);
+
 create table public.cartes (
   id               uuid primary key,       -- généré par le téléphone
   collecteur_id    uuid not null references public.collecteurs(id) on delete cascade,
-  client_id        uuid not null references public.clients(id) on delete cascade,
+  client_id        uuid not null,
   mise             integer not null check (mise between 500 and 10000),
   statut           text not null default 'active' check (statut in ('active','cloturee')),
   mises_encaissees integer not null default 0 check (mises_encaissees between 0 and 31),
   ouverte_le       timestamptz not null default now(),
   cloturee_le      timestamptz,
   constraint cartes_cloture_coherente
-    check ((statut = 'cloturee') = (cloturee_le is not null))
+    check ((statut = 'cloturee') = (cloturee_le is not null)),
+  -- Le client d'une carte doit appartenir au même collecteur que la carte.
+  -- Sans ce lien, un collecteur pourrait ouvrir une carte sur le client d'un
+  -- autre : RLS le cacherait, mais l'index unique « une seule carte active par
+  -- client » étant global, l'autre collecteur serait définitivement bloqué sur
+  -- son propre client, avec une erreur portant sur une ligne qu'il ne peut pas voir.
+  constraint cartes_client_du_meme_collecteur
+    foreign key (client_id, collecteur_id)
+    references public.clients(id, collecteur_id) on delete cascade
 );
 
 -- Décision de cadrage Phase 1 : un client possède une seule carte active à la fois.
