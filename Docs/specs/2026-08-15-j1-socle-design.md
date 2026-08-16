@@ -299,16 +299,7 @@ Les deux autres pistes ont été écartées. *Afficher seulement* laisse le regi
 
 **Conséquence à tenir en J2.** La somme encaissée sur une carte ne se lit plus dans la seule table `mises` : c'est `mises` **plus** les rattrapages qui s'y rattachent. Tout bilan, tout score de régularité et tout rapprochement de caisse doit sommer les deux, sinon ils sous-comptent précisément l'argent que ce mécanisme sert à ne pas perdre. Le solde restituable, lui, ne change pas — la carte est close.
 
-**Esquisse pour J2**, à affiner au cadrage :
-
-```
-rattrapages( id, collecteur_id →collecteurs, client_id →clients, carte_id →cartes,
-             rejet_id →synchro_rejets, montant, cree_le, regle_le )
-```
-
-Append-only comme `mises`, à une exception près : `regle_le` doit rester modifiable pour marquer la dette payée. Même motif que `synchro_rejets.traite` — privilège de colonne, `grant update (regle_le)`, jamais un droit de modification sur toute la ligne.
-
-Le reçu dépend de la passerelle WhatsApp, qui arrive en J3. Si le rattrapage est livré en J2, il naît sans reçu et en reçoit un dès que la passerelle existe — à ne pas oublier dans le cadrage de J3.
+Cette conséquence a été traitée à part, parce qu'elle dépasse le rattrapage : le Mobile Money de la Phase 2 et les bonus de fidélisation poseront le même problème. Les décisions retenues — une vue unique `mouvements` comme seule surface de lecture de l'argent, un jeu de test empoisonné qui fait échouer tout bilan écrit sur `mises` seule, un cash attendu calculé et non figé, et une file de reçus qui découple le rattrapage de la passerelle WhatsApp — sont consignées dans **`2026-08-16-j2-cadrage-mouvements.md`**.
 
 ---
 
