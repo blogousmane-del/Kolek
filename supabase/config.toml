@@ -65,7 +65,10 @@ schema_paths = []
 
 [db.seed]
 # If enabled, seeds the database after migrations during a db reset.
-enabled = true
+# Désactivé : les collecteurs de test sont créés via l'API Auth admin (les
+# inserts SQL directs dans auth.users devraient reproduire un format de hash
+# de mot de passe et d'identité qui varie selon les versions de Supabase).
+enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 sql_paths = ["./seed.sql"]
