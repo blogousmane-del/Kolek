@@ -1,0 +1,55 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-famille-ui);
+  font-size: var(--font-body);
+  color: var(--ink);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+.champ {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--r-md);
+  font: inherit;
+  background: var(--surface);
+}
+
+.champ:focus {
+  outline: none;
+  border-color: var(--green-700);
+}
+
+.bouton-primaire {
+  width: 100%;
+  min-height: 48px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--green-700);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bouton-primaire:hover {
+  background: var(--green-500);
+}
+
+.carte {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 18px;
+}
+
+.montant {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
