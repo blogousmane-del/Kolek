@@ -13,7 +13,13 @@ export function Connexion() {
     setErreur(null);
 
     const { error } = await supabase.auth.signInWithPassword({ email, password: motDePasse });
-    if (error) setErreur('Identifiants incorrects.');
+    if (error) {
+      setErreur(
+        error.status === 400 || error.status === 401
+          ? 'Identifiants incorrects.'
+          : 'Connexion impossible. Vérifie le réseau et réessaie.',
+      );
+    }
     setEnCours(false);
   }
 

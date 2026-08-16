@@ -31,7 +31,7 @@ body {
   border: none;
   border-radius: var(--r-pill);
   background: var(--green-700);
-  color: #fff;
+  color: var(--surface);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -39,6 +39,17 @@ body {
 
 .bouton-primaire:hover {
   background: var(--green-500);
+}
+
+.bouton-fantome {
+  min-height: 44px;
+  padding: 0 12px;
+  border: none;
+  background: none;
+  color: var(--green-700);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .carte {
