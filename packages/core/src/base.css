@@ -1,66 +1,21 @@
-* {
-  box-sizing: border-box;
-}
+/* Socle commun aux deux applications. Tout le reste passe par les classes
+   utilitaires : ce fichier ne définit aucun composant, sans quoi on aurait de
+   nouveau deux systèmes visuels en parallèle.
 
-body {
-  margin: 0;
-  font-family: var(--font-famille-ui);
-  font-size: var(--font-body);
-  color: var(--ink);
-  background: var(--canvas);
-  -webkit-font-smoothing: antialiased;
-}
+   Les chiffres tabulaires du Design System §3.2 ne sont pas ici : Tailwind
+   fournit déjà `tabular-nums`, et les composants l'appliquent là où on lit des
+   montants en colonne. */
 
-.champ {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1.5px solid var(--hairline);
-  border-radius: var(--r-md);
-  font: inherit;
-  background: var(--surface);
-}
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
 
-.champ:focus {
-  outline: none;
-  border-color: var(--green-700);
-}
-
-.bouton-primaire {
-  width: 100%;
-  min-height: 48px;
-  border: none;
-  border-radius: var(--r-pill);
-  background: var(--green-700);
-  color: var(--surface);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.bouton-primaire:hover {
-  background: var(--green-500);
-}
-
-.bouton-fantome {
-  min-height: 44px;
-  padding: 0 12px;
-  border: none;
-  background: none;
-  color: var(--green-700);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.carte {
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm);
-  padding: 18px;
-}
-
-.montant {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  body {
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    color: var(--color-ink);
+    background: var(--color-canvas);
+    -webkit-font-smoothing: antialiased;
+  }
 }

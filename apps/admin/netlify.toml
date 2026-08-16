@@ -17,9 +17,10 @@
 
 # Le dashboard n'a aucune raison d'être indexé ni encadré.
 #
-# `style-src` accepte l'inline pour la même raison que côté collecteur : les
-# tokens du Design System sont injectés à l'exécution dans une balise `<style>`
-# créée en JavaScript, et les composants utilisent l'attribut `style`.
+# `style-src` accepte l'inline pour la même raison que côté collecteur : la
+# largeur des jauges d'avancement vaut un pourcentage venu de la donnée, que
+# Tailwind ne peut pas connaître au build. Le thème, lui, est désormais une
+# feuille statique servie depuis l'origine.
 #
 # `connect-src` est à restreindre à `https://<ref>.supabase.co` une fois le
 # projet créé (voir Docs/deploiement.md).

@@ -17,10 +17,12 @@
   to = "/index.html"
   status = 200
 
-# `style-src` doit accepter l'inline : les tokens du Design System sont injectés
-# à l'exécution dans une balise `<style>` créée en JavaScript, et les composants
-# utilisent l'attribut `style`. Les deux relèvent de `style-src` pour le
-# navigateur. `script-src` reste strict — Vite n'émet que des scripts externes.
+# `style-src` doit accepter l'inline. Ce n'est plus pour les tokens : depuis le
+# passage à Tailwind, le thème est une feuille statique servie depuis l'origine.
+# Il reste exactement un usage de l'attribut `style` — la largeur des jauges
+# d'avancement, qui vaut un pourcentage venu de la donnée. Aucune classe ne peut
+# porter une valeur inconnue au build. `script-src` reste strict : Vite n'émet
+# que des scripts externes.
 #
 # `connect-src` accepte tout sous-domaine Supabase parce que la référence du
 # projet n'est pas connue à l'écriture de ce fichier. À restreindre à

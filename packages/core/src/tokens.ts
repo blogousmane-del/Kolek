@@ -1,15 +1,45 @@
+/**
+ * Source unique des valeurs visuelles — Design System §3.
+ *
+ * Ce fichier ne produit plus un bloc `:root` injecté à l'exécution : il produit
+ * le bloc `@theme` de Tailwind v4, écrit sur disque par
+ * `scripts/generer-theme.mjs`. Tailwind a besoin du thème au moment du build
+ * pour fabriquer les classes utilitaires ; une injection en JavaScript arrive
+ * trop tard.
+ *
+ * Les noms sont donc contraints : ils doivent tomber dans les espaces de noms
+ * que Tailwind reconnaît (`--color-*`, `--radius-*`, `--text-*`, `--font-*`,
+ * `--shadow-*`, `--container-*`), sans quoi aucune classe n'est engendrée.
+ */
+
+/**
+ * Couleurs. Certaines valeurs portent deux noms — `canvas` et `background`,
+ * `hairline` et `border`. Ce n'est pas une redite par négligence : le premier
+ * est le nom métier du Design System, le second celui qu'attendent les classes
+ * Tailwind conventionnelles (`bg-background`, `border-border`). Les deux
+ * pointent la même valeur, et un test le vérifie.
+ */
 export const couleurs = {
   // Marque & action — Design System §3.1
-  green900: '#0E2E1F',
-  green700: '#14402C',
-  green500: '#1C5A3D',
-  greenTint: '#E8F0EA',
+  primary: '#14402C',
+  primaryForeground: '#FFFFFF',
+  sidebar: '#0E2E1F',
+  accent: '#1C5A3D',
+  secondary: '#E8F0EA',
+  secondaryForeground: '#14402C',
   // Neutres
   ink: '#171A17',
-  muted: '#6C716A',
+  foreground: '#171A17',
+  // `muted` est une surface (piste de jauge, en-tête de tableau) et
+  // `mutedForeground` un texte. Les confondre donne du gris sur gris.
+  muted: '#EFEFEA',
+  mutedForeground: '#6C716A',
   hairline: '#E6E3DA',
+  border: '#E6E3DA',
   canvas: '#F4F5F2',
+  background: '#F4F5F2',
   surface: '#FFFFFF',
+  input: '#FFFFFF',
   paper: '#FBFAF6',
   darkCanvas: '#06140E',
   // Sémantique
@@ -26,80 +56,108 @@ export const couleurs = {
   chartSlate: '#AEB7D6',
 } as const;
 
+/** Design System §3.4. `xl` est donné pour 20–24 px ; on prend le haut. */
 export const rayons = {
   sm: '8px',
   md: '12px',
   lg: '16px',
-  xl: '22px',
+  xl: '24px',
   pill: '9999px',
 } as const;
 
-// Clés numériques : le générateur CSS insère un tiret entre une lettre et un
-// chiffre (green700 → green-700). Des clés comme « e2 » produiraient
-// « --space-e-2 ». On les nomme donc par leur seule valeur.
-export const espacements = {
-  '2': '2px',
-  '4': '4px',
-  '8': '8px',
-  '12': '12px',
-  '16': '16px',
-  '20': '20px',
-  '24': '24px',
-  '32': '32px',
-  '40': '40px',
-  '48': '48px',
-  '64': '64px',
+/**
+ * Design System §3.3 — base 4 px. Tailwind dérive toute son échelle de cette
+ * seule valeur : `p-2` vaut 8 px, `gap-3` vaut 12 px, `py-2.5` vaut 10 px.
+ * L'échelle du document (2 · 4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64)
+ * en est exactement l'ensemble des multiples utiles ; il n'y a donc plus de
+ * liste de jetons à tenir à jour en parallèle.
+ */
+export const grille = '4px';
+
+/**
+ * Design System §3.2. Les noms en t-shirt sont ceux qu'exigent les classes
+ * Tailwind ; la colonne de droite donne le rôle décrit par le document.
+ */
+export const taillesTexte = {
+  xs: '11px', // Overline
+  sm: '13px', // Small / label
+  base: '15px', // Body
+  lg: '16px', // H3 — titre de carte
+  xl: '20px', // H2 — section
+  '2xl': '24px', // Montant de carte
+  '3xl': '28px', // H1 — titre de page
+  '4xl': '36px', // Metric XL
 } as const;
 
-// Même raison : pas de « h1 », qui deviendrait « --font-h-1 ».
-export const typographie = {
-  familleUi: "'Plus Jakarta Sans', 'Inter', system-ui, sans-serif",
-  familleDisplay: "'Sora', 'Plus Jakarta Sans', system-ui, sans-serif",
-  metricXl: '36px',
-  titrePage: '28px',
-  titreSection: '20px',
-  titreCarte: '16px',
-  body: '15px',
-  small: '13px',
-  overline: '11px',
+export const polices = {
+  body: "'Plus Jakarta Sans', 'Inter', system-ui, sans-serif",
+  headings: "'Sora', 'Plus Jakarta Sans', system-ui, sans-serif",
 } as const;
 
-// Largeurs de conteneur. Sans elles, chaque écran réinvente son `maxWidth` en
-// dur, ce que la règle « aucune valeur visuelle en dur » interdit précisément —
-// et trois écrans finissent avec trois largeurs de formulaire différentes.
+/**
+ * Largeurs de conteneur. Sans elles, chaque écran réinvente son `max-width` en
+ * dur, ce que la règle « aucune valeur visuelle en dur » interdit précisément —
+ * et trois écrans finissent avec trois largeurs de formulaire différentes.
+ * Émises dans `--container-*`, elles donnent `max-w-formulaire`, `w-sidebar`…
+ */
 export const mesures = {
   formulaire: '360px',
   carte: '520px',
   liste: '640px',
-  sidebar: '248px',
+  sidebar: '256px',
+  mobile: '420px',
+  volet: '320px',
 } as const;
 
+/**
+ * Design System §3.5. Trois niveaux d'élévation neutres, plus une ombre teintée
+ * réservée au bouton d'encaissement : ce n'est pas un quatrième niveau mais une
+ * couleur portée, la seule surface du produit qui projette du vert.
+ */
 export const elevations = {
   shadowSm: '0 1px 2px rgba(20,30,25,.05)',
   shadowMd: '0 4px 12px rgba(20,30,25,.08)',
   shadowLg: '0 12px 32px rgba(6,20,14,.14)',
+  shadowAction: '0 4px 12px rgba(20,64,44,.25)',
+} as const;
+
+/**
+ * Dégradés. Ils ne rentrent dans aucun espace de noms Tailwind, donc aucune
+ * classe n'en sort : ils sont exposés en variables libres et consommés par
+ * `bg-[image:var(--degrade-carte)]`. Les garder ici plutôt qu'en dur dans
+ * trois composants est ce qui empêche la carte de collecte et la carte de zone
+ * de diverger silencieusement.
+ */
+export const degrades = {
+  degradeCarte: 'linear-gradient(135deg, #B7D9BE 0%, #9FC2DA 60%, #AEB7D6 100%)',
+  degradePromo: 'linear-gradient(135deg, #1C5A3D 0%, #0E2E1F 100%)',
+  degradeZone0: 'linear-gradient(135deg, #B7D9BE 0%, #9FC2DA 100%)',
+  degradeZone1: 'linear-gradient(135deg, #9FC2DA 0%, #AEB7D6 100%)',
+  degradeZone2: 'linear-gradient(135deg, #7FB6A6 0%, #B7D9BE 100%)',
+  degradeZone3: 'linear-gradient(135deg, #AEB7D6 0%, #9FC2DA 100%)',
 } as const;
 
 function kebab(cle: string): string {
   return cle.replace(/([a-z])([A-Z0-9])/g, '$1-$2').toLowerCase();
 }
 
-const PREFIXES: Array<[Record<string, string>, string]> = [
-  [couleurs, ''],
-  [rayons, 'r-'],
-  [espacements, 'space-'],
-  [mesures, 'mesure-'],
-  [typographie, 'font-'],
+const GROUPES: Array<[Record<string, string>, string]> = [
+  [couleurs, 'color-'],
+  [rayons, 'radius-'],
+  [taillesTexte, 'text-'],
+  [polices, 'font-'],
+  [mesures, 'container-'],
   [elevations, ''],
+  [degrades, ''],
 ];
 
-/** Produit le bloc `:root` consommé par les deux applications. */
-export function genererCssTokens(): string {
-  const lignes: string[] = [];
-  for (const [groupe, prefixe] of PREFIXES) {
+/** Produit le bloc `@theme` consommé par Tailwind dans les deux applications. */
+export function genererCssTheme(): string {
+  const lignes: string[] = [`  --spacing: ${grille};`];
+  for (const [groupe, prefixe] of GROUPES) {
     for (const [cle, valeur] of Object.entries(groupe)) {
       lignes.push(`  --${prefixe}${kebab(cle)}: ${valeur};`);
     }
   }
-  return `:root {\n${lignes.join('\n')}\n}\n`;
+  return `@theme {\n${lignes.join('\n')}\n}\n`;
 }

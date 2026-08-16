@@ -3,6 +3,6 @@
 @import '@kolek/core/base.css';
 
 /* Tailwind n'explore que le répertoire du build. Les composants partagés vivent
-   hors de `apps/admin` : sans cette ligne, leurs classes n'existeraient dans
-   aucune feuille de style et l'écran sortirait sans mise en forme. */
+   hors de `apps/collecteur` : sans cette ligne, leurs classes n'existeraient
+   dans aucune feuille de style et l'écran sortirait sans mise en forme. */
 @source '../../../packages/ui/src';

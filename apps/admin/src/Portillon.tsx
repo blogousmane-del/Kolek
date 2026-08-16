@@ -1,4 +1,6 @@
+import { Bouton, EcranMessage } from '@kolek/ui';
 import { useEffect, useState } from 'react';
+
 import { Coquille } from './Coquille';
 import { supabase } from './supabase';
 
@@ -42,57 +44,22 @@ export function Portillon() {
   if (etat === 'admin') return <Coquille />;
 
   return (
-    <Barrage
+    <EcranMessage
       titre={etat === 'refuse' ? 'Accès réservé' : 'Vérification impossible'}
       message={
         etat === 'refuse'
           ? 'Ce compte n’est pas un compte d’administration GTCS. Les collecteurs utilisent l’application Kolek, pas ce tableau de bord.'
           : 'Impossible de vérifier tes droits d’accès. Vérifie le réseau et réessaie.'
       }
-      reessayer={etat === 'indisponible'}
-    />
-  );
-}
-
-function Barrage({
-  titre,
-  message,
-  reessayer,
-}: {
-  titre: string;
-  message: string;
-  reessayer: boolean;
-}) {
-  return (
-    <main
-      style={{
-        minHeight: '100dvh',
-        display: 'grid',
-        placeItems: 'center',
-        background: 'var(--dark-canvas)',
-        padding: 'var(--space-20)',
-      }}
     >
-      <div className="carte" style={{ width: '100%', maxWidth: 'var(--mesure-formulaire)' }}>
-        <h1 style={{ fontSize: 'var(--font-titre-carte)', margin: '0 0 var(--space-8)' }}>
-          {titre}
-        </h1>
-        <p style={{ color: 'var(--muted)', margin: '0 0 var(--space-20)' }}>{message}</p>
-
-        {reessayer && (
-          <button
-            className="bouton-primaire"
-            style={{ marginBottom: 'var(--space-12)' }}
-            onClick={() => window.location.reload()}
-          >
-            Réessayer
-          </button>
-        )}
-
-        <button className="bouton-fantome" onClick={() => supabase.auth.signOut()}>
-          Se déconnecter
-        </button>
-      </div>
-    </main>
+      {etat === 'indisponible' && (
+        <Bouton pleineLargeur onClick={() => window.location.reload()}>
+          Réessayer
+        </Bouton>
+      )}
+      <Bouton variante="fantome" pleineLargeur onClick={() => void supabase.auth.signOut()}>
+        Se déconnecter
+      </Bouton>
+    </EcranMessage>
   );
 }

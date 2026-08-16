@@ -153,9 +153,11 @@ l'environnement distant, pas sur le local.
 5. **La Content-Security-Policy ne casse rien.** `netlify.toml` n'est appliqué
    ni par `vite preview` ni par les tests : la politique n'a jamais tourné
    ailleurs qu'en production. Ouvrir la console sur les deux sites et vérifier
-   l'absence de violation CSP — les points sensibles sont la feuille de tokens
-   injectée en JavaScript, l'enregistrement du service worker, et les appels
-   vers Supabase.
+   l'absence de violation CSP — les points sensibles sont les fontes servies
+   depuis l'origine (`@fontsource`, sous-ensemble latin), la largeur des jauges
+   d'avancement posée en attribut `style`, l'enregistrement du service worker,
+   et les appels vers Supabase. Le thème n'en est plus un : depuis le passage à
+   Tailwind, c'est une feuille statique et non une injection JavaScript.
 6. **La PWA s'installe** depuis l'URL réelle, en HTTPS : manifeste détecté,
    service worker enregistré. Le service worker ne fonctionne qu'en contexte
    sécurisé, donc c'est le premier test qui a du sens hors du local.

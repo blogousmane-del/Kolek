@@ -1,8 +1,10 @@
-# Kolek — Design System v1
+# Kolek — Design System v2
 
 > Système de design de référence pour **toutes** les interfaces Kolek : l'App Collecteur (PWA mobile, hors-ligne) et le Dashboard Admin (web). Dérivé de la **maquette de notre Dashboard Admin** (l'image fournie en est la représentation cible), adapté à notre contexte : collecte journalière, FCFA, français, terrain à faible connectivité.
 >
 > **Règle d'or :** aucune interface ne sort de ce système. Un même token, un même composant, partout.
+>
+> **v2 — 2026-08-16.** Les six écrans dessinés dans Banani (flow *Kolek Design System*) sont implémentés. Les tokens ne sont plus injectés à l'exécution : ils engendrent le thème Tailwind au build. Les noms ont changé en conséquence — voir §3 et la table de correspondance §8.2.
 
 ---
 
@@ -52,10 +54,25 @@ L'image fournie est la **maquette de représentation de notre Dashboard Admin** 
 4. **Densité maîtrisée.** Aéré côté admin ; compact et à grandes cibles tactiles côté terrain.
 5. **Cohérence absolue.** Les deux applications partagent tokens et composants. Ce qui change, c'est la disposition, pas le langage visuel.
 6. **Palette resserrée.** Vert, neutres, vert/corail sémantiques, pastels de graphique — rien d'autre. La discipline fait la cohérence.
+7. **Ne jamais afficher un chiffre qu'on ne sait pas.** Un écran branché sur la base ne montre que ce que la base établit. Un compteur inventé pour remplir une case coûte la confiance de celui qui le lit.
 
 ---
 
 ## 3. Fondations (tokens)
+
+### 3.0 D'où viennent ces valeurs et comment elles arrivent à l'écran
+
+Une seule source : **`packages/core/src/tokens.ts`**. Le script `npm run generer:theme` en tire **`packages/core/src/theme.css`**, un bloc `@theme` que Tailwind lit au build pour fabriquer ses classes utilitaires. Le fichier engendré est versionné, et `npm run verifier:theme` échoue si les deux divergent.
+
+```
+tokens.ts  ──generer:theme──▶  theme.css (@theme)  ──Tailwind──▶  bg-surface, rounded-pill, text-4xl…
+```
+
+Deux conséquences pratiques.
+
+**Les noms ne sont pas libres.** Tailwind n'engendre une classe que si la variable tombe dans l'espace de noms qu'il attend : `--color-*`, `--radius-*`, `--text-*`, `--font-*`, `--shadow-*`, `--container-*`, plus `--spacing`. Un joli nom hors de ces préfixes ne produit aucune classe et échoue silencieusement.
+
+**Le thème n'est plus injecté en JavaScript.** En v1, les tokens étaient posés dans une balise `<style>` à l'exécution. Tailwind les veut au build ; la feuille est donc statique et servie depuis l'origine. Il reste exactement un usage de l'attribut `style` dans tout le produit — la largeur des jauges d'avancement, qui vaut un pourcentage venu de la donnée.
 
 ### 3.1 Couleurs
 
@@ -63,162 +80,227 @@ L'image fournie est la **maquette de représentation de notre Dashboard Admin** 
 
 | Token | Hex | Usage |
 |---|---|---|
-| `--green-900` | `#0E2E1F` | Textes verts profonds, fonds sombres. |
-| `--green-700` (primaire) | `#14402C` | Couleur d'action : boutons pleins, état actif, icônes de valeur. |
-| `--green-500` | `#1C5A3D` | Survol / secondaire, dégradés. |
-| `--green-tint` | `#E8F0EA` | Fond d'état actif (nav), puces, surbrillances douces. |
+| `--color-sidebar` | `#0E2E1F` | Fonds sombres : barre latérale, en-têtes mobiles. |
+| `--color-primary` | `#14402C` | Couleur d'action : boutons pleins, état actif, icônes de valeur. |
+| `--color-primary-foreground` | `#FFFFFF` | Texte posé sur `primary`. |
+| `--color-accent` | `#1C5A3D` | Survol / secondaire, dégradés. |
+| `--color-secondary` | `#E8F0EA` | Fond d'état actif, bandeau d'offre, puces. |
+| `--color-secondary-foreground` | `#14402C` | Texte posé sur `secondary`. |
 
 **Neutres**
 
 | Token | Hex | Usage |
 |---|---|---|
-| `--ink` | `#171A17` | Texte principal, titres. |
-| `--muted` | `#6C716A` | Texte secondaire, étiquettes. |
-| `--hairline` | `#E6E3DA` | Bordures, séparateurs (1 px). |
-| `--canvas` | `#F4F5F2` | Fond de la zone de contenu. |
-| `--surface` | `#FFFFFF` | Cartes, panneaux. |
-| `--paper` | `#FBFAF6` | Fond alternatif chaud (documents, sheets). |
-| `--dark-canvas` | `#06140E` | Cadre sombre, écran de connexion, mode marketing. |
+| `--color-ink` / `--color-foreground` | `#171A17` | Texte principal, titres. |
+| `--color-muted-foreground` | `#6C716A` | Texte secondaire, étiquettes. |
+| `--color-muted` | `#EFEFEA` | **Surface** muette : piste de jauge, en-tête de tableau. |
+| `--color-hairline` / `--color-border` | `#E6E3DA` | Bordures, séparateurs (1 px). |
+| `--color-canvas` / `--color-background` | `#F4F5F2` | Fond de la zone de contenu. |
+| `--color-surface` / `--color-input` | `#FFFFFF` | Cartes, panneaux, champs. |
+| `--color-paper` | `#FBFAF6` | Fond alternatif chaud (documents, sheets). |
+| `--color-dark-canvas` | `#06140E` | Cadre sombre, écran de connexion. |
+
+> **`muted` et `muted-foreground` ne sont pas la même chose.** En v1 un seul token `--muted` portait le gris de texte. Tailwind attend `muted` comme surface et `muted-foreground` comme texte ; les confondre donne du gris sur gris sur chaque jauge et chaque en-tête de tableau. La valeur de texte de la v1 est devenue `muted-foreground`.
+>
+> Les doubles noms (`canvas`/`background`, `hairline`/`border`, `ink`/`foreground`, `surface`/`input`) sont des alias exacts, vérifiés par un test. Le premier est le nom métier, le second celui qu'attendent les classes conventionnelles.
 
 **Sémantique**
 
 | Token | Hex | Fond (tint) | Usage |
 |---|---|---|---|
-| `--positive` | `#1C7A4B` | `#E6F3EC` | Dépôt, à jour, montant reçu (+). |
-| `--negative` | `#C1553E` | `#F6E4DF` | Retard, sortie, alerte, échéance (−). |
-| `--info` | `#3D6E8E` | `#E6EEF4` | Neutre informatif, attention douce, accents graphiques. |
+| `--color-positive` | `#1C7A4B` | `--color-positive-tint` `#E6F3EC` | Dépôt, à jour, montant reçu (+). |
+| `--color-negative` | `#C1553E` | `--color-negative-tint` `#F6E4DF` | Retard, sortie, alerte, échéance (−). |
+| `--color-info` | `#3D6E8E` | `--color-info-tint` `#E6EEF4` | Neutre informatif, bandeau hors-ligne. |
 
 **Data-viz (dégradés pastel, comme le modèle)**
 
 | Token | Hex | Usage |
 |---|---|---|
-| `--chart-blue` | `#9FC2DA` | 1re série. |
-| `--chart-teal` | `#7FB6A6` | 2e série (souvent hachurée). |
-| `--chart-mint` | `#B7D9BE` | 3e série. |
-| `--chart-slate` | `#AEB7D6` | 4e série (ex. part « commission »). |
+| `--color-chart-blue` | `#9FC2DA` | 1re série. |
+| `--color-chart-teal` | `#7FB6A6` | 2e série. |
+| `--color-chart-mint` | `#B7D9BE` | 3e série ; indicateur actif sur fond sombre. |
+| `--color-chart-slate` | `#AEB7D6` | 4e série (ex. part « commission »). |
+
+**Dégradés.** Ils ne tombent dans aucun espace de noms Tailwind : aucune classe n'en sort, et on les consomme par `bg-[image:var(--degrade-carte)]`. Les garder dans `tokens.ts` est ce qui empêche la carte de collecte et la carte de zone de diverger.
+
+| Token | Usage |
+|---|---|
+| `--degrade-carte` | Carte de collecte (héros). |
+| `--degrade-promo` | Carte d'upsell en pied de barre latérale. |
+| `--degrade-zone-0…3` | Bandeau de tête des cartes de zone, par index. |
 
 ### 3.2 Typographie
 
-- **Police UI :** `Plus Jakarta Sans` (repli `Inter`, puis `system-ui`). Géométrique, arrondie, lisible — proche du modèle.
-- **Police display / marque :** `Sora` (logo, titres marketing, couvertures).
-- **Chiffres :** toujours **tabulaires** (`font-variant-numeric: tabular-nums`) pour aligner les FCFA.
+- **Police UI :** `Plus Jakarta Sans` (repli `Inter`, puis `system-ui`) → `--font-body`, classe `font-body`.
+- **Police display / marque :** `Sora` → `--font-headings`, classe `font-headings`.
+- **Distribution :** paquets `@fontsource`, **sous-ensemble latin uniquement**. Pas de Google Fonts : la CSP interdit `font-src` distant, et un collecteur en 3G ne doit pas attendre un serveur tiers pour lire un montant.
+- **Chiffres :** toujours **tabulaires** (classe `tabular-nums`) pour aligner les FCFA.
 
-| Style | Taille | Graisse | Usage |
-|---|---|---|---|
-| Metric XL | 32–40 px | 700 | Grands montants (solde, encours). |
-| H1 — titre de page | 28 px | 700 | « Tableau de bord », « Mes clients ». |
-| H2 — section | 20 px | 600 | Titres de bloc. |
-| H3 — carte | 16 px | 600 | Titres de widget. |
-| Body | 15 px | 400/500 | Texte courant. |
-| Small / label | 13 px | 500 | Étiquettes, méta. |
-| Overline | 11 px | 600 · +8% letter-spacing · MAJUSCULES | Sur-titres de section, en gris. |
+| Style | Classe | Taille | Graisse | Usage |
+|---|---|---|---|---|
+| Metric XL | `text-4xl` | 36 px | 700 | Grands montants (solde, encours). |
+| H1 — titre de page | `text-3xl` | 28 px | 700 | « Tableau de bord », « Mes clients ». |
+| Montant de carte | `text-2xl` | 24 px | 700 | Solde restituable, saisie de mise. |
+| H2 — section | `text-xl` | 20 px | 600 | Titres de bloc. |
+| H3 — carte | `text-lg` | 16 px | 600 | Titres de widget. |
+| Body | `text-base` | 15 px | 400/500 | Texte courant. |
+| Small / label | `text-sm` | 13 px | 500 | Étiquettes, méta. |
+| Overline | `text-xs` | 11 px | 600 · `uppercase tracking-widest` | Sur-titres de section, en gris. |
 
-**Format FCFA :** séparateur d'espace, suffixe « FCFA », **sans centimes**. Ex. `817 432 FCFA`, `2 500 FCFA`. Les variations en pourcentage gardent une décimale si utile (`+14 %`).
+Les noms en t-shirt sont imposés par Tailwind ; la colonne « Style » reste le vocabulaire du système.
+
+**Format FCFA :** séparateur d'espace, suffixe « FCFA », **sans centimes**. Ex. `817 432 FCFA`, `2 500 FCFA`. Un montant s'écrit par `formatMontant()` ou `formatFCFA()` de `@kolek/core`, jamais par interpolation directe. Les variations en pourcentage gardent une décimale si utile (`+14 %`).
 
 ### 3.3 Espacement — base 4 px
 
-`2 · 4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64`
-Padding interne des cartes : **20–24 px** (admin), **16–18 px** (mobile). Gouttière entre widgets : **14–16 px**.
+`--spacing: 4px`. Tailwind en dérive toute son échelle : `p-2` vaut 8 px, `gap-3` vaut 12 px, `py-2.5` vaut 10 px. L'échelle de la v1 (`2 · 4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64`) en est exactement l'ensemble des multiples utiles ; il n'y a plus de liste de jetons à tenir en parallèle.
+
+Padding interne des cartes : `p-5` à `p-6` (admin), `p-4` (mobile). Gouttière entre widgets : `gap-4`.
+
+**Largeurs de conteneur** — `--container-*`, classes `max-w-*` / `w-*` :
+
+| Token | Valeur | Usage |
+|---|---|---|
+| `--container-formulaire` | 360 px | Connexion, écrans de blocage. |
+| `--container-carte` | 520 px | Carte isolée. |
+| `--container-liste` | 640 px | Liste sur toute une page. |
+| `--container-sidebar` | 256 px | Barre latérale admin. |
+| `--container-mobile` | 420 px | Colonne de l'App Collecteur ouverte sur un écran large. |
+| `--container-volet` | 320 px | Colonne de droite du Dashboard. |
 
 ### 3.4 Rayons
 
-| Token | Valeur | Usage |
-|---|---|---|
-| `--r-sm` | 8 px | Petits éléments, tuiles. |
-| `--r-md` | 12 px | Boutons, champs, badges. |
-| `--r-lg` | 16 px | Cartes, widgets. |
-| `--r-xl` | 20–24 px | Cartes héros, sheets, carte de collecte. |
-| `--r-pill` | 9999 px | Pilules, boutons ronds, avatars. |
+| Token | Classe | Valeur | Usage |
+|---|---|---|---|
+| `--radius-sm` | `rounded-sm` | 8 px | Petits éléments, cases de cycle, pastilles de légende. |
+| `--radius-md` | `rounded-md` | 12 px | Boutons carrés, champs, badges. |
+| `--radius-lg` | `rounded-lg` | 16 px | Cartes, widgets. |
+| `--radius-xl` | `rounded-xl` | 24 px | Cartes héros, cadre de l'application admin, carte de collecte. |
+| `--radius-pill` | `rounded-pill` | 9999 px | Pilules, boutons ronds, avatars. |
 
 ### 3.5 Élévation
 
-| Token | Valeur | Usage |
-|---|---|---|
-| `--shadow-sm` | `0 1px 2px rgba(20,30,25,.05)` | Cartes posées sur canevas. |
-| `--shadow-md` | `0 4px 12px rgba(20,30,25,.08)` | Survol, menus. |
-| `--shadow-lg` | `0 12px 32px rgba(6,20,14,.14)` | Sheets, modales, app flottante sur fond sombre. |
+| Token | Classe | Valeur | Usage |
+|---|---|---|---|
+| `--shadow-sm` | `shadow-sm` | `0 1px 2px rgba(20,30,25,.05)` | Cartes posées sur canevas. |
+| `--shadow-md` | `shadow-md` | `0 4px 12px rgba(20,30,25,.08)` | Cartes flottantes, bandeaux de résumé. |
+| `--shadow-lg` | `shadow-lg` | `0 12px 32px rgba(6,20,14,.14)` | Cadre de l'application admin sur fond sombre, écrans de blocage. |
+| `--shadow-action` | `shadow-action` | `0 4px 12px rgba(20,64,44,.25)` | **Uniquement** le bouton d'encaissement de la barre mobile. |
 
-Bordure standard des cartes : `1px solid var(--hairline)` **+** `--shadow-sm`. Discret, jamais lourd.
+`shadow-action` n'est pas un quatrième niveau d'élévation : c'est une couleur portée. C'est la seule surface du produit qui projette du vert, et elle désigne le geste central du métier.
+
+Bordure standard des cartes : `border border-hairline` **+** `shadow-sm`. Discret, jamais lourd.
 
 ### 3.6 Iconographie
 
-- Style **outline**, trait **1.75 px**, extrémités arrondies. Un seul jeu (ex. Lucide / Phosphor).
-- Icônes d'action dans un cercle : contour vert `--green-700` sur fond blanc (comme les actions rapides du modèle).
-- Taille par défaut 20 px (24 px pour les cibles tactiles du terrain).
+- Jeu unique **Lucide**, style outline, trait **1.75 px**, extrémités arrondies. Le composant `Icone` fixe le trait ; aucun écran ne le règle.
+- Le registre d'icônes est **explicite** : `packages/ui/src/Icone.tsx` déclare nommément celles que le produit dessine. Une icône non déclarée est une erreur de compilation. Un composant qui résoudrait le nom à l'exécution embarquerait le jeu Lucide entier dans un paquet destiné à un téléphone en 3G.
+- Icônes d'action dans un cercle : contour `primary` sur fond blanc.
+- Taille par défaut 18 px ; 20–24 px pour les cibles tactiles du terrain ; 11–15 px pour les puces et méta.
 
 ---
 
 ## 4. Composants
 
-### 4.1 Navigation
-- **Admin (web) — sidebar gauche.** En-tête de contexte déroulant (« Kolek · Admin »). Items icône + label, groupés par sections avec overline gris (« Pilotage », « Monétisation », « Support »). **État actif :** fond `--green-tint`, texte `--green-700`, indicateur à gauche. Carte promo en bas (upsell de palier).
-- **Collecteur (mobile) — barre du bas.** 4–5 onglets à grandes cibles (Accueil, Clients, Encaisser, Bilans). Actif = icône pleine + label vert.
+Tous vivent dans **`packages/ui/src`** et sont partagés par les deux applications. Rien de visuel n'est écrit deux fois.
 
-### 4.2 Barre supérieure & fil d'Ariane
-Fil d'Ariane gris `Accueil → …` puis **titre de page H1**. À droite, **barre d'actions en pilules** (recherche, filtres, « Créer un rapport »). Sur mobile : titre + une action max.
+### 4.1 Inventaire
 
-### 4.3 Boutons
+| Composant | Fichier | Rôle |
+|---|---|---|
+| `Icone` | `Icone.tsx` | Registre Lucide explicite, trait 1,75 px. |
+| `Avatar` | `Avatar.tsx` | Initiales sur pastille data-viz, couleur déterministe par nom. |
+| `BadgeStatut` | `BadgeStatut.tsx` | Table unique des statuts métier. |
+| `Bouton` | `Bouton.tsx` | Primaire / contour / fantôme, hauteur minimale 44 px. |
+| `Champ` | `Champ.tsx` | Champ étiqueté, `useId`, focus vert. |
+| `Carte`, `EnteteCarte`, `EnteteSection`, `LienBloc` | `Carte.tsx` | Système de blocs : surface, en-têtes, lien « Tout voir ». |
+| `CarteStat` | `CarteStat.tsx` | Metric XL + puce de tendance. |
+| `CarteCollecte` | `CarteCollecte.tsx` | Carte héros à 31 cases (§4.4). |
+| `CarteZone` | `CarteZone.tsx` | Résumé d'un marché, bandeau dégradé indexé. |
+| `LigneTransaction` | `LigneTransaction.tsx` | Mise / retrait / commission, montant coloré. |
+| `LigneCollecteur` | `LigneCollecteur.tsx` | Ligne de tableau admin. |
+| `BarreEmpilee` | `BarreEmpilee.tsx` | Répartition pastel + légende. |
+| `BarreLaterale` | `BarreLaterale.tsx` | Navigation admin, entrées à venir grisées. |
+| `BarreHaute` | `BarreHaute.tsx` | Fil d'Ariane + titre + actions en pilules. |
+| `NavMobile` | `NavMobile.tsx` | Barre du bas, onglet d'encaissement saillant. |
+| `ActionsRapides` | `ActionsRapides.tsx` | Grille d'icônes rondes, variante compacte. |
+| `BandeauOffre`, `BandeauHorsLigne`, `useEnLigne` | `Bandeaux.tsx` | Palier d'abonnement, état réseau. |
+| `EcranConnexion` | `EcranConnexion.tsx` | Formulaire de connexion partagé. |
+| `EcranMessage` | `EcranMessage.tsx` | Écran de blocage : filet, portillon, indisponibilité. |
+| `Filet` | `Filet.tsx` | Frontière d'erreur de rendu. |
 
-| Type | Style |
+### 4.2 Navigation
+- **Admin (web) — barre latérale gauche.** En-tête de contexte (« Kolek · Admin »). Items icône + label, groupés par overline gris (« Pilotage », « Raccourcis »). **État actif :** fond `bg-white/10`, filet gauche `border-chart-mint`, icône menthe. **Entrée à venir :** contraste réduit, `disabled`, attribut `title`. Pas d'étiquette « à venir » visible — elle volait la largeur du libellé et le faisait passer sur deux lignes. Carte promo en bas, sortie de session juste au-dessus.
+- **Collecteur (mobile) — barre du bas.** Cinq onglets à grandes cibles. L'onglet **Encaisser** sort de la barre : pastille pleine de 56 px, ombre `shadow-action`. La barre est `sticky bottom-0` : une liste de clients dépasse la hauteur d'un téléphone, et une barre qui part au défilement oblige à remonter avant chaque encaissement.
+
+### 4.3 Barre supérieure & fil d'Ariane
+Fil d'Ariane gris `Accueil → …` puis **titre de page** `text-3xl`. À droite, **barre d'actions en pilules**. Sur mobile : en-tête sombre, titre centré, une action de chaque côté.
+
+### 4.4 Carte de collecte (héros, dégradé)
+`rounded-xl`, `--degrade-carte`, deux cercles décoratifs en dégradé radial. Affiche : cycle, nom du client, mise journalière, **progression sur 31 cases** en grille de 16 colonnes, solde restituable, avancement en pourcentage. Le nombre de cases vient de `MISES_PAR_CYCLE` dans `@kolek/core` : c'est une règle du métier, pas une valeur de maquette.
+
+### 4.5 Boutons
+
+| Variante | Style |
 |---|---|
-| **Primaire** | Pilule pleine `--green-700`, texte blanc, icône optionnelle. Survol `--green-500`. |
-| **Secondaire** | Pilule contour `--green-700`, fond blanc, texte vert. |
-| **Fantôme** | Texte vert sans fond (liens « Edit », « History »). |
-| **Icône** | Rond, contour `--hairline`, icône `--ink`. |
-| **Danger** | Contour ou plein `--negative` (annuler, supprimer). |
+| **Primaire** | Pilule pleine `primary`, texte blanc, icône optionnelle. |
+| **Contour** | Pilule contour `primary`, fond blanc, texte vert. |
+| **Fantôme** | Texte vert sans fond. |
+| **Icône** | Rond, contour `hairline`, icône `muted-foreground`. |
 
-Hauteur : 44–48 px (tactile terrain) / 36–40 px (admin dense).
+Hauteur minimale **44 px** partout, admin compris. Le collecteur tape debout, à une main, sur un téléphone d'entrée de gamme, parfois sous le soleil d'un marché ; c'est une cible tactile, pas une préférence esthétique.
 
-### 4.4 Pilules de filtre
-Fond blanc, contour `--hairline`, texte `--ink`, chevron `--muted`. Actif = fond `--green-tint`. Ex. « Cette semaine ▾ », « Toutes zones ▾ ».
+### 4.6 Pilules de filtre
+Fond blanc, contour `hairline`, texte `ink`, chevron `muted-foreground`. Actif = fond `primary`, texte blanc.
 
-### 4.5 Cartes & surfaces
-`--surface`, `--r-lg`, bordure hairline + `--shadow-sm`, padding 20–24. Titre H3 + action fantôme optionnelle en haut à droite.
+### 4.7 Cartes & surfaces
+`bg-surface`, `rounded-lg`, `border border-hairline` + `shadow-sm`. Titre `text-lg` + lien fantôme optionnel en haut à droite. **Une seule définition**, dans `Carte` : la maquette recopiait cette combinaison dans une quinzaine d'endroits avec trois valeurs d'ombre légèrement différentes.
 
-### 4.6 Carte-statistique (grand nombre)
-Étiquette `Small` grise (+ icône œil/expand) → **Metric XL** → **puce de tendance** : petit cercle `--green-tint` avec flèche + « +14 % vs période précédente ». Exemple Kolek : « Encaissé aujourd'hui », « Encours suivi », « Commissions du mois ».
+### 4.8 Carte-statistique
+Étiquette `text-sm` grise + icône cerclée → **Metric XL** `tabular-nums` + unité → **puce de tendance** tintée avec flèche et « vs période précédente ».
 
-### 4.7 Carte de collecte (héros, dégradé)
-Reprend la carte bancaire du modèle : `--r-xl`, **dégradé pastel** (vert menthe → crème), motif discret. Affiche : nom du client, mise journalière, **progression 31 cases**, solde restituable. La progression (31 cases) et le solde restent les repères visuels principaux.
+### 4.9 Grille d'actions rapides
+Icônes rondes à contour vert + label court : **Encaisser, Souscrire, Retrait, Bilan, Rapproch., Reçus, Alertes, Plus**. Variante `compact` (48 px) pour le Dashboard.
 
-### 4.8 Grille d'actions rapides
-Rangées d'icônes rondes (contour vert) + label court. Kolek : **Encaisser, Souscrire, Retrait, Bilan, Rapprochement, Reçus, Alertes, Plus**.
+### 4.10 Ligne de liste (mises / transactions)
+Avatar → nom (`font-semibold`) + méta (`text-sm` gris) → **montant coloré** aligné à droite : `positive` pour un dépôt, `negative` pour une sortie, `ink` pour une commission. Séparateur hairline sauf sur la dernière ligne.
 
-### 4.9 Ligne de liste (mises / transactions)
-Avatar rond (initiales sur fond coloré) → nom (`Body 500`) + méta date/heure (`Small` gris) → **montant coloré** aligné à droite : `--positive` pour un dépôt, `--negative` pour une sortie, `--ink` (neutre) pour une commission. Séparateur hairline.
-
-### 4.10 Badges & statuts
-Pilule `--r-pill`, texte 11 px, fond tinté.
+### 4.11 Badges & statuts
+Pilule `rounded-pill`, `text-xs`, fond tinté. **Une seule table**, dans `BadgeStatut` — la maquette en portait trois copies dans trois écrans, dont une en hexadécimaux bruts.
 
 | Statut | Couleur |
 |---|---|
-| À jour | `--positive` sur `#E6F3EC` |
-| Versé aujourd'hui | `--green-700` sur `--green-tint` |
-| En retard | `--negative` sur `#F6E4DF` |
-| Prête à clôturer | `--info` sur `#E6EEF4` |
-| Hors-ligne / en attente de synchro | `--muted` sur `#EFEFEA` |
+| À jour · Actif | `positive` sur `positive-tint` |
+| Versé aujourd'hui · Clôturée | `secondary-foreground` sur `secondary` |
+| En retard | `negative` sur `negative-tint` |
+| En synchro | `info` sur `info-tint` |
+| Inactif | `muted-foreground` sur `muted` |
 
-### 4.11 Data-viz
-- **Barres empilées pastel** (répartition), palette `--chart-*`, coins arrondis, légende avec montants + %.
-- **Puce de tendance** (voir 4.6).
-- **Anneau/jauge** pour la progression d'un cycle (x/31).
+### 4.12 Avatars
+Pas de portrait. Un produit qui manipule l'épargne de commerçants n'affiche pas des visages inventés à la place de ses clients : la maquette illustrait, l'application identifie. On dessine les **initiales** sur une pastille dont la couleur est tirée du nom — même nom, même couleur, sur tous les écrans et entre deux sessions. Le texte suit la taille du disque par unité `cqw`, donc une seule implémentation sert de `w-8` à `w-16`.
+
+### 4.13 Data-viz
+- **Barres empilées pastel**, palette `chart-*`, coins arrondis, légende avec montants et pourcentages. La pastille de légende porte la même classe que le segment : aucun hexadécimal en double.
+- **Jauges d'avancement** : piste `bg-muted`, remplissage `bg-primary` ou `bg-chart-mint`. Seul endroit du produit où subsiste un attribut `style`.
 - Toujours des **chiffres tabulaires** et le format FCFA.
 
-### 4.12 Champs de formulaire
-Fond blanc, contour `--hairline` 1.5 px, `--r-md`, focus = contour `--green-700`. Label `Small` gras au-dessus. Sélecteur de mise = pilules `500 / 1 000 / 2 000 / 5 000 / 10 000`.
+### 4.14 Champs de formulaire
+Fond `input`, contour `hairline` 1,5 px, `rounded-md`, focus = contour `primary`. Label `text-sm` gras au-dessus. Sélecteur de mise = pilules `500 / 1 000 / 2 000 / 5 000 / 10 000`, bornées par `MISE_MIN` et `MISE_MAX` de `@kolek/core`.
 
-### 4.13 États
-- **Vide :** illustration légère + une phrase + une action primaire.
-- **Chargement :** squelettes gris clair (pas de spinner plein écran).
-- **Hors-ligne (spécifique Kolek) :** bandeau discret `--info` en haut : « Hors ligne · N mise(s) en attente de synchro ». Jamais bloquant.
+Un champ de montant est en `type="text"` avec `inputMode="numeric"`, jamais en `type="number"` : un champ numérique natif refuse l'espace des milliers, et le montant s'afficherait « 10000 » là où tout le reste du produit écrit « 10 000 ».
+
+### 4.15 États
+- **Vide :** une carte, une phrase, et ce qui viendra (« La souscription arrive au jalon J2 »).
+- **Aucun résultat :** distinct du vide. « Aucun client ne correspond » n'est pas « Aucun client ».
+- **Chargement :** texte discret, pas de spinner plein écran.
+- **Erreur :** carte à bordure `negative` + bouton de reprise. Jamais un écran blanc muet.
+- **Hors-ligne :** bandeau `info-tint`, non bloquant. Le message dit ce qu'on sait vraiment : sans file de synchronisation, il ne prétend pas compter des mises en attente.
 
 ---
 
 ## 5. Adaptation à notre contexte
 
 Cette maquette **est** notre Dashboard Admin. Son contenu de démonstration se traduit en données réelles ainsi :
-
-**Contenu placeholder de la maquette → données réelles Kolek**
 
 | Bloc de la maquette | Équivalent Kolek |
 |---|---|
@@ -227,7 +309,7 @@ Cette maquette **est** notre Dashboard Admin. Son contenu de démonstration se t
 | Available Balance / Withdraw | **Solde restituable** + action **Retrait / clôture**. |
 | Total Earnings + tendance | **Commissions du mois** (admin) / **Encaissé du jour** (collecteur). |
 | All Activity (actions rapides) | Encaisser · Souscrire · Retrait · Bilan · Rapprochement. |
-| Stock Index International | **Top clients** ou **zones/marchés** (régularité, encours). |
+| Stock Index International | **Top zones / marchés** (encaissé du jour, objectif). |
 | Recently Completed (barres) | **Répartition** encaissements / commissions / restitutions. |
 | Transactions | **Mises & retraits récents** (dépôt vert, commission neutre, sortie corail). |
 | Subscribe now | **Upsell de palier** (passer à Pro / Illimité). |
@@ -238,12 +320,10 @@ Cette maquette **est** notre Dashboard Admin. Son contenu de démonstration se t
 
 ## 6. Cohérence sur les deux surfaces
 
-La maquette fournie cadre le **Dashboard Admin**. L'**App Collecteur** n'a pas de maquette dédiée mais réutilise exactement les mêmes tokens et composants — c'est ce qui garantit qu'on reconnaît Kolek d'une surface à l'autre.
-
 | | App Collecteur (PWA mobile) | Dashboard Admin (web) |
 |---|---|---|
-| Navigation | Barre du bas, 4–5 onglets | Sidebar gauche à sections |
-| Densité | Compacte, grandes cibles (44–48 px) | Aérée, plus d'infos par écran |
+| Navigation | Barre du bas, 5 onglets | Barre latérale à sections |
+| Densité | Compacte, grandes cibles (44–56 px) | Aérée, plus d'infos par écran |
 | Cartes | Pleine largeur, empilées | Grille modulaire de widgets |
 | Priorité | Vitesse du geste, hors-ligne | Vue d'ensemble, pilotage |
 | **Tokens & composants** | **Identiques** | **Identiques** |
@@ -255,18 +335,64 @@ Même palette, même typo, mêmes rayons, mêmes badges. On ne redessine jamais 
 ## 7. Règles de cohérence (à respecter partout)
 
 **À faire**
-- Utiliser les **tokens**, jamais une valeur en dur.
-- Vert `--green-700` pour l'action principale ; **une seule** action primaire par écran.
-- **S'en tenir à la palette** (vert, neutres, vert/corail, pastels) : aucune couleur hors tokens.
-- Chiffres tabulaires + format FCFA partout.
+- Utiliser les **classes issues des tokens**, jamais une valeur en dur. `bg-surface`, pas `bg-[#FFFFFF]`.
+- Ajouter une valeur visuelle **dans `tokens.ts`**, puis `npm run generer:theme`. Jamais directement dans `theme.css`, qui est engendré.
+- Écrire les classes **en toutes lettres**. Tailwind lit le source, il ne l'exécute pas : `` `bg-chart-${i}` `` n'existe dans aucune feuille de style. Un tableau de classes complètes, oui.
+- Vert `primary` pour l'action principale ; **une seule** action primaire par écran.
+- Chiffres tabulaires et `formatMontant()` partout.
 - Toujours afficher l'**état de synchro** sur le terrain.
+- Un composant nouveau va dans `packages/ui`, pas dans une application.
 
 **À éviter**
+- Un attribut `style` pour autre chose qu'une valeur venue de la donnée.
 - Multiplier les couleurs vives ou les dégradés hors éléments héros.
 - Mélanger plusieurs jeux d'icônes ou de rayons.
-- Des montants non alignés / au format `$` / avec centimes.
+- Des montants non alignés, au format `$`, ou avec centimes.
 - Un composant « maison » qui n'existe pas dans ce système.
+- Un bouton qui n'écrit rien mais laisse croire le contraire. S'il n'est pas branché, il est désactivé et il le dit.
 
 ---
 
-*Kolek — Design System v1 · à faire vivre avec le produit. Toute nouvelle interface part de ce fichier.*
+## 8. Annexes
+
+### 8.1 Écrans implémentés (flow Banani *Kolek Design System*)
+
+| Écran | Fichier | Données |
+|---|---|---|
+| Collecteur — Accueil | `apps/collecteur/src/ecrans/Accueil.tsx` | Démonstration (J2a) |
+| Collecteur — Liste clients | `apps/collecteur/src/ecrans/Clients.tsx` | **Supabase** |
+| Collecteur — Encaisser | `apps/collecteur/src/ecrans/Encaisser.tsx` | Démonstration (J2a) |
+| Admin — Tableau de bord | `apps/admin/src/ecrans/TableauDeBord.tsx` | Démonstration (J4) |
+| Admin — Collecteurs & Zones | `apps/admin/src/ecrans/Collecteurs.tsx` | Démonstration (J4) |
+| Admin — Détail collecteur | `apps/admin/src/ecrans/DetailCollecteur.tsx` | Démonstration (J4) |
+
+### 8.2 Correspondance v1 → v2
+
+| v1 | v2 | Note |
+|---|---|---|
+| `--green-700` | `--color-primary` | |
+| `--green-900` | `--color-sidebar` | |
+| `--green-500` | `--color-accent` | |
+| `--green-tint` | `--color-secondary` | |
+| `--muted` | `--color-muted-foreground` | **Attention** : `--color-muted` existe et désigne une surface. |
+| `--r-lg` | `--radius-lg` | `--radius-xl` fixé à 24 px (v1 : « 20–24 px »). |
+| `--font-titre-page` | `--text-3xl` | Échelle en t-shirt imposée par Tailwind. |
+| `--space-16` | `p-4`, `gap-4`… | Dérivé de `--spacing: 4px`. |
+| `--mesure-formulaire` | `--container-formulaire` | Donne `max-w-formulaire`. |
+| `genererCssTokens()` | `genererCssTheme()` | Produit `@theme` et non `:root`. |
+
+### 8.3 Écarts assumés avec la maquette Banani
+
+| Écart | Raison |
+|---|---|
+| Portraits engendrés → initiales | Ne pas inventer le visage d'un client réel ; la CSP interdit les images distantes. |
+| Ombres uniformisées sur trois niveaux | La maquette en portait sept variantes proches. §3.5 en définit trois. |
+| Hauteurs de canevas (900/960 px) → `min-h-dvh` | Artefacts de l'outil de dessin. |
+| Bandeau d'offre hoissé dans la coquille admin | La maquette l'omettait sur la fiche collecteur ; l'état de l'abonnement ne dépend pas de la page. |
+| Filtres « En retard / Non visités » remplacés | Ils supposent la date de la dernière mise, que J2a introduit. |
+| Chevron au lieu de « … » en fin de ligne collecteur | La ligne ouvre une fiche ; « … » promet un menu qui n'existe pas. |
+| Déconnexion ajoutée | Absente de la maquette, indispensable au produit. |
+
+---
+
+*Kolek — Design System v2 · 2026-08-16. Toute nouvelle interface part de ce fichier.*

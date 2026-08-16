@@ -1,0 +1,65 @@
+/* Fichier engendré par scripts/generer-theme.mjs — ne pas modifier à la main.
+   La source est packages/core/src/tokens.ts. Relancer : npm run generer:theme */
+
+@theme {
+  --spacing: 4px;
+  --color-primary: #14402C;
+  --color-primary-foreground: #FFFFFF;
+  --color-sidebar: #0E2E1F;
+  --color-accent: #1C5A3D;
+  --color-secondary: #E8F0EA;
+  --color-secondary-foreground: #14402C;
+  --color-ink: #171A17;
+  --color-foreground: #171A17;
+  --color-muted: #EFEFEA;
+  --color-muted-foreground: #6C716A;
+  --color-hairline: #E6E3DA;
+  --color-border: #E6E3DA;
+  --color-canvas: #F4F5F2;
+  --color-background: #F4F5F2;
+  --color-surface: #FFFFFF;
+  --color-input: #FFFFFF;
+  --color-paper: #FBFAF6;
+  --color-dark-canvas: #06140E;
+  --color-positive: #1C7A4B;
+  --color-positive-tint: #E6F3EC;
+  --color-negative: #C1553E;
+  --color-negative-tint: #F6E4DF;
+  --color-info: #3D6E8E;
+  --color-info-tint: #E6EEF4;
+  --color-chart-blue: #9FC2DA;
+  --color-chart-teal: #7FB6A6;
+  --color-chart-mint: #B7D9BE;
+  --color-chart-slate: #AEB7D6;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 9999px;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 28px;
+  --text-4xl: 36px;
+  --font-body: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  --font-headings: 'Sora', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --container-formulaire: 360px;
+  --container-carte: 520px;
+  --container-liste: 640px;
+  --container-sidebar: 256px;
+  --container-mobile: 420px;
+  --container-volet: 320px;
+  --shadow-sm: 0 1px 2px rgba(20,30,25,.05);
+  --shadow-md: 0 4px 12px rgba(20,30,25,.08);
+  --shadow-lg: 0 12px 32px rgba(6,20,14,.14);
+  --shadow-action: 0 4px 12px rgba(20,64,44,.25);
+  --degrade-carte: linear-gradient(135deg, #B7D9BE 0%, #9FC2DA 60%, #AEB7D6 100%);
+  --degrade-promo: linear-gradient(135deg, #1C5A3D 0%, #0E2E1F 100%);
+  --degrade-zone-0: linear-gradient(135deg, #B7D9BE 0%, #9FC2DA 100%);
+  --degrade-zone-1: linear-gradient(135deg, #9FC2DA 0%, #AEB7D6 100%);
+  --degrade-zone-2: linear-gradient(135deg, #7FB6A6 0%, #B7D9BE 100%);
+  --degrade-zone-3: linear-gradient(135deg, #AEB7D6 0%, #9FC2DA 100%);
+}

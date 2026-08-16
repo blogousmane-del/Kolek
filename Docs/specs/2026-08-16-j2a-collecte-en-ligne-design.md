@@ -213,23 +213,41 @@ interface CarteDetail {
 
 ## 6. Les écrans
 
-Tous les jetons visuels viennent de `@kolek/core`. Aucune couleur en dur, aucun or.
+> **Corrigé le 2026-08-16.** Cette section supposait des écrans à dessiner. Ils
+> le sont : les six écrans du flow Banani *Kolek Design System* sont
+> implémentés, en Tailwind v4 sur le thème engendré depuis `tokens.ts`. Le
+> travail de J2a n'est donc plus de les concevoir mais de **les brancher**, plus
+> trois écrans que la maquette ne couvre pas.
 
-**Tournée** — écran d'accueil. Clients groupés par marché, chacun avec son badge du jour (« Versé aujourd'hui » sur `--green-tint`, ou rien). En-tête : « 18 sur 30 · 18 000 FCFA encaissés ». Cibles tactiles de 44 à 48 px.
+Tous les jetons visuels viennent de `@kolek/core` par les classes Tailwind. Aucune couleur en dur, aucun or. Composants partagés dans `packages/ui`.
 
-**Carte** — les 31 cases en grille, le solde restituable en Metric XL, l'historique en lignes de liste, un bouton Encaisser en action primaire unique. Les mises annulées apparaissent barrées, avec leur motif.
+**Ce qui existe et reste à brancher**
 
-**Souscription** — nom, téléphone, marché, activité, et le sélecteur de mise en pilules `500 / 1 000 / 2 000 / 5 000 / 10 000` prévu au Design System §4.12.
+| Écran | Fichier | État |
+|---|---|---|
+| **Tournée** (Accueil) | `apps/collecteur/src/ecrans/Accueil.tsx` | Dessiné, données de démonstration. À brancher sur `mouvements` et la caisse du jour. |
+| **Liste clients** | `apps/collecteur/src/ecrans/Clients.tsx` | **Déjà branché** sur `clients` et `cartes`. À enrichir : le badge « En retard » et le filtre « Non visités » attendent la date de dernière mise, que J2a apporte. |
+| **Encaissement** | `apps/collecteur/src/ecrans/Encaisser.tsx` | Dessiné, sélection fonctionnelle, bouton de confirmation désactivé. À brancher sur l'insertion de mise. |
+
+**Ce qui reste à dessiner**
+
+**Carte** — les 31 cases en grille (composant `CarteCollecte`, déjà écrit), le solde restituable en Metric XL, l'historique en `LigneTransaction`, un bouton Encaisser en action primaire unique. Les mises annulées apparaissent barrées, avec leur motif.
+
+**Souscription** — nom, téléphone, marché, activité, et le sélecteur de mise en pilules `500 / 1 000 / 2 000 / 5 000 / 10 000` prévu au Design System §4.14.
 
 **Confirmation d'encaissement** — feuille avec le nom du client en grand et le montant. Un appui de plus, qui coûte une demi-seconde et évite l'erreur qu'on vient de rendre réparable. Le geste reste « en un geste » au sens du cahier : ouvrir la fiche, appuyer, confirmer.
 
 **Annulation** — depuis l'historique de la carte. Choix du motif dans la liste, confirmation.
 
+**Deux dettes d'honnêteté à solder.** L'écran Accueil et l'écran Encaisser affichent aujourd'hui les chiffres de la maquette. Tant qu'ils ne sont pas branchés, ils mentent à qui les regarde. Le bouton « Confirmer la mise » est désactivé pour cette raison précise, et le restera jusqu'à ce qu'il écrive vraiment.
+
 ---
 
 ## 7. Vérification de fin de J2a
 
-Automatisée, exécutable par une commande unique. La commande `verifier:j1` devient `verifier` et couvre les deux jalons.
+Automatisée, exécutable par une commande unique : `npm run verifier`. *(Le renommage depuis `verifier:j1`, prévu ici, a été fait le 2026-08-16 ; la commande enchaîne désormais reconstruction, fraîcheur du thème, tests des trois paquets, tests de base, builds et garde anti-fuite.)*
+
+Point de départ à battre — état au 2026-08-16, sortie 0 : **6 migrations**, 34 tests `@kolek/core`, 9 tests `@kolek/ui`, 8 tests de scripts, **50 tests de base**, soit 101 au total.
 
 1. **Reconstruction complète.** Les migrations s'appliquent sur base vierge, y compris la suppression de `est_commission`.
 2. **La carte ne se bloque plus.** Encaisser, annuler, réencaisser : la seconde mise devient la commission, aucune violation d'unicité. C'est le test du défaut de §2.1.
@@ -239,6 +257,7 @@ Automatisée, exécutable par une commande unique. La commande `verifier:j1` dev
 6. **Annulations immuables**, y compris sous clé de service.
 7. **Isolation de la vue.** Le collecteur A n'obtient de `mouvements` que ses propres lignes — le test qui accompagne `security_invoker`.
 8. **Le jeu de test empoisonné.** Une carte portant une mise annulée entre dans les fixtures standard. Tout calcul écrit sur `mises` seule échoue dès la première exécution, au lieu d'attendre la production.
+9. **Aucun écran ne ment.** Plus aucune donnée de démonstration dans `apps/collecteur` : le contrôle est textuel, sur la présence des noms de la maquette (« Kouamé Assi », « Mariam Koné ») hors fichiers de test.
 
 ---
 
@@ -250,7 +269,11 @@ Listée au cahier §5 (M1), reportée. Rien ne s'en sert en J2a : elle ne partic
 
 ### 8.2 Une carte complète n'a pas de suite
 
-À 31 mises, la carte attend son retrait, qui arrive en J3. L'écran affiche le badge « Prête à clôturer » du Design System §4.10 plutôt qu'un bouton inerte. Le renouvellement multi-cycles est écarté en Phase 1 par le cahier lui-même.
+À 31 mises, la carte attend son retrait, qui arrive en J3. L'écran affiche le badge « Prête à clôturer » du Design System §4.11 plutôt qu'un bouton inerte. Le renouvellement multi-cycles est écarté en Phase 1 par le cahier lui-même.
+
+### 8.3 Les trois écrans d'administration
+
+Dessinés et implémentés, mais alimentés par des données de démonstration jusqu'à J4. Leurs agrégats traversent tous les locataires — solde total géré, commissions du mois, répartition — et RLS interdit à juste titre de les calculer depuis le navigateur. Ils passeront par des Edge Functions, qui ne sont pas du périmètre de J2a.
 
 ---
 

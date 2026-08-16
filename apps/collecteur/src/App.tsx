@@ -1,7 +1,8 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
+
 import { Connexion } from './Connexion';
-import { MesClients } from './MesClients';
+import { Coquille } from './Coquille';
 import { supabase } from './supabase';
 
 export default function App() {
@@ -19,5 +20,5 @@ export default function App() {
 
   if (!pret) return null;
   if (!session) return <Connexion />;
-  return <MesClients onDeconnexion={() => setSession(null)} />;
+  return <Coquille onDeconnexion={() => setSession(null)} />;
 }

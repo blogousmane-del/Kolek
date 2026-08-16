@@ -1,74 +1,55 @@
-import { Banknote, Building2, LayoutDashboard, LifeBuoy, Users } from 'lucide-react';
+import { BandeauOffre, BarreLaterale, type CleNavAdmin } from '@kolek/ui';
+import { useState } from 'react';
+
+import { Collecteurs } from './ecrans/Collecteurs';
+import { DetailCollecteur } from './ecrans/DetailCollecteur';
+import { TableauDeBord } from './ecrans/TableauDeBord';
 import { supabase } from './supabase';
 
-const NAV = [
-  { icone: LayoutDashboard, libelle: 'Tableau de bord', section: 'Pilotage', actif: true },
-  { icone: Users, libelle: 'Collecteurs', section: 'Pilotage', actif: false },
-  { icone: Building2, libelle: 'Zones & marchés', section: 'Pilotage', actif: false },
-  { icone: Banknote, libelle: 'Abonnements', section: 'Monétisation', actif: false },
-  { icone: LifeBuoy, libelle: 'Support', section: 'Support', actif: false },
-];
+/** Le détail d'un collecteur n'est pas une entrée de menu : on y arrive depuis
+    la liste, et la barre latérale reste sur « Collecteurs ». */
+type Page = CleNavAdmin | 'detail';
 
 export function Coquille() {
-  const sections = [...new Set(NAV.map((n) => n.section))];
+  const [page, setPage] = useState<Page>('tableau');
+  const [erreurSortie, setErreurSortie] = useState<string | null>(null);
+
+  async function deconnecter() {
+    setErreurSortie(null);
+    const { error } = await supabase.auth.signOut();
+    if (error) setErreurSortie('Déconnexion impossible. Vérifie le réseau et réessaie.');
+  }
 
   return (
-    <div className="grille-admin">
-      <aside className="sidebar">
-        <div
-          style={{
-            padding: 'var(--space-4) var(--space-12) var(--space-8)',
-            fontWeight: 700,
-            fontSize: 'var(--font-titre-carte)',
-          }}
-        >
-          Kolek · Admin
-        </div>
-        {sections.map((section) => (
-          <div key={section}>
-            <div className="overline">{section}</div>
-            {NAV.filter((n) => n.section === section).map((n) => (
-              <div key={n.libelle} className={`nav-item${n.actif ? ' actif' : ''}`}>
-                <n.icone size={20} strokeWidth={1.75} />
-                {n.libelle}
-              </div>
-            ))}
-          </div>
-        ))}
-      </aside>
+    <div className="flex min-h-dvh bg-dark-canvas">
+      {/* Le cadre flottant sur fond sombre est la signature de l'application
+          d'administration — Design System §3.5, ombre `lg`. */}
+      <div className="flex w-full m-3 rounded-xl overflow-hidden shadow-lg">
+        <BarreLaterale
+          actif={page === 'detail' ? 'collecteurs' : page}
+          onNaviguer={setPage}
+          onDeconnexion={deconnecter}
+        />
 
-      <main className="contenu">
-        <div className="fil-ariane">Accueil → Tableau de bord</div>
-        <div
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}
-        >
-          <h1 style={{ fontSize: 'var(--font-titre-page)', margin: '0 0 var(--space-20)' }}>
-            Tableau de bord
-          </h1>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            style={{
-              border: 'none',
-              background: 'none',
-              color: 'var(--green-700)',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Déconnexion
-          </button>
-        </div>
+        <div className="flex-1 min-w-0 bg-canvas flex flex-col">
+          {/* La maquette omettait ce bandeau sur la fiche collecteur. L'état de
+              l'abonnement ne dépend pas de la page où l'on se trouve. */}
+          <BandeauOffre />
 
-        <div className="carte" style={{ maxWidth: 'var(--mesure-carte)' }}>
-          <h2 style={{ fontSize: 'var(--font-titre-carte)', margin: '0 0 var(--space-8)' }}>
-            Socle en place
-          </h2>
-          <p style={{ margin: 0, color: 'var(--muted)' }}>
-            Les widgets de supervision arrivent au jalon J4. Cette page fixe la mise en page et le
-            langage visuel du Design System.
-          </p>
+          {erreurSortie && (
+            <p
+              role="alert"
+              className="bg-negative-tint text-negative text-sm font-body font-medium px-8 py-2"
+            >
+              {erreurSortie}
+            </p>
+          )}
+
+          {page === 'tableau' && <TableauDeBord />}
+          {page === 'collecteurs' && <Collecteurs onOuvrirCollecteur={() => setPage('detail')} />}
+          {page === 'detail' && <DetailCollecteur onRetour={() => setPage('collecteurs')} />}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
