@@ -1,0 +1,48 @@
+.grille-admin {
+  display: grid;
+  grid-template-columns: 248px 1fr;
+  min-height: 100dvh;
+}
+
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--hairline);
+  padding: 20px 12px;
+}
+
+.sidebar .overline {
+  font-size: var(--font-overline);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 16px 12px 6px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  color: var(--ink);
+  font-size: var(--font-body);
+  cursor: pointer;
+}
+
+.nav-item.actif {
+  background: var(--green-tint);
+  color: var(--green-700);
+  font-weight: 600;
+}
+
+.contenu {
+  padding: 24px 28px;
+  background: var(--canvas);
+}
+
+.fil-ariane {
+  font-size: var(--font-small);
+  color: var(--muted);
+  margin-bottom: 6px;
+}
