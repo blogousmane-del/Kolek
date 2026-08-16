@@ -136,6 +136,25 @@ describe('accès légitime du collecteur à ses propres données', () => {
       .eq('id', sienne!.id);
     expect(count).toBe(1);
   });
+
+  it('modifie son profil mais ne peut pas s’offrir un palier', async () => {
+    const profil = await a.client.from('collecteurs').update({ zone: 'Adjamé' }).eq('id', a.id);
+    expect(profil.error).toBeNull();
+
+    const escalade = await a.client
+      .from('collecteurs')
+      .update({ palier: 'illimite', abonnement_statut: 'actif' })
+      .eq('id', a.id);
+    expect(escalade.error).not.toBeNull();
+
+    const { data } = await admin
+      .from('collecteurs')
+      .select('zone, palier')
+      .eq('id', a.id)
+      .single();
+    expect(data!.zone).toBe('Adjamé');
+    expect(data!.palier).toBe('essai');
+  });
 });
 
 describe('privilège de colonne sur les rejets de synchro', () => {
@@ -154,7 +173,7 @@ describe('privilège de colonne sur les rejets de synchro', () => {
       .from('synchro_rejets')
       .update({ charge_utile: { falsifie: true } })
       .eq('id', rejet!.id);
-    expect(ko.error).not.toBeNull();
+    expect(ko.error!.code).toBe('42501');
 
     const { data } = await admin
       .from('synchro_rejets')
