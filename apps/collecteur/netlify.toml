@@ -1,0 +1,46 @@
+# Site Netlify de l'App Collecteur.
+# Le répertoire de base du site doit être réglé sur `apps/collecteur` dans
+# Netlify : c'est ce qui fait lire ce fichier. La commande remonte ensuite à la
+# racine du dépôt, où vivent les workspaces npm et le fichier de verrouillage.
+
+[build]
+  command = "cd ../.. && npm ci && npm run build -w @kolek/collecteur"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "26"
+
+# Application à page unique : toute route inconnue rend l'index.
+# Le code 200 et non 301 — c'est une réécriture, pas une redirection.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(self), geolocation=(), microphone=()"
+
+# Le service worker ne doit jamais être servi depuis un cache : c'est lui qui
+# porte les mises à jour de l'application. Un sw.js périmé fige la version
+# installée sur le téléphone du collecteur.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Les fichiers d'assets portent une empreinte dans leur nom : ils sont
+# immuables et peuvent être mis en cache indéfiniment.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
