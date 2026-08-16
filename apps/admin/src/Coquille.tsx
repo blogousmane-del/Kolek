@@ -1,11 +1,11 @@
-import { BadgeEuro, Building2, LayoutDashboard, LifeBuoy, Users } from 'lucide-react';
+import { Banknote, Building2, LayoutDashboard, LifeBuoy, Users } from 'lucide-react';
 import { supabase } from './supabase';
 
 const NAV = [
   { icone: LayoutDashboard, libelle: 'Tableau de bord', section: 'Pilotage', actif: true },
   { icone: Users, libelle: 'Collecteurs', section: 'Pilotage', actif: false },
   { icone: Building2, libelle: 'Zones & marchés', section: 'Pilotage', actif: false },
-  { icone: BadgeEuro, libelle: 'Abonnements', section: 'Monétisation', actif: false },
+  { icone: Banknote, libelle: 'Abonnements', section: 'Monétisation', actif: false },
   { icone: LifeBuoy, libelle: 'Support', section: 'Support', actif: false },
 ];
 
