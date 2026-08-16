@@ -22,6 +22,11 @@ describe('chercherFuites', () => {
     expect(chercherFuites(dir)).toHaveLength(1);
   });
 
+  it('détecte une clé secrète au format actuel', () => {
+    const dir = dossierAvec('const k = "sb_secret_AbCdEf123456";');
+    expect(chercherFuites(dir)).toHaveLength(1);
+  });
+
   it('laisse passer un artefact propre', () => {
     const dir = dossierAvec('const k = import.meta.env.VITE_SUPABASE_ANON_KEY;');
     expect(chercherFuites(dir)).toHaveLength(0);

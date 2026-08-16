@@ -81,6 +81,11 @@ create trigger on_auth_user_created
 grant select                        on public.collecteurs to authenticated;
 grant update (nom, telephone, zone) on public.collecteurs to authenticated;
 grant select, insert, update on public.clients     to authenticated;
-grant select, insert         on public.cartes      to authenticated;
+
+-- Sur cartes, mises_encaissees, statut, ouverte_le et cloturee_le sont
+-- décidés par le serveur, jamais par le client : ce compteur est la source
+-- dont dépend chaque solde et chaque futur versement.
+grant select on public.cartes to authenticated;
+grant insert (id, collecteur_id, client_id, mise) on public.cartes to authenticated;
 
 grant all on public.collecteurs, public.clients, public.cartes to service_role;

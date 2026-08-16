@@ -11,6 +11,7 @@ const MOTIFS = [
     // précèdent) — un JWT Supabase réel n'utilise pas toujours le même.
     regex: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]*(c2VydmljZV9yb2xl|cnZpY2Vfcm9s|ZXJ2aWNlX3Jv)/,
   },
+  { nom: 'clé secrète Supabase', regex: /sb_secret_[A-Za-z0-9_-]{8,}/ },
 ];
 
 function fichiers(dossier) {
@@ -44,6 +45,14 @@ export function chercherFuites(dossier) {
 // qui empêche silencieusement le bloc CLI de s'exécuter.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const dossiers = ['apps/collecteur/dist', 'apps/admin/dist'];
+
+  const manquants = dossiers.filter((dossier) => !existsSync(dossier));
+  if (manquants.length > 0) {
+    console.error('Dossier de build absent — le contrôle ne peut pas passer en silence :');
+    for (const dossier of manquants) console.error(`  ${dossier}`);
+    process.exit(1);
+  }
+
   const fuites = dossiers.flatMap(chercherFuites);
 
   if (fuites.length > 0) {

@@ -22,7 +22,6 @@
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.112.3",
-    "dotenv": "^17.4.2",
     "vitest": "^4.1.10"
   }
 }

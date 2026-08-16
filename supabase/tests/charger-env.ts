@@ -1,3 +1,1 @@
-import { config } from 'dotenv';
-
-config({ path: 'supabase/tests/.env.test' });
+process.loadEnvFile('supabase/tests/.env.test');

@@ -142,6 +142,33 @@ describe('idempotence de la synchronisation', () => {
       .single();
     expect(data!.mises_encaissees).toBe(1);
   });
+
+  it('rejoue en 23505 sur une carte au cycle complet', async () => {
+    const carteId = await nouvelleCarte();
+    const derniere = crypto.randomUUID();
+
+    for (let i = 0; i < 30; i++) {
+      await admin.from('mises').insert(nouvelleMise(carteId));
+    }
+    await admin.from('mises').insert(nouvelleMise(carteId, 1000, derniere));
+
+    const rejeu = await admin.from('mises').insert(nouvelleMise(carteId, 1000, derniere));
+    expect(rejeu.error!.code).toBe('23505');
+  });
+
+  it('rejoue en 23505 sur une carte clôturée entre-temps', async () => {
+    const carteId = await nouvelleCarte();
+    const miseId = crypto.randomUUID();
+    await admin.from('mises').insert(nouvelleMise(carteId, 1000, miseId));
+
+    await admin
+      .from('cartes')
+      .update({ statut: 'cloturee', cloturee_le: new Date().toISOString() })
+      .eq('id', carteId);
+
+    const rejeu = await admin.from('mises').insert(nouvelleMise(carteId, 1000, miseId));
+    expect(rejeu.error!.code).toBe('23505');
+  });
 });
 
 describe('immuabilité', () => {

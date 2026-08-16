@@ -44,6 +44,15 @@ set search_path = public
 as $$
 declare c public.cartes%rowtype;
 begin
+  -- Un rejeu de la file de synchro doit toujours se présenter comme un doublon,
+  -- quel que soit l'état de la carte depuis. Sans ce test, un rejeu sur une carte
+  -- clôturée ou complète lèverait CARTE_CLOTUREE ou CYCLE_COMPLET, que le client
+  -- prendrait pour un vrai refus : la mise partirait en rejet de synchro, et sa
+  -- ressaisie par un humain — avec un nouvel identifiant — serait un double comptage.
+  if exists (select 1 from public.mises where id = new.id) then
+    raise exception 'DOUBLON' using errcode = '23505';
+  end if;
+
   -- Verrou de ligne : deux mises concurrentes sur la même carte ne peuvent
   -- pas lire toutes les deux mises_encaissees = 0 et créer deux commissions.
   select * into c from public.cartes where id = new.carte_id for update;
@@ -116,7 +125,11 @@ create trigger retraits_immuables
 -- Ni update ni delete : l'immuabilité se refuse aussi au niveau des privilèges.
 -- retraits n'a pas non plus insert : une clôture passe par une Edge Function
 -- (J3), jamais par le téléphone — même raison que l'absence d'update sur cartes.
-grant select, insert on public.mises    to authenticated;
+-- recu_le est le seul horodatage serveur du registre (encaisse_le vient du
+-- téléphone) ; est_commission est lui aussi décidé par le trigger BEFORE
+-- INSERT ci-dessus. Ni l'un ni l'autre n'est insertable par le client.
+grant select on public.mises to authenticated;
+grant insert (id, collecteur_id, carte_id, montant, encaisse_le) on public.mises to authenticated;
 grant select         on public.retraits to authenticated;
 
 grant all on public.mises, public.retraits to service_role;
