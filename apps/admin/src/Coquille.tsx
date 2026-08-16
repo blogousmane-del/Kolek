@@ -15,7 +15,15 @@ export function Coquille() {
   return (
     <div className="grille-admin">
       <aside className="sidebar">
-        <div style={{ padding: '4px 12px 8px', fontWeight: 700, fontSize: 18 }}>Kolek · Admin</div>
+        <div
+          style={{
+            padding: 'var(--space-4) var(--space-12) var(--space-8)',
+            fontWeight: 700,
+            fontSize: 'var(--font-titre-carte)',
+          }}
+        >
+          Kolek · Admin
+        </div>
         {sections.map((section) => (
           <div key={section}>
             <div className="overline">{section}</div>
@@ -34,7 +42,9 @@ export function Coquille() {
         <div
           style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}
         >
-          <h1 style={{ fontSize: 'var(--font-titre-page)', margin: '0 0 20px' }}>Tableau de bord</h1>
+          <h1 style={{ fontSize: 'var(--font-titre-page)', margin: '0 0 var(--space-20)' }}>
+            Tableau de bord
+          </h1>
           <button
             onClick={() => supabase.auth.signOut()}
             style={{
@@ -49,8 +59,10 @@ export function Coquille() {
           </button>
         </div>
 
-        <div className="carte" style={{ maxWidth: 520 }}>
-          <h2 style={{ fontSize: 'var(--font-titre-carte)', margin: '0 0 6px' }}>Socle en place</h2>
+        <div className="carte" style={{ maxWidth: 'var(--mesure-carte)' }}>
+          <h2 style={{ fontSize: 'var(--font-titre-carte)', margin: '0 0 var(--space-8)' }}>
+            Socle en place
+          </h2>
           <p style={{ margin: 0, color: 'var(--muted)' }}>
             Les widgets de supervision arrivent au jalon J4. Cette page fixe la mise en page et le
             langage visuel du Design System.

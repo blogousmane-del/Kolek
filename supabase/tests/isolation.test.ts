@@ -157,6 +157,100 @@ describe('accès légitime du collecteur à ses propres données', () => {
   });
 });
 
+describe('privilèges de colonne rendus au serveur — audit du 2026-08-16', () => {
+  it('déclare son cash mais n’écrit pas le cash attendu qui le contrôle', async () => {
+    const jour = new Date().toISOString().slice(0, 10);
+
+    // L'insert passe : le trigger écrase la valeur envoyée, il n'y a pas de
+    // refus de privilège sur une colonne qu'on n'a pas nommée dans le INSERT.
+    const ouverture = await a.client
+      .from('caisses_jour')
+      .insert({ collecteur_id: a.id, date: jour, cash_declare: 500 });
+    expect(ouverture.error).toBeNull();
+
+    // Nommer la colonne, en revanche, est refusé au niveau du privilège.
+    const forgeage = await a.client
+      .from('caisses_jour')
+      .update({ cash_attendu: 500 })
+      .eq('collecteur_id', a.id);
+    expect(forgeage.error!.code).toBe('42501');
+
+    const correction = await a.client
+      .from('caisses_jour')
+      .update({ cash_declare: 900 })
+      .eq('collecteur_id', a.id);
+    expect(correction.error).toBeNull();
+
+    // A a encaissé une mise de 1 000 plus haut : l'attendu le sait.
+    const { data } = await admin
+      .from('caisses_jour')
+      .select('cash_attendu, cash_declare, ecart')
+      .eq('collecteur_id', a.id)
+      .single();
+    expect(data!.cash_attendu).toBe(1000);
+    expect(data!.cash_declare).toBe(900);
+    expect(data!.ecart).toBe(-100);
+  });
+
+  it('renomme un client mais ne réécrit ni son identifiant ni sa date de création', async () => {
+    const clientId = crypto.randomUUID();
+    await a.client.from('clients').insert({ id: clientId, collecteur_id: a.id, nom: 'Awa' });
+
+    const ok = await a.client.from('clients').update({ nom: 'Awa Touré' }).eq('id', clientId);
+    expect(ok.error).toBeNull();
+
+    // `id` est la clé de la souscription hors-ligne : insertable, jamais réécrit.
+    const identite = await a.client
+      .from('clients')
+      .update({ id: crypto.randomUUID() })
+      .eq('id', clientId);
+    expect(identite.error!.code).toBe('42501');
+
+    const horodatage = await a.client
+      .from('clients')
+      .update({ cree_le: '2020-01-01T00:00:00Z' })
+      .eq('id', clientId);
+    expect(horodatage.error!.code).toBe('42501');
+  });
+
+  it('ne dépose pas un rejet de synchro déjà marqué traité', async () => {
+    const forge = await a.client.from('synchro_rejets').insert({
+      collecteur_id: a.id,
+      charge_utile: { montant: 1000 },
+      motif: 'CARTE_CLOTUREE',
+      traite: true,
+    });
+    expect(forge.error!.code).toBe('42501');
+
+    const honnete = await a.client.from('synchro_rejets').insert({
+      collecteur_id: a.id,
+      charge_utile: { montant: 1000 },
+      motif: 'CARTE_CLOTUREE',
+    });
+    expect(honnete.error).toBeNull();
+  });
+});
+
+describe('portillon du Dashboard Admin', () => {
+  it('répond faux pour un collecteur ordinaire, vrai une fois inscrit aux admins', async () => {
+    const avant = await a.client.rpc('est_admin');
+    expect(avant.error).toBeNull();
+    expect(avant.data).toBe(false);
+
+    await admin.from('admins').insert({ user_id: a.id });
+
+    const apres = await a.client.rpc('est_admin');
+    expect(apres.data).toBe(true);
+
+    // Le portillon ne donne pas accès à la table qu'il interroge.
+    const lecture = await a.client.from('admins').select('user_id');
+    expect(lecture.data).toBeNull();
+    expect(lecture.error!.code).toBe('42501');
+
+    await admin.from('admins').delete().eq('user_id', a.id);
+  });
+});
+
 describe('privilège de colonne sur les rejets de synchro', () => {
   it('marque un rejet comme traité mais ne peut pas réécrire la charge utile', async () => {
     const charge = { id: crypto.randomUUID(), montant: 1000 };

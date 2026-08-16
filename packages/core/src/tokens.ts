@@ -64,6 +64,16 @@ export const typographie = {
   overline: '11px',
 } as const;
 
+// Largeurs de conteneur. Sans elles, chaque écran réinvente son `maxWidth` en
+// dur, ce que la règle « aucune valeur visuelle en dur » interdit précisément —
+// et trois écrans finissent avec trois largeurs de formulaire différentes.
+export const mesures = {
+  formulaire: '360px',
+  carte: '520px',
+  liste: '640px',
+  sidebar: '248px',
+} as const;
+
 export const elevations = {
   shadowSm: '0 1px 2px rgba(20,30,25,.05)',
   shadowMd: '0 4px 12px rgba(20,30,25,.08)',
@@ -78,6 +88,7 @@ const PREFIXES: Array<[Record<string, string>, string]> = [
   [couleurs, ''],
   [rayons, 'r-'],
   [espacements, 'space-'],
+  [mesures, 'mesure-'],
   [typographie, 'font-'],
   [elevations, ''],
 ];

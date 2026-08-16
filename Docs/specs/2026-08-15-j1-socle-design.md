@@ -178,7 +178,7 @@ Le cahier donne l'esquisse du modèle. Les ajouts suivants sont requis par les d
 | `id` | `uuid` PK | |
 | `collecteur_id` | `uuid` FK | |
 | `date` | `date` | `UNIQUE (collecteur_id, date)`. |
-| `cash_attendu` | `integer` | Calculé à la clôture de journée. |
+| `cash_attendu` | `integer` | Calculé depuis les mises, jamais écrit par le client. Le privilège d'insertion et de mise à jour lui est retiré, et un trigger le repose à chaque écriture sur la caisse **et** à chaque mise datée de ce jour — un attendu figé à la clôture laisserait faux à jamais l'écart d'une journée qu'une synchro tardive vient corriger (cadrage J2). Point de calcul unique : `cash_attendu_du_jour()`. |
 | `cash_declare` | `integer` | Saisi par le collecteur. |
 | `ecart` | `integer` | Colonne générée : `cash_declare - cash_attendu`. |
 
@@ -333,6 +333,10 @@ Un contrôle automatisé est ajouté au processus de build : échec si `SERVICE_
 ### 5.3 Super-admin
 
 Hors périmètre J1 au niveau applicatif, mais le schéma le prévoit : une table `admins(user_id)` détermine le rôle. Aucune policy RLS ne l'utilise — les accès admin passent exclusivement par Edge Functions, conformément au dossier stratégique §3.
+
+**Correctif de l'audit du 2026-08-16.** « Hors périmètre applicatif » avait été lu comme « pas de contrôle du tout » : `apps/admin` laissait entrer toute session valide, et un collecteur possède une session valide. Sans conséquence tant que la page est une coquille, mais la porte devait être fermée *avant* les widgets de J4, pas pendant.
+
+La fonction `est_admin()` répond par oui ou non sur l'appelant, en `security definer`, et n'ouvre aucune ligne d'`admins` — `authenticated` n'a toujours aucun privilège sur cette table. C'est un portillon, pas un chemin de données : la vue globale du dashboard reste derrière les Edge Functions. Un échec réseau laisse le portillon fermé, jamais ouvert.
 
 ---
 

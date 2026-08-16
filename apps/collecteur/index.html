@@ -7,7 +7,29 @@
     <title>Kolek — Collecteur</title>
   </head>
   <body>
-    <div id="root"></div>
+    <!--
+      Repli statique. React le remplace dès qu'il monte. S'il ne monte pas — un
+      module qui lève au chargement, par exemple une configuration Supabase
+      absente — ce message reste, à la place d'un écran blanc muet. Le filet
+      React ne couvre pas ce cas : il n'existe qu'une fois React démarré.
+    -->
+    <div id="root">
+      <div
+        style="
+          font-family: system-ui, sans-serif;
+          max-width: 360px;
+          margin: 15vh auto;
+          padding: 0 20px;
+          color: #171a17;
+        "
+      >
+        <h1 style="font-size: 16px">Kolek ne démarre pas</h1>
+        <p style="color: #6c716a">
+          L’application n’a pas pu se charger. Vérifie ta connexion et recharge la page. Si le
+          problème persiste, préviens ton contact GTCS.
+        </p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

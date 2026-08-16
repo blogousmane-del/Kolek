@@ -7,6 +7,7 @@ import '@fontsource/plus-jakarta-sans/700.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { Filet } from './Filet';
 
 const feuille = document.createElement('style');
 feuille.textContent = genererCssTokens();
@@ -14,6 +15,8 @@ document.head.prepend(feuille);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <Filet>
+      <App />
+    </Filet>
   </StrictMode>,
 );

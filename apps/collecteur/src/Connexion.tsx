@@ -30,14 +30,14 @@ export function Connexion() {
         display: 'grid',
         placeItems: 'center',
         background: 'var(--dark-canvas)',
-        padding: 20,
+        padding: 'var(--space-20)',
       }}
     >
-      <form className="carte" style={{ width: '100%', maxWidth: 360 }} onSubmit={soumettre}>
-        <h1 style={{ fontSize: 'var(--font-titre-page)', margin: '0 0 4px' }}>Kolek</h1>
-        <p style={{ color: 'var(--muted)', margin: '0 0 20px' }}>Chaque mise compte</p>
+      <form className="carte" style={{ width: '100%', maxWidth: 'var(--mesure-formulaire)' }} onSubmit={soumettre}>
+        <h1 style={{ fontSize: 'var(--font-titre-page)', margin: '0 0 var(--space-4)' }}>Kolek</h1>
+        <p style={{ color: 'var(--muted)', margin: '0 0 var(--space-20)' }}>Chaque mise compte</p>
 
-        <label style={{ display: 'block', marginBottom: 12 }}>
+        <label style={{ display: 'block', marginBottom: 'var(--space-12)' }}>
           <span style={{ fontSize: 'var(--font-small)', fontWeight: 600 }}>Email</span>
           <input
             className="champ"
@@ -48,7 +48,7 @@ export function Connexion() {
           />
         </label>
 
-        <label style={{ display: 'block', marginBottom: 20 }}>
+        <label style={{ display: 'block', marginBottom: 'var(--space-20)' }}>
           <span style={{ fontSize: 'var(--font-small)', fontWeight: 600 }}>Mot de passe</span>
           <input
             className="champ"

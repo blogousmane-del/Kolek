@@ -16,9 +16,18 @@
   status = 200
 
 # Le dashboard n'a aucune raison d'être indexé ni encadré.
+#
+# `style-src` accepte l'inline pour la même raison que côté collecteur : les
+# tokens du Design System sont injectés à l'exécution dans une balise `<style>`
+# créée en JavaScript, et les composants utilisent l'attribut `style`.
+#
+# `connect-src` est à restreindre à `https://<ref>.supabase.co` une fois le
+# projet créé (voir Docs/deploiement.md).
 [[headers]]
   for = "/*"
   [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"

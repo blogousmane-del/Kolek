@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { couleurs, genererCssTokens, rayons } from './tokens';
+import { couleurs, genererCssTokens, mesures, rayons } from './tokens';
 
 describe('tokens du Design System', () => {
   it("porte la couleur d'action de la marque", () => {
@@ -21,6 +21,11 @@ describe('tokens du Design System', () => {
 
   it('porte le rayon des pilules', () => {
     expect(rayons.pill).toBe('9999px');
+  });
+
+  it('porte les largeurs de conteneur, pour que les écrans cessent de les inventer', () => {
+    expect(mesures.formulaire).toBe('360px');
+    expect(genererCssTokens()).toContain('--mesure-formulaire: 360px;');
   });
 });
 

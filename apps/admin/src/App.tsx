@@ -1,7 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { useEffect, useState } from 'react';
 import { Connexion } from './Connexion';
-import { Coquille } from './Coquille';
+import { Portillon } from './Portillon';
 import { supabase } from './supabase';
 
 export default function App() {
@@ -19,5 +19,8 @@ export default function App() {
 
   if (!pret) return null;
   if (!session) return <Connexion />;
-  return <Coquille />;
+
+  // Une session valide ouvre le portillon, pas le dashboard : la clé est
+  // remontée pour que le contrôle soit refait si l'utilisateur change.
+  return <Portillon key={session.user.id} />;
 }

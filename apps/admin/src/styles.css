@@ -1,6 +1,6 @@
 .grille-admin {
   display: grid;
-  grid-template-columns: 248px 1fr;
+  grid-template-columns: var(--mesure-sidebar) 1fr;
   min-height: 100dvh;
 }
 

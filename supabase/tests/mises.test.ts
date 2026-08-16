@@ -115,6 +115,67 @@ describe("validation à l'insertion", () => {
   });
 });
 
+describe('bornes de l’heure du téléphone', () => {
+  // `encaisse_le` vient du téléphone. Sans borne, antidater une mise déplace le
+  // cash attendu d'une journée vers une autre : c'est l'outil de masquage d'un
+  // écart de caisse. Les bornes restent larges — la synchro différée est le
+  // fonctionnement normal du produit, pas une exception.
+  function decale(jours: number): string {
+    return new Date(Date.now() + jours * 86_400_000).toISOString();
+  }
+
+  it('refuse une mise datée dans un futur lointain', async () => {
+    const carteId = await nouvelleCarte();
+    const { error } = await admin
+      .from('mises')
+      .insert({ ...nouvelleMise(carteId), encaisse_le: decale(30) });
+    expect(error!.message).toContain('DATE_INVALIDE');
+  });
+
+  it('refuse une mise antidatée de plus de quatre-vingt-dix jours', async () => {
+    const carteId = await nouvelleCarte();
+    const { error } = await admin
+      .from('mises')
+      .insert({ ...nouvelleMise(carteId), encaisse_le: decale(-120) });
+    expect(error!.message).toContain('DATE_INVALIDE');
+  });
+
+  it('accepte une file de synchro restée trois semaines hors-ligne', async () => {
+    const carteId = await nouvelleCarte();
+    const { error } = await admin
+      .from('mises')
+      .insert({ ...nouvelleMise(carteId), encaisse_le: decale(-21) });
+    expect(error).toBeNull();
+  });
+
+  it('tolère la dérive d’horloge d’un téléphone en avance de quelques heures', async () => {
+    const carteId = await nouvelleCarte();
+    const { error } = await admin
+      .from('mises')
+      .insert({ ...nouvelleMise(carteId), encaisse_le: decale(0.25) });
+    expect(error).toBeNull();
+  });
+
+  it('rejoue en DOUBLON, pas en DATE_INVALIDE, une mise devenue trop ancienne', async () => {
+    // Le test d'antériorité du doublon protège exactement ce cas : un rejeu qui
+    // sortirait en DATE_INVALIDE partirait en rejet de synchro, et sa ressaisie
+    // par un humain — avec un nouvel identifiant — serait un double comptage.
+    const carteId = await nouvelleCarte();
+    const miseId = crypto.randomUUID();
+    await admin
+      .from('mises')
+      .insert({ ...nouvelleMise(carteId, 1000, miseId), encaisse_le: decale(-80) });
+
+    // On vieillit la ligne au-delà de la borne, sans passer par le trigger
+    // d'immuabilité : la date d'origine reste, c'est le rejeu qu'on observe.
+    const { error } = await admin
+      .from('mises')
+      .insert({ ...nouvelleMise(carteId, 1000, miseId), encaisse_le: decale(-200) });
+    expect(error!.code).toBe('23505');
+    expect(error!.message).toContain('DOUBLON');
+  });
+});
+
 describe('idempotence de la synchronisation', () => {
   it("rejoue trois fois la même mise et n'en enregistre qu'une", async () => {
     const carteId = await nouvelleCarte();

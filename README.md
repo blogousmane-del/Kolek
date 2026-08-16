@@ -58,6 +58,15 @@ npm run verifier:j1   # les cinq vérifications du jalon J1
 - Le solde restituable n'est jamais stocké : `(mises encaissées − 1) × mise`.
 - Les mises et les retraits sont append-only. Ne pas ajouter de politique
   `update` ou `delete` sur ces tables.
+- `caisses_jour.cash_attendu` n'est jamais écrit par le collecteur : il se
+  calcule depuis les mises et se recalcule à chaque mise datée du jour. Un
+  rapprochement de caisse dont le contrôlé écrit les deux termes ne contrôle
+  rien.
+- Tout ce que le serveur décide se refuse aussi au niveau du privilège de
+  colonne, pas seulement au niveau de RLS — qui ne sait pas filtrer par colonne.
+  Un `grant` de table sur une table qui a des champs serveur est un défaut.
+- Le Dashboard Admin vérifie `est_admin()` avant d'afficher quoi que ce soit.
+  Une session valide n'est pas une autorisation : un collecteur en possède une.
 - Aucune valeur visuelle en dur : tout vient de `packages/core/src/tokens.ts`.
 - La clé de service ne quitte jamais le serveur. `npm run verifier:bundles`
   le contrôle à chaque build.
