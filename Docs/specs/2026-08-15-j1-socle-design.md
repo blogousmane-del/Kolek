@@ -281,7 +281,34 @@ C'est le mécanisme anti-double-comptage dans son intégralité. Il n'y en a pas
 
 La troisième est la seule compatible avec un produit dont l'argument de vente est la fin des zones d'ombre.
 
-Le traitement des rejets — écran, actions possibles — relève de J2. J1 crée la table et la consignation.
+J1 crée la table et la consignation. L'écran relève de J2, mais la résolution est tranchée ci-dessous : elle décide d'une notion du modèle, donc elle ne pouvait pas attendre l'implémentation.
+
+### 4.5 Résolution d'un rejet — le rattrapage
+
+*Décidé le 2026-08-16.*
+
+Le collecteur dispose d'une seule action : le **rattrapage**. Une écriture rattachée à la carte clôturée qui enregistre ce qu'il doit au client. Dans le scénario de §4.4 : 31 mises reçues, 29 000 FCFA restitués, **1 000 FCFA dus à la cliente**.
+
+Les deux autres pistes ont été écartées. *Afficher seulement* laisse le registre affirmer 30 mises quand il y en a eu 31 — c'est archiver le litige, pas le résoudre, et la vérité du registre est le produit. *Reporter sur la carte suivante* ne fonctionne que si le client reprend une carte ; sinon l'argent reste bloqué, et il faut en plus une mise explicitement non-commissionnable sous peine de faire encaisser deux commissions au collecteur pour un seul versement.
+
+**Trois règles.**
+
+1. **Le collecteur agit seul**, sans validation de GTCS. Un collecteur immobilisé en pleine tournée par une validation distante est exactement ce que le hors-ligne d'abord cherche à éviter. Le risque d'abus est faible par construction : un rattrapage ne peut naître que d'une mise que le serveur a réellement refusée, et il enregistre une dette, pas un gain.
+2. **Le client est prévenu**, par reçu WhatsApp avec repli SMS, au même titre qu'une mise ou un retrait. Sans reçu, le client ignore qu'on lui doit quelque chose et ne peut pas le réclamer — la transparence reposerait sur la seule bonne foi du collecteur, ce que le produit existe pour ne plus demander.
+3. **La carte reste clôturée** et la mise refusée n'est jamais insérée dans `mises`. Le cycle clôturé n'est pas rouvert.
+
+**Conséquence à tenir en J2.** La somme encaissée sur une carte ne se lit plus dans la seule table `mises` : c'est `mises` **plus** les rattrapages qui s'y rattachent. Tout bilan, tout score de régularité et tout rapprochement de caisse doit sommer les deux, sinon ils sous-comptent précisément l'argent que ce mécanisme sert à ne pas perdre. Le solde restituable, lui, ne change pas — la carte est close.
+
+**Esquisse pour J2**, à affiner au cadrage :
+
+```
+rattrapages( id, collecteur_id →collecteurs, client_id →clients, carte_id →cartes,
+             rejet_id →synchro_rejets, montant, cree_le, regle_le )
+```
+
+Append-only comme `mises`, à une exception près : `regle_le` doit rester modifiable pour marquer la dette payée. Même motif que `synchro_rejets.traite` — privilège de colonne, `grant update (regle_le)`, jamais un droit de modification sur toute la ligne.
+
+Le reçu dépend de la passerelle WhatsApp, qui arrive en J3. Si le rattrapage est livré en J2, il naît sans reçu et en reçoit un dès que la passerelle existe — à ne pas oublier dans le cadrage de J3.
 
 ---
 
@@ -408,7 +435,7 @@ Non bloquants pour J1, à trancher avant les jalons indiqués.
 | Point | Échéance | Note |
 |---|---|---|
 | Client qui « saute » longtemps : carte en veille ? relance automatique ? | Avant J4 | Point ouvert du cahier §11. Concerne le score de régularité et les alertes retard. |
-| Traitement des rejets de synchro : quelles actions offrir au collecteur ? | Avant J2 | La table existe en J1 ; l'écran et les actions sont à concevoir. |
+| ~~Traitement des rejets de synchro~~ | ~~Avant J2~~ | **Tranché le 2026-08-16** — le rattrapage, voir §4.5. Reste à concevoir : l'écran, et la table `rattrapages` au cadrage de J2. |
 | Plafond de clients par palier : blocage dur ou avertissement ? | Avant J5 | Affecte le trigger de création de client. |
 | Priorité Phase 2 : renouvellement multi-cartes ou Mobile Money ? | Après J5 | Décision à valider du dossier stratégique §8. |
 
