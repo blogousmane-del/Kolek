@@ -260,7 +260,11 @@ Le détail d'implémentation de la file relève de J2. J1 doit simplement garant
 
 Le téléphone génère l'UUID de la mise au moment du geste, via `crypto.randomUUID()`. Cet identifiant est stable : la même mise rejouée porte le même UUID.
 
-Le serveur ne fait rien de particulier. Un rejeu produit une violation de clé primaire, que le client traite comme un succès — la mise est déjà arrivée. Aucune table de déduplication, aucune fenêtre temporelle, aucun compteur : la contrainte d'unicité de PostgreSQL fait tout le travail.
+Un rejeu produit une violation de clé primaire — code `23505` — que le client traite comme un succès : la mise est déjà arrivée. Aucune table de déduplication, aucune fenêtre temporelle, aucun compteur.
+
+Une précision est nécessaire, et elle a coûté un correctif. Les triggers `BEFORE ROW` s'exécutent **avant** l'insertion dans l'index, donc les contrôles métier lèvent leur propre erreur avant que la clé primaire ne soit consultée. Un rejeu sur une carte clôturée entre-temps — précisément le cas « l'insertion a réussi, la réponse s'est perdue, la file réessaie » — levait `CARTE_CLOTUREE`, que le client aurait pris pour un vrai refus. La mise serait partie en rejet de synchro, et sa ressaisie par un humain, avec un nouvel identifiant, aurait été un double comptage produit par la table même qui existe pour l'empêcher.
+
+`mises_avant_insert` teste donc le doublon **en premier**, avant tout contrôle métier, et lève `23505` explicitement. Le contrat « un rejeu se présente toujours comme un doublon » vaut alors quel que soit l'état de la carte depuis.
 
 C'est le mécanisme anti-double-comptage dans son intégralité. Il n'y en a pas d'autre, et il n'en faut pas d'autre.
 
@@ -387,7 +391,7 @@ React 19 + Vite + TypeScript. Écran de connexion. Une page authentifiée vide p
 
 J1 n'est pas terminé tant que ces cinq vérifications ne passent pas sur une base reconstruite depuis zéro. Sans elles, l'expression « socle sécurisé » est une affirmation invérifiable.
 
-1. **Reconstruction complète.** `supabase db reset` applique toutes les migrations sur une base vierge, sans erreur, et charge le seed.
+1. **Reconstruction complète.** `supabase db reset` applique toutes les migrations sur une base vierge, sans erreur. Aucun `seed.sql` : les collecteurs de test naissent du harnais, via l'API d'administration Auth (§8), et l'amorçage est désactivé dans `config.toml` pour que la sortie reste propre.
 2. **Isolation.** Authentifié comme collecteur A, six tentatives sur les données du collecteur B — lecture d'un client, lecture d'une mise, insertion d'un client sur B, insertion d'une mise sur une carte de B, modification d'un client de B, lecture du journal d'audit — produisent six refus ou six résultats vides.
 3. **Moteur métier.** La suite de `packages/core` passe intégralement, table de vérification du cahier §4 incluse.
 4. **Idempotence.** La même mise, identifiant compris, insérée trois fois : une seule ligne en base, `mises_encaissees` incrémenté exactement une fois.
