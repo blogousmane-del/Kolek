@@ -159,12 +159,16 @@ statique et son formulaire de paiement est délibérément inerte, faute de
 partenaire agréé (cahier §11). Lui donner une clé, même anonyme, serait exposer
 un secret sans usage.
 
-**Content-Security-Policy à resserrer.** Les `netlify.toml` des deux
-applications autorisent `connect-src https://*.supabase.co` parce que la
-référence du projet n'était pas connue à leur écriture. Une fois le projet créé,
-remplacer le joker par `https://<ref>.supabase.co` dans ces deux fichiers-là —
-c'est un `sed`, et ça évite qu'une application compromise puisse parler à
-n'importe quel projet Supabase.
+**Content-Security-Policy — resserrée le 2026-08-17.** Les `netlify.toml` des
+deux applications nommaient `connect-src https://*.supabase.co`, faute de
+connaître la référence du projet à leur écriture. Le joker laissait une
+application compromise parler à n'importe quel projet Supabase du monde. Il est
+remplacé par `https://yfnwmokxkznejotgpfgf.supabase.co`.
+
+Si la référence change un jour — nouveau projet, migration de compte — c'est
+dans ces deux fichiers qu'il faut la reporter. Une CSP périmée ne lève aucune
+alerte : elle se manifeste par des requêtes bloquées et un écran de connexion
+qui tourne dans le vide.
 
 Celui de `apps/site` est déjà au plus strict : `connect-src 'self'`, sans
 exception Supabase. Il ne bouge que le jour où le tunnel de commande s'adresse à

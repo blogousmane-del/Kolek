@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { admin, creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
+import { admin, anonyme, creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
 
 afterAll(nettoyer);
 
@@ -276,5 +276,85 @@ describe('privilège de colonne sur les rejets de synchro', () => {
       .single();
     expect(data!.charge_utile).toEqual(charge);
     expect(data!.traite).toBe(true);
+  });
+});
+
+/**
+ * Audit du projet distant, 2026-08-17.
+ *
+ * Ces trois tests n'existaient pas, et c'est précisément pourquoi la faille
+ * ci-dessous a survécu à trois relectures et à cinquante tests verts : la suite
+ * ne posait pas la question. Le garde-fou de la migration 7 vérifie le
+ * catalogue ; ceux-ci vérifient qu'un vrai client refuse une vraie écriture.
+ */
+describe('liste blanche de privilèges — audit du distant, 2026-08-17', () => {
+  it('ouvre une carte mais ne la préremplit pas de mises jamais encaissées', async () => {
+    const clientId = crypto.randomUUID();
+    await a.client.from('clients').insert({ id: clientId, collecteur_id: a.id, nom: 'Mariam' });
+
+    // La fraude que la plateforme rendait possible. Une carte ouverte à 30 :
+    // une seule vraie mise la porte à 31, cycle complet, et le solde
+    // restituable affiche trente fois la mise — jamais déposée.
+    const fraude = await a.client.from('cartes').insert({
+      id: crypto.randomUUID(),
+      collecteur_id: a.id,
+      client_id: clientId,
+      mise: 1000,
+      mises_encaissees: 30,
+    });
+    expect(fraude.error!.code).toBe('42501');
+
+    // Le statut appartient à la clôture de cycle, pas au téléphone.
+    const forgeStatut = await a.client.from('cartes').insert({
+      id: crypto.randomUUID(),
+      collecteur_id: a.id,
+      client_id: clientId,
+      mise: 1000,
+      statut: 'cloturee',
+    });
+    expect(forgeStatut.error!.code).toBe('42501');
+
+    // L'ouverture honnête passe, et part de zéro.
+    const carteId = crypto.randomUUID();
+    const honnete = await a.client
+      .from('cartes')
+      .insert({ id: carteId, collecteur_id: a.id, client_id: clientId, mise: 1000 });
+    expect(honnete.error).toBeNull();
+
+    const { data } = await admin
+      .from('cartes')
+      .select('mises_encaissees, statut')
+      .eq('id', carteId)
+      .single();
+    expect(data!.mises_encaissees).toBe(0);
+    expect(data!.statut).toBe('active');
+  });
+
+  it('n’ouvre aucune table en écriture au rôle anonyme', async () => {
+    // `anonyme` porte la clé publique, celle qui voyage dans le bundle. La
+    // plateforme lui accordait INSERT, UPDATE et DELETE sur les neuf tables.
+    const ecriture = await anonyme
+      .from('clients')
+      .insert({ id: crypto.randomUUID(), collecteur_id: a.id, nom: 'Intrus' });
+    expect(ecriture.error!.code).toBe('42501');
+
+    const suppression = await anonyme.from('mises').delete().neq('id', crypto.randomUUID());
+    expect(suppression.error!.code).toBe('42501');
+  });
+
+  it('ne lit rien sans session, malgré la clé publique', async () => {
+    // La clé anonyme n'est pas un secret — elle est publique par construction,
+    // elle voyage dans le bundle. Ce qui protège les données, c'est qu'elle
+    // n'ouvre rien.
+    //
+    // Le refus arrive en `42501`, pas en liste vide : depuis la migration 7,
+    // `anon` n'a plus le `SELECT`, donc PostgreSQL barre l'accès avant que RLS
+    // ait à filtrer quoi que ce soit. Deux barrières là où il n'y en avait
+    // qu'une, et c'est la plus extérieure qui répond.
+    for (const table of ['clients', 'cartes', 'mises', 'collecteurs', 'retraits']) {
+      const { data, error } = await anonyme.from(table).select('*');
+      expect(error?.code, `${table} doit refuser la lecture au rôle anonyme`).toBe('42501');
+      expect(data, `${table} ne doit rien rendre`).toBeNull();
+    }
   });
 });

@@ -22,12 +22,12 @@
 # Tailwind ne peut pas connaître au build. Le thème, lui, est désormais une
 # feuille statique servie depuis l'origine.
 #
-# `connect-src` est à restreindre à `https://<ref>.supabase.co` une fois le
-# projet créé (voir Docs/deploiement.md).
+# `connect-src` nomme le projet `kolek-prod` et lui seul — voir la note plus
+# longue dans le netlify.toml du collecteur.
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://yfnwmokxkznejotgpfgf.supabase.co wss://yfnwmokxkznejotgpfgf.supabase.co; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
