@@ -13,6 +13,15 @@ const sansSession = { auth: { persistSession: false, autoRefreshToken: false } }
 /** Client à clé de service : contourne RLS. Réservé aux tests et aux Edge Functions. */
 export const admin: SupabaseClient = createClient(url, serviceKey, sansSession);
 
+/**
+ * Client non authentifié — le rôle `anon`. Celui que porte n'importe qui
+ * connaissant l'URL du projet et la clé anonyme, laquelle voyage dans le bundle
+ * de l'application. L'audit du distant du 2026-08-17 a montré que la plateforme
+ * lui accorde d'office l'écriture sur toute table du schéma ; il faut donc le
+ * tester, pas le supposer inoffensif.
+ */
+export const anonyme: SupabaseClient = createClient(url, anonKey, sansSession);
+
 const MOT_DE_PASSE = 'kolek-test-2026';
 const creesDansCeFichier: string[] = [];
 

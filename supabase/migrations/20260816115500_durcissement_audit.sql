@@ -236,6 +236,31 @@ create index retraits_collecteur_idx  on public.retraits(collecteur_id);
 create index audit_log_collecteur_idx on public.audit_log(collecteur_id, survenu_le desc);
 
 -- ---------------------------------------------------------------------------
+-- 8. anon n'écrit nulle part
+-- ---------------------------------------------------------------------------
+-- Découvert au premier déploiement distant, le 2026-08-16 : le garde-fou
+-- ci-dessous a refusé la migration sur le projet cloud alors qu'elle passait en
+-- local. Sept privilèges de colonne restaient accordés à `anon`, qu'aucune
+-- migration de ce dépôt n'a jamais donnés — ils viennent des privilèges par
+-- défaut de la plateforme Supabase, qui accorde à `anon` ce que le conteneur
+-- local ne lui accorde pas. Troisième divergence de la même famille, après
+-- l'exposition automatique des tables et le TRUNCATE de la migration
+-- précédente.
+--
+-- Ce n'était pas une porte ouverte : RLS refuse `anon` sur les neuf tables, et
+-- les sections 1 à 3 ci-dessus n'avaient rendu au serveur que les colonnes de
+-- `authenticated`. Mais une défense qui ne tient que par la couche du dessus
+-- n'est plus une défense en profondeur, et le produit n'a aucun usage d'un rôle
+-- anonyme capable d'écrire : on se connecte avant de toucher la moindre donnée.
+--
+-- On coupe donc à la racine plutôt que colonne par colonne — une liste de
+-- colonnes serait à tenir à jour à chaque table ajoutée, et c'est exactement ce
+-- genre de liste qu'on oublie.
+revoke insert, update, delete on all tables in schema public from anon;
+alter default privileges in schema public
+  revoke insert, update, delete on tables from anon;
+
+-- ---------------------------------------------------------------------------
 -- Garde-fou — les colonnes rendues au serveur ne doivent pas revenir
 -- ---------------------------------------------------------------------------
 -- Même principe que le contrôle de la migration précédente : la reconstruction
@@ -265,5 +290,27 @@ begin
 
   if restants is not null then
     raise exception 'Colonnes réservées au serveur encore accordées : %', restants;
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- Garde-fou — anon reste sans aucune écriture
+-- ---------------------------------------------------------------------------
+-- Le contrôle ci-dessus énumère des colonnes connues. Il n'aurait rien vu si la
+-- plateforme accordait demain une écriture à `anon` sur une table ajoutée en
+-- J2a. Celui-ci ne liste rien : il refuse la catégorie entière, sur toute table
+-- présente ou future du schéma.
+do $$
+declare restants text;
+begin
+  select string_agg(distinct table_name || '.' || privilege_type, ', ' order by table_name || '.' || privilege_type)
+    into restants
+    from information_schema.table_privileges
+   where table_schema = 'public'
+     and grantee = 'anon'
+     and privilege_type in ('INSERT', 'UPDATE', 'DELETE');
+
+  if restants is not null then
+    raise exception 'Le rôle anonyme peut écrire : %. Aucun rôle non authentifié ne doit écrire dans Kolek.', restants;
   end if;
 end $$;
