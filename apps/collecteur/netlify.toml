@@ -6,6 +6,16 @@
 [build]
   command = "cd ../.. && npm ci && npm run build -w @kolek/collecteur"
   publish = "dist"
+  # Piège de monorepo. Un répertoire de base réglé fait décider Netlify de
+  # reconstruire ou non en regardant si *ce répertoire* a changé. Or cette
+  # application vit surtout dans `packages/ui` et `packages/core`. Sans cette
+  # ligne, une correction faite dans un paquet partagé ne déclenche rien : le
+  # site reste sur l'ancienne version, et aucun signal ne le dit. Le premier
+  # symptôme serait un écran corrigé en local et cassé en ligne.
+  #
+  # Convention Netlify : code de sortie 0 = ne pas construire. `git diff
+  # --quiet` rend 0 quand rien n'a bougé — c'est exactement ce qu'on veut.
+  ignore = "cd ../.. && git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/collecteur packages"
 
 [build.environment]
   NODE_VERSION = "26"
