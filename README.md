@@ -11,10 +11,12 @@ registres — voir `Docs/Kolek Cahier de charges consolide.md` §11.
 | Dossier | Contenu |
 |---|---|
 | `Docs/` | Cahier de charges, Design System, spécifications et plans |
-| `packages/core/` | Moteur de calcul, formatage FCFA, tokens du Design System |
+| `packages/core/` | Moteur de calcul, formatage FCFA, paliers tarifaires, tokens du Design System |
+| `packages/ui/` | Composants partagés par les trois applications |
 | `supabase/` | Migrations, Edge Functions, tests de base |
 | `apps/collecteur/` | PWA terrain, hors-ligne d'abord |
 | `apps/admin/` | Dashboard de pilotage GTCS |
+| `apps/site/` | Site public — grille tarifaire. Aucune session, aucune donnée |
 
 ## Démarrer
 
@@ -31,6 +33,7 @@ cp apps/admin/.env.example apps/admin/.env
 
 npm run dev -w @kolek/collecteur
 npm run dev -w @kolek/admin
+npm run dev -w @kolek/site      # aucun .env : le site ne parle à aucune API
 ```
 
 ### Si `npm run db:start` échoue localement
@@ -47,10 +50,15 @@ npx supabase start --exclude realtime,storage-api,imgproxy,studio,edge-runtime,l
 ## Tests
 
 ```bash
-npm test              # moteur de calcul et formatage
-npm run test:db       # contraintes, idempotence, immuabilité, isolation RLS
-npm run verifier:j1   # les cinq vérifications du jalon J1
+npm test               # moteur de calcul, formatage, paliers, composants
+npm run test:scripts   # garde-fous d'outillage
+npm run test:db        # contraintes, idempotence, immuabilité, isolation RLS
+npm run verifier       # tout ce qui précède, plus thème, build et fuite de clé
 ```
+
+`npm run verifier` réinitialise la base locale. C'est la seule commande à lancer
+avant de pousser : elle échoue si un artefact de build manque, plutôt que de
+contrôler ce qui reste d'un build précédent.
 
 ## Règles à ne pas contourner
 
