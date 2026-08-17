@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+@import '@kolek/core/theme.css';
+@import '@kolek/core/base.css';
+
+/* Tailwind n'explore que le répertoire du build. Les composants partagés vivent
+   hors de `apps/site` : sans cette ligne, leurs classes n'existeraient dans
+   aucune feuille de style et la page sortirait sans mise en forme. */
+@source '../../../packages/ui/src';
+
+/* `base.css` pose un fond clair, celui des deux applications. La page de tarifs
+   est la seule surface sombre du produit : elle le corrige ici plutôt que sur
+   un `div`, pour que le sur-défilement d'un téléphone ne découvre pas une
+   bande blanche sous le pied de page. */
+body {
+  background: var(--color-dark-canvas);
+}

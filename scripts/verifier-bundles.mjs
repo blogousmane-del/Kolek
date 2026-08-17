@@ -44,7 +44,10 @@ export function chercherFuites(dossier) {
 // dernier échoue sous Windows (séparateurs `\`, absence d'encodage URL), ce
 // qui empêche silencieusement le bloc CLI de s'exécuter.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const dossiers = ['apps/collecteur/dist', 'apps/admin/dist'];
+  // Toute application publiée entre ici. Le site public n'appelle aucune API
+  // aujourd'hui, mais un artefact non contrôlé est un artefact où une clé peut
+  // arriver sans que personne ne le voie.
+  const dossiers = ['apps/collecteur/dist', 'apps/admin/dist', 'apps/site/dist'];
 
   const manquants = dossiers.filter((dossier) => !existsSync(dossier));
   if (manquants.length > 0) {

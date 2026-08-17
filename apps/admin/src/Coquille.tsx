@@ -1,8 +1,11 @@
 import { BandeauOffre, BarreLaterale, type CleNavAdmin } from '@kolek/ui';
 import { useState } from 'react';
 
+import { Abonnements } from './ecrans/Abonnements';
 import { Collecteurs } from './ecrans/Collecteurs';
 import { DetailCollecteur } from './ecrans/DetailCollecteur';
+import { EncaisserMise } from './ecrans/EncaisserMise';
+import { EncoursSoldes } from './ecrans/EncoursSoldes';
 import { TableauDeBord } from './ecrans/TableauDeBord';
 import { supabase } from './supabase';
 
@@ -48,6 +51,9 @@ export function Coquille() {
           {page === 'tableau' && <TableauDeBord />}
           {page === 'collecteurs' && <Collecteurs onOuvrirCollecteur={() => setPage('detail')} />}
           {page === 'detail' && <DetailCollecteur onRetour={() => setPage('collecteurs')} />}
+          {page === 'encours' && <EncoursSoldes />}
+          {page === 'encaisser' && <EncaisserMise />}
+          {page === 'abonnements' && <Abonnements />}
         </div>
       </div>
     </div>

@@ -1,6 +1,13 @@
 import { Icone, type NomIcone } from './Icone';
 
-export type CleNavAdmin = 'tableau' | 'collecteurs' | 'encours' | 'transactions' | 'zones';
+export type CleNavAdmin =
+  | 'tableau'
+  | 'collecteurs'
+  | 'encours'
+  | 'transactions'
+  | 'zones'
+  | 'encaisser'
+  | 'abonnements';
 
 interface Entree {
   cle: CleNavAdmin;
@@ -14,9 +21,16 @@ interface Entree {
 const PILOTAGE: Entree[] = [
   { cle: 'tableau', icone: 'layout-dashboard', libelle: 'Tableau de bord', disponible: true },
   { cle: 'collecteurs', icone: 'users', libelle: 'Collecteurs', disponible: true },
-  { cle: 'encours', icone: 'wallet', libelle: 'Encours & Soldes', disponible: false },
+  { cle: 'encours', icone: 'wallet', libelle: 'Encours & Soldes', disponible: true },
+  { cle: 'encaisser', icone: 'circle-dollar-sign', libelle: 'Encaisser', disponible: true },
   { cle: 'transactions', icone: 'receipt', libelle: 'Transactions', disponible: false },
   { cle: 'zones', icone: 'map-pin', libelle: 'Zones & Marchés', disponible: false },
+];
+
+/** La monétisation est le métier de GTCS, pas celui d'un collecteur : elle a sa
+    propre section plutôt que de se glisser dans le pilotage terrain. */
+const MONETISATION: Entree[] = [
+  { cle: 'abonnements', icone: 'credit-card', libelle: 'Abonnements', disponible: true },
 ];
 
 const RACCOURCIS: Array<{ icone: NomIcone; libelle: string }> = [
@@ -28,6 +42,61 @@ interface Props {
   actif: CleNavAdmin;
   onNaviguer: (cle: CleNavAdmin) => void;
   onDeconnexion: () => void;
+}
+
+function Section({
+  titre,
+  entrees,
+  actif,
+  onNaviguer,
+  className = 'px-4 mb-1',
+}: {
+  titre: string;
+  entrees: Entree[];
+  actif: CleNavAdmin;
+  onNaviguer: (cle: CleNavAdmin) => void;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <p className="text-xs font-body font-semibold uppercase tracking-widest text-white/30 px-2 mb-2">
+        {titre}
+      </p>
+      {entrees.map((entree) => {
+        const estActif = entree.cle === actif;
+        return (
+          <button
+            key={entree.cle}
+            type="button"
+            disabled={!entree.disponible}
+            // Pas d'étiquette « à venir » : elle volait la largeur du libellé
+            // et faisait passer « Encours & Soldes » sur deux lignes. Le
+            // contraste réduit et l'état `disabled` disent la même chose sans
+            // déformer la barre.
+            title={entree.disponible ? undefined : 'Écran à venir'}
+            onClick={() => onNaviguer(entree.cle)}
+            className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md mb-0.5 ${
+              estActif ? 'bg-white/10 border-l-2 border-chart-mint' : ''
+            } ${entree.disponible ? 'cursor-pointer' : 'cursor-default'}`}
+          >
+            <Icone
+              nom={entree.icone}
+              className={
+                estActif ? 'text-chart-mint' : entree.disponible ? 'text-white/50' : 'text-white/25'
+              }
+            />
+            <span
+              className={`text-base font-body font-medium whitespace-nowrap ${
+                estActif ? 'text-white' : entree.disponible ? 'text-white/60' : 'text-white/30'
+              }`}
+            >
+              {entree.libelle}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export function BarreLaterale({ actif, onNaviguer, onDeconnexion }: Props) {
@@ -49,44 +118,14 @@ export function BarreLaterale({ actif, onNaviguer, onDeconnexion }: Props) {
         </div>
       </div>
 
-      <div className="px-4 mb-1">
-        <p className="text-xs font-body font-semibold uppercase tracking-widest text-white/30 px-2 mb-2">
-          Pilotage
-        </p>
-        {PILOTAGE.map((entree) => {
-          const estActif = entree.cle === actif;
-          return (
-            <button
-              key={entree.cle}
-              type="button"
-              disabled={!entree.disponible}
-              // Pas d'étiquette « à venir » : elle volait la largeur du libellé
-              // et faisait passer « Encours & Soldes » sur deux lignes. Le
-              // contraste réduit et l'état `disabled` disent la même chose sans
-              // déformer la barre.
-              title={entree.disponible ? undefined : 'Écran à venir'}
-              onClick={() => onNaviguer(entree.cle)}
-              className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md mb-0.5 ${
-                estActif ? 'bg-white/10 border-l-2 border-chart-mint' : ''
-              } ${entree.disponible ? 'cursor-pointer' : 'cursor-default'}`}
-            >
-              <Icone
-                nom={entree.icone}
-                className={
-                  estActif ? 'text-chart-mint' : entree.disponible ? 'text-white/50' : 'text-white/25'
-                }
-              />
-              <span
-                className={`text-base font-body font-medium whitespace-nowrap ${
-                  estActif ? 'text-white' : entree.disponible ? 'text-white/60' : 'text-white/30'
-                }`}
-              >
-                {entree.libelle}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <Section titre="Pilotage" entrees={PILOTAGE} actif={actif} onNaviguer={onNaviguer} />
+      <Section
+        titre="Monétisation"
+        entrees={MONETISATION}
+        actif={actif}
+        onNaviguer={onNaviguer}
+        className="px-4 mt-4 mb-1"
+      />
 
       <div className="px-4 mt-4 mb-1">
         <p className="text-xs font-body font-semibold uppercase tracking-widest text-white/30 px-2 mb-2">

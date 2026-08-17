@@ -1,0 +1,41 @@
+# Site public Kolek — page de tarifs.
+# Le répertoire de base du site doit être réglé sur `apps/site` dans Netlify :
+# c'est ce qui fait lire ce fichier. La commande remonte ensuite à la racine du
+# dépôt, où vivent les workspaces npm et le fichier de verrouillage.
+
+[build]
+  command = "cd ../.. && npm ci && npm run build -w @kolek/site"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "26"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Contrairement aux deux applications, ce site a vocation à être indexé : c'est
+# la surface commerciale. Pas de `X-Robots-Tag: noindex` ici.
+#
+# La CSP est plus stricte que celle des applications : aucune donnée ne quitte
+# cette page, donc `connect-src 'self'` sans exception Supabase. À élargir le
+# jour où le tunnel de commande s'adresse à un partenaire de paiement — et ce
+# jour-là, à l'origine exacte de ce partenaire, pas à un joker.
+#
+# `style-src` accepte l'inline pour la même raison que dans les applications :
+# le repli statique de `index.html` porte ses styles en attribut.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), geolocation=(), microphone=()"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
