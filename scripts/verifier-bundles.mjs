@@ -2,7 +2,9 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const MOTIFS = [
+// Exporté : `verifier-en-ligne.mjs` applique les mêmes motifs, mais aux
+// fichiers réellement servis par Netlify plutôt qu'au dossier `dist` local.
+export const MOTIFS = [
   { nom: 'libellé service_role', regex: /service_role/ },
   {
     nom: 'JWT de rôle service',
@@ -13,6 +15,11 @@ const MOTIFS = [
   },
   { nom: 'clé secrète Supabase', regex: /sb_secret_[A-Za-z0-9_-]{8,}/ },
 ];
+
+/** Renvoie les noms des motifs de fuite trouvés dans un texte. */
+export function chercherFuitesTexte(texte) {
+  return MOTIFS.filter((motif) => motif.regex.test(texte)).map((motif) => motif.nom);
+}
 
 function fichiers(dossier) {
   return readdirSync(dossier).flatMap((entree) => {

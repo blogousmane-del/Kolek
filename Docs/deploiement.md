@@ -119,6 +119,15 @@ Trois sites distincts sur le même dépôt, conformément au dossier stratégiqu
 | `kolek-admin` | `apps/admin` | `apps/admin/netlify.toml` | GTCS et gérants |
 | `kolek-site` | `apps/site` | `apps/site/netlify.toml` | Public — grille tarifaire |
 
+En ligne depuis le 2026-08-18, équipe `blog-ousmane`, publiés à la main depuis
+les artefacts locaux :
+
+| Site | URL | Identifiant |
+|---|---|---|
+| `kolek-collecteur` | https://kolek-collecteur.netlify.app | `56d28aa0-de05-4a92-b384-4a576685fe47` |
+| `kolek-admin` | https://kolek-admin.netlify.app | `401e55b2-0aaa-4f02-a21a-18e777bf9369` |
+| `kolek-site` | https://kolek-site.netlify.app | `eae737cb-2247-49d6-a190-2a662f9af5e2` |
+
 Le dossier stratégique n'en prévoyait que deux : les deux applications. Le site
 public est venu après, avec les maquettes de tarifs. Il ne partage avec elles que
 `@kolek/ui` et `@kolek/core` — aucun compte, aucune session, aucune donnée.
@@ -129,6 +138,53 @@ branchés directement, plutôt que déployés à la main par
 `npx netlify deploy --prod`. Le dépôt est **public** : rien de secret ne doit y
 entrer, et `npm run verifier:bundles` ne contrôle que les artefacts, pas les
 sources.
+
+**Déploiement à la main, depuis Windows.** Tant que les trois sites ne sont pas
+branchés sur GitHub, la publication passe par la CLI — et quatre pièges s'y
+succèdent, tous propres à Windows, tous silencieux ou trompeurs :
+
+| Symptôme | Cause | Ce qu'il faut faire |
+|---|---|---|
+| `ERR_USE_AFTER_CLOSE: readline was closed` | La sous-commande ouvre une invite interactive, il n'y a pas de clavier | Passer par `netlify api <methode> --data '{...}'`, qui ne demande rien |
+| `'C:\Program' n'est pas reconnu` | `npx.cmd` passe par `cmd.exe`, qui casse la citation dès qu'un argument contient une espace — ici `--message "..."` | Supprimer l'argument, ou l'écrire sans espace |
+| `npm error code EPERM ... unlink` pendant un déploiement | `netlify deploy` exécute par défaut la commande de build du `netlify.toml`, donc `npm ci`, qui **efface `node_modules`** avant de réinstaller. Un binaire verrouillé par l'antivirus fait échouer l'effacement à mi-chemin | `--no-build` quand les artefacts sont déjà construits. Réparer ensuite par `npm install` |
+| `The deploy directory "…\Kolek\dist" has not been found` | `--dir` est résolu depuis la racine du dépôt, pas depuis le répertoire courant | Donner un chemin absolu : `--dir C:/…/apps/<app>/dist` |
+
+La commande qui fonctionne, depuis le répertoire de l'application :
+
+```
+npx.cmd --no-install netlify deploy --prod --no-build --dir C:/…/apps/<app>/dist
+```
+
+Le `netlify.toml` du répertoire courant est bien lu — c'est lui qui pose les
+en-têtes et les réécritures, y compris avec `--no-build`. C'est précisément ce
+que `npm run verifier:en-ligne` va constater sur les URL réelles.
+
+Pour les appels `netlify api`, dont le corps est du JSON, aucun de ces contours
+ne suffit : sous Git Bash la ligne casse, et PowerShell mange les guillemets.
+La forme qui passe est PowerShell avec les guillemets échappés :
+
+```powershell
+npx.cmd --no-install netlify api updateSite --data '{\"site_id\":\"…\",\"body\":{…}}'
+```
+
+**Les sites naissent privés — 401 sur tout.** Une équipe Netlify créée
+aujourd'hui porte `account_sso_login: true`, et chaque site hérite d'un
+`sso_login: true` qui renvoie une page « Login Redirect » vers
+`app.netlify.com/edge-access`. Ce n'est ni un défaut de déploiement ni une CSP :
+le site est publié et correct, mais réservé aux membres de l'équipe. Rien dans
+la sortie de `netlify deploy` ne le signale — elle annonce une URL de production
+qui répond 401 au premier visiteur.
+
+À lever site par site, une fois, après création :
+
+```powershell
+npx.cmd --no-install netlify api updateSite --data '{\"site_id\":\"…\",\"body\":{\"sso_login\":false}}'
+```
+
+Le Dashboard admin n'y gagne aucune exposition indue : sa protection est le
+portillon applicatif et `X-Robots-Tag: noindex`, pas un mur d'équipe Netlify qui
+aurait aussi bloqué les GTCS.
 
 Un piège de monorepo à connaître avant de brancher : quand un répertoire de base
 est réglé, Netlify décide de reconstruire ou non en regardant si ce répertoire a
@@ -193,6 +249,21 @@ de la vérification.
 
 Le déploiement n'est pas terminé tant que ces points ne sont pas constatés sur
 l'environnement distant, pas sur le local.
+
+Une partie se contrôle sans les mains :
+
+```
+npm run verifier:en-ligne
+```
+
+Le script interroge les trois URL réelles et échoue au premier manquement. Il
+couvre les en-têtes de sécurité, les directives de CSP qui portent le risque, la
+présence de la clé anonyme dans les deux applications et son absence du site
+public, la recherche de clé de service dans chaque artefact **servi**, la
+réécriture des routes inconnues, et les en-têtes de cache du service worker et
+du manifeste. Ce qu'il ne peut pas voir reste manuel : une violation de CSP ne
+se constate qu'en ouvrant la console, et un portillon ne se teste qu'avec un
+vrai compte.
 
 1. **Le schéma est bien celui attendu.** Rejouer l'audit des privilèges sur le
    projet distant : RLS active sur les neuf tables, politiques identiques,
