@@ -342,6 +342,31 @@ describe('liste blanche de privilèges — audit du distant, 2026-08-17', () => 
     expect(suppression.error!.code).toBe('42501');
   });
 
+  it('ne déclare pas une caisse en négatif — audit des 20 contrôles, 2026-08-18', async () => {
+    // `cash_declare` est la seule colonne monétaire que le collecteur écrit
+    // lui-même. `ecart` s'en déduit. Un négatif fabriquait un écart de
+    // rapprochement à partir de rien.
+    const jour = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+
+    const negatif = await a.client
+      .from('caisses_jour')
+      .insert({ collecteur_id: a.id, date: jour, cash_declare: -50_000 });
+    expect(negatif.error!.code).toBe('23514');
+
+    const honnete = await a.client
+      .from('caisses_jour')
+      .insert({ collecteur_id: a.id, date: jour, cash_declare: 0 });
+    expect(honnete.error).toBeNull();
+
+    // La correction d'une caisse déjà ouverte suit la même règle.
+    const correctionFautive = await a.client
+      .from('caisses_jour')
+      .update({ cash_declare: -1 })
+      .eq('collecteur_id', a.id)
+      .eq('date', jour);
+    expect(correctionFautive.error!.code).toBe('23514');
+  });
+
   it('ne lit rien sans session, malgré la clé publique', async () => {
     // La clé anonyme n'est pas un secret — elle est publique par construction,
     // elle voyage dans le bundle. Ce qui protège les données, c'est qu'elle
