@@ -48,6 +48,12 @@
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(self), geolocation=(), microphone=()"
+    # Posé le 2026-08-18. L'audit a constaté que cette application était
+    # indexable alors que le dashboard ne l'était pas : une incohérence, pas une
+    # brèche — la page d'accueil est un écran de connexion. Les deux outils
+    # internes se tiennent maintenant pareil. Seul `apps/site` est indexable, et
+    # c'est écrit dans son propre netlify.toml.
+    X-Robots-Tag = "noindex, nofollow"
 
 # Le service worker ne doit jamais être servi depuis un cache : c'est lui qui
 # porte les mises à jour de l'application. Un sw.js périmé fige la version

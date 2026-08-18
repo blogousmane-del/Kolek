@@ -1,0 +1,6 @@
+# Le site public est la surface commerciale : il a vocation à être indexé.
+# C'est le seul des trois. L'autorisation est écrite explicitement plutôt que
+# laissée à l'absence de fichier — sans ce fichier, la réécriture `/*` répond à
+# `/robots.txt` par du HTML, et l'intention ne se lit nulle part.
+User-agent: *
+Allow: /

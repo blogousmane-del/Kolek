@@ -224,3 +224,47 @@ tient en une phrase : **aucun test ne posait la question.** Celui-ci refuse une
 caisse déclarée en négatif, à l'insertion comme à la correction.
 
 Ce qui reste ouvert est à ton tableau de bord Supabase — les trois ⚪️ plus haut.
+
+---
+
+## Audit de contrôle, même jour — un constat de plus
+
+Le second passage a sondé trois choses que le premier n'avait pas faites, et
+c'est là que se trouve l'intérêt d'un audit de contrôle : refaire les mêmes
+requêtes n'apprend rien.
+
+```
+OpenAPI /rest/v1/            401   schéma non énumérable
+rpc est_admin sans session   401   permission denied for function
+source maps                  aucune, ni construite ni servie
+```
+
+La première mérite qu'on s'y arrête. Sur la plupart des projets Supabase,
+`/rest/v1/` rend la liste complète des tables et de leurs colonnes à qui détient
+la clé anonyme — une carte du schéma, offerte. Ici, refus. Ce n'est pas un
+réglage : c'est la conséquence directe du `revoke` de la migration 7.
+
+### 🟡 L'application du collecteur était indexable — corrigé
+
+```
+collecteur  x-robots-tag : absent
+admin       x-robots-tag : noindex, nofollow
+site        x-robots-tag : absent   (voulu)
+```
+
+Et `/robots.txt` répondait `200` en `text/html` sur les trois : la réécriture
+`/*` vers `/index.html` l'avalait. Aucun des trois sites n'avait donc de vrai
+`robots.txt` — un moteur recevait une page là où il attend des règles, et en
+concluait qu'il n'y en avait aucune.
+
+Pas une faille : la page d'accueil du collecteur est un écran de connexion. Mais
+une incohérence que ce dépôt avait lui-même signalée, au point 7 de la
+vérification de déploiement, et laissée en suspens.
+
+Corrigé le 2026-08-18. `X-Robots-Tag: noindex, nofollow` sur le collecteur, et
+un `robots.txt` réel dans le `public/` des trois — `Disallow: /` pour les deux
+outils internes, `Allow: /` pour la surface commerciale. Les deux mécanismes ne
+disent pas la même chose : l'en-tête dit « n'indexe pas ce que tu as lu », le
+fichier dit « ne le lis pas ». `verifier:en-ligne` contrôle désormais les deux,
+et dans les deux sens — il échoue aussi si le site public se retrouvait marqué
+`noindex`.

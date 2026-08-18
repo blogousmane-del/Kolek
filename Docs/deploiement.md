@@ -297,12 +297,20 @@ vrai compte.
    sécurisé, donc c'est le premier test qui a du sens hors du local. Ne concerne
    que les deux applications : `kolek-site` est une page, pas une application
    installable.
-7. **L'indexation est celle qu'on veut.** `kolek-site` doit être indexable — pas
-   de `X-Robots-Tag` — et `kolek-admin` porte bien `noindex, nofollow`.
-   `kolek-collecteur` n'en porte aucun aujourd'hui : ce n'est pas une brèche,
-   la page d'accueil est un écran de connexion, mais c'est une incohérence avec
-   l'administration. À trancher avant le pilote, pas à découvrir dans un
-   résultat de recherche.
+7. **L'indexation est celle qu'on veut** — tranché le 2026-08-18. Les deux
+   outils internes portent `X-Robots-Tag: noindex, nofollow` et un `robots.txt`
+   en `Disallow: /` ; `kolek-site`, seule surface commerciale, n'a pas d'en-tête
+   et autorise explicitement.
+
+   Le fichier compte autant que l'en-tête, et pour une raison qui ne se devine
+   pas : la réécriture `/*` vers `/index.html` répond à `/robots.txt` par du
+   HTML en 200. Un moteur reçoit une page là où il attend des règles, et conclut
+   qu'il n'y en a aucune. Le fichier doit donc exister réellement dans
+   `public/` — Netlify sert les fichiers présents avant d'appliquer la
+   réécriture. Les deux mécanismes ne disent d'ailleurs pas la même chose :
+   l'en-tête dit « n'indexe pas ce que tu as lu », le fichier dit « ne le lis
+   pas ». `npm run verifier:en-ligne` contrôle les deux, dans les deux sens —
+   il échoue aussi si le site public se retrouvait marqué `noindex`.
 8. **Les comptes de test sont supprimés** du projet de production avant le pilote.
 
 ---

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyserCsp, assetsDe, hstsSuffisant } from './verifier-en-ligne.mjs';
+import { CIBLES, analyserCsp, assetsDe, hstsSuffisant } from './verifier-en-ligne.mjs';
 
 // Le script parle au réseau : ce qui est testable ici, ce sont les deux
 // fonctions qui décident si la réponse est conforme. Une CSP mal découpée fait
@@ -28,6 +28,24 @@ describe('analyserCsp', () => {
   it('laisse voir un joker plutôt que de le normaliser', () => {
     const d = analyserCsp("connect-src 'self' https://*.supabase.co");
     expect(d['connect-src'].some((source) => source.includes('*'))).toBe(true);
+  });
+});
+
+describe('les attentes déclarées par cible', () => {
+  it('ne rend indexable que le site public', () => {
+    const indexables = CIBLES.filter((c) => c.robots === null).map((c) => c.nom);
+    expect(indexables).toEqual(['site']);
+  });
+
+  it('accorde en-tête et fichier : ce qui est noindex refuse aussi la lecture', () => {
+    for (const cible of CIBLES) {
+      const attendue = cible.robots === null ? 'Allow: /' : 'Disallow: /';
+      expect(cible.robotsRegle, `${cible.nom} : règle robots.txt incohérente`).toBe(attendue);
+    }
+  });
+
+  it('ne donne la clé Supabase qu’aux deux applications', () => {
+    expect(CIBLES.filter((c) => c.supabase).map((c) => c.nom)).toEqual(['collecteur', 'admin']);
   });
 });
 

@@ -1,0 +1,5 @@
+# Le tableau de bord GTCS est fermé par nature. Voir la note plus longue dans
+# le robots.txt du collecteur : ce fichier double l'en-tête `X-Robots-Tag`, et
+# doit exister réellement pour ne pas être avalé par la réécriture `/*`.
+User-agent: *
+Disallow: /

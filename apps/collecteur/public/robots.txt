@@ -1,0 +1,14 @@
+# L'application du collecteur n'a rien à faire dans un index. Sa page d'accueil
+# est un écran de connexion : un résultat de recherche n'apporterait rien à
+# personne, sinon un point d'entrée à qui cherche des cibles.
+#
+# Ce fichier double l'en-tête `X-Robots-Tag` du netlify.toml, et ce n'est pas
+# une redondance inutile : l'en-tête dit « n'indexe pas ce que tu as lu », le
+# robots.txt dit « ne le lis pas ». Les robots qui ignorent l'un respectent
+# souvent l'autre.
+#
+# Il doit exister comme fichier réel dans `public/`. Sans lui, la réécriture
+# `/*` vers `/index.html` répond à `/robots.txt` par du HTML en 200 — ce qu'un
+# moteur interprète comme l'absence de toute règle.
+User-agent: *
+Disallow: /

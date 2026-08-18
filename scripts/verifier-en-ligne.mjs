@@ -49,13 +49,15 @@ export function hstsSuffisant(valeur) {
   return Boolean(age) && Number(age[1]) >= 31536000 && /includeSubDomains/i.test(valeur);
 }
 
-const CIBLES = [
+export const CIBLES = [
   {
     nom: 'collecteur',
     url: 'https://kolek-collecteur.netlify.app',
     supabase: true,
     pwa: true,
     permissions: 'camera=(self), geolocation=(), microphone=()',
+    robots: 'noindex, nofollow',
+    robotsRegle: 'Disallow: /',
   },
   {
     nom: 'admin',
@@ -64,6 +66,7 @@ const CIBLES = [
     pwa: false,
     permissions: 'camera=(), geolocation=(), microphone=()',
     robots: 'noindex, nofollow',
+    robotsRegle: 'Disallow: /',
   },
   {
     nom: 'site',
@@ -71,6 +74,10 @@ const CIBLES = [
     supabase: false,
     pwa: false,
     permissions: 'camera=(), geolocation=(), microphone=()',
+    // Le seul des trois qui doit rester indexable : aucun en-tête, et une règle
+    // d'autorisation écrite noir sur blanc plutôt que déduite d'une absence.
+    robots: null,
+    robotsRegle: 'Allow: /',
   },
 ];
 
@@ -95,12 +102,31 @@ async function verifier(cible) {
     racine.headers.get('permissions-policy') === cible.permissions,
     `permissions-policy = ${racine.headers.get('permissions-policy') ?? 'absent'}`,
   );
-  if (cible.robots) {
-    constat(
-      racine.headers.get('x-robots-tag') === cible.robots,
-      `x-robots-tag = ${racine.headers.get('x-robots-tag') ?? 'absent'}`,
-    );
-  }
+  // L'indexation se vérifie dans les deux sens. Un `X-Robots-Tag` oublié sur un
+  // outil interne est une incohérence silencieuse ; le même en-tête posé par
+  // erreur sur le site public le ferait disparaître des moteurs sans qu'aucune
+  // alerte ne le dise.
+  const robotsEnTete = racine.headers.get('x-robots-tag');
+  constat(
+    robotsEnTete === (cible.robots ?? null),
+    `x-robots-tag = ${robotsEnTete ?? 'absent'} (attendu : ${cible.robots ?? 'absent'})`,
+  );
+
+  // Et le fichier, qui doit exister réellement. Sans lui, la réécriture `/*`
+  // rend `index.html` en 200 : un moteur reçoit du HTML là où il attend des
+  // règles, et conclut qu'il n'y en a aucune.
+  const robots = await fetch(`${cible.url}/robots.txt`);
+  constat(robots.ok, `/robots.txt renvoie ${robots.status}`);
+  const typeRobots = robots.headers.get('content-type') ?? '';
+  constat(
+    typeRobots.includes('text/plain'),
+    `/robots.txt sert ${typeRobots} — la réécriture SPA l'a probablement avalé`,
+  );
+  const regleRobots = await robots.text();
+  constat(
+    regleRobots.includes(cible.robotsRegle),
+    `/robots.txt ne contient pas « ${cible.robotsRegle} »`,
+  );
 
   // La CSP. Les directives qui portent le risque : d'où vient le code, à qui
   // l'application peut parler, et qui a le droit de l'encadrer.
