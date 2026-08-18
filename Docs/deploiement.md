@@ -196,12 +196,45 @@ par site, qui déclenche aussi sur les paquets :
 
 ```toml
 [build]
-  ignore = "cd ../.. && git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/site packages"
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/site packages"
 ```
 
 À poser dans les trois `netlify.toml`, chacun avec son propre chemin
 d'application. Sans quoi le premier symptôme sera un écran corrigé en local qui
 reste cassé en ligne.
+
+**Le second piège, celui qui a fait échouer la première construction en
+intégration continue.** Le répertoire de base fait lire le bon `netlify.toml`,
+et rien de plus : Netlify le traite comme un *packagePath* et lance la
+construction **depuis la racine du dépôt**. Le journal du 2026-08-18 :
+
+```
+Current directory  /opt/build/repo
+Config file        /opt/build/repo/apps/site/netlify.toml
+```
+
+Les trois fichiers commençaient leur commande par `cd ../..`, en supposant
+l'inverse. La construction sortait donc du dépôt, vers `/opt/build`, et échouait
+sur un `package-lock.json` introuvable — alors qu'il est versionné, 310 Ko. Le
+message d'erreur, lui, accusait le fichier de verrouillage :
+
+```
+npm error The `npm ci` command can only install with an existing package-lock.json
+```
+
+Même cause pour la publication : `publish = "dist"` désignait `/opt/build/repo/dist`,
+qui n'existe pas.
+
+**La règle, une fois pour toutes : tous les chemins d'un `netlify.toml` se
+résolvent depuis la racine du dépôt.** Elle vaut aussi pour `netlify deploy
+--dir` en local, où le même symptôme s'était produit sans qu'on en tire la
+leçon. D'où, dans chacun des trois fichiers :
+
+```toml
+[build]
+  command = "npm ci && npm run build -w @kolek/site"
+  publish = "apps/site/dist"
+```
 
 **Variables d'environnement.** Uniquement sur les deux applications :
 

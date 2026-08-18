@@ -1,14 +1,25 @@
 # Site Netlify du Dashboard Admin.
-# Le répertoire de base du site doit être réglé sur `apps/admin` dans Netlify :
-# c'est ce qui fait lire ce fichier. La commande remonte ensuite à la racine du
-# dépôt, où vivent les workspaces npm et le fichier de verrouillage.
+#
+# Le répertoire `apps/admin` est réglé dans Netlify : c'est ce qui fait lire ce
+# fichier plutôt qu'un autre. Mais attention à ce qu'il ne fait PAS — Netlify le
+# traite comme un *packagePath* et lance la construction depuis la racine du
+# dépôt, pas depuis lui. Le journal du 2026-08-18 le dit noir sur blanc :
+#
+#   Current directory  /opt/build/repo
+#   Config file        /opt/build/repo/apps/admin/netlify.toml
+#
+# **Tous les chemins ci-dessous se résolvent donc depuis la racine du dépôt.**
+# La première version de ce fichier faisait `cd ../..` en tête de commande, en
+# supposant l'inverse : la construction sortait du dépôt et `npm ci` échouait
+# sur un `package-lock.json` introuvable, alors qu'il est bien versionné. Et
+# `publish = "dist"` désignait un `dist` à la racine, qui n'existe pas.
 
 [build]
-  command = "cd ../.. && npm ci && npm run build -w @kolek/admin"
-  publish = "dist"
+  command = "npm ci && npm run build -w @kolek/admin"
+  publish = "apps/admin/dist"
   # Voir la note longue dans le netlify.toml du collecteur : sans cette ligne,
   # une correction dans `packages/` ne reconstruit pas ce site.
-  ignore = "cd ../.. && git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/admin packages"
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/admin packages"
 
 [build.environment]
   NODE_VERSION = "26"
