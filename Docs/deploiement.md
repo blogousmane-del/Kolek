@@ -132,12 +132,43 @@ Le dossier stratégique n'en prévoyait que deux : les deux applications. Le sit
 public est venu après, avec les maquettes de tarifs. Il ne partage avec elles que
 `@kolek/ui` et `@kolek/core` — aucun compte, aucune session, aucune donnée.
 
-**Déploiement continu.** Le dépôt est désormais sur GitHub
-(`blogousmane-del/Kolek`, branche `main`) : les trois sites peuvent y être
-branchés directement, plutôt que déployés à la main par
-`npx netlify deploy --prod`. Le dépôt est **public** : rien de secret ne doit y
-entrer, et `npm run verifier:bundles` ne contrôle que les artefacts, pas les
-sources.
+**Déploiement continu — en place depuis le 2026-08-18.** Les trois projets
+Netlify sont branchés sur `blogousmane-del/Kolek`, branche `main` : un `git
+push` reconstruit et republie. Le déploiement manuel décrit plus bas ne sert
+plus qu'au dépannage. Le dépôt est **public** : rien de secret ne doit y entrer,
+et `npm run verifier:bundles` ne contrôle que les artefacts, pas les sources.
+
+Trois champs par projet, et c'est **Package directory** qui compte — pas
+*Base directory*, qui reste à `/` :
+
+| Projet | Package directory | Build command | Publish directory |
+|---|---|---|---|
+| `kolek-collecteur` | `apps/collecteur` | `npm ci && npm run build -w @kolek/collecteur` | `apps/collecteur/dist` |
+| `kolek-admin` | `apps/admin` | `npm ci && npm run build -w @kolek/admin` | `apps/admin/dist` |
+| `kolek-site` | `apps/site` | `npm ci && npm run build -w @kolek/site` | `apps/site/dist` |
+
+**Vérifier le nom du projet avant de saisir.** Le 2026-08-18, `kolek-site` a reçu
+`apps/admin` dans ces trois champs : le tableau de bord d'administration s'est
+retrouvé publié sur l'URL commerciale, en `noindex`, avec la CSP de l'admin. Rien
+n'était compromis — le portillon `est_admin()` tient — mais la page de tarifs
+avait disparu de son propre domaine, et la seule chose qui l'a signalé est
+`npm run verifier:en-ligne` :
+
+```
+site  3 manquement(s)
+  x-robots-tag = noindex, nofollow (attendu : absent)
+  /robots.txt ne contient pas « Allow: / »
+  connect-src du site public devrait valoir 'self' seul
+```
+
+Ni Netlify ni la construction n'ont rien dit : de leur point de vue tout s'était
+bien passé. C'est la raison d'être de ce script — un déploiement vert n'est pas
+un déploiement correct.
+
+Une observation utile au passage : la construction Netlify du site public a
+produit `index-BEeLuKI6.js`, empreinte identique au bit près à celle du build
+local. Deux machines, deux systèmes, même sortie. Une divergence d'empreinte,
+désormais, se lit comme une divergence de source — pas comme du bruit.
 
 **Déploiement à la main, depuis Windows.** Tant que les trois sites ne sont pas
 branchés sur GitHub, la publication passe par la CLI — et quatre pièges s'y
