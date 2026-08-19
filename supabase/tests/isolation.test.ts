@@ -56,7 +56,21 @@ describe('isolation multi-tenant — A face aux données de B', () => {
       montant: 1000,
       encaisse_le: new Date().toISOString(),
     });
-    expect(error!.code).toBe('42501');
+
+    // `P0001` et non plus `42501` depuis la migration 20260819010000. Le refus
+    // venait du `with check` de la politique `mises_insert`, évalué *après* les
+    // déclencheurs BEFORE : l'insertion était bien bloquée, mais les messages
+    // levés entre-temps décrivaient une carte que A ne peut pas lire — son
+    // statut par CARTE_CLOTUREE, son avancement par CYCLE_COMPLET, sa mise
+    // exacte par MONTANT_INVALIDE en quelques essais.
+    //
+    // Le déclencheur tranche maintenant sur la propriété avant tout test
+    // d'état, et se confond avec l'absence. Deux barrières au lieu d'une, et
+    // c'est la plus extérieure qui répond — comme pour la lecture anonyme plus
+    // bas, où le privilège barre avant que RLS ait à filtrer.
+    expect(error!.code).toBe('P0001');
+    expect(error!.message).toContain('CARTE_INTROUVABLE');
+    expect(error!.message).not.toContain('MONTANT_INVALIDE');
   });
 
   it('5. ne modifie pas un client de B', async () => {
