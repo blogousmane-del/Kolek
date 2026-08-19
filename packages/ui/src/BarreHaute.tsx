@@ -4,6 +4,10 @@ export interface ActionBarre {
   icone: NomIcone;
   libelle: string;
   principale?: boolean;
+  /** Même convention que la barre latérale : une action qui ne mène à rien se
+      désactive au lieu de se cliquer dans le vide. Les écrans d'administration
+      sont des maquettes jusqu'à J4 ; ils passent tous `false` aujourd'hui. */
+  disponible?: boolean;
 }
 
 interface Props {
@@ -14,7 +18,7 @@ interface Props {
 
 export function BarreHaute({ filAriane, titre, actions }: Props) {
   return (
-    <div className="bg-canvas px-8 pt-6 pb-4 flex-shrink-0">
+    <div className="bg-canvas px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-4 flex-shrink-0">
       <div className="flex items-center gap-1.5 mb-2">
         {filAriane.map((miette, i) => (
           <span key={miette} className="flex items-center gap-1.5">
@@ -32,23 +36,34 @@ export function BarreHaute({ filAriane, titre, actions }: Props) {
         ))}
       </div>
 
-      <div className="flex items-center justify-between">
-        <h1 className="font-headings font-bold text-3xl text-ink">{titre}</h1>
-        <div className="flex items-center gap-2">
-          {actions.map((action) => (
-            <button
-              key={action.libelle}
-              type="button"
-              className={`flex items-center gap-2 px-4 py-2 rounded-pill text-base font-body font-medium border ${
-                action.principale
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-surface text-ink border-hairline'
-              }`}
-            >
-              <Icone nom={action.icone} taille={15} />
-              {action.libelle}
-            </button>
-          ))}
+      {/* En dessous de `sm`, le titre et les actions s'empilent : sur un écran
+          de 360 px, quatre boutons et un titre de 30 px sur la même ligne
+          débordaient l'un dans l'autre. */}
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="font-headings font-bold text-2xl sm:text-3xl text-ink">{titre}</h1>
+        <div className="flex items-center flex-wrap gap-2">
+          {actions.map((action) => {
+            const disponible = action.disponible ?? true;
+            return (
+              <button
+                key={action.libelle}
+                type="button"
+                disabled={!disponible}
+                // Le libellé disparaît sous `sm` — l'icône suffit à un pouce, et
+                // `aria-label` garde l'intitulé pour les lecteurs d'écran.
+                aria-label={action.libelle}
+                title={disponible ? action.libelle : `${action.libelle} — à venir`}
+                className={`flex items-center gap-2 min-h-11 px-3 sm:px-4 rounded-pill text-base font-body font-medium border ${
+                  action.principale
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-surface text-ink border-hairline'
+                } ${disponible ? 'cursor-pointer' : 'opacity-50 cursor-default'}`}
+              >
+                <Icone nom={action.icone} taille={15} />
+                <span className="hidden sm:inline">{action.libelle}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

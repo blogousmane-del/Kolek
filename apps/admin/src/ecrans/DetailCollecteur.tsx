@@ -49,8 +49,8 @@ export function DetailCollecteur({ onRetour }: { onRetour: () => void }) {
     <>
       {/* Fil d'Ariane et identité. Ce n'est pas `BarreHaute` : la fiche montre
           un profil, pas un titre de page — avatar, coordonnées, statut. */}
-      <div className="bg-canvas px-8 pt-6 pb-4 flex-shrink-0">
-        <div className="flex items-center gap-1.5 mb-2">
+      <div className="bg-canvas px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-4 flex-shrink-0">
+        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
           <span className="text-sm font-body text-muted-foreground">Accueil</span>
           <Icone nom="chevron-right" taille={13} className="text-muted-foreground" />
           <button
@@ -64,12 +64,14 @@ export function DetailCollecteur({ onRetour }: { onRetour: () => void }) {
           <span className="text-sm font-body text-ink font-medium">Kouamé Assi</span>
         </div>
 
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col items-start gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-center gap-4">
-            <Avatar nom="Kouamé Assi" className="w-16 h-16" />
-            <div>
-              <h1 className="font-headings font-bold text-3xl text-ink">Kouamé Assi</h1>
-              <div className="flex items-center gap-3 mt-1">
+            <Avatar nom="Kouamé Assi" className="w-16 h-16 flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="font-headings font-bold text-2xl sm:text-3xl text-ink">Kouamé Assi</h1>
+              {/* Zone, téléphone et statut passent à la ligne plutôt que de
+                  déborder : sur un téléphone, les trois tenaient sur 520 px. */}
+              <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1">
                 <div className="flex items-center gap-1.5">
                   <Icone nom="map-pin" taille={13} className="text-muted-foreground" />
                   <span className="text-sm font-body text-muted-foreground">Marché Adjamé</span>
@@ -83,16 +85,20 @@ export function DetailCollecteur({ onRetour }: { onRetour: () => void }) {
               </div>
             </div>
           </div>
-          <div className="flex gap-2 mt-1">
-            <Bouton variante="contour" icone="message-square">
+          {/* Contacter et Modifier attendent l'écriture côté serveur, en J4 :
+              désactivés avec la raison, pas laissés cliquables dans le vide. */}
+          <div className="flex flex-wrap gap-2 mt-1">
+            <Bouton variante="contour" icone="message-square" disabled title="Messagerie à venir">
               Contacter
             </Bouton>
-            <Bouton icone="edit">Modifier</Bouton>
+            <Bouton icone="edit" disabled title="Modification à venir">
+              Modifier
+            </Bouton>
           </div>
         </div>
       </div>
 
-      <div className="px-8 mb-4 grid grid-cols-4 gap-4">
+      <div className="px-4 sm:px-6 lg:px-8 mb-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <CarteStat
           libelle="Encaissé aujourd’hui"
           valeur="48 500"
@@ -117,7 +123,7 @@ export function DetailCollecteur({ onRetour }: { onRetour: () => void }) {
         />
       </div>
 
-      <div className="px-8 pb-8 grid gap-4 grid-cols-[1fr_var(--container-volet)]">
+      <div className="px-4 sm:px-6 lg:px-8 pb-8 grid gap-4 grid-cols-1 xl:grid-cols-[1fr_var(--container-volet)]">
         <div className="flex flex-col gap-4">
           <Carte className="p-5">
             <BarreEmpilee
@@ -138,6 +144,11 @@ export function DetailCollecteur({ onRetour }: { onRetour: () => void }) {
               }
             />
 
+            {/* Quatre colonnes fixes plus le nom : 340 px incompressibles. En
+                dessous de la largeur minimale, le tableau défile latéralement
+                plutôt que d'écraser les montants. */}
+            <div className="overflow-x-auto">
+            <div className="min-w-[560px]">
             <div
               className={`grid ${GRILLE_CLIENTS} px-5 py-2.5 bg-canvas border-b border-hairline text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground`}
             >
@@ -171,12 +182,20 @@ export function DetailCollecteur({ onRetour }: { onRetour: () => void }) {
                   <BadgeStatut statut={c.statut} />
                 </div>
                 <div className="flex justify-end">
-                  <button type="button" aria-label={`Ouvrir la carte de ${c.nom}`}>
+                  <button
+                    type="button"
+                    disabled
+                    aria-label={`Ouvrir la carte de ${c.nom}`}
+                    title="Fiche de carte à venir"
+                    className="opacity-50 cursor-default"
+                  >
                     <Icone nom="chevron-right" taille={16} className="text-muted-foreground" />
                   </button>
                 </div>
               </div>
             ))}
+            </div>
+            </div>
           </Carte>
         </div>
 

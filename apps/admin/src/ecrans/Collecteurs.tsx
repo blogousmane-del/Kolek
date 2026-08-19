@@ -50,6 +50,11 @@ const ZONES = [
   { zone: 'Abobo', collecteurs: 5, clients: 110, encaisse: '88 000', progression: 38 },
 ];
 
+/** Somme des colonnes fixes de `LigneCollecteur` plus la gouttière : en dessous,
+    le nom du collecteur et le montant se chevauchent. Même idiome que
+    `EncoursSoldes` et `Abonnements`. */
+const LARGEUR_MINIMALE = 'min-w-[720px]';
+
 function Filtre({ libelle }: { libelle: string }) {
   return (
     <div className="flex items-center gap-1 border border-hairline rounded-pill px-3 py-1.5 bg-surface">
@@ -66,15 +71,15 @@ export function Collecteurs({ onOuvrirCollecteur }: { onOuvrirCollecteur: () => 
         filAriane={['Accueil', 'Collecteurs']}
         titre="Collecteurs & Zones"
         actions={[
-          { icone: 'search', libelle: 'Rechercher' },
-          { icone: 'sliders-horizontal', libelle: 'Filtrer' },
-          { icone: 'download', libelle: 'Exporter' },
-          { icone: 'plus', libelle: 'Ajouter un collecteur', principale: true },
+          { icone: 'search', libelle: 'Rechercher', disponible: false },
+          { icone: 'sliders-horizontal', libelle: 'Filtrer', disponible: false },
+          { icone: 'download', libelle: 'Exporter', disponible: false },
+          { icone: 'plus', libelle: 'Ajouter un collecteur', principale: true, disponible: false },
         ]}
       />
 
-      <div className="px-8 pb-8 flex flex-col gap-5">
-        <div className="grid grid-cols-4 gap-4">
+      <div className="px-4 sm:px-6 lg:px-8 pb-8 flex flex-col gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <CarteStat libelle="Collecteurs actifs" valeur="18" tendance="+3" icone="users" />
           <CarteStat
             libelle="Encaissé aujourd’hui"
@@ -95,7 +100,7 @@ export function Collecteurs({ onOuvrirCollecteur }: { onOuvrirCollecteur: () => 
 
         <div>
           <EnteteSection titre="Zones & Marchés" action={<LienBloc libelle="Voir tout" />} />
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {ZONES.map((z, i) => (
               <CarteZone key={z.zone} {...z} index={i} />
             ))}
@@ -103,7 +108,7 @@ export function Collecteurs({ onOuvrirCollecteur }: { onOuvrirCollecteur: () => 
         </div>
 
         <Carte>
-          <div className="flex items-center justify-between px-6 py-4 border-b border-hairline">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-hairline">
             <h2 className="font-headings font-bold text-xl text-ink">Mes Collecteurs</h2>
             <div className="flex items-center gap-2">
               <Filtre libelle="Aujourd’hui" />
@@ -111,32 +116,40 @@ export function Collecteurs({ onOuvrirCollecteur }: { onOuvrirCollecteur: () => 
             </div>
           </div>
 
-          {/* En-têtes de colonnes — mêmes largeurs que LigneCollecteur. */}
-          <div className="flex items-center gap-4 px-6 py-3 bg-canvas border-b border-hairline">
-            <div className="w-10 flex-shrink-0" />
-            <div className="flex-1 text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground">
-              Collecteur
-            </div>
-            <div className="w-20 text-right text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground">
-              Clients
-            </div>
-            <div className="w-36 text-right text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground">
-              Encaissé
-            </div>
-            <div className="w-28 text-right text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground">
-              Statut
-            </div>
-            <div className="w-10" />
-          </div>
+          {/* `overflow-x-auto` et largeur minimale, comme dans EncoursSoldes :
+              cinq colonnes à largeur fixe ne rentrent pas sur un téléphone, et
+              les comprimer rendait les montants illisibles. On fait défiler le
+              tableau plutôt que d'écraser les chiffres. */}
+          <div className="overflow-x-auto">
+            <div className={LARGEUR_MINIMALE}>
+              {/* En-têtes de colonnes — mêmes largeurs que LigneCollecteur. */}
+              <div className="flex items-center gap-4 px-4 sm:px-6 py-3 bg-canvas border-b border-hairline">
+                <div className="w-10 flex-shrink-0" />
+                <div className="flex-1 text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground">
+                  Collecteur
+                </div>
+                <div className="w-20 text-right text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground">
+                  Clients
+                </div>
+                <div className="w-36 text-right text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground">
+                  Encaissé
+                </div>
+                <div className="w-28 text-right text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground">
+                  Statut
+                </div>
+                <div className="w-10" />
+              </div>
 
-          {COLLECTEURS.map((c, i) => (
-            <LigneCollecteur
-              key={c.nom}
-              {...c}
-              derniere={i === COLLECTEURS.length - 1}
-              onOuvrir={onOuvrirCollecteur}
-            />
-          ))}
+              {COLLECTEURS.map((c, i) => (
+                <LigneCollecteur
+                  key={c.nom}
+                  {...c}
+                  derniere={i === COLLECTEURS.length - 1}
+                  onOuvrir={onOuvrirCollecteur}
+                />
+              ))}
+            </div>
+          </div>
         </Carte>
       </div>
     </>

@@ -160,12 +160,12 @@ export function Abonnements() {
         filAriane={['Accueil', 'Abonnements']}
         titre="Gestion des abonnements"
         actions={[
-          { icone: 'download', libelle: 'Exporter' },
-          { icone: 'plus', libelle: 'Nouvel abonnement', principale: true },
+          { icone: 'download', libelle: 'Exporter', disponible: false },
+          { icone: 'plus', libelle: 'Nouvel abonnement', principale: true, disponible: false },
         ]}
       />
 
-      <div className="px-4 sm:px-8 py-6 flex flex-col gap-6 overflow-y-auto">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 overflow-y-auto">
         {/* Indicateurs — deux colonnes sur petit écran, quatre au-delà. */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {INDICATEURS.map((indicateur) => (

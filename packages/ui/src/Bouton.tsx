@@ -17,6 +17,9 @@ interface Props {
   type?: 'button' | 'submit';
   pleineLargeur?: boolean;
   disabled?: boolean;
+  /** Infobulle. Sert surtout à dire pourquoi un bouton est désactivé — un
+      bouton éteint sans explication se lit comme un bouton cassé. */
+  title?: string;
   onClick?: () => void;
   className?: string;
 }
@@ -33,6 +36,7 @@ export function Bouton({
   type = 'button',
   pleineLargeur = false,
   disabled = false,
+  title,
   onClick,
   className = '',
 }: Props) {
@@ -40,6 +44,7 @@ export function Bouton({
     <button
       type={type}
       disabled={disabled}
+      title={title}
       onClick={onClick}
       className={`min-h-11 px-5 rounded-pill font-body font-semibold text-base flex items-center justify-center gap-2 ${
         VARIANTES[variante]

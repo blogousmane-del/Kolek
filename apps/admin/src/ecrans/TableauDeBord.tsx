@@ -61,14 +61,16 @@ export function TableauDeBord() {
         filAriane={['Accueil', 'Tableau de bord']}
         titre="Tableau de bord"
         actions={[
-          { icone: 'search', libelle: 'Rechercher' },
-          { icone: 'calendar', libelle: 'Calendrier' },
-          { icone: 'plus', libelle: 'Créer un rapport', principale: true },
+          { icone: 'search', libelle: 'Rechercher', disponible: false },
+          { icone: 'calendar', libelle: 'Calendrier', disponible: false },
+          { icone: 'plus', libelle: 'Créer un rapport', principale: true, disponible: false },
         ]}
       />
 
-      <div className="px-8 pb-8 flex-1">
-        <div className="grid grid-cols-4 gap-4 mb-5">
+      <div className="px-4 sm:px-6 lg:px-8 pb-8 flex-1">
+        {/* Une colonne sur téléphone, deux sur tablette, quatre au-delà. Les
+            quatre fixes écrasaient chaque carte à moins de 90 px de large. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-5">
           <CarteStat
             libelle="Solde total géré"
             valeur="817 432"
@@ -93,7 +95,10 @@ export function TableauDeBord() {
           />
         </div>
 
-        <div className="grid gap-4 grid-cols-[1fr_1fr_var(--container-volet)]">
+        {/* Les trois colonnes du pilotage s'empilent en dessous de `xl` : la
+            colonne de droite est un volet à largeur fixe, et sur un écran
+            étroit elle poussait les deux autres sous les 200 px. */}
+        <div className="grid gap-4 grid-cols-1 xl:grid-cols-[1fr_1fr_var(--container-volet)]">
           {/* Colonne gauche */}
           <div className="flex flex-col gap-4">
             <Carte className="p-5">
@@ -106,21 +111,35 @@ export function TableauDeBord() {
                   <Icone nom="chevron-down" taille={11} className="text-muted-foreground" />
                 </div>
               </div>
-              <p className="font-headings font-bold text-4xl text-ink mb-4 tabular-nums">
+              <p className="font-headings font-bold text-3xl sm:text-4xl text-ink mb-4 tabular-nums">
                 817 432{' '}
-                <span className="text-xl font-body font-medium text-muted-foreground">FCFA</span>
+                <span className="text-lg sm:text-xl font-body font-medium text-muted-foreground">
+                  FCFA
+                </span>
               </p>
-              <div className="flex gap-2">
-                <Bouton icone="arrow-up-right" className="flex-1">
+              {/* Retrait et historique passent par des Edge Functions qui
+                  n'existent pas avant J3 : désactivés, avec la raison en
+                  infobulle. Un bouton actif qui ne fait rien est un bug ; un
+                  bouton éteint qui dit pourquoi est une information. */}
+              <div className="flex flex-wrap gap-2">
+                <Bouton icone="arrow-up-right" className="flex-1" disabled title="Retrait à venir">
                   Retirer
                 </Bouton>
-                <Bouton variante="contour" icone="history" className="flex-1">
+                <Bouton
+                  variante="contour"
+                  icone="history"
+                  className="flex-1"
+                  disabled
+                  title="Historique à venir"
+                >
                   Historique
                 </Bouton>
                 <button
                   type="button"
+                  disabled
                   aria-label="Autres actions"
-                  className="w-11 h-11 rounded-pill border border-hairline flex items-center justify-center cursor-pointer"
+                  title="À venir"
+                  className="w-11 h-11 rounded-pill border border-hairline flex items-center justify-center opacity-50 cursor-default"
                 >
                   <Icone nom="more-horizontal" taille={16} className="text-muted-foreground" />
                 </button>

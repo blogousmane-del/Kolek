@@ -42,6 +42,10 @@ interface Props {
   actif: CleNavAdmin;
   onNaviguer: (cle: CleNavAdmin) => void;
   onDeconnexion: () => void;
+  /** Fourni uniquement quand la barre est ouverte en tiroir, sous `lg`. Sa
+      présence est ce qui fait apparaître la croix de fermeture : sur un écran
+      large, la barre est toujours là et n'a rien à fermer. */
+  onFermer?: () => void;
 }
 
 function Section({
@@ -99,15 +103,28 @@ function Section({
   );
 }
 
-export function BarreLaterale({ actif, onNaviguer, onDeconnexion }: Props) {
+export function BarreLaterale({ actif, onNaviguer, onDeconnexion, onFermer }: Props) {
   return (
-    <div className="flex flex-col bg-sidebar w-sidebar flex-shrink-0 min-h-full">
+    // `overflow-y-auto` : la barre porte huit entrées, deux raccourcis et un
+    // encart de promotion. Sur un portable en 768 px de haut, le bas était
+    // coupé sans possibilité d'y accéder.
+    <div className="flex flex-col bg-sidebar w-sidebar flex-shrink-0 h-full overflow-y-auto">
       {/* Logo */}
       <div className="px-6 py-6 flex items-center gap-3">
         <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
           <span className="text-primary-foreground font-headings font-bold text-base">K</span>
         </div>
         <span className="font-headings font-bold text-surface text-xl tracking-tight">Kolek</span>
+        {onFermer && (
+          <button
+            type="button"
+            onClick={onFermer}
+            aria-label="Fermer le menu"
+            className="ml-auto w-11 h-11 -mr-2 flex items-center justify-center rounded-md cursor-pointer"
+          >
+            <Icone nom="x" className="text-white/60" />
+          </button>
+        )}
       </div>
 
       {/* Contexte */}
@@ -167,9 +184,14 @@ export function BarreLaterale({ actif, onNaviguer, onDeconnexion }: Props) {
         <p className="text-white/60 text-sm font-body mb-3">
           Collecteurs illimités, rapports avancés.
         </p>
+        {/* Sans gestionnaire tant que la page d'offres n'existe pas. Désactivé
+            plutôt qu'inerte : la même convention que les entrées « à venir »
+            au-dessus, sinon il se lit comme un bouton cassé. */}
         <button
           type="button"
-          className="w-full rounded-md bg-chart-mint text-sidebar text-sm font-body font-semibold py-2"
+          disabled
+          title="Page des offres à venir"
+          className="w-full rounded-md bg-chart-mint text-sidebar text-sm font-body font-semibold py-2 opacity-60 cursor-default"
         >
           Voir les offres
         </button>

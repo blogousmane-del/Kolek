@@ -11,7 +11,7 @@ export function BandeauOffre({
   detail?: string;
 }) {
   return (
-    <div className="bg-secondary flex items-center justify-between px-8 py-2 flex-shrink-0">
+    <div className="bg-secondary flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-2 flex-shrink-0">
       <div className="flex items-center gap-2">
         <span className="px-3 py-0.5 rounded-pill bg-primary text-primary-foreground text-xs font-body font-semibold">
           {etiquette}

@@ -25,14 +25,18 @@ interface Props {
 
 export function ActionsRapides({ actions = ACTIONS_PAR_DEFAUT, compact = false }: Props) {
   return (
-    <div className="grid grid-cols-4 gap-3">
+    // Deux colonnes sur téléphone : à quatre, le libellé sous la pastille
+    // passait sur trois lignes et coupait les mots.
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {actions.map((action) => (
         <button
           key={action.libelle}
           type="button"
+          disabled={!action.onActiver}
+          title={action.onActiver ? undefined : 'À venir'}
           onClick={action.onActiver}
           className={`flex flex-col items-center ${compact ? 'gap-1.5' : 'gap-2'} ${
-            action.onActiver ? 'cursor-pointer' : 'cursor-default'
+            action.onActiver ? 'cursor-pointer' : 'opacity-60 cursor-default'
           }`}
         >
           <div

@@ -102,7 +102,7 @@ export function EncaisserMise() {
         actions={[]}
       />
 
-      <div className="px-8 py-6 overflow-y-auto">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto">
         <div className="grid gap-6 grid-cols-1 xl:grid-cols-[1fr_420px]">
           {/* Formulaire */}
           <div className="flex flex-col gap-5">
