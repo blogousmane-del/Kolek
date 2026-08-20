@@ -4,10 +4,18 @@ export interface ActionBarre {
   icone: NomIcone;
   libelle: string;
   principale?: boolean;
-  /** Même convention que la barre latérale : une action qui ne mène à rien se
-      désactive au lieu de se cliquer dans le vide. Les écrans d'administration
-      sont des maquettes jusqu'à J4 ; ils passent tous `false` aujourd'hui. */
+  /**
+   * Même convention que la barre latérale : une action qui ne mène à rien se
+   * désactive au lieu de se cliquer dans le vide.
+   *
+   * Par défaut, une action est disponible si et seulement si elle porte un
+   * `onActiver`. Le déduire plutôt que de le déclarer supprime la possibilité
+   * d'un bouton actif qui n'appelle rien — et c'est exactement ce que ce
+   * composant produisait : il n'avait aucun `onClick`, donc *toutes* ses
+   * actions étaient mortes, y compris celles annoncées comme disponibles.
+   */
   disponible?: boolean;
+  onActiver?: () => void;
 }
 
 interface Props {
@@ -43,12 +51,13 @@ export function BarreHaute({ filAriane, titre, actions }: Props) {
         <h1 className="font-headings font-bold text-2xl sm:text-3xl text-ink">{titre}</h1>
         <div className="flex items-center flex-wrap gap-2">
           {actions.map((action) => {
-            const disponible = action.disponible ?? true;
+            const disponible = action.disponible ?? Boolean(action.onActiver);
             return (
               <button
                 key={action.libelle}
                 type="button"
                 disabled={!disponible}
+                onClick={action.onActiver}
                 // Le libellé disparaît sous `sm` — l'icône suffit à un pouce, et
                 // `aria-label` garde l'intitulé pour les lecteurs d'écran.
                 aria-label={action.libelle}

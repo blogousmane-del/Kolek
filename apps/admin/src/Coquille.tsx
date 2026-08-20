@@ -109,6 +109,7 @@ export function Coquille() {
               {page === 'collecteurs' && (
                 <Collecteurs
                   vue={donnees.vue}
+                  onCollecteurCree={donnees.recharger}
                   onOuvrirCollecteur={(id) => {
                     setCollecteurOuvert(id);
                     setPage('detail');

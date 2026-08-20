@@ -175,3 +175,63 @@ export function useVueGlobale(): EtatVue & { recharger: () => void } {
 
   return { ...etat, recharger };
 }
+
+// --- Création d'un collecteur ---
+
+export interface SaisieCollecteur {
+  email: string;
+  motDePasse: string;
+  nom: string;
+  telephone: string;
+  zone?: string;
+  palier?: string;
+}
+
+const MESSAGES_CREATION: Record<string, string> = {
+  EMAIL_INVALIDE: 'Adresse électronique invalide.',
+  EMAIL_DEJA_PRIS: 'Un compte existe déjà avec cette adresse.',
+  MOT_DE_PASSE_COURT: 'Le mot de passe doit faire au moins 10 caractères.',
+  NOM_REQUIS: 'Le nom du collecteur est obligatoire.',
+  TELEPHONE_REQUIS: 'Le téléphone est obligatoire — il identifie le collecteur.',
+  NOM_TROP_LONG: 'Le nom dépasse 120 caractères.',
+  TELEPHONE_TROP_LONG: 'Le téléphone dépasse 64 caractères.',
+  ZONE_TROP_LONGUE: 'La zone dépasse 80 caractères.',
+  PALIER_INCONNU: 'Ce palier ne figure pas dans la grille tarifaire.',
+  ACCES_RESERVE: "Ce compte n'est pas un compte d'administration GTCS.",
+  VERIFICATION_IMPOSSIBLE: "Impossible de vérifier les droits d'accès.",
+  COMPLEMENT_INCOMPLET:
+    'Le compte est créé et fonctionne, mais la zone et le palier n’ont pas été enregistrés. Corrige-les depuis sa fiche — ne recrée pas le compte.',
+  CREATION_IMPOSSIBLE: 'Création impossible. Réessaie.',
+  CORPS_ILLISIBLE: 'Requête mal formée.',
+};
+
+/**
+ * Crée un compte collecteur.
+ *
+ * L'inscription publique est fermée, et créer un utilisateur exige la clé de
+ * service : ce geste ne peut donc vivre que sur le serveur. L'écran ne fait
+ * qu'appeler l'Edge Function, qui vérifie `est_admin()` sous l'identité de
+ * l'appelant avant de sortir la clé.
+ */
+export async function creerCollecteur(
+  saisie: SaisieCollecteur,
+): Promise<{ ok: true; collecteurId: string } | { ok: false; message: string }> {
+  const { data, error } = await supabase.functions.invoke('admin-creer-collecteur', {
+    body: saisie,
+  });
+
+  if (error) {
+    let code: string | undefined;
+    try {
+      const contexte = (error as { context?: Response }).context;
+      if (contexte && typeof contexte.json === 'function') {
+        code = ((await contexte.json()) as { erreur?: string }).erreur;
+      }
+    } catch {
+      // Corps illisible : on garde le message générique.
+    }
+    return { ok: false, message: code ? (MESSAGES_CREATION[code] ?? code) : error.message };
+  }
+
+  return { ok: true, collecteurId: (data as { collecteurId: string }).collecteurId };
+}

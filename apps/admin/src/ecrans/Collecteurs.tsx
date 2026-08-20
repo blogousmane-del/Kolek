@@ -8,8 +8,10 @@ import {
   LigneCollecteur,
   type Statut,
 } from '@kolek/ui';
+import { useState } from 'react';
 
 import type { LigneCollecteur as Ligne, VueGlobale } from '../donnees';
+import { FormulaireCollecteur } from './FormulaireCollecteur';
 
 /** Somme des colonnes fixes de `LigneCollecteur` plus la gouttière : en dessous,
     le nom du collecteur et le montant se chevauchent. Même idiome que
@@ -35,10 +37,13 @@ function statutDe(c: Ligne): Statut {
 export function Collecteurs({
   vue,
   onOuvrirCollecteur,
+  onCollecteurCree,
 }: {
   vue: VueGlobale;
   onOuvrirCollecteur: (id: string) => void;
+  onCollecteurCree: () => void;
 }) {
+  const [formulaireOuvert, setFormulaireOuvert] = useState(false);
   const { collecteurs, zones, abonnements, totaux } = vue;
 
   const enRetard = collecteurs.filter((c) => c.abonnement_statut !== 'actif').length;
@@ -54,11 +59,26 @@ export function Collecteurs({
           { icone: 'search', libelle: 'Rechercher', disponible: false },
           { icone: 'sliders-horizontal', libelle: 'Filtrer', disponible: false },
           { icone: 'download', libelle: 'Exporter', disponible: false },
-          { icone: 'plus', libelle: 'Ajouter un collecteur', principale: true, disponible: false },
+          {
+            icone: 'plus',
+            libelle: 'Ajouter un collecteur',
+            principale: true,
+            onActiver: () => setFormulaireOuvert(true),
+          },
         ]}
       />
 
       <div className="px-4 sm:px-6 lg:px-8 pb-8 flex flex-col gap-5">
+        {formulaireOuvert && (
+          <FormulaireCollecteur
+            onAnnuler={() => setFormulaireOuvert(false)}
+            onCree={() => {
+              setFormulaireOuvert(false);
+              onCollecteurCree();
+            }}
+          />
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <CarteStat
             libelle="Collecteurs actifs"
