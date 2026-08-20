@@ -17,7 +17,7 @@ regardé **la taille** de ce qui entre.
 |---|---|---|
 | 🔴 Bloquant | 0 | — |
 | 🟠 Important | 1 | **corrigé le jour même**, migration `20260819010000` |
-| 🟡 À faire | 3 | dont **un durcissement à une case à cocher** : mots de passe divulgués non filtrés, confirmé le 2026-08-20 |
+| 🟡 À faire | 2 | le durcissement le plus rentable — mots de passe divulgués non filtrés — a été **appliqué le 2026-08-20**, seuil porté à 10 dans le même geste |
 | ⚪️ Non vérifié | 0 | les trois sont tombés le 2026-08-20 |
 | Non applicable | 3 | inchangés |
 
@@ -170,7 +170,13 @@ section à eux :
   le déclencheur existant, `now()` étant interdit dans un `check`. Sur `INSERT`
   seulement : corriger le cash déclaré d'une journée ancienne reste légitime.
 
-### 2. Mots de passe : seuil à 8, et **aucun filtre sur les fuites connues**
+### 2. Mots de passe : le seuil était à 8, les fuites connues n'étaient pas filtrées — **corrigé le 2026-08-20**
+
+> **Suite, même jour.** L'exploitant a relevé le seuil à 10 et activé
+> `Prevent use of leaked passwords` au tableau de bord. Ce qui suit décrit
+> l'état constaté *avant* cette correction, et l'argument qui l'a motivée. La
+> preuve du changement est plus bas : « Ce que vaut cette correction, et ce qui
+> la prouve ».
 
 **Relevé le 2026-08-20**, au tableau de bord — Authentication → Policies. C'était
 le dernier ⚪️ ; le chiffre étant connu, il change de catégorie.
@@ -231,6 +237,41 @@ interroge Have I Been Pwned par k-anonymat : seuls les cinq premiers caractères
 de l'empreinte SHA-1 sortent, jamais le mot de passe. Cocher cette case
 n'expose rien.
 
+#### Ce que vaut cette correction, et ce qui la prouve
+
+**Déclaré fait par l'exploitant le 2026-08-20** : seuil porté à 10, et
+`Prevent use of leaked passwords` activé. Les deux gestes ont été faits au
+tableau de bord, jamais par `supabase config push` — qui aurait appliqué le bloc
+`[auth]` entier, `site_url` compris, et cassé l'authentification en production.
+
+**Aucun des deux réglages n'est mesurable de l'extérieur.** `/auth/v1/settings`,
+seul point d'entrée public de GoTrue, publie les fournisseurs, `disable_signup`
+et les confirmations automatiques — jamais la politique de mot de passe. Vérifié
+après la correction : la réponse est identique à celle d'avant. Ce n'est pas une
+lacune de la sonde, c'est le bon comportement : une plateforme qui annoncerait
+publiquement son seuil renseignerait un attaquant.
+
+Le seuil de 10 restera donc **déclaré**, faute d'un moyen de le lire qui ne soit
+pas destructeur — le mesurer exigerait de changer réellement le mot de passe d'un
+compte, la même raison qui l'avait laissé en ⚪️ jusqu'au 2026-08-20.
+
+Le filtre HIBP, lui, **est mesurable**, et sans rien casser. Le chemin existe
+depuis aujourd'hui : la fonction `admin-creer-collecteur` appelle
+`auth.admin.createUser`, qui est soumis à la même politique. La sonde consiste à
+créer un collecteur avec `password123` — onze caractères, donc la validation
+locale de `valider-collecteur.ts` le laisse passer, et l'un des mots de passe les
+plus reproduits des fuites publiques.
+
+| Réponse | Ce qu'elle prouve |
+| --- | --- |
+| `CREATION_IMPOSSIBLE` (500) | Le filtre est actif. **Aucun compte n'est créé.** |
+| `201` avec un `collecteurId` | Le filtre n'a pas pris. Le compte est à supprimer. |
+
+Le point qui rend cette sonde acceptable : **sa branche d'échec ne crée rien.**
+C'est l'inverse exact des deux sondes écartées plus haut, dont la branche
+informative était la branche nuisible. À faire une fois, à noter ici, et à ne pas
+refaire.
+
 ### 3. Le jeton de session vit dans `localStorage` — reconduit, inchangé
 
 Contrôle 9, déjà argumenté le 2026-08-18 et revérifié aujourd'hui : comportement
@@ -283,7 +324,7 @@ contrôle 13 (aucun SQL concaténé, aucun `execute` dynamique).
 | 7 | Verrouillage par enregistrement | conforme, **durci** | policies sur `collecteur_id = auth.uid()` ; le déclencheur ne renseigne plus sur les cartes d'autrui |
 | 8 | Champs non modifiables | conforme | liste blanche de colonnes, garde-fous des migrations 7 et 8 |
 | 9 | Cookies de session | 🟡 | jeton en `localStorage`, mitigé par la CSP |
-| 10 | Mots de passe hachés | conforme, 🟡 sur le seuil | délégué à Supabase Auth, aucune colonne de mot de passe dans `public` ; longueur minimale relevée le 2026-08-20 : 8 en ligne contre 10 déclaré dans `config.toml` |
+| 10 | Mots de passe hachés | conforme | délégué à Supabase Auth, aucune colonne de mot de passe dans `public` ; seuil relevé le 2026-08-20 de 8 à 10, et filtre des fuites connues (HIBP) activé le même jour — déclaré, la sonde qui le mesure est décrite en « 2. Mots de passe » |
 | 11 | Rate limiting | conforme | plafond mesuré trois fois le 2026-08-20 : `429 over_request_rate_limit` entre la 33ᵉ et la 54ᵉ tentative, en moins de 20 s ; inscription fermée (`disable_signup: true`, mesuré) |
 | 12 | Anti-bot | non applicable | aucun formulaire public |
 | 13 | Requêtes paramétrées | non applicable | aucun SQL concaténé |

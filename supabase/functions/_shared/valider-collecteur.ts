@@ -28,9 +28,17 @@ import { tarifParCle } from './paliers.ts';
 export const BORNES = { nom: 120, telephone: 64, zone: 80 } as const;
 
 /**
- * Le distant applique 8 ; on exige 10, l'intention écrite dans `config.toml` et
- * relevée en écart au dernier audit. Durcir ici est sans risque : un mot de
- * passe plus long n'est jamais refusé par le serveur.
+ * Le distant a rejoint cette valeur le 2026-08-20 — il appliquait 8, l'écart
+ * avec `config.toml` ayant été relevé à l'audit. Le contrôle reste ici malgré
+ * tout : il refuse avant que `auth.admin.createUser` ne soit appelé, donc avant
+ * qu'un compte ne soit créé pour rien. Et si le réglage distant venait à
+ * changer, un mot de passe plus long n'est jamais refusé par le serveur.
+ *
+ * Ce que ce module ne fait pas, et ne doit pas faire : vérifier que le mot de
+ * passe ne figure pas dans une fuite connue. Depuis le 2026-08-20 Supabase s'en
+ * charge par k-anonymat contre Have I Been Pwned, et un refus remonte ici en
+ * `CREATION_IMPOSSIBLE`. Le redoubler en clientèle enverrait le mot de passe
+ * quelque part où il n'a pas à aller.
  */
 export const LONGUEUR_MOT_DE_PASSE = 10;
 

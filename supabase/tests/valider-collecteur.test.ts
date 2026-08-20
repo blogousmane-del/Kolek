@@ -104,10 +104,10 @@ describe('saisie refusée', () => {
 });
 
 describe('le seuil de mot de passe', () => {
-  it('est plus exigeant que le distant, et c’est voulu', () => {
-    // Le projet en ligne applique 8, l'intention écrite dans `config.toml` dit
-    // 10. Durcir ici ne peut pas être refusé par le serveur — un mot de passe
-    // plus long passe toujours.
+  it('vaut 10, comme `config.toml` et comme le distant depuis le 2026-08-20', () => {
+    // Le projet en ligne appliquait 8 ; l'écart relevé à l'audit a été corrigé
+    // au tableau de bord. Le contrôle reste ici pour refuser avant la création
+    // du compte, et parce qu'un mot de passe plus long n'est jamais refusé.
     expect(LONGUEUR_MOT_DE_PASSE).toBe(10);
 
     const juste = validerCollecteur({ ...VALIDE, motDePasse: 'a'.repeat(10) });

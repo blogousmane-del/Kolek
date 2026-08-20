@@ -246,11 +246,17 @@ collecteur — nom, téléphone, courriel, marché.
 
 Rien de neuf, rappelé pour que ce rapport se suffise :
 
-1. **`Prevent use of leaked passwords` désactivé** — le durcissement le plus
-   rentable des deux rapports. Une case, zéro migration, zéro déploiement.
-2. **Longueur minimale à 8** là où `config.toml` déclare 10. Le fichier ne
-   gouverne pas le distant ; ne pas corriger par `supabase config push`, qui
-   écraserait `site_url`.
+1. ~~**`Prevent use of leaked passwords` désactivé**~~ — **fait le 2026-08-20**,
+   dans la journée. Le durcissement le plus rentable des deux rapports a coûté
+   une case à cocher.
+2. ~~**Longueur minimale à 8**~~ là où `config.toml` déclare 10 — **portée à 10
+   le 2026-08-20**, dans le même geste et au tableau de bord, jamais par
+   `supabase config push` qui aurait écrasé `site_url`.
+
+   Les deux sont **déclarés**, pas mesurés : `/auth/v1/settings` ne publie pas la
+   politique de mot de passe, et c'est le bon comportement. Le filtre HIBP admet
+   toutefois une sonde non destructrice via `admin-creer-collecteur` ; elle est
+   décrite dans le rapport d'hier, section « 2. Mots de passe ».
 3. **Jeton de session dans `localStorage`** — comportement par défaut de
    `supabase-js`, risque bas tant que la CSP reste ce qu'elle est. Revérifié
    aujourd'hui : aucun `innerHTML`, `dangerouslySetInnerHTML`, `eval` ni
