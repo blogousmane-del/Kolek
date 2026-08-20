@@ -334,7 +334,28 @@ foulée : cela n'ouvre rien au rôle anonyme. Les neuf tables répondent toujour
 `401 / 42501` à la clé publiée, `rpc est_admin` aussi, et `storage.buckets` reste
 vide.
 
-**Ce qui reste ⚪️** est inchangé : les deux réglages du tableau de bord Supabase,
-plus le test du non-admin — créer un second compte, ne pas l'inscrire dans
-`admins`, et vérifier qu'il reste dehors. Un administrateur qui entre ne prouve
-rien tant qu'un non-administrateur n'est pas resté à la porte.
+**Le « test du non-admin » était mal classé, et c'est corrigé.** Il figurait en
+⚪️ depuis le 2026-08-18 comme s'il n'existait pas. Le contrat serveur, lui, est
+tenu par un test vert depuis le premier jour — `isolation.test.ts`, « portillon
+du Dashboard Admin » : `est_admin()` rend faux pour un collecteur ordinaire, vrai
+une fois la ligne insérée dans `admins`, et la table reste inaccessible en
+lecture dans les deux cas (`42501`).
+
+Ce qui n'était couvert par rien, c'est la **branche d'interface**. `Portillon.tsx`
+porte en commentaire la propriété qui compte — « un portillon qui s'ouvre quand
+il ne sait pas n'est pas un portillon » — et aucun test ne la posait. Une erreur
+réseau, un jet du constructeur de requête, une réponse qui n'arrive jamais :
+trois chemins où un `useState` mal placé ouvrirait le tableau de bord à qui
+passe. `apps/admin` n'avait d'ailleurs aucun harnais de test.
+
+Ajouté : `apps/admin/src/Portillon.test.tsx`, cinq cas — la coquille s'ouvre sur
+`true`, et reste fermée sur `false`, sur erreur, sur jet, et tant que la réponse
+n'est pas arrivée. Le harnais reprend celui de `packages/ui` sans le modifier.
+Le nettoyage entre rendus y est explicite : `@testing-library/react` ne branche
+le sien qu'avec les globales de vitest, que ce dépôt n'active pas — sans lui, un
+test de refus passe parce qu'il retrouve la coquille du test précédent.
+
+**Ce qui reste réellement ⚪️** tient en deux réglages du tableau de bord
+Supabase, plus le parcours en production : deux vrais comptes, l'un admin,
+l'autre non, sur `kolek-admin.netlify.app`. Le contrat est prouvé, l'exécution de
+bout en bout ne l'est pas.
