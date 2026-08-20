@@ -224,7 +224,7 @@ Les trois de la première rédaction sont tombés le 2026-08-20.
    un chiffre connu qui diverge de l'intention n'est plus un angle mort, c'est
    un durcissement.
 2. ~~Les limites de débit sur la connexion~~ (contrôle 11) — **mesurées**, voir
-   « Contrôle 11, mesuré » plus bas. Non lisibles de l'extérieur, mais
+   « Contrôle 11, mesuré trois fois » plus bas. Non lisibles de l'extérieur, mais
    observables, et c'est ce qui compte : le plafond existe et se déclenche.
 3. ~~La suite de tests de la base n'a pas pu être rejouée~~ — **levé**, voir
    « Ce qui restait en suspens » : les 63 tests sont verts, migration comprise.
@@ -253,7 +253,7 @@ contrôle 13 (aucun SQL concaténé, aucun `execute` dynamique).
 | 8 | Champs non modifiables | conforme | liste blanche de colonnes, garde-fous des migrations 7 et 8 |
 | 9 | Cookies de session | 🟡 | jeton en `localStorage`, mitigé par la CSP |
 | 10 | Mots de passe hachés | conforme, 🟡 sur le seuil | délégué à Supabase Auth, aucune colonne de mot de passe dans `public` ; longueur minimale relevée le 2026-08-20 : 8 en ligne contre 10 déclaré dans `config.toml` |
-| 11 | Rate limiting | conforme | mesuré le 2026-08-20 : `429 over_request_rate_limit` à la 54ᵉ tentative depuis une IP ; inscription fermée |
+| 11 | Rate limiting | conforme | plafond mesuré trois fois le 2026-08-20 : `429 over_request_rate_limit` entre la 33ᵉ et la 54ᵉ tentative, en moins de 20 s ; inscription fermée (`disable_signup: true`, mesuré) |
 | 12 | Anti-bot | non applicable | aucun formulaire public |
 | 13 | Requêtes paramétrées | non applicable | aucun SQL concaténé |
 | 14 | Validation des entrées | 🟠 **corrigé** | dix colonnes texte sans borne de longueur ; bornées et garde-fou posé, migration `20260819010000` |
@@ -380,30 +380,89 @@ Le nettoyage entre rendus y est explicite : `@testing-library/react` ne branche
 le sien qu'avec les globales de vitest, que ce dépôt n'active pas — sans lui, un
 test de refus passe parce qu'il retrouve la coquille du test précédent.
 
-### Contrôle 11, mesuré
+### Contrôle 11, mesuré trois fois — et ce que les trois mesures apprennent
 
 Le débit sur `/token` n'est pas lisible depuis l'extérieur — c'est ce qui le
-maintenait en ⚪️ depuis le 2026-08-18. Il est en revanche **mesurable**, et une
-limite qu'on observe vaut mieux qu'une valeur qu'on lit.
+maintenait en ⚪️ depuis le 2026-08-18. Il est en revanche **mesurable**.
 
-Sonde du 2026-08-20 : connexions échouées en rafale depuis une seule IP, sur une
-adresse qui n'existe pas — aucun compte réel touché, aucun verrouillage
-provoqué.
+Sonde : connexions échouées en rafale depuis une seule IP, sur une adresse qui
+n'existe pas (`sonde-debit-inexistant@kolek.test`) — aucun compte réel touché,
+aucun verrouillage provoqué.
 
 ```
-tentatives 1 → 53   400  invalid_credentials
-tentative 54        429  {"error_code":"over_request_rate_limit"}
+2026-08-20, fenêtre non purgée    429 à la 54ᵉ tentative
+2026-08-20, après 7 min de pause  429 à la 40ᵉ tentative, en 19 s
+2026-08-20, fenêtre franchement froide  429 à la 33ᵉ tentative, en 17 s
 ```
 
-Le plafond existe et se déclenche. Il est large — une cinquantaine de tentatives
-par fenêtre et par IP, là où le `sign_in_sign_ups = 30` de `config.toml`
-laisserait croire à trente ; ce fichier ne gouverne que le conteneur local, et
-l'écart le confirme une fois de plus. Large ne veut pas dire absent : une attaque
-par dictionnaire est ralentie de plusieurs ordres de grandeur, et l'inscription
-étant fermée, `/token` est la seule surface.
+**Le chiffre n'est pas stable, et c'est le résultat.** Trois mesures propres ou
+semi-propres donnent 54, 40, 33. Une première rédaction de ce rapport annonçait
+« une cinquantaine de tentatives par fenêtre » sur la foi de la première seule :
+c'était une extrapolation à partir d'un échantillon de un, et elle était fausse.
 
-Ce qui reste à faire de ce côté n'est plus un contrôle mais un réglage de
-confort : si tu veux resserrer, c'est Authentication → Rate limits.
+Ce qu'on peut affirmer, et rien de plus :
+
+- le plafond **existe** et se déclenche ;
+- il tombe en **moins de 20 secondes** de martèlement continu ;
+- il se situe dans les **dizaines** de tentatives, pas dans les centaines ni
+  dans les unités.
+
+Ce qu'on ne peut **pas** affirmer : la valeur du réglage. Une fenêtre glissante
+ne rend pas le même compte selon l'instant où on l'attaque, et aucune des trois
+sondes ne permet de dire si le réglage a été modifié entre-temps ou si l'écart
+n'est que la respiration de la fenêtre. Le `sign_in_sign_ups = 30` de
+`config.toml` reste sans valeur probante ici : ce fichier ne gouverne que le
+conteneur local.
+
+Large ne veut pas dire absent : une attaque par dictionnaire est ralentie de
+plusieurs ordres de grandeur, et l'inscription étant fermée, `/token` est la
+seule surface.
+
+Si tu veux une valeur certaine plutôt qu'un ordre de grandeur, elle se lit dans
+Authentication → Rate limits — et c'est le même genre de réglage que la longueur
+minimale : **déclaré**, pas mesuré.
+
+### Ce que `/auth/v1/settings` publie, et qui vaut d'être consigné
+
+Cet endpoint ne dit rien des mots de passe, mais il dit tout de la **surface**
+d'authentification, sans clé privilégiée. Relevé le 2026-08-20 :
+
+```
+disable_signup      true     inscription fermée — mesuré, plus seulement affirmé
+anonymous_users     false    pas de session anonyme
+email               true     seul fournisseur actif
+phone               false    pas de SMS
+mailer_autoconfirm  false    l'adresse doit être confirmée
+saml_enabled        false    passkeys_enabled false
+```
+
+Les vingt-quatre fournisseurs externes — Google, GitHub, Apple, Azure, et le
+reste — sont tous à `false`. Aucun OAuth à surveiller, aucune redirection
+tierce, aucun `redirect_to` à valider chez un fournisseur. La surface
+d'authentification de Kolek est un seul endpoint, `/token`, sur un seul
+fournisseur, avec l'inscription fermée. C'est le meilleur résultat de cet audit
+et il n'avait jamais été écrit noir sur blanc.
+
+### La protection contre les mots de passe divulgués reste non mesurable
+
+Elle ne s'applique qu'au moment où un mot de passe est **posé** : inscription,
+changement, ou fin de récupération. Les trois sont hors de portée d'une sonde
+inoffensive.
+
+- L'inscription est fermée — `422 signup_disabled` tranche avant toute
+  validation de mot de passe.
+- `POST /auth/v1/recover` n'envoie qu'un courriel ; il ne pose aucun mot de
+  passe.
+- `PUT /auth/v1/user` avec un mot de passe notoirement compromis trancherait la
+  question — et c'est précisément pour ça qu'il est écarté. En cas de refus on
+  apprendrait que la protection est active ; en cas de succès on l'apprendrait
+  aussi, **en ayant remplacé le mot de passe d'un vrai compte par un mot de
+  passe figurant dans les fuites publiques**. La branche qui informe est la
+  branche qui nuit.
+
+Même règle que pour la longueur minimale, et pour la même raison : une sonde qui
+modifie ce qu'elle mesure n'est pas une mesure. Ce réglage se lit dans
+Authentication → Policies, et restera **déclaré**.
 
 ### Pourquoi la longueur minimale a dû être lue à la main
 
