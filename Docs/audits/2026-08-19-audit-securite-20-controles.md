@@ -170,7 +170,7 @@ section à eux :
   le déclencheur existant, `now()` étant interdit dans un `check`. Sur `INSERT`
   seulement : corriger le cash déclaré d'une journée ancienne reste légitime.
 
-### 3. La longueur minimale de mot de passe est de 8, l'intention écrite dit 10
+### 2. La longueur minimale de mot de passe est de 8, l'intention écrite dit 10
 
 **Relevé le 2026-08-20**, au tableau de bord — Authentication → Policies. C'était
 le dernier ⚪️ ; le chiffre étant connu, il change de catégorie.
@@ -200,7 +200,7 @@ longueur : c'est la **protection contre les mots de passe déjà divulgués**, d
 le même écran. Un mot de passe de douze caractères qui figure dans une fuite
 connue est plus faible qu'un de huit qui n'y figure pas.
 
-### 2. Le jeton de session vit dans `localStorage` — reconduit, inchangé
+### 3. Le jeton de session vit dans `localStorage` — reconduit, inchangé
 
 Contrôle 9, déjà argumenté le 2026-08-18 et revérifié aujourd'hui : comportement
 par défaut de `supabase-js`, non modifié. Le risque reste bas — `script-src
