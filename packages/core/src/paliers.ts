@@ -11,22 +11,28 @@ import type { Palier } from './types';
  *
  * ---
  *
- * ATTENTION — ces montants viennent des maquettes Banani et **contredisent le
- * cahier des charges §5**, qui donne 0 / 2 500 / 5 000 / 10 000 FCFA avec des
- * limites exprimées en *clients* (20 / 50 / 150 / illimité).
+ * ARBITRAGE RENDU LE 2026-08-20 — **le modèle du cahier des charges §5 fait foi.**
  *
- * Ce n'est pas un écart de chiffres, ce sont deux modèles :
+ * Ce fichier a porté jusqu'à cette date les montants des maquettes Banani, qui
+ * décrivaient un autre modèle d'affaires : le client payant y était une
+ * *organisation* employant plusieurs collecteurs, à 0 / 9 900 / 24 900 / 49 900
+ * FCFA, avec des limites exprimées en nombre de collecteurs.
  *
- * - Cahier §5 : le client payant est **un collecteur**. Le raisonnement de prix
- *   y est explicite — « un collecteur de 100 clients à 1 000 FCFA de mise
- *   encaisse ~100 000 FCFA de commissions par cycle ». La base de données suit
- *   ce modèle : `collecteurs.palier`, en correspondance 1 pour 1 avec
- *   `auth.users`, sans notion d'organisation.
- * - Maquettes : le client payant est **une organisation** qui emploie plusieurs
- *   collecteurs, à un tarif quatre à cinq fois supérieur.
+ * Le modèle retenu est celui du cahier §5 : **le client payant est un
+ * collecteur**, et les limites s'expriment en nombre de *clients*. Le
+ * raisonnement de prix y est explicite — « un collecteur de 100 clients à
+ * 1 000 FCFA de mise encaisse ~100 000 FCFA de commissions par cycle ».
  *
- * Les montants ci-dessous sont ceux des maquettes, parce que c'est ce qui a été
- * demandé à l'écran. L'arbitrage reste à faire, et il se fait ici.
+ * C'est aussi le seul modèle que la base sait représenter : `collecteurs` est en
+ * correspondance 1 pour 1 avec `auth.users`, `palier` et `abonnement_*` sont
+ * portés par la ligne du collecteur, et il n'existe aucune table
+ * `organisations`. Retenir les maquettes aurait imposé une migration avant tout
+ * calcul de chiffre d'affaires.
+ *
+ * Conséquence directe : le MRR se calcule en sommant `prix` sur les collecteurs
+ * dont `abonnement_statut = 'actif'`. Appliquer les anciens montants à ce même
+ * décompte aurait multiplié le chiffre annoncé par quatre à cinq — un prix par
+ * organisation facturé à chaque collecteur.
  */
 export interface DescriptionPalier {
   cle: Palier;
@@ -36,6 +42,15 @@ export interface DescriptionPalier {
   prix: number;
   periode: string;
   limite: string;
+  /**
+   * Le plafond de `limite`, en clients, sous une forme exploitable par le code.
+   * `null` vaut « aucun plafond ».
+   *
+   * `limite` est une chaîne d'affichage ; l'utiliser pour décider d'un refus
+   * obligerait à la relire, et un jour quelqu'un écrira « 150 clients max » et
+   * cassera l'analyse sans casser l'écran. Le chiffre vit donc à part.
+   */
+  limiteClients: number | null;
   /** Couleur d'accent du palier. Reprise du jeu data-viz du Design System. */
   teinte: string;
   fond: string;
@@ -51,15 +66,16 @@ export const PALIERS: readonly DescriptionPalier[] = [
     accroche: 'Testez Kolek sans engagement',
     prix: 0,
     periode: '30 jours',
-    limite: '3 collecteurs',
+    limite: '20 clients',
+    limiteClients: 20,
     teinte: '#AEB7D6',
     fond: '#F0F1F8',
     texte: '#5A6380',
     fonctions: [
-      { libelle: '3 collecteurs', incluse: true },
-      { libelle: '100 clients', incluse: true },
+      { libelle: '20 clients', incluse: true },
+      { libelle: 'Encaissement hors ligne', incluse: true },
       { libelle: 'Rapports basiques', incluse: true },
-      { libelle: 'Accès API', incluse: false },
+      { libelle: 'Exports CSV', incluse: false },
       { libelle: 'Support prioritaire', incluse: false },
       { libelle: 'Manager dédié', incluse: false },
     ],
@@ -67,18 +83,19 @@ export const PALIERS: readonly DescriptionPalier[] = [
   {
     cle: 'standard',
     nom: 'Standard',
-    accroche: 'Pour les équipes qui grandissent',
-    prix: 9900,
+    accroche: 'Pour le collecteur qui installe sa tournée',
+    prix: 2500,
     periode: 'mois',
-    limite: '10 collecteurs',
+    limite: '50 clients',
+    limiteClients: 50,
     teinte: '#7FB6A6',
     fond: '#EDF5F3',
     texte: '#2E6557',
     fonctions: [
-      { libelle: '10 collecteurs', incluse: true },
-      { libelle: '500 clients', incluse: true },
+      { libelle: '50 clients', incluse: true },
+      { libelle: 'Encaissement hors ligne', incluse: true },
       { libelle: 'Rapports avancés', incluse: true },
-      { libelle: 'Accès API', incluse: false },
+      { libelle: 'Exports CSV', incluse: false },
       { libelle: 'Support prioritaire', incluse: true },
       { libelle: 'Manager dédié', incluse: false },
     ],
@@ -87,17 +104,18 @@ export const PALIERS: readonly DescriptionPalier[] = [
     cle: 'pro',
     nom: 'Pro',
     accroche: 'La solution complète pour les pros',
-    prix: 24900,
+    prix: 5000,
     periode: 'mois',
-    limite: '50 collecteurs',
+    limite: '150 clients',
+    limiteClients: 150,
     teinte: '#1C7A4B',
     fond: '#E6F3EC',
     texte: '#1C7A4B',
     fonctions: [
-      { libelle: '50 collecteurs', incluse: true },
-      { libelle: '2 000 clients', incluse: true },
+      { libelle: '150 clients', incluse: true },
+      { libelle: 'Encaissement hors ligne', incluse: true },
       { libelle: 'Rapports avancés', incluse: true },
-      { libelle: 'API & exports CSV', incluse: true },
+      { libelle: 'Exports CSV', incluse: true },
       { libelle: 'Support prioritaire', incluse: true },
       { libelle: 'Manager dédié', incluse: false },
     ],
@@ -106,17 +124,18 @@ export const PALIERS: readonly DescriptionPalier[] = [
     cle: 'illimite',
     nom: 'Illimité',
     accroche: 'Puissance maximale, zéro limite',
-    prix: 49900,
+    prix: 10000,
     periode: 'mois',
-    limite: 'Illimité',
+    limite: 'Clients illimités',
+    limiteClients: null,
     teinte: '#14402C',
     fond: '#E8F0EA',
     texte: '#14402C',
     fonctions: [
-      { libelle: 'Collecteurs illimités', incluse: true },
       { libelle: 'Clients illimités', incluse: true },
+      { libelle: 'Encaissement hors ligne', incluse: true },
       { libelle: 'Rapports avancés', incluse: true },
-      { libelle: 'API complète', incluse: true },
+      { libelle: 'Exports CSV', incluse: true },
       { libelle: 'Support dédié 24/7', incluse: true },
       { libelle: 'Manager dédié', incluse: true },
     ],

@@ -21,7 +21,9 @@
     "verifier:en-ligne": "node scripts/verifier-en-ligne.mjs",
     "generer:theme": "node scripts/generer-theme.mjs",
     "verifier:theme": "node scripts/generer-theme.mjs --verifier",
-    "verifier": "npm run db:reset && npm run verifier:theme && npm test && npm run test:scripts && npm run test:db && npm run build && npm run verifier:bundles"
+    "verifier": "npm run db:reset && npm run verifier:theme && npm run verifier:paliers && npm test && npm run test:scripts && npm run test:db && npm run build && npm run verifier:bundles",
+    "generer:paliers": "node scripts/generer-paliers-edge.mjs",
+    "verifier:paliers": "node scripts/generer-paliers-edge.mjs --verifier"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.112.3",
