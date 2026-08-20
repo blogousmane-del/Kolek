@@ -18,7 +18,7 @@ regardé **la taille** de ce qui entre.
 | 🔴 Bloquant | 0 | — |
 | 🟠 Important | 1 | **corrigé le jour même**, migration `20260819010000` |
 | 🟡 À faire | 2 | 1 corrigé, 1 reconduit et argumenté |
-| ⚪️ Non vérifié | 2 | reconduits du 2026-08-18, réglages du tableau de bord |
+| ⚪️ Non vérifié | 1 | longueur minimale de mot de passe, tableau de bord |
 | Non applicable | 3 | inchangés |
 
 ---
@@ -193,12 +193,10 @@ que d'introduire une troisième convention dans le même schéma.
    Policies. Ne pas lancer `supabase config push` tel quel : il appliquerait le
    bloc `[auth]` entier, `site_url` compris, qui pointe encore sur le local.
 
-2. **Les limites de débit sur la connexion** (contrôle 11). Reconduit. Ce qui a
-   pu être lu sans le tableau de bord l'a été : `/auth/v1/settings` confirme
-   aujourd'hui encore `disable_signup: true`, `anonymous_users: false`,
-   `mailer_autoconfirm: false` et aucun fournisseur externe. La seule surface
-   ouverte reste `/token`, dont les valeurs de débit ne sont pas lisibles depuis
-   l'extérieur.
+2. ~~**Les limites de débit sur la connexion** (contrôle 11).~~ **Levé le
+   2026-08-20 — voir « Contrôle 11, mesuré » plus bas.** La valeur n'est
+   toujours pas *lisible* de l'extérieur, mais elle est *mesurable*, et c'est ce
+   qui compte : le plafond existe et se déclenche.
 
 Le troisième ⚪️ de la première rédaction — « la suite de tests de la base n'a pas
 pu être rejouée » — **est levé.** Voir la section « Ce qui restait en suspens »
@@ -228,7 +226,7 @@ contrôle 13 (aucun SQL concaténé, aucun `execute` dynamique).
 | 8 | Champs non modifiables | conforme | liste blanche de colonnes, garde-fous des migrations 7 et 8 |
 | 9 | Cookies de session | 🟡 | jeton en `localStorage`, mitigé par la CSP |
 | 10 | Mots de passe hachés | conforme | délégué à Supabase Auth ; aucune colonne de mot de passe dans `public` |
-| 11 | Rate limiting | ⚪️ | valeurs par défaut non lues ; inscription fermée, confirmée par `/auth/v1/settings` |
+| 11 | Rate limiting | conforme | mesuré le 2026-08-20 : `429 over_request_rate_limit` à la 54ᵉ tentative depuis une IP ; inscription fermée |
 | 12 | Anti-bot | non applicable | aucun formulaire public |
 | 13 | Requêtes paramétrées | non applicable | aucun SQL concaténé |
 | 14 | Validation des entrées | 🟠 **corrigé** | dix colonnes texte sans borne de longueur ; bornées et garde-fou posé, migration `20260819010000` |
@@ -355,7 +353,52 @@ Le nettoyage entre rendus y est explicite : `@testing-library/react` ne branche
 le sien qu'avec les globales de vitest, que ce dépôt n'active pas — sans lui, un
 test de refus passe parce qu'il retrouve la coquille du test précédent.
 
-**Ce qui reste réellement ⚪️** tient en deux réglages du tableau de bord
-Supabase, plus le parcours en production : deux vrais comptes, l'un admin,
-l'autre non, sur `kolek-admin.netlify.app`. Le contrat est prouvé, l'exécution de
-bout en bout ne l'est pas.
+### Contrôle 11, mesuré
+
+Le débit sur `/token` n'est pas lisible depuis l'extérieur — c'est ce qui le
+maintenait en ⚪️ depuis le 2026-08-18. Il est en revanche **mesurable**, et une
+limite qu'on observe vaut mieux qu'une valeur qu'on lit.
+
+Sonde du 2026-08-20 : connexions échouées en rafale depuis une seule IP, sur une
+adresse qui n'existe pas — aucun compte réel touché, aucun verrouillage
+provoqué.
+
+```
+tentatives 1 → 53   400  invalid_credentials
+tentative 54        429  {"error_code":"over_request_rate_limit"}
+```
+
+Le plafond existe et se déclenche. Il est large — une cinquantaine de tentatives
+par fenêtre et par IP, là où le `sign_in_sign_ups = 30` de `config.toml`
+laisserait croire à trente ; ce fichier ne gouverne que le conteneur local, et
+l'écart le confirme une fois de plus. Large ne veut pas dire absent : une attaque
+par dictionnaire est ralentie de plusieurs ordres de grandeur, et l'inscription
+étant fermée, `/token` est la seule surface.
+
+Ce qui reste à faire de ce côté n'est plus un contrôle mais un réglage de
+confort : si tu veux resserrer, c'est Authentication → Rate limits.
+
+### Ce qui reste réellement ⚪️
+
+**Un seul point, et il tient en vingt secondes de tableau de bord :** la longueur
+minimale de mot de passe. Trois tentatives pour l'obtenir autrement ont échoué,
+et il vaut mieux écrire pourquoi que de laisser croire qu'on n'a pas essayé.
+
+- `/auth/v1/settings` ne publie pas les exigences de mot de passe.
+- `POST /auth/v1/signup` avec un mot de passe de trois caractères rend
+  `422 signup_disabled` : le refus d'inscription tranche avant la validation, la
+  sonde n'apprend rien.
+- `supabase config` n'a qu'un `push`, pas de `pull` — et pousser écraserait le
+  distant avec le `config.toml` local, dont le `site_url` pointe encore sur
+  `127.0.0.1:3000`. Casser l'authentification en production pour lire un réglage
+  n'est pas un audit.
+
+Reste **Authentication → Policies**, à la main.
+
+Et le parcours en production, qui n'est plus un contrôle mais une formalité :
+deux vrais comptes sur `kolek-admin.netlify.app`, l'un admin, l'autre non. Le
+contrat serveur est prouvé par `isolation.test.ts`, la branche d'interface par
+`Portillon.test.tsx` ; il ne manque que de l'avoir vu de ses yeux. Créer le
+second compte demande le tableau de bord ou la clé de service — ni l'un ni
+l'autre n'est à la portée d'un audit conduit depuis le terminal, et c'est très
+bien ainsi.
