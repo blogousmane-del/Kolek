@@ -31,6 +31,13 @@ const PHRASES: Record<string, string> = {
   ACCES_RESERVE: 'Session expirée. Reconnecte-toi.',
   JETON_ABSENT: 'Session expirée. Reconnecte-toi.',
   CLOTURE_IMPOSSIBLE: 'Clôture impossible. Réessaie.',
+  // Le seul message de cette table qui porte une consigne plutôt qu'un constat.
+  // Dans ce cas précis le retrait est déjà inscrit au journal, et le journal est
+  // immuable : si le collecteur croit à un échec, il rend l'argent une seconde
+  // fois et personne ne le rattrape. La phrase doit donc dire d'abord ce qu'il
+  // ne faut pas faire.
+  CLOTURE_PARTIELLE:
+    'Le retrait est déjà inscrit — ne rends pas l’argent une seconde fois. Seule la fermeture de la carte a échoué : reprends la clôture, elle terminera le travail sans créer de doublon.',
   INCONNU: 'Enregistrement impossible. Réessaie.',
 };
 
@@ -122,6 +129,17 @@ export async function cloturerCarte(carteId: string): Promise<ResultatCloture> {
     return { ok: false, echec: phrase(code) };
   }
 
-  const corps = data as { montantRestitue: number; commission: number };
-  return { ok: true, montantRestitue: corps.montantRestitue, commission: corps.commission };
+  // `invoke` ne remplit `error` que pour un statut hors 2xx. Or la clôture
+  // partielle rend **207**, qui est un succès pour le transport et un échec pour
+  // le métier. Sans ce second examen, le message le plus important de l'écran —
+  // « ne rends pas l'argent deux fois » — ne s'afficherait jamais, et le corps
+  // serait lu comme une clôture réussie avec une commission indéfinie.
+  const corps = data as { montantRestitue?: number; commission?: number; erreur?: string };
+  if (corps.erreur) return { ok: false, echec: phrase(corps.erreur) };
+
+  return {
+    ok: true,
+    montantRestitue: corps.montantRestitue ?? 0,
+    commission: corps.commission ?? 0,
+  };
 }

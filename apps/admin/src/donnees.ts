@@ -264,10 +264,19 @@ export async function creerCollecteur(
     return { ok: false, message: code ? messageCreation(code, occurrences) : error.message };
   }
 
-  const corps = data as { collecteurId: string; avertissement?: string };
+  // `invoke` ne remplit `error` que pour un statut hors 2xx. `COMPLEMENT_INCOMPLET`
+  // arrive en **207** — un succès pour le transport, un demi-échec pour le métier :
+  // le compte existe et fonctionne, seuls la zone et le palier manquent. Sans cet
+  // examen du corps, l'écran annoncerait une création parfaite et personne
+  // n'irait corriger la fiche.
+  const corps = data as { collecteurId: string; avertissement?: string; erreur?: string };
+  const codeAvertissement = corps.erreur ?? corps.avertissement;
+
   return {
     ok: true,
     collecteurId: corps.collecteurId,
-    avertissement: corps.avertissement ? AVERTISSEMENTS[corps.avertissement] : undefined,
+    avertissement: codeAvertissement
+      ? (AVERTISSEMENTS[codeAvertissement] ?? MESSAGES_CREATION[codeAvertissement])
+      : undefined,
   };
 }
