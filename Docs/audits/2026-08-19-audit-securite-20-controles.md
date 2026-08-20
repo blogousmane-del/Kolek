@@ -18,7 +18,7 @@ regardé **la taille** de ce qui entre.
 | 🔴 Bloquant | 0 | — |
 | 🟠 Important | 1 | **corrigé le jour même**, migration `20260819010000` |
 | 🟡 À faire | 2 | 1 corrigé, 1 reconduit et argumenté |
-| ⚪️ Non vérifié | 3 | 2 reconduits (tableau de bord), 1 nouveau (Docker local HS) |
+| ⚪️ Non vérifié | 2 | reconduits du 2026-08-18, réglages du tableau de bord |
 | Non applicable | 3 | inchangés |
 
 ---
@@ -200,15 +200,9 @@ que d'introduire une troisième convention dans le même schéma.
    ouverte reste `/token`, dont les valeurs de débit ne sont pas lisibles depuis
    l'extérieur.
 
-3. **La suite de tests de la base n'a pas pu être rejouée.** Nouveau, et
-   d'origine locale : le moteur WSL de Docker Desktop refuse de démarrer sur
-   cette machine, donc `npm run db:reset` et `npm run test:db` sont hors service.
-   Les cinquante-trois tests existants et les neuf ajoutés aujourd'hui n'ont donc
-   pas été exécutés. Ce qui a été fait à la place, et qui ne le remplace pas : la
-   migration a été passée au vrai analyseur PostgreSQL 17 (`libpg-query`), qui
-   l'accepte, et le fichier de test compile sous `tsc --noEmit`. **La migration
-   ne doit pas être poussée sur `kolek-prod` avant que `npm run verifier` soit
-   vert.**
+Le troisième ⚪️ de la première rédaction — « la suite de tests de la base n'a pas
+pu être rejouée » — **est levé.** Voir la section « Ce qui restait en suspens »
+en fin de document : les 63 tests sont verts, migration comprise.
 
 ---
 
@@ -272,10 +266,10 @@ audit_log   401 42501    synchro_rejets 401 42501    settings  disable_signup: t
    suffisait de demander laquelle de ces dix colonnes texte portait une borne.
    Aucune.
 
-4. **Chaîne de construction.** `npm test` (50 tests), `npm run test:scripts` (22),
-   `verifier:theme`, `npm run build` sur les trois applications,
-   `verifier:bundles`, `verifier:en-ligne`. Tout vert. `test:db` n'a pas pu
-   tourner — voir le ⚪️ n°3.
+4. **Chaîne de construction complète.** `npm test` (50 tests),
+   `npm run test:scripts` (22), `npm run test:db` (63), `verifier:theme`,
+   `npm run build` sur les trois applications, `verifier:bundles`,
+   `verifier:en-ligne`. Tout vert.
 
 ---
 
@@ -290,5 +284,57 @@ audit_log   401 42501    synchro_rejets 401 42501    settings  disable_signup: t
   que la correction d'une caisse ouverte reste possible. La leçon de F1 n'a pas
   changé : **aucun test ne posait la question.**
 
-À faire dans l'ordre, dès que Docker redémarre : `npm run verifier`, puis
-`npx supabase db push` sur `kolek-prod`, puis reconstater les catalogues.
+---
+
+## Ce qui restait en suspens, et qui est clos
+
+Rédigé le 2026-08-20, après coup. La première version de ce document classait la
+suite de tests en ⚪️ : Docker Desktop refusait de démarrer sur le poste, et la
+migration n'avait été validée que par l'analyseur PostgreSQL 17 (`libpg-query`),
+ce qui prouve la syntaxe et rien d'autre.
+
+**La panne locale, puisqu'elle se reproduira.** `supabase start` attend la sonde
+de santé de *tous* les services. Cinq ne l'atteignent jamais ici —
+`analytics`, `realtime`, `storage`, `pg_meta`, `studio` — parce que `vector`
+n'arrive pas à lire le socket Docker après un redémarrage du moteur WSL :
+
+```
+vector::sources::docker_logs: Listing currently running containers failed.
+error=ConnectError("tcp connect error", ConnectionRefused)
+```
+
+Le CLI démonte alors la pile entière, `kong`, `auth` et `rest` compris, alors
+qu'ils étaient sains — d'où des services qui répondent `200` puis disparaissent
+au milieu d'une exécution de tests. Le symptôme trompe : il ressemble à une
+migration qui échoue. Il n'y en avait aucune. La parade, sans toucher à
+`config.toml` — aucun de ces cinq services n'est utilisé par la suite de tests :
+
+```bash
+npx supabase start -x logflare,vector,realtime,storage-api,postgres-meta,studio,imgproxy,edge-runtime,supavisor
+```
+
+**Ce que l'exécution a donné.** `db reset` applique les neuf migrations,
+`20260819010000` comprise ; ses trois garde-fous passent, ce qui se déduit du
+succès lui-même — un `raise exception` dans un bloc `do $$` aurait arrêté le
+reset. Puis 63 tests sur 63, dont les neuf de `bornes.test.ts`.
+
+**Un test a dû être corrigé, et c'est le plus instructif du lot.**
+`isolation.test.ts` n°4 attendait `42501` sur une mise posée sur la carte
+d'autrui — la violation du `with check` de `mises_insert`. Il reçoit désormais
+`P0001 CARTE_INTROUVABLE`. L'insertion était refusée avant, elle l'est toujours :
+ce qui a changé, c'est que le refus arrive plus tôt, au déclencheur, avant que
+les messages d'état ne décrivent une carte que l'appelant ne peut pas lire.
+C'est exactement le durcissement décrit plus haut, et le test asserte maintenant
+le contrat fort, en vérifiant explicitement que `MONTANT_INVALIDE` ne fuit plus.
+
+**Sur `kolek-prod`.** La migration y est appliquée, confirmé au catalogue. Un
+premier compte d'administration existe désormais — créé au tableau de bord, puis
+inscrit dans `public.admins`, `est_admin()` rendant `true`. Contrôlé dans la
+foulée : cela n'ouvre rien au rôle anonyme. Les neuf tables répondent toujours
+`401 / 42501` à la clé publiée, `rpc est_admin` aussi, et `storage.buckets` reste
+vide.
+
+**Ce qui reste ⚪️** est inchangé : les deux réglages du tableau de bord Supabase,
+plus le test du non-admin — créer un second compte, ne pas l'inscrire dans
+`admins`, et vérifier qu'il reste dehors. Un administrateur qui entre ne prouve
+rien tant qu'un non-administrateur n'est pas resté à la porte.
