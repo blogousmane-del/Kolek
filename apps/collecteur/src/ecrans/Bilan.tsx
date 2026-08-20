@@ -1,0 +1,145 @@
+import { formatMontant } from '@kolek/core';
+import { Carte } from '@kolek/ui';
+import { useEffect, useState } from 'react';
+
+import { chargerBilan, type Bilan as DonneesBilan } from '../lectures-ecrans';
+import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
+
+/**
+ * Le bilan du collecteur.
+ *
+ * Trois tranches — le jour, la semaine, le mois — et rien au-delà : les données
+ * n'existent que depuis l'ouverture du compte, et une tranche « cette année »
+ * afficherait le même chiffre que « 30 jours » en laissant croire à autre chose.
+ *
+ * **La commission est montrée à part, et c'est le point de l'écran.** « Encaissé »
+ * est de l'argent qui transite ; seule la première mise de chaque carte revient
+ * au collecteur. Les confondre est l'erreur qui fait qu'on dépense l'épargne de
+ * ses clients sans s'en rendre compte.
+ */
+export function Bilan({ onRetour }: { onRetour: () => void }) {
+  const [donnees, setDonnees] = useState<DonneesBilan | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  useEffect(() => {
+    let vivant = true;
+    void (async () => {
+      try {
+        const b = await chargerBilan();
+        if (vivant) setDonnees(b);
+      } catch {
+        if (vivant) setErreur('Chiffres indisponibles. Vérifie le réseau.');
+      }
+    })();
+    return () => {
+      vivant = false;
+    };
+  }, []);
+
+  return (
+    <div className="flex-1 flex flex-col">
+      <EnTeteEcran
+        titre="Bilan"
+        sousTitre="Ce qui est passé par tes mains"
+        onRetour={onRetour}
+        enfants={
+          donnees && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white/10 rounded-lg p-3">
+                <p className="text-white/60 text-xs font-body mb-0.5">Encours client</p>
+                <p className="text-white font-headings font-bold text-xl tabular-nums">
+                  {formatMontant(donnees.encoursTotal)}
+                </p>
+                <p className="text-white/50 text-xs font-body">FCFA à rendre</p>
+              </div>
+              <div className="bg-white/10 rounded-lg p-3">
+                <p className="text-white/60 text-xs font-body mb-0.5">Cartes actives</p>
+                <p className="text-white font-headings font-bold text-xl tabular-nums">
+                  {donnees.cartesActives}
+                </p>
+                <p className="text-white/50 text-xs font-body">
+                  {donnees.clients} client{donnees.clients > 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+          )
+        }
+      />
+
+      <CorpsEcran
+        enfants={
+          <>
+            {erreur && (
+              <p role="alert" className="bg-negative-tint text-negative text-sm font-body p-3 rounded-md">
+                {erreur}
+              </p>
+            )}
+
+            {!donnees && !erreur && (
+              <p className="font-body text-sm text-muted-foreground text-center py-8">Lecture…</p>
+            )}
+
+            {donnees?.tranches.every((t) => t.nombreMises === 0) && (
+              <RienAMontrer
+                icone="bar-chart-2"
+                titre="Aucune mise sur 30 jours"
+                detail="Le bilan se remplit tout seul dès le premier encaissement."
+              />
+            )}
+
+            {donnees?.tranches.map((tranche) => (
+              <Carte key={tranche.libelle} className="p-4">
+                <p className="font-headings font-bold text-base text-ink mb-3">{tranche.libelle}</p>
+
+                <div className="flex items-baseline justify-between mb-1">
+                  <span className="font-body text-sm text-muted-foreground">Encaissé</span>
+                  <span className="font-headings font-bold text-xl text-ink tabular-nums">
+                    {formatMontant(tranche.encaisse)}{' '}
+                    <span className="text-xs font-body font-medium text-muted-foreground">FCFA</span>
+                  </span>
+                </div>
+
+                {/* La ligne qui compte : ce qui reste au collecteur. */}
+                <div className="flex items-baseline justify-between mb-3 pb-3 border-b border-hairline">
+                  <span className="font-body text-sm text-positive font-medium">Ta commission</span>
+                  <span className="font-headings font-bold text-lg text-positive tabular-nums">
+                    {formatMontant(tranche.commissions)}{' '}
+                    <span className="text-xs font-body font-medium">FCFA</span>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="font-headings font-bold text-base text-ink tabular-nums">
+                      {tranche.nombreMises}
+                    </p>
+                    <p className="text-xs font-body text-muted-foreground">mises</p>
+                  </div>
+                  <div>
+                    <p className="font-headings font-bold text-base text-ink tabular-nums">
+                      {tranche.cartesOuvertes}
+                    </p>
+                    <p className="text-xs font-body text-muted-foreground">cartes ouvertes</p>
+                  </div>
+                  <div>
+                    <p className="font-headings font-bold text-base text-ink tabular-nums">
+                      {tranche.cartesCloturees}
+                    </p>
+                    <p className="text-xs font-body text-muted-foreground">clôturées</p>
+                  </div>
+                </div>
+
+                {tranche.restitue > 0 && (
+                  <p className="font-body text-xs text-muted-foreground mt-3 pt-3 border-t border-hairline">
+                    Restitué aux clients :{' '}
+                    <strong className="text-ink">{formatMontant(tranche.restitue)} FCFA</strong>
+                  </p>
+                )}
+              </Carte>
+            ))}
+          </>
+        }
+      />
+    </div>
+  );
+}

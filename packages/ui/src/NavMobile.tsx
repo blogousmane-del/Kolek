@@ -21,8 +21,12 @@ const ONGLETS: Onglet[] = [
     disponible: true,
     saillant: true,
   },
-  { cle: 'bilans', icone: 'bar-chart-2', libelle: 'Bilans', disponible: false },
-  { cle: 'profil', icone: 'user', libelle: 'Profil', disponible: false },
+  // Les deux derniers ont été éteints tant qu'aucun écran ne vivait derrière.
+  // Ils sont branchés depuis le 2026-08-20 : `bilans` mène au bilan, `profil` à
+  // la fiche du collecteur — le même écran que la pastille « Plus » de l'accueil,
+  // deux chemins vers un seul endroit plutôt que deux endroits qui se ressemblent.
+  { cle: 'bilans', icone: 'bar-chart-2', libelle: 'Bilans', disponible: true },
+  { cle: 'profil', icone: 'user', libelle: 'Profil', disponible: true },
 ];
 
 interface Props {

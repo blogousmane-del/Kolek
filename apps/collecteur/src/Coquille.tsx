@@ -2,9 +2,27 @@ import { NavMobile, type CleNavCollecteur } from '@kolek/ui';
 import { useEffect, useState } from 'react';
 
 import { Accueil } from './ecrans/Accueil';
+import { Alertes } from './ecrans/Alertes';
+import { Bilan } from './ecrans/Bilan';
 import { Clients } from './ecrans/Clients';
 import { Encaisser } from './ecrans/Encaisser';
+import { Plus } from './ecrans/Plus';
+import { Rapprochement } from './ecrans/Rapprochement';
+import { Recus } from './ecrans/Recus';
+import { Retrait } from './ecrans/Retrait';
 import { supabase } from './supabase';
+
+/**
+ * Les écrans qui ne figurent pas dans la barre du bas.
+ *
+ * Type distinct de `CleNavCollecteur` : la barre ne montre que cinq onglets, et
+ * y ajouter six clés de plus la rendrait illisible sur un téléphone. Ces écrans
+ * s'atteignent par la grille d'actions de l'accueil, et en sortent par la flèche
+ * de leur en-tête.
+ */
+type EcranSecondaire = 'retrait' | 'rapprochement' | 'recus' | 'alertes' | 'plus';
+
+export type Page = CleNavCollecteur | EcranSecondaire;
 
 /** La carte choisie pour l'encaissement, portée par la coquille : l'écran
     « Encaisser » a besoin de savoir sur quelle carte il écrit, et c'est la
@@ -19,7 +37,7 @@ export interface CarteChoisie {
 export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
   // Départ sur « Clients » : c'est l'écran branché sur la base, et celui d'où
   // partent les deux gestes du métier — inscrire un client, encaisser sa mise.
-  const [page, setPage] = useState<CleNavCollecteur>('clients');
+  const [page, setPage] = useState<Page>('clients');
   const [erreurSortie, setErreurSortie] = useState<string | null>(null);
   const [collecteurId, setCollecteurId] = useState<string | null>(null);
   const [nomCollecteur, setNomCollecteur] = useState<string | null>(null);
@@ -113,7 +131,35 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
         />
       )}
 
-      <NavMobile actif={page} onNaviguer={setPage} />
+      {/* Les six écrans qui étaient éteints. Chacun revient à l'accueil : ils
+          ne figurent pas dans la barre du bas, donc sans cette flèche on y
+          serait enfermé. */}
+      {page === 'retrait' && (
+        <Retrait
+          onRetour={() => setPage('accueil')}
+          onCloture={() => setRevision((r) => r + 1)}
+        />
+      )}
+      {page === 'bilans' && <Bilan onRetour={() => setPage('accueil')} />}
+      {page === 'rapprochement' && (
+        <Rapprochement collecteurId={collecteurId} onRetour={() => setPage('accueil')} />
+      )}
+      {page === 'recus' && <Recus onRetour={() => setPage('accueil')} />}
+      {page === 'alertes' && <Alertes onRetour={() => setPage('accueil')} />}
+      {(page === 'plus' || page === 'profil') && (
+        <Plus onRetour={() => setPage('accueil')} onDeconnexion={deconnecter} />
+      )}
+
+      {/* La barre ne connaît que ses cinq clés. Sur un écran secondaire, aucun
+          onglet n'est actif — d'où le repli sur 'accueil', qui est bien l'endroit
+          d'où l'on vient et où la flèche ramène. */}
+      <NavMobile actif={estOnglet(page) ? page : 'accueil'} onNaviguer={setPage} />
     </div>
   );
+}
+
+const ONGLETS: readonly CleNavCollecteur[] = ['accueil', 'clients', 'encaisser', 'bilans', 'profil'];
+
+function estOnglet(page: Page): page is CleNavCollecteur {
+  return (ONGLETS as readonly string[]).includes(page);
 }

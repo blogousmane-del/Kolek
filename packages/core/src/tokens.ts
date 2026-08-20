@@ -127,9 +127,17 @@ export const elevations = {
  * `bg-[image:var(--degrade-carte)]`. Les garder ici plutôt qu'en dur dans
  * trois composants est ce qui empêche la carte de collecte et la carte de zone
  * de diverger silencieusement.
+ *
+ * `degradeCarte` a été saturé le 2026-08-20 et ne partage donc plus ses teintes
+ * avec les dégradés de zone. La divergence est voulue, et elle est écrite ici
+ * pour qu'elle ne soit pas silencieuse : la carte de collecte se lit dehors, en
+ * plein soleil, sur un téléphone d'entrée de gamme. Les cartes de zone se
+ * lisent au bureau, sur un écran d'administration. Ce ne sont pas les mêmes
+ * conditions, donc pas le même contraste. L'encre de la carte est passée de
+ * `--color-sidebar` à `--color-ink` pour la même raison.
  */
 export const degrades = {
-  degradeCarte: 'linear-gradient(135deg, #B7D9BE 0%, #9FC2DA 60%, #AEB7D6 100%)',
+  degradeCarte: 'linear-gradient(135deg, #8FC79E 0%, #6FA3C9 60%, #8A96C4 100%)',
   degradePromo: 'linear-gradient(135deg, #1C5A3D 0%, #0E2E1F 100%)',
   degradeZone0: 'linear-gradient(135deg, #B7D9BE 0%, #9FC2DA 100%)',
   degradeZone1: 'linear-gradient(135deg, #9FC2DA 0%, #AEB7D6 100%)',

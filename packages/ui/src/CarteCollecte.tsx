@@ -36,14 +36,14 @@ export function CarteCollecte({
         {/* En-tête */}
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="text-xs font-body font-semibold uppercase tracking-widest text-sidebar/60 mb-0.5">
+            <p className="text-xs font-body font-semibold uppercase tracking-widest text-ink/60 mb-0.5">
               Cycle {cycle}
             </p>
-            <p className="font-headings font-bold text-xl text-sidebar">{nomClient}</p>
+            <p className="font-headings font-bold text-xl text-ink">{nomClient}</p>
           </div>
-          <div className="bg-sidebar/10 rounded-md px-3 py-1.5 text-right">
-            <p className="text-xs font-body text-sidebar/70">Mise / jour</p>
-            <p className="font-body font-bold text-base text-sidebar tabular-nums">
+          <div className="bg-ink/10 rounded-md px-3 py-1.5 text-right">
+            <p className="text-xs font-body text-ink/70">Mise / jour</p>
+            <p className="font-body font-bold text-base text-ink tabular-nums">
               {misePar} <span className="text-xs">FCFA</span>
             </p>
           </div>
@@ -56,7 +56,7 @@ export function CarteCollecte({
               key={numero}
               className={`h-5 rounded-sm flex items-center justify-center ${
                 numero < jourCourant
-                  ? 'bg-sidebar/60'
+                  ? 'bg-ink/60'
                   : numero === jourCourant
                     ? 'bg-sidebar'
                     : 'bg-white/40'
@@ -70,13 +70,13 @@ export function CarteCollecte({
         {/* Pied */}
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-xs font-body text-sidebar/60 mb-0.5">Solde restituable</p>
-            <p className="font-headings font-bold text-2xl text-sidebar tabular-nums">
+            <p className="text-xs font-body text-ink/60 mb-0.5">Solde restituable</p>
+            <p className="font-headings font-bold text-2xl text-ink tabular-nums">
               {solde} <span className="text-sm font-body font-medium">FCFA</span>
             </p>
           </div>
           <div className="text-right">
-            <span className="text-xs font-body font-medium text-sidebar/70">
+            <span className="text-xs font-body font-medium text-ink/70">
               {jourCourant}/{totalJours} jours · {pourcentage} %
             </span>
           </div>

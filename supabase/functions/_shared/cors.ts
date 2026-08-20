@@ -73,11 +73,25 @@ export function entetesCors({
 }
 
 /** Découpe la variable d'environnement des origines autorisées. */
-export function listerOrigines(brut: string | undefined | null): ReadonlySet<string> {
+export function listerOrigines(
+  brut: string | undefined | null,
+  defaut = ORIGINES_ADMIN,
+): ReadonlySet<string> {
   return new Set(
-    (brut ?? 'https://kolek-admin.netlify.app,http://localhost:5173')
+    (brut ?? defaut)
       .split(',')
       .map((o) => o.trim())
       .filter(Boolean),
   );
 }
+
+/**
+ * Les replis, quand la variable d'environnement n'est pas posée.
+ *
+ * Chaque fonction reçoit **le sien**. Une liste commune aux deux applications
+ * laisserait le navigateur du collecteur appeler la fonction d'administration :
+ * le portillon `est_admin()` la refuserait, mais autant que la requête ne parte
+ * pas. Le port 5173 est celui de Vite en développement.
+ */
+export const ORIGINES_ADMIN = 'https://kolek-admin.netlify.app,http://localhost:5173';
+export const ORIGINES_COLLECTEUR = 'https://kolek-collecteur.netlify.app,http://localhost:5173';

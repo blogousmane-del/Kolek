@@ -11,10 +11,10 @@ import {
   LigneTransaction,
   useEnLigne,
   type ActionRapide,
-  type CleNavCollecteur,
 } from '@kolek/ui';
 import { useEffect, useState } from 'react';
 
+import type { Page } from '../Coquille';
 import { chargerTableauCollecteur, type TableauCollecteur } from '../lectures';
 
 /**
@@ -42,7 +42,7 @@ export function Accueil({
 }: {
   nomCollecteur: string | null;
   revision: number;
-  onNaviguer: (cle: CleNavCollecteur) => void;
+  onNaviguer: (cle: Page) => void;
   onSouscrire: () => void;
   onDeconnexion: () => void;
 }) {
@@ -71,19 +71,20 @@ export function Accueil({
     };
   }, [revision]);
 
-  // Deux actions mènent quelque part, les six autres sont désactivées avec leur
-  // raison. `ActionsRapides` grise toute action sans `onActiver` — un bouton
-  // éteint qui dit pourquoi est une information ; un bouton actif qui ne fait
-  // rien est un défaut.
+  // Les huit mènent quelque part depuis le 2026-08-20. Six étaient grises,
+  // faute d'écran derrière : `ActionsRapides` désactive toute action sans
+  // `onActiver`, ce qui était honnête tant que rien n'existait, mais illisible
+  // pour qui n'a pas lu le code — six pastilles éteintes se lisent comme une
+  // application cassée, pas comme une application en cours de construction.
   const actions: ActionRapide[] = [
     { icone: 'circle-dollar-sign', libelle: 'Encaisser', onActiver: () => onNaviguer('clients') },
     { icone: 'user-plus', libelle: 'Souscrire', onActiver: onSouscrire },
-    { icone: 'arrow-up-right', libelle: 'Retrait' },
-    { icone: 'bar-chart-2', libelle: 'Bilan' },
-    { icone: 'refresh-cw', libelle: 'Rapproch.' },
-    { icone: 'receipt', libelle: 'Reçus' },
-    { icone: 'bell', libelle: 'Alertes' },
-    { icone: 'more-horizontal', libelle: 'Plus' },
+    { icone: 'arrow-up-right', libelle: 'Retrait', onActiver: () => onNaviguer('retrait') },
+    { icone: 'bar-chart-2', libelle: 'Bilan', onActiver: () => onNaviguer('bilans') },
+    { icone: 'refresh-cw', libelle: 'Rapproch.', onActiver: () => onNaviguer('rapprochement') },
+    { icone: 'receipt', libelle: 'Reçus', onActiver: () => onNaviguer('recus') },
+    { icone: 'bell', libelle: 'Alertes', onActiver: () => onNaviguer('alertes') },
+    { icone: 'more-horizontal', libelle: 'Plus', onActiver: () => onNaviguer('plus') },
   ];
 
   const nom = nomCollecteur ?? 'Collecteur';
