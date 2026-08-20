@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import { entetesCors, listerOrigines } from '../_shared/cors.ts';
+import { verifierFuite } from '../_shared/hibp.ts';
 import { validerCollecteur } from '../_shared/valider-collecteur.ts';
 
 /**
@@ -97,6 +98,39 @@ Deno.serve(async (requete) => {
   if (!controle.ok) return reponse({ erreur: controle.erreur }, 400, requete);
   const { email, motDePasse, nom, telephone, zone, palier } = controle.valeurs;
 
+  // --- Mots de passe divulgués ---
+  //
+  // Ce contrôle double en apparence le réglage `Prevent use of leaked
+  // passwords`, activé sur le projet le 2026-08-20. Il ne le double pas :
+  // `auth.admin.createUser` ne consulte aucune règle de mot de passe
+  // (supabase/auth#1959), ce qui a été mesuré ici même — un compte s'est créé
+  // avec `password123` réglage actif. Ce chemin étant le seul par lequel un
+  // compte naît dans Kolek, la case cochée ne couvrait rien.
+  //
+  // Même remarque pour la longueur minimale : `LONGUEUR_MOT_DE_PASSE` dans
+  // `valider-collecteur.ts` n'est pas une précaution redondante, c'est la seule
+  // application effective du seuil.
+  const fuite = await verifierFuite(motDePasse);
+  if (fuite.etat === 'compromis') {
+    // Le nombre d'occurrences est rendu : « vu 2 918 953 fois dans des fuites »
+    // fait comprendre à l'administrateur qu'il ne s'agit pas d'un caprice de
+    // complexité. Il ne renseigne personne — c'est une propriété publique du
+    // mot de passe qu'il vient de taper, pas un fait sur un compte.
+    return reponse(
+      { erreur: 'MOT_DE_PASSE_COMPROMIS', occurrences: fuite.occurrences },
+      400,
+      requete,
+    );
+  }
+
+  // Service injoignable : on laisse passer plutôt que de bloquer la création
+  // d'un collecteur sur une panne extérieure, mais on le dit dans la réponse.
+  // Le risque réel est faible — le formulaire engendre par défaut un mot de
+  // passe aléatoire de 16 caractères, qui ne peut pas figurer dans une fuite.
+  // Il n'existe que si l'administrateur a saisi le sien.
+  const avertissement = fuite.etat === 'indisponible' ? 'FUITES_NON_VERIFIEES' : undefined;
+  if (avertissement) console.error('HIBP injoignable :', fuite.raison);
+
   // --- Passé ce point seulement, la clé de service sort ---
 
   const clientService = createClient(url, cleService, {
@@ -144,11 +178,11 @@ Deno.serve(async (requete) => {
     // seconde tentative buterait sur l'adresse déjà prise.
     console.error('complément collecteur :', erreurLigne.message);
     return reponse(
-      { erreur: 'COMPLEMENT_INCOMPLET', collecteurId: cree.user.id },
+      { erreur: 'COMPLEMENT_INCOMPLET', collecteurId: cree.user.id, avertissement },
       207,
       requete,
     );
   }
 
-  return reponse({ collecteurId: cree.user.id, email, nom }, 201, requete);
+  return reponse({ collecteurId: cree.user.id, email, nom, avertissement }, 201, requete);
 });

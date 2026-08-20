@@ -272,6 +272,58 @@ C'est l'inverse exact des deux sondes écartées plus haut, dont la branche
 informative était la branche nuisible. À faire une fois, à noter ici, et à ne pas
 refaire.
 
+#### Ce que la sonde a réellement montré, et pourquoi ma table ci-dessus était fausse
+
+**Sonde exécutée le 2026-08-20 : le compte s'est créé.** Réglage distant actif,
+`password123` accepté.
+
+Ma table proposait deux issues et attribuait celle-là à « le réglage n'a pas
+pris ». C'était faux, et le protocole lui-même était invalide : **il mesurait un
+chemin qui ne consulte jamais le réglage.**
+
+`auth.admin.createUser` ne fait tourner **aucune** règle de mot de passe. C'est un
+défaut ouvert chez l'éditeur — [supabase/auth#1959](https://github.com/supabase/auth/issues/1959),
+*« `admin.createUser` doesn't run the configured password strength rules...
+`admin.updateUser` does seem to do so »*. Ni la longueur minimale, ni le filtre
+des fuites, ni les exigences de composition.
+
+C'est la même erreur que le défaut CORS du 2026-08-20, et elle mérite d'être
+nommée deux fois puisqu'elle s'est produite deux fois : **j'ai conçu une sonde
+qui traversait un chemin différent de celui que la règle gouverne.** La première
+fois, ma requête `curl` ne demandait que les en-têtes que j'avais moi-même
+déclarés, donc elle confirmait ma liste au lieu de l'éprouver. Cette fois, la
+sonde passait par l'API d'administration, la seule qui ignore la politique.
+
+**La conséquence est plus grave que le diagnostic manqué**, et c'est le vrai
+constat de la journée :
+
+> `admin-creer-collecteur` est **le seul chemin par lequel un compte naît dans
+> Kolek**. L'inscription publique est fermée, le changement de mot de passe n'est
+> pas proposé. Donc tant que ce défaut vit, la case cochée au tableau de bord ne
+> protège aucun chemin réellement emprunté — et le seuil de 10 n'était appliqué
+> que par la validation TypeScript du dépôt.
+
+**Corrigé le 2026-08-20**, `supabase/functions/_shared/hibp.ts` : la fonction
+interroge Have I Been Pwned elle-même, par k-anonymat, avant d'appeler
+`createUser`. Cinq caractères de l'empreinte SHA-1 sortent, jamais le mot de
+passe ni l'empreinte entière ; `Add-Padding: true` empêche la taille de la
+réponse de trahir le préfixe demandé. Un mot de passe divulgué rend
+`MOT_DE_PASSE_COMPROMIS` avec son nombre d'occurrences, et aucun compte n'est
+créé.
+
+Service injoignable : la création passe quand même — bloquer l'exploitation sur
+une panne extérieure serait un mauvais échange — mais la réponse porte
+`FUITES_NON_VERIFIEES`, que l'écran affiche. Taire une vérification qui n'a pas
+eu lieu serait pire que ne pas la faire.
+
+Module séparé et sans API Deno, comme `cors.ts` et `valider-collecteur.ts` :
+`fetch` est injecté, et les 14 tests couvrent le rembourrage, les fins de ligne
+`CRLF`, le service en panne, et surtout l'assertion qui compte — **l'URL appelée
+ne contient ni le mot de passe, ni l'empreinte complète, ni son suffixe.**
+
+**Ce qui reste à faire de ton côté :** supprimer le compte créé par la sonde,
+au tableau de bord, Authentication → Users.
+
 ### 3. Le jeton de session vit dans `localStorage` — reconduit, inchangé
 
 Contrôle 9, déjà argumenté le 2026-08-18 et revérifié aujourd'hui : comportement
@@ -324,7 +376,7 @@ contrôle 13 (aucun SQL concaténé, aucun `execute` dynamique).
 | 7 | Verrouillage par enregistrement | conforme, **durci** | policies sur `collecteur_id = auth.uid()` ; le déclencheur ne renseigne plus sur les cartes d'autrui |
 | 8 | Champs non modifiables | conforme | liste blanche de colonnes, garde-fous des migrations 7 et 8 |
 | 9 | Cookies de session | 🟡 | jeton en `localStorage`, mitigé par la CSP |
-| 10 | Mots de passe hachés | conforme | délégué à Supabase Auth, aucune colonne de mot de passe dans `public` ; seuil relevé le 2026-08-20 de 8 à 10, et filtre des fuites connues (HIBP) activé le même jour — déclaré, la sonde qui le mesure est décrite en « 2. Mots de passe » |
+| 10 | Mots de passe hachés | conforme | délégué à Supabase Auth, aucune colonne de mot de passe dans `public` ; réglages distants relevés le 2026-08-20 (seuil 8 → 10, filtre HIBP activé), **et le filtre porté dans `admin-creer-collecteur`** parce que `auth.admin.createUser` ignore la politique — mesuré, voir « 2. Mots de passe » |
 | 11 | Rate limiting | conforme | plafond mesuré trois fois le 2026-08-20 : `429 over_request_rate_limit` entre la 33ᵉ et la 54ᵉ tentative, en moins de 20 s ; inscription fermée (`disable_signup: true`, mesuré) |
 | 12 | Anti-bot | non applicable | aucun formulaire public |
 | 13 | Requêtes paramétrées | non applicable | aucun SQL concaténé |

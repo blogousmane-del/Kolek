@@ -254,9 +254,15 @@ Rien de neuf, rappelé pour que ce rapport se suffise :
    `supabase config push` qui aurait écrasé `site_url`.
 
    Les deux sont **déclarés**, pas mesurés : `/auth/v1/settings` ne publie pas la
-   politique de mot de passe, et c'est le bon comportement. Le filtre HIBP admet
-   toutefois une sonde non destructrice via `admin-creer-collecteur` ; elle est
-   décrite dans le rapport d'hier, section « 2. Mots de passe ».
+   politique de mot de passe, et c'est le bon comportement.
+
+   **Et cocher la case ne suffisait pas.** La sonde a montré qu'un compte se crée
+   avec `password123` réglage actif : `auth.admin.createUser` ne fait tourner
+   aucune règle de mot de passe ([supabase/auth#1959](https://github.com/supabase/auth/issues/1959)),
+   or c'est le seul chemin par lequel un compte naît dans Kolek. Le filtre a donc
+   été porté dans `admin-creer-collecteur` le jour même — k-anonymat HIBP,
+   `_shared/hibp.ts`, 14 tests. Récit complet dans le rapport d'hier, « 2. Mots
+   de passe ».
 3. **Jeton de session dans `localStorage`** — comportement par défaut de
    `supabase-js`, risque bas tant que la CSP reste ce qu'elle est. Revérifié
    aujourd'hui : aucun `innerHTML`, `dangerouslySetInnerHTML`, `eval` ni

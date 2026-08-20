@@ -58,6 +58,7 @@ export function FormulaireCollecteur({
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [cree, setCree] = useState(false);
+  const [avertissement, setAvertissement] = useState<string | null>(null);
 
   const pret =
     email.includes('@') &&
@@ -77,6 +78,7 @@ export function FormulaireCollecteur({
       setErreur(resultat.message);
       return;
     }
+    setAvertissement(resultat.avertissement ?? null);
     setCree(true);
     onCree();
   }
@@ -89,6 +91,11 @@ export function FormulaireCollecteur({
           Remets ces identifiants à {nom} en main propre. Le mot de passe n’est stocké nulle part
           et ne pourra pas être relu.
         </p>
+        {avertissement && (
+          <p className="text-sm font-body text-info bg-info-tint rounded-md p-3 mb-4">
+            {avertissement}
+          </p>
+        )}
         <div className="bg-canvas border border-hairline rounded-md p-4 mb-4">
           <p className="text-xs font-body uppercase tracking-widest text-muted-foreground mb-1">
             Adresse

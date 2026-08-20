@@ -201,9 +201,34 @@ const MESSAGES_CREATION: Record<string, string> = {
   VERIFICATION_IMPOSSIBLE: "Impossible de vérifier les droits d'accès.",
   COMPLEMENT_INCOMPLET:
     'Le compte est créé et fonctionne, mais la zone et le palier n’ont pas été enregistrés. Corrige-les depuis sa fiche — ne recrée pas le compte.',
+  MOT_DE_PASSE_COMPROMIS:
+    'Ce mot de passe figure dans des fuites de données publiques. Choisis-en un autre — ou reprends celui que le formulaire propose.',
   CREATION_IMPOSSIBLE: 'Création impossible. Réessaie.',
   CORPS_ILLISIBLE: 'Requête mal formée.',
 };
+
+/**
+ * Le compte est créé, mais quelque chose mérite d'être dit.
+ *
+ * Un seul cas aujourd'hui : le service Have I Been Pwned était injoignable au
+ * moment de la création, donc le mot de passe n'a pas pu être confronté aux
+ * fuites connues. La fonction laisse passer plutôt que de bloquer l'exploitation
+ * sur une panne extérieure — mais le taire reviendrait à faire croire à une
+ * vérification qui n'a pas eu lieu.
+ */
+const AVERTISSEMENTS: Record<string, string> = {
+  FUITES_NON_VERIFIEES:
+    'Le compte est créé. Le service de vérification des fuites était injoignable : ce mot de passe n’a pas pu être confronté aux fuites connues.',
+};
+
+/** Rend le message du code, en y glissant le nombre d'occurrences s'il est là. */
+function messageCreation(code: string, occurrences?: number): string {
+  const base = MESSAGES_CREATION[code] ?? code;
+  if (code !== 'MOT_DE_PASSE_COMPROMIS' || !occurrences) return base;
+  // « vu 2 918 953 fois » fait comprendre qu'il ne s'agit pas d'un caprice de
+  // complexité, mais d'un mot de passe que n'importe qui peut rejouer.
+  return `${base} Il a été vu ${occurrences.toLocaleString('fr-FR')} fois.`;
+}
 
 /**
  * Crée un compte collecteur.
@@ -215,23 +240,34 @@ const MESSAGES_CREATION: Record<string, string> = {
  */
 export async function creerCollecteur(
   saisie: SaisieCollecteur,
-): Promise<{ ok: true; collecteurId: string } | { ok: false; message: string }> {
+): Promise<
+  | { ok: true; collecteurId: string; avertissement?: string }
+  | { ok: false; message: string }
+> {
   const { data, error } = await supabase.functions.invoke('admin-creer-collecteur', {
     body: saisie,
   });
 
   if (error) {
     let code: string | undefined;
+    let occurrences: number | undefined;
     try {
       const contexte = (error as { context?: Response }).context;
       if (contexte && typeof contexte.json === 'function') {
-        code = ((await contexte.json()) as { erreur?: string }).erreur;
+        const corps = (await contexte.json()) as { erreur?: string; occurrences?: number };
+        code = corps.erreur;
+        occurrences = corps.occurrences;
       }
     } catch {
       // Corps illisible : on garde le message générique.
     }
-    return { ok: false, message: code ? (MESSAGES_CREATION[code] ?? code) : error.message };
+    return { ok: false, message: code ? messageCreation(code, occurrences) : error.message };
   }
 
-  return { ok: true, collecteurId: (data as { collecteurId: string }).collecteurId };
+  const corps = data as { collecteurId: string; avertissement?: string };
+  return {
+    ok: true,
+    collecteurId: corps.collecteurId,
+    avertissement: corps.avertissement ? AVERTISSEMENTS[corps.avertissement] : undefined,
+  };
 }
