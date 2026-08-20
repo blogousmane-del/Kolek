@@ -322,10 +322,16 @@ audit_log   401 42501    synchro_rejets 401 42501    settings  disable_signup: t
    suffisait de demander laquelle de ces dix colonnes texte portait une borne.
    Aucune.
 
-4. **Chaîne de construction complète.** `npm test` (50 tests),
-   `npm run test:scripts` (22), `npm run test:db` (63), `verifier:theme`,
-   `npm run build` sur les trois applications, `verifier:bundles`,
-   `verifier:en-ligne`. Tout vert.
+4. **Chaîne de construction complète.** `npm test` (**55** tests — 41 pour
+   `@kolek/core`, 9 pour `@kolek/ui`, 5 pour `@kolek/admin`), `npm run
+   test:scripts` (22), `npm run test:db` (63), `verifier:theme`, `npm run build`
+   sur les trois applications, `verifier:bundles`, `verifier:en-ligne`. Tout
+   vert.
+
+   Le chiffre était resté à 50 après l'ajout des cinq tests du portillon ; il
+   est corrigé ici. **118 tests au total**, rejoués en entier le 2026-08-20 après
+   la dernière modification du rapport — 55 côté application, 63 côté base sur
+   pile locale reconstruite.
 
 ---
 
@@ -474,7 +480,7 @@ d'authentification de Kolek est un seul endpoint, `/token`, sur un seul
 fournisseur, avec l'inscription fermée. C'est le meilleur résultat de cet audit
 et il n'avait jamais été écrit noir sur blanc.
 
-### La protection contre les mots de passe divulgués reste non mesurable
+### Pourquoi la protection contre les mots de passe divulgués a dû être déclarée
 
 Elle ne s'applique qu'au moment où un mot de passe est **posé** : inscription,
 changement, ou fin de récupération. Les trois sont hors de portée d'une sonde
