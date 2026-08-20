@@ -17,7 +17,7 @@ regardé **la taille** de ce qui entre.
 |---|---|---|
 | 🔴 Bloquant | 0 | — |
 | 🟠 Important | 1 | **corrigé le jour même**, migration `20260819010000` |
-| 🟡 À faire | 3 | 1 corrigé, 2 argumentés — dont le seuil de mot de passe, relevé le 2026-08-20 |
+| 🟡 À faire | 3 | dont **un durcissement à une case à cocher** : mots de passe divulgués non filtrés, confirmé le 2026-08-20 |
 | ⚪️ Non vérifié | 0 | les trois sont tombés le 2026-08-20 |
 | Non applicable | 3 | inchangés |
 
@@ -170,7 +170,7 @@ section à eux :
   le déclencheur existant, `now()` étant interdit dans un `check`. Sur `INSERT`
   seulement : corriger le cash déclaré d'une journée ancienne reste légitime.
 
-### 2. La longueur minimale de mot de passe est de 8, l'intention écrite dit 10
+### 2. Mots de passe : seuil à 8, et **aucun filtre sur les fuites connues**
 
 **Relevé le 2026-08-20**, au tableau de bord — Authentication → Policies. C'était
 le dernier ⚪️ ; le chiffre étant connu, il change de catégorie.
@@ -195,10 +195,41 @@ Authentication → Policies, pour rejoindre l'intention. Ne pas passer par
 compris, qui pointe encore sur `127.0.0.1:3000` — casser l'authentification en
 production pour aligner un entier serait un mauvais échange.
 
-Et si un seul durcissement doit être fait sur ce front, ce n'est pas la
-longueur : c'est la **protection contre les mots de passe déjà divulgués**, dans
-le même écran. Un mot de passe de douze caractères qui figure dans une fuite
-connue est plus faible qu'un de huit qui n'y figure pas.
+#### Le point qui compte vraiment : `Prevent use of leaked passwords` est **désactivé**
+
+**Confirmé par l'exploitant le 2026-08-20**, au tableau de bord. C'est une
+réponse déclarée, non mesurable de l'extérieur pour les raisons écrites plus bas
+— mais elle est négative, et c'est le seul cas où une réponse déclarée suffit à
+conclure : personne ne s'accuse à tort d'avoir laissé une protection ouverte.
+
+Prises séparément, les deux valeurs sont anodines. Prises ensemble, elles
+décrivent un état précis : **rien n'empêche aujourd'hui de fixer `12345678` ou
+`password` sur le compte d'administration.** Huit caractères, c'est exactement la
+longueur des mots de passe les plus reproduits des fuites publiques. Le filtre
+qui les refuserait est éteint.
+
+Ce que ce compte ouvre, si le mot de passe tombe : la lecture de **tous** les
+collecteurs, **tous** les clients, **toutes** les mises et **tous** les
+encaissements. Le portillon `est_admin()` fait son travail — il tient, on l'a
+vérifié à trois niveaux — mais il ne protège de rien contre quelqu'un qui
+présente les bons identifiants.
+
+Les défenses qui restent alors sont minces et il faut les nommer honnêtement :
+l'inscription est fermée, donc l'attaquant doit connaître l'adresse ; et le
+plafond de débit se déclenche dans les dizaines de tentatives. Ni l'un ni
+l'autre n'arrête un bourrage d'identifiants (*credential stuffing*), qui ne
+devine pas : il rejoue un couple adresse/mot de passe déjà fuité ailleurs. Une
+seule tentative suffit, et un plafond à trente-trois ne la voit pas passer.
+
+**C'est le durcissement le plus rentable de tout cet audit** : une case à cocher,
+zéro migration, zéro déploiement, aucun risque de régression. Elle vaut plus que
+l'écart de 8 à 10 — un mot de passe de douze caractères qui figure dans une
+fuite connue est plus faible qu'un de huit qui n'y figure pas.
+
+Authentication → Policies → **Prevent use of leaked passwords**. Supabase
+interroge Have I Been Pwned par k-anonymat : seuls les cinq premiers caractères
+de l'empreinte SHA-1 sortent, jamais le mot de passe. Cocher cette case
+n'expose rien.
 
 ### 3. Le jeton de session vit dans `localStorage` — reconduit, inchangé
 
@@ -462,7 +493,10 @@ inoffensive.
 
 Même règle que pour la longueur minimale, et pour la même raison : une sonde qui
 modifie ce qu'elle mesure n'est pas une mesure. Ce réglage se lit dans
-Authentication → Policies, et restera **déclaré**.
+Authentication → Policies, et reste **déclaré**.
+
+L'exploitant l'a lu le 2026-08-20 : **désactivé**. Conséquences en « 2. Mots de
+passe » plus haut — c'est le durcissement prioritaire de ce rapport.
 
 ### Pourquoi la longueur minimale a dû être lue à la main
 
