@@ -112,7 +112,8 @@ Deno.serve(async (requete) => {
   // application effective du seuil.
   const fuite = await verifierFuite(motDePasse);
   if (fuite.etat === 'compromis') {
-    // Le nombre d'occurrences est rendu : « vu 2 918 953 fois dans des fuites »
+    // Le nombre d'occurrences est rendu : « vu 2 266 543 fois dans des fuites »
+    // — chiffre relevé pour `password123` le 2026-08-20 —
     // fait comprendre à l'administrateur qu'il ne s'agit pas d'un caprice de
     // complexité. Il ne renseigne personne — c'est une propriété publique du
     // mot de passe qu'il vient de taper, pas un fait sur un compte.

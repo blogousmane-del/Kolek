@@ -225,7 +225,7 @@ const AVERTISSEMENTS: Record<string, string> = {
 function messageCreation(code: string, occurrences?: number): string {
   const base = MESSAGES_CREATION[code] ?? code;
   if (code !== 'MOT_DE_PASSE_COMPROMIS' || !occurrences) return base;
-  // « vu 2 918 953 fois » fait comprendre qu'il ne s'agit pas d'un caprice de
+  // « vu 2 266 543 fois » fait comprendre qu'il ne s'agit pas d'un caprice de
   // complexité, mais d'un mot de passe que n'importe qui peut rejouer.
   return `${base} Il a été vu ${occurrences.toLocaleString('fr-FR')} fois.`;
 }

@@ -321,8 +321,44 @@ Module séparé et sans API Deno, comme `cors.ts` et `valider-collecteur.ts` :
 `CRLF`, le service en panne, et surtout l'assertion qui compte — **l'URL appelée
 ne contient ni le mot de passe, ni l'empreinte complète, ni son suffixe.**
 
-**Ce qui reste à faire de ton côté :** supprimer le compte créé par la sonde,
-au tableau de bord, Authentication → Users.
+#### Le filtre, mesuré contre le service en ligne
+
+Sonde du 2026-08-20, exécutée à travers `verifierFuite` sur le vrai service, sans
+maquette :
+
+```
+password123        -> { "etat": "compromis", "occurrences": 2266543 }
+Wq7zPk2RnHx9CtBv   -> { "etat": "sain" }
+```
+
+Deux millions deux cent soixante-six mille cinq cent quarante-trois fois. C'est
+ce que « figurer dans une fuite » veut dire concrètement : le mot de passe n'a
+pas à être deviné, il est déjà écrit dans des listes que tout le monde a.
+
+Le second est un tirage du même type que celui du formulaire — seize caractères
+issus de `crypto.getRandomValues`. Le chemin sain est donc vérifié lui aussi,
+sans quoi la sonde n'aurait prouvé qu'une chose : que la fonction sait dire non.
+
+Cette sonde n'est pas restée dans la suite : un test qui appelle le réseau rend
+l'ensemble instable. Les 14 tests permanents injectent `fetch`.
+
+#### Ce qui reste à faire à la main, et pourquoi je ne peux pas le faire
+
+**Supprimer le compte créé par la sonde** — tableau de bord, Authentication →
+Users, celui qui porte `password123`.
+
+Ce n'est pas un choix de prudence, c'est une impossibilité. Supprimer un compte
+exige d'écrire dans le schéma `auth`, ce qui demande soit la clé de service, soit
+un rôle Postgres qui y a accès. Le rôle temporaire que le CLI ouvre pour ses
+extractions ne l'a pas — vérifié : `ERROR: permission denied for schema auth`.
+
+Le seul contournement techniquement disponible serait de déployer une fonction de
+maintenance qui, elle, tient la clé de service. C'est-à-dire exposer sur Internet
+un point d'entrée capable d'effacer des comptes, pour économiser un clic. Le
+portillon `est_admin()` ne le garderait pas — il exige un jeton d'administration
+que je n'ai pas. Le remplacer par un secret partagé mettrait la sûreté du geste
+au niveau de ce secret, et laisserait le point d'entrée en place si le retrait
+échouait. C'est un mauvais échange contre quinze secondes au tableau de bord.
 
 ### 3. Le jeton de session vit dans `localStorage` — reconduit, inchangé
 
