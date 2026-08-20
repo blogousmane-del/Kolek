@@ -14,7 +14,7 @@ veille.
 |---|---|---|
 | 🔴 Bloquant | 0 | — |
 | 🟠 Important | 0 | celui de la veille est corrigé et vérifié en ligne |
-| 🟡 Durcissement | 3 nouveaux | dont un trou dans la piste d'audit |
+| 🟡 Durcissement | 4 | dont **un traité le jour même** — constat 3, voir plus bas |
 | ⚪️ Non vérifié | 0 | — |
 | Reconduits | 3 | voir « Ce qui reste ouvert depuis hier » |
 
@@ -140,9 +140,9 @@ rien d'autre. La CSP admin est par ailleurs excellente et mérite d'être citée
 
 ---
 
-## 🟡 3. Le tableau de bord admin est une maquette, et c'est là qu'est le prochain risque
+## ~~🟡 3. Le tableau de bord admin est une maquette~~ — **traité le jour même**
 
-**Contrôles 3 et 6.** Constat de fait, mesuré :
+**Contrôles 3 et 6.** Le constat, mesuré le matin :
 
 ```
 apps/admin/src        1 seul appel à la base : rpc('est_admin')
@@ -151,31 +151,94 @@ politiques RLS        16, toutes en collecteur_id = auth.uid()
                       aucune n'accorde à un admin la lecture d'autrui
 ```
 
-Aujourd'hui c'est une propriété de sécurité, pas un défaut : le tableau de bord
-n'expose aucune donnée réelle parce qu'il n'en lit aucune. Le portillon
-`est_admin()` tient — vérifié hier à trois niveaux, serveur, interface et
-production.
+Le risque annoncé était le suivant : celui qui câblerait les vrais chiffres se
+cognerait au mur des politiques RLS, et le raccourci qui se présenterait est le
+premier de la liste des quatre failles à chercher en priorité — la clé
+`service_role` posée côté client.
 
-Mais la conséquence mérite d'être écrite avant que quelqu'un ne s'y heurte :
-**aucune politique ne permet à un administrateur de lire les données d'un autre
-collecteur.** Celui qui câblera les vrais chiffres se cognera à ce mur, et le
-raccourci qui se présentera est le premier de la liste des quatre failles à
-chercher en priorité — la clé `service_role` posée côté client.
+### Ce qui a été fait, l'après-midi même
 
-L'intention est déjà écrite dans la base, et il faut s'y tenir. Commentaire porté
-par `est_admin()` en production :
+La voie recommandée a été suivie sans dévier. Deux Edge Functions,
+`admin-vue-globale` et `admin-creer-collecteur`, tenant le même dispositif :
 
-> Portillon du Dashboard, pas un accès aux données : la vue globale reste
-> derrière les Edge Functions.
+1. Un jeton est exigé. Sans lui, `401`.
+2. `est_admin()` est appelée **avec le jeton de l'appelant**, jamais avec la clé
+   de service. Interroger `admins` avec la clé de service répondrait à une autre
+   question et laisserait passer un jeton révoqué.
+3. Seulement ensuite la clé de service sort — côté serveur, jamais livrée.
 
-**Donc, dans l'ordre de préférence :** une Edge Function qui vérifie `est_admin()`
-puis interroge avec la clé de service **côté serveur** ; ou à défaut des
-fonctions `SECURITY DEFINER` conditionnées à `est_admin()`, sur le modèle exact
-de celles qui existent déjà. Jamais de clé de service dans un paquet navigateur.
+Et un second verrou, indépendant du premier : `admin_vue_globale()` porte
+`revoke all from public / anon / authenticated`, avec un bloc de garde qui fait
+échouer la migration si un `create or replace` ultérieur réattribuait les droits
+par défaut. Un administrateur ne peut donc pas appeler la fonction directement
+depuis la console de son navigateur ; il doit passer par l'Edge Function, qui
+est le seul endroit où le portillon vit.
 
-Le garde-fou existe déjà et il fonctionne : `verifier:bundles` inspecte les
-artefacts construits et a répondu aujourd'hui « Aucune fuite de clé de service
-dans les artefacts ». Il attrapera la faute — autant ne pas la commettre.
+Vérifié en production le 2026-08-20 :
+
+```
+sans jeton                      401  UNAUTHORIZED_NO_AUTH_HEADER
+clé anon comme jeton            403  VERIFICATION_IMPOSSIBLE
+fonction SQL appelée par anon   401  42501 permission denied for function
+création de collecteur, anon    403  VERIFICATION_IMPOSSIBLE
+collecteurs après la sonde      2 lignes — aucun compte intrus créé
+```
+
+`verifier:bundles` continue de répondre « Aucune fuite de clé de service dans
+les artefacts » sur les trois paquets construits.
+
+### Une correction à mon propre compte rendu
+
+Le commit de câblage annonce « les six écrans lisent la base ». **C'était cinq
+sur six.** `EncaisserMise` est resté une maquette entière, avec un client nommé,
+un cycle et un solde qui n'existaient nulle part.
+
+L'écran n'a pas été câblé, et ne le sera pas : le cahier des charges §11 pose
+que l'argent est manié par le collecteur, pas par la plateforme. Une mise saisie
+depuis un bureau n'aurait pas d'espèces en face, et fausserait le rapprochement
+de caisse du collecteur — qui compare chaque soir `cash_declare` à
+`cash_attendu`. La base défend déjà cette règle : la politique d'insertion sur
+`mises` exige `collecteur_id = auth.uid()`. L'écran dit désormais cela, au lieu
+d'afficher des chiffres inventés.
+
+---
+
+## 🟡 4. Des commandes inertes dans les trois applications
+
+Trouvé en vérifiant les deux écrans ci-dessus, par un balayage de tous les
+`<button>` sans `onClick` ni `disabled`. Ce n'est pas une faille, mais c'est de
+la même famille que les chiffres inventés : **l'interface affirme quelque chose
+qui n'est pas vrai**, et l'utilisateur qui s'en aperçoit cesse de la croire
+ailleurs.
+
+Cinq trouvées, cinq traitées :
+
+| Où | Quoi | Traitement |
+|---|---|---|
+| `packages/ui/BarreHaute` | **aucun `onClick` du tout** | le composant ne pouvait rien déclencher ; `onActiver` ajouté, `disponible` déduit de sa présence |
+| `admin/EncaisserMise` | « Retirer ce client » | écran remplacé par la raison de son indisponibilité |
+| `collecteur/Clients` | « Filtrer » | retiré — les pastilles en dessous filtraient déjà |
+| `ui/Bandeaux` | « Voir les offres → » | désactivé, avec sa raison en infobulle |
+| `site/Tarifs` | « Essai gratuit », modes de paiement | le premier mène au formulaire, le second devient un vrai sélecteur |
+
+Le cas de `BarreHaute` mérite d'être retenu : le composant portait un champ
+`disponible` documenté et respecté à l'affichage, mais **aucun gestionnaire de
+clic**. Toutes ses actions étaient mortes, y compris celles déclarées
+disponibles. `disponible` se déduit désormais de la présence d'un `onActiver`,
+ce qui rend un bouton actif sans effet impossible à écrire.
+
+### Une incohérence de modèle sur la page publique
+
+L'arbitrage tarifaire du 2026-08-20 a retenu le modèle du cahier §5 — le client
+payant est un collecteur. Les prix affichés sur la page de vente ont suivi
+aussitôt, puisqu'ils viennent de `@kolek/core`. Mais son formulaire demandait
+encore « Nom de l'organisation » et « Responsable ».
+
+C'est la pire forme d'incohérence : une page qui vend à un collecteur en lui
+demandant le nom de son organisation. Les champs décrivent désormais un
+collecteur — nom, téléphone, courriel, marché.
+
+---
 
 ---
 

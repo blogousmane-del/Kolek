@@ -361,3 +361,57 @@ describe('admin_vue_globale — deux collecteurs de même nom', () => {
     expect(cartes.find((c) => c.collecteur_id === un.id)).toBeDefined();
   });
 });
+
+describe('le contrat entre la vue SQL et le tableau de bord', () => {
+  it('15. rend exactement les clés que l’administration consomme', async () => {
+    // Le défaut que ce test empêche, constaté le 2026-08-20 : la migration qui a
+    // ajouté `cartes` n'avait pas été reportée dans l'Edge Function, qui
+    // énumérait ses clés une à une. Deux écrans lisaient `undefined.length`.
+    //
+    // La fonction transmet désormais tout ce que rend la vue, donc une clé
+    // ajoutée ne se perd plus en chemin. Reste le sens inverse : une clé
+    // *retirée* du SQL casserait les écrans en silence. C'est ce que fige la
+    // liste ci-dessous — elle doit être relue en même temps que `donnees.ts`.
+    const { data, error } = await admin.rpc('admin_vue_globale');
+    expect(error).toBeNull();
+
+    expect(Object.keys(data as object).sort()).toEqual(
+      [
+        'abonnements',
+        'cartes',
+        'cartes_total_lignes',
+        'collecteurs',
+        'genere_le',
+        'mouvements',
+        'par_palier',
+        'totaux',
+        'zones',
+      ].sort(),
+    );
+  });
+
+  it('16. rend des tableaux, jamais null, même sans aucune donnée', async () => {
+    // Chaque agrégat est enveloppé dans un `coalesce(..., '[]'::jsonb)`. Sans
+    // lui, `jsonb_agg` rend `null` sur un ensemble vide, et l'écran tomberait
+    // sur `null.map` — précisément le jour de la mise en service, quand la
+    // base est encore vide.
+    const { data } = await admin.rpc('admin_vue_globale');
+    const vue = data as Record<string, unknown>;
+
+    for (const cle of ['cartes', 'collecteurs', 'mouvements', 'par_palier', 'zones']) {
+      expect(Array.isArray(vue[cle])).toBe(true);
+    }
+  });
+
+  it('17. compte les lignes de chaque total en entiers, jamais en chaînes', () => {
+    // `sum()` sur `bigint` rend une chaîne en JSON. Un total qui arrive en
+    // chaîne se concatène au lieu de s'additionner côté écran, et « 1000 » plus
+    // « 500 » donne « 1000500 ».
+    return admin.rpc('admin_vue_globale').then(({ data }) => {
+      const totaux = (data as { totaux: Record<string, unknown> }).totaux;
+      for (const [cle, valeur] of Object.entries(totaux)) {
+        expect(typeof valeur, `totaux.${cle}`).toBe('number');
+      }
+    });
+  });
+});

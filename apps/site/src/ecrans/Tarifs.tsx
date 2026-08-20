@@ -33,11 +33,22 @@ const GARANTIES: Array<{ icone: NomIcone; texte: string }> = [
   { icone: 'wifi-off', texte: 'Fonctionne hors-ligne dès activation' },
 ];
 
-const CHAMPS_ORGANISATION = [
-  { id: 'organisation', libelle: 'Nom de l’organisation', exemple: 'Ex : Épargne Adjamé', type: 'text' },
-  { id: 'responsable', libelle: 'Responsable', exemple: 'Prénom et nom', type: 'text' },
-  { id: 'email', libelle: 'Email', exemple: 'contact@organisation.ci', type: 'email' },
-  { id: 'telephone', libelle: 'Téléphone', exemple: '+225 …', type: 'tel' },
+/**
+ * Le formulaire demandait « Nom de l'organisation » et « Responsable ».
+ *
+ * Ces deux champs décrivaient un modèle d'affaires — une entité employant
+ * plusieurs collecteurs — que l'arbitrage du 2026-08-20 a écarté au profit de
+ * celui du cahier des charges §5 : **le client payant est un collecteur**. Les
+ * prix affichés plus haut ont changé le même jour, puisqu'ils viennent de
+ * `@kolek/core`. Laisser les champs décrire l'ancien modèle aurait produit la
+ * pire des incohérences : une page qui vend à un collecteur en lui demandant le
+ * nom de son organisation.
+ */
+const CHAMPS_COLLECTEUR = [
+  { id: 'nom', libelle: 'Votre nom', exemple: 'Prénom et nom', type: 'text' },
+  { id: 'telephone', libelle: 'Téléphone', exemple: '+225 07 …', type: 'tel' },
+  { id: 'email', libelle: 'Email', exemple: 'vous@exemple.ci', type: 'email' },
+  { id: 'zone', libelle: 'Marché ou zone', exemple: 'Ex : Adjamé', type: 'text' },
 ] as const;
 
 function ChampSombre({
@@ -177,6 +188,7 @@ function CartePalier({
 
 export function Tarifs() {
   const [choisi, setChoisi] = useState<Palier>(PALIER_RECOMMANDE);
+  const [modePaiement, setModePaiement] = useState<string>(MODES_PAIEMENT[0]!.libelle);
   const palierChoisi = palierParCle(choisi);
   const incluses = palierChoisi.fonctions.filter((f) => f.incluse);
 
@@ -208,12 +220,16 @@ export function Tarifs() {
           <span className="hidden md:inline text-white/70 text-base font-body font-medium px-4 py-2">
             Se connecter
           </span>
-          <button
-            type="button"
+          {/* Le bouton principal de la page ne menait nulle part. L'inscription
+              publique étant fermée, il ne peut pas ouvrir de compte — mais il
+              peut conduire au formulaire de demande, qui est la seule suite
+              possible aujourd'hui. Un CTA qui ne répond pas coûte un prospect. */}
+          <a
+            href="#recapitulatif"
             className="px-4 md:px-5 py-1.5 md:py-2.5 rounded-pill bg-primary text-primary-foreground text-xs md:text-base font-body font-semibold cursor-pointer"
           >
             Essai gratuit
-          </button>
+          </a>
         </div>
       </header>
 
@@ -254,7 +270,7 @@ export function Tarifs() {
       </div>
 
       {/* Récapitulatif */}
-      <section className="px-4 md:px-16 pb-16 max-w-6xl mx-auto">
+      <section id="recapitulatif" className="px-4 md:px-16 pb-16 max-w-6xl mx-auto scroll-mt-24">
         <h2 className="font-headings font-bold text-lg md:text-2xl text-white mb-4 md:mb-6">
           Récapitulatif de votre commande
         </h2>
@@ -268,10 +284,10 @@ export function Tarifs() {
           >
             <div className="bg-white/5 rounded-xl border border-white/8 p-4 md:p-6 flex flex-col gap-4 md:gap-5">
               <h3 className="font-headings font-bold text-base md:text-lg text-white">
-                Informations de l'organisation
+                Vos informations
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {CHAMPS_ORGANISATION.map((champ) => (
+                {CHAMPS_COLLECTEUR.map((champ) => (
                   <ChampSombre key={champ.id} {...champ} />
                 ))}
               </div>
@@ -284,14 +300,19 @@ export function Tarifs() {
                 <p className="text-sm font-body font-semibold text-white/60 mb-2">
                   Mode de paiement
                 </p>
+                {/* La maquette figeait `aria-pressed` sur le premier mode : les
+                    trois étaient cliquables et aucun ne répondait. Un sélecteur
+                    qui ne sélectionne pas est pire qu'un affichage, parce qu'il
+                    invite à essayer. */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-                  {MODES_PAIEMENT.map((mode, i) => (
+                  {MODES_PAIEMENT.map((mode) => (
                     <button
                       key={mode.libelle}
                       type="button"
-                      aria-pressed={i === 0}
+                      aria-pressed={mode.libelle === modePaiement}
+                      onClick={() => setModePaiement(mode.libelle)}
                       className={`flex items-center gap-2 px-3 py-2.5 rounded-md border text-sm font-body font-medium cursor-pointer ${
-                        i === 0
+                        mode.libelle === modePaiement
                           ? 'border-positive bg-positive/10 text-positive'
                           : 'border-white/10 text-white/40'
                       }`}

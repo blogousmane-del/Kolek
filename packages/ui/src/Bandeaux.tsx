@@ -18,7 +18,16 @@ export function BandeauOffre({
         </span>
         <span className="text-sm font-body text-secondary-foreground">{detail}</span>
       </div>
-      <button type="button" className="text-sm font-body font-medium text-primary cursor-pointer">
+      {/* Aucune page d'offres n'existe encore dans l'application. Désactivé avec
+          sa raison plutôt que laissé cliquable : un bouton qui ne répond pas
+          apprend à l'utilisateur que l'interface ne réagit pas, et il cesse
+          d'essayer ailleurs. */}
+      <button
+        type="button"
+        disabled
+        title="Page des offres à venir"
+        className="text-sm font-body font-medium text-primary opacity-50 cursor-default"
+      >
         Voir les offres →
       </button>
     </div>

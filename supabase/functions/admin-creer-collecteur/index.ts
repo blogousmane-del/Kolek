@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import { entetesCors, listerOrigines } from '../_shared/cors.ts';
-import { tarifParCle } from '../_shared/paliers.ts';
+import { validerCollecteur } from '../_shared/valider-collecteur.ts';
 
 /**
  * Créer un compte collecteur.
@@ -41,69 +41,6 @@ function entetesPour(requete: Request): Record<string, string> {
 
 function reponse(corps: unknown, statut: number, requete: Request): Response {
   return new Response(JSON.stringify(corps), { status: statut, headers: entetesPour(requete) });
-}
-
-interface Saisie {
-  email?: unknown;
-  motDePasse?: unknown;
-  nom?: unknown;
-  telephone?: unknown;
-  zone?: unknown;
-  palier?: unknown;
-}
-
-/**
- * Bornes reprises des contraintes `CHECK` de la base.
- *
- * Les répéter ici n'est pas une seconde source de vérité : la base reste seule
- * juge, et un dépassement y lèverait `23514`. Ce contrôle sert à rendre une
- * phrase utile plutôt qu'un code SQL, et à ne pas créer l'utilisateur Auth
- * avant de découvrir que sa ligne `collecteurs` sera refusée.
- */
-const BORNES = { nom: 120, telephone: 64, zone: 80 } as const;
-
-/** Longueur minimale du mot de passe. Le distant applique 8 ; on exige 10, qui
-    est l'intention écrite dans `config.toml`. Durcir ici est sans risque : un
-    mot de passe plus long n'est jamais refusé par le serveur. */
-const LONGUEUR_MOT_DE_PASSE = 10;
-
-function valider(saisie: Saisie): { ok: true; valeurs: Required<Record<string, string>> } | {
-  ok: false;
-  erreur: string;
-} {
-  const texte = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
-
-  const email = texte(saisie.email).toLowerCase();
-  const motDePasse = typeof saisie.motDePasse === 'string' ? saisie.motDePasse : '';
-  const nom = texte(saisie.nom);
-  const telephone = texte(saisie.telephone);
-  const zone = texte(saisie.zone);
-  const palier = texte(saisie.palier) || 'essai';
-
-  // Volontairement sommaire : la validation d'adresse fait autorité chez
-  // GoTrue, qui refusera ce qui ne lui convient pas. Ce test n'est là que pour
-  // éviter un aller-retour évident.
-  if (!email.includes('@') || email.length < 5) return { ok: false, erreur: 'EMAIL_INVALIDE' };
-  if (motDePasse.length < LONGUEUR_MOT_DE_PASSE) {
-    return { ok: false, erreur: 'MOT_DE_PASSE_COURT' };
-  }
-  if (!nom) return { ok: false, erreur: 'NOM_REQUIS' };
-  if (!telephone) return { ok: false, erreur: 'TELEPHONE_REQUIS' };
-
-  if (nom.length > BORNES.nom) return { ok: false, erreur: 'NOM_TROP_LONG' };
-  if (telephone.length > BORNES.telephone) return { ok: false, erreur: 'TELEPHONE_TROP_LONG' };
-  if (zone.length > BORNES.zone) return { ok: false, erreur: 'ZONE_TROP_LONGUE' };
-
-  // Lève si le palier n'existe pas dans la grille tarifaire, laquelle est
-  // engendrée depuis `packages/core`. La contrainte `collecteurs_palier_check`
-  // dirait la même chose, mais plus tard et moins clairement.
-  try {
-    tarifParCle(palier);
-  } catch {
-    return { ok: false, erreur: 'PALIER_INCONNU' };
-  }
-
-  return { ok: true, valeurs: { email, motDePasse, nom, telephone, zone, palier } };
 }
 
 Deno.serve(async (requete) => {
@@ -147,14 +84,16 @@ Deno.serve(async (requete) => {
 
   // --- Validation avant toute écriture ---
 
-  let saisie: Saisie;
+  let saisie: unknown;
   try {
-    saisie = (await requete.json()) as Saisie;
+    saisie = await requete.json();
   } catch {
     return reponse({ erreur: 'CORPS_ILLISIBLE' }, 400, requete);
   }
 
-  const controle = valider(saisie);
+  // Les règles vivent dans `_shared/valider-collecteur.ts`, sans API Deno, pour
+  // être couvertes par la suite de tests du dépôt.
+  const controle = validerCollecteur(saisie as Record<string, unknown>);
   if (!controle.ok) return reponse({ erreur: controle.erreur }, 400, requete);
   const { email, motDePasse, nom, telephone, zone, palier } = controle.valeurs;
 

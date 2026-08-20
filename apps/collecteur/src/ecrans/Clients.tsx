@@ -194,6 +194,9 @@ export function Clients({
       </div>
 
       {/* Recherche */}
+      {/* Le bouton « Filtrer » de la maquette a été retiré : il n'ouvrait rien, et
+          les pastilles juste en dessous font déjà ce filtrage. Deux commandes pour
+          un même geste, dont une inerte, valent moins qu'une seule qui marche. */}
       <div className="px-4 mt-5 flex gap-2">
         <div className="flex-1 flex items-center gap-2 bg-surface border border-hairline rounded-md px-3 py-2.5 focus-within:border-primary">
           <Icone nom="search" taille={15} className="text-muted-foreground" />
@@ -206,13 +209,7 @@ export function Clients({
             className="flex-1 min-w-0 bg-transparent text-base font-body text-ink outline-none placeholder:text-muted-foreground"
           />
         </div>
-        <button
-          type="button"
-          aria-label="Filtrer"
-          className="w-10 h-10 bg-surface border border-hairline rounded-md flex items-center justify-center cursor-pointer"
-        >
-          <Icone nom="sliders-horizontal" taille={16} className="text-ink" />
-        </button>
+
       </div>
 
       {/* Inscrire un client */}
