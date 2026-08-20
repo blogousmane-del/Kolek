@@ -73,6 +73,21 @@ export function entetesCors({
 }
 
 /** Découpe la variable d'environnement des origines autorisées. */
+/**
+ * Les replis, quand la variable d'environnement n'est pas posée.
+ *
+ * Chaque fonction reçoit **le sien**. Une liste commune aux deux applications
+ * laisserait le navigateur du collecteur appeler la fonction d'administration :
+ * le portillon `est_admin()` la refuserait, mais autant que la requête ne parte
+ * pas. Le port 5173 est celui de Vite en développement.
+ *
+ * Déclarés **avant** `listerOrigines` : ils servent de valeur par défaut à son
+ * paramètre, et une constante lue avant son initialisation lèverait une erreur
+ * de zone morte temporelle si l'ordre venait à compter un jour.
+ */
+export const ORIGINES_ADMIN = 'https://kolek-admin.netlify.app,http://localhost:5173';
+export const ORIGINES_COLLECTEUR = 'https://kolek-collecteur.netlify.app,http://localhost:5173';
+
 export function listerOrigines(
   brut: string | undefined | null,
   defaut = ORIGINES_ADMIN,
@@ -84,14 +99,3 @@ export function listerOrigines(
       .filter(Boolean),
   );
 }
-
-/**
- * Les replis, quand la variable d'environnement n'est pas posée.
- *
- * Chaque fonction reçoit **le sien**. Une liste commune aux deux applications
- * laisserait le navigateur du collecteur appeler la fonction d'administration :
- * le portillon `est_admin()` la refuserait, mais autant que la requête ne parte
- * pas. Le port 5173 est celui de Vite en développement.
- */
-export const ORIGINES_ADMIN = 'https://kolek-admin.netlify.app,http://localhost:5173';
-export const ORIGINES_COLLECTEUR = 'https://kolek-collecteur.netlify.app,http://localhost:5173';

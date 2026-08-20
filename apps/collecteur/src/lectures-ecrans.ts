@@ -214,12 +214,20 @@ const JOURS_DORMANCE = 7;
  * exactement ce qu'on veut d'un rappel qui porte sur de l'argent.
  */
 export async function chargerAlertes(): Promise<Alerte[]> {
+  // Fenêtre bornée, et non « toutes les mises » : au bout d'un an d'activité,
+  // une requête sans borne descendrait des milliers de lignes en 3G pour n'en
+  // garder qu'une par carte. Quatre-vingt-dix jours dépassent largement le seuil
+  // de dormance, donc la fenêtre ne peut pas cacher une carte endormie — et la
+  // date d'ouverture sert de repli pour celles qui n'ont aucune mise dedans.
+  const fenetre = new Date(Date.now() - 90 * 86_400_000).toISOString();
+
   const [rCartes, rClients, rMises, rCollecteur] = await Promise.all([
-    supabase.from('cartes').select('id, client_id, mise, statut, mises_encaissees'),
+    supabase.from('cartes').select('id, client_id, mise, statut, mises_encaissees, ouverte_le'),
     supabase.from('clients').select('id, nom'),
     supabase
       .from('mises')
       .select('carte_id, encaisse_le')
+      .gte('encaisse_le', fenetre)
       .order('encaisse_le', { ascending: false }),
     supabase.from('collecteurs').select('abonnement_statut, abonnement_echeance').maybeSingle(),
   ]);
@@ -235,7 +243,9 @@ export async function chargerAlertes(): Promise<Alerte[]> {
   }
 
   const alertes: Alerte[] = [];
-  const actives = ((rCartes.data ?? []) as Carte[]).filter((c) => c.statut === 'active');
+  const actives = ((rCartes.data ?? []) as Array<Carte & { ouverte_le: string }>).filter(
+    (c) => c.statut === 'active',
+  );
 
   for (const carte of actives) {
     const nom = noms.get(carte.client_id) ?? 'Client';
@@ -260,17 +270,21 @@ export async function chargerAlertes(): Promise<Alerte[]> {
       });
     }
 
-    const derniere = derniereMise.get(carte.id);
-    if (derniere) {
-      const jours = Math.floor((Date.now() - new Date(derniere).getTime()) / 86_400_000);
-      if (jours >= JOURS_DORMANCE) {
-        alertes.push({
-          cle: `dormante-${carte.id}`,
-          gravite: 'attention',
-          titre: `${nom} — ${jours} jours sans mise`,
-          detail: `Carte à ${carte.mises_encaissees}/${MISES_PAR_CYCLE}. Dernière mise il y a ${jours} jours.`,
-        });
-      }
+    // Repli sur la date d'ouverture quand aucune mise n'est tombée dans la
+    // fenêtre. Sans lui, les cartes les plus endormies — celles sans aucune mise
+    // récente — seraient les seules à ne rien déclencher.
+    const repere = derniereMise.get(carte.id) ?? carte.ouverte_le;
+    const jours = Math.floor((Date.now() - new Date(repere).getTime()) / 86_400_000);
+
+    if (jours >= JOURS_DORMANCE) {
+      alertes.push({
+        cle: `dormante-${carte.id}`,
+        gravite: 'attention',
+        titre: `${nom} — ${jours} jours sans mise`,
+        detail: derniereMise.has(carte.id)
+          ? `Carte à ${carte.mises_encaissees}/${MISES_PAR_CYCLE}. Dernière mise il y a ${jours} jours.`
+          : `Carte à ${carte.mises_encaissees}/${MISES_PAR_CYCLE}, ouverte il y a ${jours} jours et sans mise récente.`,
+      });
     }
   }
 
