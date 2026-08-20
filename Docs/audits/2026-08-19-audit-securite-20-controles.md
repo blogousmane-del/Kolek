@@ -220,7 +220,7 @@ que d'introduire une troisième convention dans le même schéma.
 Les trois de la première rédaction sont tombés le 2026-08-20.
 
 1. ~~La longueur minimale du mot de passe côté distant.~~ **Relevée : 8.** Elle
-   devient un 🟡, voir « 3. La longueur minimale de mot de passe » plus haut —
+   devient un 🟡, voir « 2. La longueur minimale de mot de passe » plus haut —
    un chiffre connu qui diverge de l'intention n'est plus un angle mort, c'est
    un durcissement.
 2. ~~Les limites de débit sur la connexion~~ (contrôle 11) — **mesurées**, voir
