@@ -17,8 +17,8 @@ regardé **la taille** de ce qui entre.
 |---|---|---|
 | 🔴 Bloquant | 0 | — |
 | 🟠 Important | 1 | **corrigé le jour même**, migration `20260819010000` |
-| 🟡 À faire | 2 | 1 corrigé, 1 reconduit et argumenté |
-| ⚪️ Non vérifié | 1 | longueur minimale de mot de passe, tableau de bord |
+| 🟡 À faire | 3 | 1 corrigé, 2 argumentés — dont le seuil de mot de passe, relevé le 2026-08-20 |
+| ⚪️ Non vérifié | 0 | les trois sont tombés le 2026-08-20 |
 | Non applicable | 3 | inchangés |
 
 ---
@@ -170,6 +170,36 @@ section à eux :
   le déclencheur existant, `now()` étant interdit dans un `check`. Sur `INSERT`
   seulement : corriger le cash déclaré d'une journée ancienne reste légitime.
 
+### 3. La longueur minimale de mot de passe est de 8, l'intention écrite dit 10
+
+**Relevé le 2026-08-20**, au tableau de bord — Authentication → Policies. C'était
+le dernier ⚪️ ; le chiffre étant connu, il change de catégorie.
+
+`supabase/config.toml` porte `minimum_password_length = 10`. Le projet en ligne
+applique **8**. Personne n'a baissé le seuil : ce fichier n'a jamais gouverné le
+distant. C'est la quatrième divergence de la même famille, après l'exposition
+automatique des tables, le `TRUNCATE` résiduel et les privilèges par défaut des
+schémas `public` et `storage`. Le motif ne varie pas — **ce que le dépôt déclare
+n'est pas ce que la plateforme applique**, et seul le distant fait foi.
+
+Ce n'est pas exploitable en soi. Huit caractères restent au-dessus du défaut de
+Supabase, l'inscription est fermée — donc les comptes sont créés à la main par
+GTCS, pas par un inconnu — et le contrôle 11 vient de montrer que la force brute
+bute sur un `429`. L'écart entre 8 et 10 vaut surtout comme signal : une
+intention écrite dans le dépôt et jamais appliquée finit par être prise pour
+acquise.
+
+**À faire, dans cet ordre de valeur.** Le seuil se relève à 10 dans
+Authentication → Policies, pour rejoindre l'intention. Ne pas passer par
+`supabase config push` : il appliquerait le bloc `[auth]` entier, `site_url`
+compris, qui pointe encore sur `127.0.0.1:3000` — casser l'authentification en
+production pour aligner un entier serait un mauvais échange.
+
+Et si un seul durcissement doit être fait sur ce front, ce n'est pas la
+longueur : c'est la **protection contre les mots de passe déjà divulgués**, dans
+le même écran. Un mot de passe de douze caractères qui figure dans une fuite
+connue est plus faible qu'un de huit qui n'y figure pas.
+
 ### 2. Le jeton de session vit dans `localStorage` — reconduit, inchangé
 
 Contrôle 9, déjà argumenté le 2026-08-18 et revérifié aujourd'hui : comportement
@@ -185,22 +215,19 @@ que d'introduire une troisième convention dans le même schéma.
 
 ---
 
-## ⚪️ Non vérifié
+## ⚪️ Non vérifié — **plus aucun**
 
-1. **La longueur minimale du mot de passe côté distant.** Reconduit du
-   2026-08-18. `supabase/config.toml` porte `minimum_password_length = 10`, mais
-   ce fichier gouverne le conteneur local. Tableau de bord → Authentication →
-   Policies. Ne pas lancer `supabase config push` tel quel : il appliquerait le
-   bloc `[auth]` entier, `site_url` compris, qui pointe encore sur le local.
+Les trois de la première rédaction sont tombés le 2026-08-20.
 
-2. ~~**Les limites de débit sur la connexion** (contrôle 11).~~ **Levé le
-   2026-08-20 — voir « Contrôle 11, mesuré » plus bas.** La valeur n'est
-   toujours pas *lisible* de l'extérieur, mais elle est *mesurable*, et c'est ce
-   qui compte : le plafond existe et se déclenche.
-
-Le troisième ⚪️ de la première rédaction — « la suite de tests de la base n'a pas
-pu être rejouée » — **est levé.** Voir la section « Ce qui restait en suspens »
-en fin de document : les 63 tests sont verts, migration comprise.
+1. ~~La longueur minimale du mot de passe côté distant.~~ **Relevée : 8.** Elle
+   devient un 🟡, voir « 3. La longueur minimale de mot de passe » plus haut —
+   un chiffre connu qui diverge de l'intention n'est plus un angle mort, c'est
+   un durcissement.
+2. ~~Les limites de débit sur la connexion~~ (contrôle 11) — **mesurées**, voir
+   « Contrôle 11, mesuré » plus bas. Non lisibles de l'extérieur, mais
+   observables, et c'est ce qui compte : le plafond existe et se déclenche.
+3. ~~La suite de tests de la base n'a pas pu être rejouée~~ — **levé**, voir
+   « Ce qui restait en suspens » : les 63 tests sont verts, migration comprise.
 
 ---
 
@@ -225,7 +252,7 @@ contrôle 13 (aucun SQL concaténé, aucun `execute` dynamique).
 | 7 | Verrouillage par enregistrement | conforme, **durci** | policies sur `collecteur_id = auth.uid()` ; le déclencheur ne renseigne plus sur les cartes d'autrui |
 | 8 | Champs non modifiables | conforme | liste blanche de colonnes, garde-fous des migrations 7 et 8 |
 | 9 | Cookies de session | 🟡 | jeton en `localStorage`, mitigé par la CSP |
-| 10 | Mots de passe hachés | conforme | délégué à Supabase Auth ; aucune colonne de mot de passe dans `public` |
+| 10 | Mots de passe hachés | conforme, 🟡 sur le seuil | délégué à Supabase Auth, aucune colonne de mot de passe dans `public` ; longueur minimale relevée le 2026-08-20 : 8 en ligne contre 10 déclaré dans `config.toml` |
 | 11 | Rate limiting | conforme | mesuré le 2026-08-20 : `429 over_request_rate_limit` à la 54ᵉ tentative depuis une IP ; inscription fermée |
 | 12 | Anti-bot | non applicable | aucun formulaire public |
 | 13 | Requêtes paramétrées | non applicable | aucun SQL concaténé |
