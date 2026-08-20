@@ -9,6 +9,15 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        // Le nouveau service worker prend la main sans attendre la fermeture
+        // de tous les onglets, et `src/maj-service-worker.ts` recharge alors
+        // l'écran. Sans ces trois lignes, une version corrigée n'atteint le
+        // collecteur qu'au deuxième lancement de l'application.
+        clientsClaim: true,
+        skipWaiting: true,
+        cleanupOutdatedCaches: true,
+      },
       manifest: {
         name: 'Kolek — Collecteur',
         short_name: 'Kolek',

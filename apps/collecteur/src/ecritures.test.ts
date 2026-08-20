@@ -137,3 +137,65 @@ describe('ce que le téléphone envoie, et ce qu’il n’envoie pas', () => {
     expect(ligne.marche).toBeNull();
   });
 });
+
+describe('reprise après un nouveau déploiement', () => {
+  it('recharge l’écran quand un autre service worker prend la main', async () => {
+    // Le défaut vu en production le 2026-08-20 : le paquet servi était le bon,
+    // mais la coquille précachée était vieille — le collecteur voyait encore le
+    // bouton « Confirmer la mise » grisé. Sur une application posée sur l'écran
+    // d'accueil d'un téléphone, personne ne recharge deux fois.
+    const ecouteurs: Record<string, () => void> = {};
+    const reload = vi.fn();
+
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        controller: {},
+        addEventListener: (nom: string, f: () => void) => {
+          ecouteurs[nom] = f;
+        },
+      },
+    });
+    vi.stubGlobal('window', { location: { reload } });
+
+    const { surveillerMisesAJour } = await import('./maj-service-worker');
+    surveillerMisesAJour();
+
+    ecouteurs.controllerchange!();
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    // Deuxième événement : pas de second rechargement. Sans ce garde-fou, un
+    // service worker qui n'arrive pas à s'activer mettrait l'écran en boucle et
+    // emporterait la saisie en cours.
+    ecouteurs.controllerchange!();
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('ne recharge pas à la toute première installation', async () => {
+    // Première visite : aucun contrôleur, puis un contrôleur. L'événement se
+    // déclenche pour un remplacement qui n'en est pas un, et recharger ici
+    // infligerait un clignotement à chaque nouveau collecteur.
+    vi.resetModules();
+    const ecouteurs: Record<string, () => void> = {};
+    const reload = vi.fn();
+
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        controller: null,
+        addEventListener: (nom: string, f: () => void) => {
+          ecouteurs[nom] = f;
+        },
+      },
+    });
+    vi.stubGlobal('window', { location: { reload } });
+
+    const { surveillerMisesAJour } = await import('./maj-service-worker');
+    surveillerMisesAJour();
+
+    ecouteurs.controllerchange!();
+    expect(reload).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+});

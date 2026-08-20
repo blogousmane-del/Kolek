@@ -22,6 +22,10 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
   const [page, setPage] = useState<CleNavCollecteur>('clients');
   const [erreurSortie, setErreurSortie] = useState<string | null>(null);
   const [collecteurId, setCollecteurId] = useState<string | null>(null);
+  const [nomCollecteur, setNomCollecteur] = useState<string | null>(null);
+  /** Demande faite à l'écran des clients d'ouvrir le formulaire d'inscription.
+      C'est le bouton « Souscrire » de l'accueil qui la pose. */
+  const [souscrire, setSouscrire] = useState(false);
   const [carteChoisie, setCarteChoisie] = useState<CarteChoisie | null>(null);
   /** Incrémenté après chaque écriture : la liste des clients s'y abonne pour
       se relire. Sans ça, un client tout juste inscrit n'apparaît qu'au
@@ -33,6 +37,17 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
     // l'exige au `with check`. On le lit une fois, à l'ouverture.
     void supabase.auth.getUser().then(({ data }) => setCollecteurId(data.user?.id ?? null));
   }, []);
+
+  useEffect(() => {
+    // Le nom vient de `collecteurs`, pas des métadonnées du jeton : c'est la
+    // ligne que le collecteur peut lui-même corriger, et l'écran doit montrer
+    // ce qu'il a corrigé. La politique RLS la borne à sa propre ligne.
+    void supabase
+      .from('collecteurs')
+      .select('nom')
+      .maybeSingle()
+      .then(({ data }) => setNomCollecteur((data as { nom?: string } | null)?.nom ?? null));
+  }, [collecteurId]);
 
   async function deconnecter() {
     setErreurSortie(null);
@@ -63,11 +78,24 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
         </p>
       )}
 
-      {page === 'accueil' && <Accueil onNaviguer={setPage} onDeconnexion={deconnecter} />}
+      {page === 'accueil' && (
+        <Accueil
+          nomCollecteur={nomCollecteur}
+          revision={revision}
+          onNaviguer={setPage}
+          onSouscrire={() => {
+            setSouscrire(true);
+            setPage('clients');
+          }}
+          onDeconnexion={deconnecter}
+        />
+      )}
       {page === 'clients' && (
         <Clients
           collecteurId={collecteurId}
           revision={revision}
+          ouvrirFormulaire={souscrire}
+          onFormulaireVu={() => setSouscrire(false)}
           onDeconnexion={deconnecter}
           onEncaisser={encaisserSur}
           onEcriture={() => setRevision((r) => r + 1)}

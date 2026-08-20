@@ -48,17 +48,30 @@ type Filtre = (typeof FILTRES)[number];
 export function Clients({
   collecteurId,
   revision,
+  ouvrirFormulaire,
+  onFormulaireVu,
   onDeconnexion,
   onEncaisser,
   onEcriture,
 }: {
   collecteurId: string | null;
   revision: number;
+  /** Posé par le bouton « Souscrire » de l'accueil. */
+  ouvrirFormulaire: boolean;
+  onFormulaireVu: () => void;
   onDeconnexion: () => void;
   onEncaisser: (carte: CarteChoisie) => void;
   onEcriture: () => void;
 }) {
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);
+
+  useEffect(() => {
+    if (!ouvrirFormulaire) return;
+    setFormulaireOuvert(true);
+    // La demande est consommée tout de suite : sans ça, refermer le formulaire
+    // puis revenir sur cet écran le rouvrirait tout seul.
+    onFormulaireVu();
+  }, [ouvrirFormulaire, onFormulaireVu]);
   const [lignes, setLignes] = useState<Ligne[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [recherche, setRecherche] = useState('');
