@@ -1,17 +1,38 @@
 import { NavMobile, type CleNavCollecteur } from '@kolek/ui';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Accueil } from './ecrans/Accueil';
 import { Clients } from './ecrans/Clients';
 import { Encaisser } from './ecrans/Encaisser';
 import { supabase } from './supabase';
 
+/** La carte choisie pour l'encaissement, portée par la coquille : l'écran
+    « Encaisser » a besoin de savoir sur quelle carte il écrit, et c'est la
+    liste des clients qui le décide. */
+export interface CarteChoisie {
+  carteId: string;
+  clientNom: string;
+  mise: number;
+  misesEncaissees: number;
+}
+
 export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
-  // Départ sur « Clients » et non sur « Accueil » : c'est le seul écran branché
-  // sur la base. Un collecteur qui ouvre l'application voit ses vrais clients,
-  // pas les chiffres de la maquette.
+  // Départ sur « Clients » : c'est l'écran branché sur la base, et celui d'où
+  // partent les deux gestes du métier — inscrire un client, encaisser sa mise.
   const [page, setPage] = useState<CleNavCollecteur>('clients');
   const [erreurSortie, setErreurSortie] = useState<string | null>(null);
+  const [collecteurId, setCollecteurId] = useState<string | null>(null);
+  const [carteChoisie, setCarteChoisie] = useState<CarteChoisie | null>(null);
+  /** Incrémenté après chaque écriture : la liste des clients s'y abonne pour
+      se relire. Sans ça, un client tout juste inscrit n'apparaît qu'au
+      rechargement de la page. */
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    // `collecteur_id` doit accompagner chaque écriture : la politique RLS
+    // l'exige au `with check`. On le lit une fois, à l'ouverture.
+    void supabase.auth.getUser().then(({ data }) => setCollecteurId(data.user?.id ?? null));
+  }, []);
 
   async function deconnecter() {
     setErreurSortie(null);
@@ -21,6 +42,11 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       return;
     }
     onDeconnexion();
+  }
+
+  function encaisserSur(carte: CarteChoisie) {
+    setCarteChoisie(carte);
+    setPage('encaisser');
   }
 
   return (
@@ -38,8 +64,26 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       )}
 
       {page === 'accueil' && <Accueil onNaviguer={setPage} onDeconnexion={deconnecter} />}
-      {page === 'clients' && <Clients onDeconnexion={deconnecter} />}
-      {page === 'encaisser' && <Encaisser onNaviguer={setPage} />}
+      {page === 'clients' && (
+        <Clients
+          collecteurId={collecteurId}
+          revision={revision}
+          onDeconnexion={deconnecter}
+          onEncaisser={encaisserSur}
+          onEcriture={() => setRevision((r) => r + 1)}
+        />
+      )}
+      {page === 'encaisser' && (
+        <Encaisser
+          collecteurId={collecteurId}
+          carte={carteChoisie}
+          onNaviguer={setPage}
+          onEncaisse={() => {
+            setRevision((r) => r + 1);
+            setCarteChoisie(null);
+          }}
+        />
+      )}
 
       <NavMobile actif={page} onNaviguer={setPage} />
     </div>

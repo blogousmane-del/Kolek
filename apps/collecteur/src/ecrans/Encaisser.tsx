@@ -1,8 +1,9 @@
-import { formatMontant, MISE_MAX, MISE_MIN } from '@kolek/core';
+import { formatMontant, MISES_PAR_CYCLE, soldeRestituable } from '@kolek/core';
 import {
   Avatar,
-  BadgeStatut,
   BandeauHorsLigne,
+  Bouton,
+  Carte,
   CarteCollecte,
   Icone,
   useEnLigne,
@@ -10,20 +11,61 @@ import {
 } from '@kolek/ui';
 import { useState } from 'react';
 
-/** Paliers usuels du marché, tous compris dans [MISE_MIN, MISE_MAX]. */
-const PALIERS = [500, 1000, 2000, 5000, 10000] as const;
+import type { CarteChoisie } from '../Coquille';
+import { enregistrerMise } from '../ecritures';
 
 /**
- * Écran de démonstration : la sélection fonctionne, l'enregistrement non. Le
- * bouton reste donc désactivé et le dit. Un bouton « Confirmer » qui n'écrit
- * rien en base est le pire mensonge que puisse faire cette application — le
- * collecteur repart en pensant la mise encaissée.
+ * Encaissement d'une mise.
+ *
+ * Cet écran a longtemps porté un bouton désactivé et un avertissement : « un
+ * bouton *Confirmer* qui n'écrit rien en base est le pire mensonge que puisse
+ * faire cette application — le collecteur repart en pensant la mise encaissée ».
+ * Le bouton écrit maintenant.
+ *
+ * Deux choix qui en découlent.
+ *
+ * **Le montant n'est pas libre.** Il est celui de la carte, et rien d'autre :
+ * le déclencheur `mises_avant_insert` refuse toute mise dont le montant diffère
+ * de `cartes.mise`. Proposer un clavier libre laisserait saisir 2 000 sur une
+ * carte à 1 000, pour se voir refuser après coup. Le montant s'affiche, il ne
+ * se saisit pas.
+ *
+ * **Le champ « Note » a disparu.** `mises` n'a pas de colonne pour le recevoir.
+ * Un champ qui accepte du texte et le jette est de la même famille que le
+ * bouton qui n'écrivait rien.
  */
-export function Encaisser({ onNaviguer }: { onNaviguer: (cle: CleNavCollecteur) => void }) {
-  const [montant, setMontant] = useState<number>(1000);
+export function Encaisser({
+  collecteurId,
+  carte,
+  onNaviguer,
+  onEncaisse,
+}: {
+  collecteurId: string | null;
+  carte: CarteChoisie | null;
+  onNaviguer: (cle: CleNavCollecteur) => void;
+  onEncaisse: () => void;
+}) {
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [succes, setSucces] = useState<string | null>(null);
   const enLigne = useEnLigne();
 
-  const valide = montant >= MISE_MIN && montant <= MISE_MAX;
+  async function confirmer() {
+    if (!carte || !collecteurId || envoi) return;
+    setEnvoi(true);
+    setErreur(null);
+    setSucces(null);
+
+    const resultat = await enregistrerMise(collecteurId, carte.carteId, carte.mise);
+
+    setEnvoi(false);
+    if (!resultat.ok) {
+      setErreur(resultat.echec.message);
+      return;
+    }
+    setSucces(`Mise de ${formatMontant(carte.mise)} FCFA enregistrée pour ${carte.clientNom}.`);
+    onEncaisse();
+  }
 
   return (
     <div className="flex-1 flex flex-col">
@@ -39,126 +81,98 @@ export function Encaisser({ onNaviguer }: { onNaviguer: (cle: CleNavCollecteur) 
             <Icone nom="arrow-left" className="text-white" />
           </button>
           <p className="font-headings font-bold text-white text-lg">Encaisser une mise</p>
-          <button
-            type="button"
-            aria-label="Autres actions"
-            className="w-9 h-9 rounded-pill bg-white/10 flex items-center justify-center cursor-pointer"
-          >
-            <Icone nom="more-horizontal" className="text-white" />
-          </button>
+          <div className="w-9" />
         </div>
       </div>
 
       {!enLigne && <BandeauHorsLigne className="mx-4 mt-3" />}
 
-      {/* Client */}
-      <div className="mx-4 mt-3 bg-surface rounded-xl border border-hairline p-4 flex items-center gap-3 shadow-md">
-        <Avatar nom="Mariam Koné" className="w-12 h-12" />
-        <div className="flex-1 min-w-0">
-          <p className="font-headings font-bold text-lg text-ink truncate">Mariam Koné</p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <BadgeStatut statut="À jour" className="px-2 py-0.5" />
-            <span className="text-sm font-body text-muted-foreground">Cycle 3 · Jour 18/31</span>
-          </div>
-        </div>
-        <Icone nom="chevron-right" className="text-muted-foreground" />
-      </div>
-
-      <div className="mx-4 mt-3">
-        <CarteCollecte
-          nomClient="Mariam Koné"
-          misePar="1 000"
-          jourCourant={18}
-          solde="18 000"
-          cycle="3"
-        />
-      </div>
-
-      {/* Paliers */}
-      <div className="mx-4 mt-5">
-        <p className="text-sm font-body font-semibold text-ink mb-2">Montant de la mise</p>
-        <div className="flex gap-2 flex-wrap">
-          {PALIERS.map((palier) => (
-            <button
-              key={palier}
-              type="button"
-              onClick={() => setMontant(palier)}
-              className={`px-4 py-2 rounded-pill text-base font-body font-semibold border tabular-nums cursor-pointer ${
-                palier === montant
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-surface text-ink border-hairline'
-              }`}
-            >
-              {formatMontant(palier)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Saisie libre */}
-      <div className="mx-4 mt-4">
-        <label
-          htmlFor="montant-libre"
-          className="block text-sm font-body font-semibold text-ink mb-2"
-        >
-          Ou saisir un montant
-        </label>
-        <div
-          className={`flex items-center gap-3 bg-surface border-2 rounded-md px-4 py-3 ${
-            valide ? 'border-primary' : 'border-negative'
-          }`}
-        >
-          {/* `type="text"` et non `number` : un champ numérique natif refuse
-              l'espace des milliers, et le montant s'afficherait « 10000 » là où
-              tout le reste du produit écrit « 10 000 ». `inputMode` garde le
-              pavé numérique sur le téléphone. */}
-          <input
-            id="montant-libre"
-            type="text"
-            inputMode="numeric"
-            value={formatMontant(montant)}
-            onChange={(e) => setMontant(Number(e.target.value.replace(/\D/g, '')) || 0)}
-            className="flex-1 min-w-0 bg-transparent font-headings font-bold text-2xl text-ink tabular-nums outline-none"
-          />
-          <span className="text-base font-body font-medium text-muted-foreground">FCFA</span>
-        </div>
-        {!valide && (
-          <p className="text-sm font-body text-negative mt-1.5">
-            La mise doit être comprise entre {formatMontant(MISE_MIN)} et {formatMontant(MISE_MAX)}{' '}
-            FCFA.
+      {!carte ? (
+        // On arrive ici par l'onglet du bas, sans être passé par la liste. Dire
+        // quoi faire plutôt que d'afficher un formulaire sans destinataire.
+        <Carte className="mx-4 mt-4 p-4">
+          <p className="text-base font-body text-ink m-0">Aucune carte choisie.</p>
+          <p className="text-sm font-body text-muted-foreground mt-1 mb-3">
+            Ouvre la liste de tes clients et touche « Encaisser » sur la carte concernée.
           </p>
-        )}
-      </div>
+          <Bouton pleineLargeur onClick={() => onNaviguer('clients')}>
+            Voir mes clients
+          </Bouton>
+        </Carte>
+      ) : (
+        <>
+          {/* Client */}
+          <div className="mx-4 mt-3 bg-surface rounded-xl border border-hairline p-4 flex items-center gap-3 shadow-md">
+            <Avatar nom={carte.clientNom} className="w-12 h-12" />
+            <div className="flex-1 min-w-0">
+              <p className="font-headings font-bold text-lg text-ink truncate">
+                {carte.clientNom}
+              </p>
+              <span className="text-sm font-body text-muted-foreground">
+                Jour {carte.misesEncaissees}/{MISES_PAR_CYCLE}
+              </span>
+            </div>
+          </div>
 
-      {/* Note */}
-      <div className="mx-4 mt-3">
-        <label htmlFor="note" className="block text-sm font-body font-semibold text-ink mb-2">
-          Note (optionnel)
-        </label>
-        <input
-          id="note"
-          type="text"
-          placeholder="Ajouter une note…"
-          className="w-full bg-surface border border-hairline rounded-md px-4 py-3 text-base font-body text-ink outline-none focus:border-primary placeholder:text-muted-foreground"
-        />
-      </div>
+          <div className="mx-4 mt-3">
+            <CarteCollecte
+              nomClient={carte.clientNom}
+              misePar={formatMontant(carte.mise)}
+              jourCourant={carte.misesEncaissees}
+              solde={formatMontant(soldeRestituable(carte.misesEncaissees, carte.mise))}
+              cycle="1"
+            />
+          </div>
 
-      <div className="flex-1 min-h-4" />
+          {/* Montant — imposé par la carte */}
+          <div className="mx-4 mt-5">
+            <p className="text-sm font-body font-semibold text-ink mb-2">Montant de la mise</p>
+            <div className="flex items-baseline gap-2 bg-surface border border-hairline rounded-md px-4 py-3">
+              <span className="font-headings font-bold text-3xl text-ink tabular-nums">
+                {formatMontant(carte.mise)}
+              </span>
+              <span className="text-base font-body font-medium text-muted-foreground">FCFA</span>
+            </div>
+            <p className="text-xs font-body text-muted-foreground mt-1.5">
+              Fixé à l’ouverture de la carte. Une mise d’un autre montant est refusée par le
+              serveur.
+            </p>
+          </div>
 
-      {/* Confirmation */}
-      <div className="mx-4 mb-4">
-        <button
-          type="button"
-          disabled
-          className="w-full rounded-pill bg-primary text-primary-foreground font-body font-bold text-lg py-4 flex items-center justify-center gap-2 opacity-50 cursor-default"
-        >
-          <Icone nom="check-circle" taille={20} />
-          Confirmer la mise — {formatMontant(montant)} FCFA
-        </button>
-        <p className="text-xs text-center text-muted-foreground font-body mt-2">
-          L’enregistrement d’une mise arrive au jalon J2a.
-        </p>
-      </div>
+          <div className="flex-1 min-h-4" />
+
+          {erreur && (
+            <p role="alert" className="mx-4 mb-2 text-sm font-body text-negative">
+              {erreur}
+            </p>
+          )}
+          {succes && (
+            <p role="status" className="mx-4 mb-2 text-sm font-body text-positive">
+              {succes}
+            </p>
+          )}
+
+          {/* Confirmation */}
+          <div className="mx-4 mb-4">
+            <button
+              type="button"
+              onClick={confirmer}
+              disabled={envoi || collecteurId === null || carte.misesEncaissees >= MISES_PAR_CYCLE}
+              className="w-full rounded-pill bg-primary text-primary-foreground font-body font-bold text-lg py-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-default"
+            >
+              <Icone nom="check-circle" taille={20} />
+              {envoi
+                ? 'Enregistrement…'
+                : `Confirmer la mise — ${formatMontant(carte.mise)} FCFA`}
+            </button>
+            {carte.misesEncaissees >= MISES_PAR_CYCLE && (
+              <p className="text-xs text-center text-muted-foreground font-body mt-2">
+                Le cycle de {MISES_PAR_CYCLE} mises est complet. La carte doit être clôturée.
+              </p>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

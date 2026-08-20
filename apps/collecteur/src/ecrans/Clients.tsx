@@ -1,4 +1,4 @@
-import { formatMontant, MISES_PAR_CYCLE } from '@kolek/core';
+import { formatMontant, MISE_MAX, MISE_MIN, MISES_PAR_CYCLE, validerMise } from '@kolek/core';
 import {
   Avatar,
   BadgeStatut,
@@ -11,6 +11,8 @@ import {
 } from '@kolek/ui';
 import { useEffect, useMemo, useState } from 'react';
 
+import type { CarteChoisie } from '../Coquille';
+import { creerClientAvecCarte } from '../ecritures';
 import { supabase } from '../supabase';
 
 interface Client {
@@ -20,6 +22,7 @@ interface Client {
 }
 
 interface CarteClient {
+  id: string;
   client_id: string;
   mise: number;
   statut: 'active' | 'cloturee';
@@ -42,7 +45,20 @@ type Filtre = (typeof FILTRES)[number];
  * filtres ci-dessus disent ce que la base sait aujourd'hui : proposer un
  * bouton « En retard » qui ne filtre rien serait pire que ne pas le proposer.
  */
-export function Clients({ onDeconnexion }: { onDeconnexion: () => void }) {
+export function Clients({
+  collecteurId,
+  revision,
+  onDeconnexion,
+  onEncaisser,
+  onEcriture,
+}: {
+  collecteurId: string | null;
+  revision: number;
+  onDeconnexion: () => void;
+  onEncaisser: (carte: CarteChoisie) => void;
+  onEcriture: () => void;
+}) {
+  const [formulaireOuvert, setFormulaireOuvert] = useState(false);
   const [lignes, setLignes] = useState<Ligne[] | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [recherche, setRecherche] = useState('');
@@ -64,7 +80,7 @@ export function Clients({ onDeconnexion }: { onDeconnexion: () => void }) {
       try {
         const [reponseClients, reponseCartes] = await Promise.all([
           supabase.from('clients').select('id, nom, marche').order('nom'),
-          supabase.from('cartes').select('client_id, mise, statut, mises_encaissees'),
+          supabase.from('cartes').select('id, client_id, mise, statut, mises_encaissees'),
         ]);
 
         if (!vivant) return;
@@ -99,7 +115,9 @@ export function Clients({ onDeconnexion }: { onDeconnexion: () => void }) {
     return () => {
       vivant = false;
     };
-  }, []);
+    // `revision` change après chaque écriture : la liste se relit d'elle-même
+    // plutôt que d'attendre un rechargement de page.
+  }, [revision]);
 
   const visibles = useMemo(() => {
     if (!lignes) return [];
@@ -184,6 +202,30 @@ export function Clients({ onDeconnexion }: { onDeconnexion: () => void }) {
         </button>
       </div>
 
+      {/* Inscrire un client */}
+      <div className="px-4 mt-3">
+        {formulaireOuvert ? (
+          <FormulaireClient
+            collecteurId={collecteurId}
+            onAnnuler={() => setFormulaireOuvert(false)}
+            onCree={() => {
+              setFormulaireOuvert(false);
+              onEcriture();
+            }}
+          />
+        ) : (
+          <Bouton
+            icone="plus"
+            pleineLargeur
+            disabled={collecteurId === null}
+            title={collecteurId === null ? 'Session en cours de lecture…' : undefined}
+            onClick={() => setFormulaireOuvert(true)}
+          >
+            Inscrire un client
+          </Bouton>
+        )}
+      </div>
+
       {/* Filtres */}
       <div className="px-4 mt-3 flex gap-2 overflow-x-auto">
         {FILTRES.map((f) => (
@@ -240,7 +282,7 @@ export function Clients({ onDeconnexion }: { onDeconnexion: () => void }) {
         )}
 
         {visibles.map((ligne) => (
-          <LigneClient key={ligne.id} ligne={ligne} />
+          <LigneClient key={ligne.id} ligne={ligne} onEncaisser={onEncaisser} />
         ))}
       </div>
 
@@ -249,7 +291,13 @@ export function Clients({ onDeconnexion }: { onDeconnexion: () => void }) {
   );
 }
 
-function LigneClient({ ligne }: { ligne: Ligne }) {
+function LigneClient({
+  ligne,
+  onEncaisser,
+}: {
+  ligne: Ligne;
+  onEncaisser: (carte: CarteChoisie) => void;
+}) {
   const carte = ligne.carte;
   const encaissees = carte?.mises_encaissees ?? 0;
   const avancement = Math.round((encaissees / MISES_PAR_CYCLE) * 100);
@@ -259,6 +307,11 @@ function LigneClient({ ligne }: { ligne: Ligne }) {
   // tourne, ou elle est close, ou il n'y en a pas.
   const statut: Statut | null =
     carte === null ? null : carte.statut === 'cloturee' ? 'Clôturée' : 'À jour';
+
+  // Une carte active est encaissable tant que le cycle n'est pas complet ;
+  // au-delà, le déclencheur répondrait CYCLE_COMPLET. Autant ne pas proposer
+  // un geste dont on sait qu'il sera refusé.
+  const encaissable = carte !== null && carte.statut === 'active' && encaissees < MISES_PAR_CYCLE;
 
   return (
     <div className="bg-surface rounded-lg border border-hairline p-4 flex items-center gap-3 shadow-sm">
@@ -279,7 +332,22 @@ function LigneClient({ ligne }: { ligne: Ligne }) {
           </div>
         )}
       </div>
-      {statut ? (
+      {encaissable ? (
+        <button
+          type="button"
+          onClick={() =>
+            onEncaisser({
+              carteId: carte.id,
+              clientNom: ligne.nom,
+              mise: carte.mise,
+              misesEncaissees: encaissees,
+            })
+          }
+          className="px-3 py-2 rounded-pill bg-primary text-primary-foreground text-sm font-body font-bold flex-shrink-0 cursor-pointer"
+        >
+          Encaisser
+        </button>
+      ) : statut ? (
         <BadgeStatut statut={statut} className="px-2.5 py-1 flex-shrink-0" />
       ) : (
         <span className="px-2.5 py-1 rounded-pill text-xs font-body font-semibold bg-muted text-muted-foreground flex-shrink-0">
@@ -287,5 +355,149 @@ function LigneClient({ ligne }: { ligne: Ligne }) {
         </span>
       )}
     </div>
+  );
+}
+
+/** Paliers usuels du marché, tous compris dans [MISE_MIN, MISE_MAX]. */
+const MISES_USUELLES = [500, 1000, 2000, 5000, 10000] as const;
+
+/**
+ * Inscrire un client, c'est aussi lui ouvrir sa première carte : un client sans
+ * carte n'encaisse rien, et le collecteur au marché fait les deux gestes d'un
+ * coup. Le formulaire demande donc la mise journalière avec le nom.
+ *
+ * Seul le nom est obligatoire. Le téléphone, le marché et l'activité sont
+ * facultatifs en base, et les exiger ici ferait perdre du temps devant un
+ * étal — la fiche se complète plus tard.
+ */
+function FormulaireClient({
+  collecteurId,
+  onAnnuler,
+  onCree,
+}: {
+  collecteurId: string | null;
+  onAnnuler: () => void;
+  onCree: () => void;
+}) {
+  const [nom, setNom] = useState('');
+  const [telephone, setTelephone] = useState('');
+  const [marche, setMarche] = useState('');
+  const [mise, setMise] = useState(1000);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  const pret = nom.trim().length > 0 && validerMise(mise) && collecteurId !== null;
+
+  async function enregistrer() {
+    if (!pret || !collecteurId) return;
+    setEnvoi(true);
+    setErreur(null);
+
+    const resultat = await creerClientAvecCarte(collecteurId, {
+      nom,
+      telephone,
+      marche,
+      mise,
+    });
+
+    setEnvoi(false);
+    if (!resultat.ok) {
+      setErreur(resultat.echec.message);
+      return;
+    }
+    onCree();
+  }
+
+  return (
+    <Carte className="p-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="font-headings font-bold text-lg text-ink m-0">Nouveau client</p>
+        <button
+          type="button"
+          onClick={onAnnuler}
+          aria-label="Fermer le formulaire"
+          className="w-9 h-9 rounded-pill flex items-center justify-center cursor-pointer"
+        >
+          <Icone nom="x" taille={18} className="text-muted-foreground" />
+        </button>
+      </div>
+
+      <label htmlFor="nouveau-nom" className="block text-sm font-body font-semibold text-ink mb-1">
+        Nom
+      </label>
+      <input
+        id="nouveau-nom"
+        type="text"
+        value={nom}
+        maxLength={120}
+        onChange={(e) => setNom(e.target.value)}
+        placeholder="Nom du client"
+        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-base font-body text-ink outline-none focus:border-primary placeholder:text-muted-foreground mb-3"
+      />
+
+      <label htmlFor="nouveau-tel" className="block text-sm font-body font-semibold text-ink mb-1">
+        Téléphone <span className="font-normal text-muted-foreground">(optionnel)</span>
+      </label>
+      <input
+        id="nouveau-tel"
+        type="tel"
+        inputMode="tel"
+        value={telephone}
+        maxLength={32}
+        onChange={(e) => setTelephone(e.target.value)}
+        placeholder="+225…07 00 00 00"
+        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-base font-body text-ink outline-none focus:border-primary placeholder:text-muted-foreground mb-3"
+      />
+
+      <label
+        htmlFor="nouveau-marche"
+        className="block text-sm font-body font-semibold text-ink mb-1"
+      >
+        Marché <span className="font-normal text-muted-foreground">(optionnel)</span>
+      </label>
+      <input
+        id="nouveau-marche"
+        type="text"
+        value={marche}
+        maxLength={80}
+        onChange={(e) => setMarche(e.target.value)}
+        placeholder="Adjamé, Plateau…"
+        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-base font-body text-ink outline-none focus:border-primary placeholder:text-muted-foreground mb-3"
+      />
+
+      <p className="text-sm font-body font-semibold text-ink mb-2">Mise journalière</p>
+      <div className="flex gap-2 flex-wrap mb-2">
+        {MISES_USUELLES.map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMise(m)}
+            className={`px-3 py-2 rounded-pill text-base font-body font-semibold border tabular-nums cursor-pointer ${
+              m === mise
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-surface text-ink border-hairline'
+            }`}
+          >
+            {formatMontant(m)}
+          </button>
+        ))}
+      </div>
+      {!validerMise(mise) && (
+        <p className="text-sm font-body text-negative mb-2">
+          La mise doit être comprise entre {formatMontant(MISE_MIN)} et {formatMontant(MISE_MAX)}{' '}
+          FCFA.
+        </p>
+      )}
+
+      {erreur && (
+        <p role="alert" className="text-sm font-body text-negative mb-2">
+          {erreur}
+        </p>
+      )}
+
+      <Bouton pleineLargeur disabled={!pret || envoi} onClick={enregistrer}>
+        {envoi ? 'Enregistrement…' : 'Inscrire et ouvrir la carte'}
+      </Bouton>
+    </Carte>
   );
 }
