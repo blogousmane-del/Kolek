@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
+import { entetesCors, listerOrigines } from '../_shared/cors.ts';
 import { TARIFS, tarifParCle } from '../_shared/paliers.ts';
 
 /**
@@ -31,31 +32,20 @@ import { TARIFS, tarifParCle } from '../_shared/paliers.ts';
  * raison.
  */
 
-const ORIGINES_AUTORISEES = new Set(
-  (Deno.env.get('ORIGINES_ADMIN') ?? 'https://kolek-admin.netlify.app,http://localhost:5173')
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean),
-);
+const ORIGINES_AUTORISEES = listerOrigines(Deno.env.get('ORIGINES_ADMIN'));
 
-function entetesCors(origine: string | null): Record<string, string> {
-  const entetes: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Vary: 'Origin',
-  };
-  // Pas de joker : l'écran d'administration a une origine connue, et la lister
-  // coûte une ligne. `*` ouvrirait la fonction à n'importe quelle page ouverte
-  // dans le même navigateur que la session de l'administrateur.
-  if (origine && ORIGINES_AUTORISEES.has(origine)) {
-    entetes['Access-Control-Allow-Origin'] = origine;
-    entetes['Access-Control-Allow-Headers'] = 'authorization, content-type';
-    entetes['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
-  }
-  return entetes;
+/** Les en-têtes à rendre pour cette requête. `requete` sert à relire l'en-tête
+    `Access-Control-Request-Headers` du préalable — voir `_shared/cors.ts`. */
+function entetesPour(requete: Request): Record<string, string> {
+  return entetesCors({
+    origine: requete.headers.get('Origin'),
+    entetesDemandes: requete.headers.get('Access-Control-Request-Headers'),
+    origines: ORIGINES_AUTORISEES,
+  });
 }
 
-function reponse(corps: unknown, statut: number, origine: string | null): Response {
-  return new Response(JSON.stringify(corps), { status: statut, headers: entetesCors(origine) });
+function reponse(corps: unknown, statut: number, requete: Request): Response {
+  return new Response(JSON.stringify(corps), { status: statut, headers: entetesPour(requete) });
 }
 
 interface Comptage {
@@ -101,15 +91,13 @@ function calculerMrr(comptages: Comptage[]) {
 }
 
 Deno.serve(async (requete) => {
-  const origine = requete.headers.get('Origin');
-
   if (requete.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: entetesCors(origine) });
+    return new Response(null, { status: 204, headers: entetesPour(requete) });
   }
 
   const autorisation = requete.headers.get('Authorization');
   if (!autorisation?.startsWith('Bearer ')) {
-    return reponse({ erreur: 'JETON_ABSENT' }, 401, origine);
+    return reponse({ erreur: 'JETON_ABSENT' }, 401, requete);
   }
 
   const url = Deno.env.get('SUPABASE_URL');
@@ -119,7 +107,7 @@ Deno.serve(async (requete) => {
   if (!url || !cleAnon || !cleService) {
     // Ne jamais dire laquelle manque : la réponse part vers le réseau.
     console.error('Configuration incomplète : URL, clé anon ou clé de service absente.');
-    return reponse({ erreur: 'CONFIGURATION' }, 500, origine);
+    return reponse({ erreur: 'CONFIGURATION' }, 500, requete);
   }
 
   // --- Portillon, sous l'identité de l'appelant ---
@@ -134,7 +122,7 @@ Deno.serve(async (requete) => {
     const { data, error } = await clientAppelant.rpc('est_admin');
     if (error) {
       console.error('est_admin a échoué :', error.message);
-      return reponse({ erreur: 'VERIFICATION_IMPOSSIBLE' }, 403, origine);
+      return reponse({ erreur: 'VERIFICATION_IMPOSSIBLE' }, 403, requete);
     }
     estAdmin = data === true;
   } catch (cause) {
@@ -142,11 +130,11 @@ Deno.serve(async (requete) => {
     // comme un `error` peuplé. Sans ce `catch`, la fonction rendrait 500 — et
     // un 500 sur un contrôle d'accès est une porte qu'on n'a pas su fermer.
     console.error('est_admin a levé :', cause instanceof Error ? cause.message : cause);
-    return reponse({ erreur: 'VERIFICATION_IMPOSSIBLE' }, 403, origine);
+    return reponse({ erreur: 'VERIFICATION_IMPOSSIBLE' }, 403, requete);
   }
 
   if (!estAdmin) {
-    return reponse({ erreur: 'ACCES_RESERVE' }, 403, origine);
+    return reponse({ erreur: 'ACCES_RESERVE' }, 403, requete);
   }
 
   // --- Passé ce point seulement, la clé de service sort ---
@@ -158,7 +146,7 @@ Deno.serve(async (requete) => {
   const { data, error } = await clientService.rpc('admin_vue_globale');
   if (error) {
     console.error('admin_vue_globale a échoué :', error.message);
-    return reponse({ erreur: 'AGREGATION_IMPOSSIBLE' }, 500, origine);
+    return reponse({ erreur: 'AGREGATION_IMPOSSIBLE' }, 500, requete);
   }
 
   const brut = data as Record<string, unknown>;
@@ -170,19 +158,17 @@ Deno.serve(async (requete) => {
     abonnements = { ...(brut.abonnements as Record<string, unknown>), mrr, parPalier };
   } catch (cause) {
     console.error('Palier inconnu en base :', cause instanceof Error ? cause.message : cause);
-    return reponse({ erreur: 'PALIER_INCONNU' }, 500, origine);
+    return reponse({ erreur: 'PALIER_INCONNU' }, 500, requete);
   }
 
-  return reponse(
-    {
-      genereLe: brut.genere_le,
-      abonnements,
-      totaux: brut.totaux,
-      zones: brut.zones,
-      collecteurs: brut.collecteurs,
-      mouvements: brut.mouvements,
-    },
-    200,
-    origine,
-  );
+  // Tout ce que la vue SQL produit est transmis, et seul `abonnements` est
+  // remplacé — c'est la seule clé que cette fonction enrichit, en y ajoutant le
+  // chiffre d'affaires calculé depuis la grille tarifaire.
+  //
+  // La première version énumérait les clés une à une. La migration qui a ajouté
+  // `cartes` n'a pas été reportée ici, et les deux écrans qui la lisent —
+  // « Encours & Soldes » et la fiche d'un collecteur — tombaient sur
+  // `undefined`. Transmettre l'ensemble supprime la classe de défaut : la vue
+  // SQL décide de ce qu'elle rend, et rien ne se perd en chemin.
+  return reponse({ ...brut, genereLe: brut.genere_le, abonnements }, 200, requete);
 });
