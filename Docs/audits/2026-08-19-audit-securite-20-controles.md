@@ -405,11 +405,11 @@ par dictionnaire est ralentie de plusieurs ordres de grandeur, et l'inscription
 Ce qui reste à faire de ce côté n'est plus un contrôle mais un réglage de
 confort : si tu veux resserrer, c'est Authentication → Rate limits.
 
-### Ce qui reste réellement ⚪️
+### Pourquoi la longueur minimale a dû être lue à la main
 
-**Un seul point, et il tient en vingt secondes de tableau de bord :** la longueur
-minimale de mot de passe. Trois tentatives pour l'obtenir autrement ont échoué,
-et il vaut mieux écrire pourquoi que de laisser croire qu'on n'a pas essayé.
+Le chiffre est connu — **8** — mais il vient du tableau de bord, pas d'une
+sonde. Trois tentatives pour l'obtenir depuis le terminal ont échoué, et il vaut
+mieux écrire pourquoi que de laisser croire qu'on n'a pas essayé.
 
 - `/auth/v1/settings` ne publie pas les exigences de mot de passe.
 - `POST /auth/v1/signup` avec un mot de passe de trois caractères rend
@@ -420,12 +420,40 @@ et il vaut mieux écrire pourquoi que de laisser croire qu'on n'a pas essayé.
   `127.0.0.1:3000`. Casser l'authentification en production pour lire un réglage
   n'est pas un audit.
 
-Reste **Authentication → Policies**, à la main.
+La quatrième voie — changer le mot de passe du compte admin avec une chaîne
+courte pour voir si le serveur refuse — a été écartée volontairement : si aucun
+minimum n'était appliqué, la sonde aurait réellement changé le mot de passe.
+Une sonde qui modifie ce qu'elle mesure n'est pas une mesure.
 
-Et le parcours en production, qui n'est plus un contrôle mais une formalité :
-deux vrais comptes sur `kolek-admin.netlify.app`, l'un admin, l'autre non. Le
-contrat serveur est prouvé par `isolation.test.ts`, la branche d'interface par
-`Portillon.test.tsx` ; il ne manque que de l'avoir vu de ses yeux. Créer le
-second compte demande le tableau de bord ou la clé de service — ni l'un ni
-l'autre n'est à la portée d'un audit conduit depuis le terminal, et c'est très
-bien ainsi.
+D'où la règle tenue dans tout ce rapport : ce chiffre est **déclaré**, pas
+**mesuré**, et il est écrit comme tel.
+
+### Le parcours en production, fait de bout en bout — 2026-08-20
+
+Ce point était laissé ouvert la veille au motif que créer un second compte
+demandait le tableau de bord ou la clé de service. Le compte a été créé, et le
+parcours joué en entier.
+
+Vérification côté base, faite depuis le terminal sans clé de service, par
+`supabase inspect db table-stats --linked` :
+
+```
+public.collecteurs   2 lignes
+public.admins        1 ligne
+```
+
+Deux comptes Auth existent — le déclencheur `on_auth_user_created` crée une
+ligne `collecteurs` par compte — et un seul figure dans `admins`. Réserve de
+méthode, qui vaut d'être écrite : ces chiffres viennent de `pg_class.reltuples`,
+une estimation rafraîchie par l'autovacuum, pas d'un `count(*)`. Sur des tables
+de deux lignes elle est fiable, mais c'est une estimation.
+
+Ce que l'estimation ne prouvait pas, l'écran l'a montré : connexion sur
+`kolek-admin.netlify.app` avec le second compte, et le portillon rend « Accès
+réservé — ce compte n'est pas un compte d'administration GTCS », avec pour seule
+action « Se déconnecter ». Pas de coquille, pas de tableau de bord.
+
+Les trois niveaux disent donc la même chose, ce qui est le seul résultat
+intéressant : `est_admin()` rend faux côté serveur (`isolation.test.ts`), la
+branche d'interface refuse et ne s'ouvre sur aucune incertitude
+(`Portillon.test.tsx`), et la production se comporte comme les deux.
