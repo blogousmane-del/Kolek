@@ -1,4 +1,4 @@
-import { BandeauOffre, BarreLaterale, Icone, type CleNavAdmin } from '@kolek/ui';
+import { BandeauOffre, BarreLaterale, Bouton, Icone, type CleNavAdmin } from '@kolek/ui';
 import { useEffect, useState } from 'react';
 
 import { Abonnements } from './ecrans/Abonnements';
@@ -7,6 +7,7 @@ import { DetailCollecteur } from './ecrans/DetailCollecteur';
 import { EncaisserMise } from './ecrans/EncaisserMise';
 import { EncoursSoldes } from './ecrans/EncoursSoldes';
 import { TableauDeBord } from './ecrans/TableauDeBord';
+import { useVueGlobale } from './donnees';
 import { supabase } from './supabase';
 
 /** Le détail d'un collecteur n'est pas une entrée de menu : on y arrive depuis
@@ -16,10 +17,18 @@ type Page = CleNavAdmin | 'detail';
 export function Coquille() {
   const [page, setPage] = useState<Page>('tableau');
   const [erreurSortie, setErreurSortie] = useState<string | null>(null);
+  /** Quel collecteur la fiche détaillée affiche. `null` avant tout clic. */
+  const [collecteurOuvert, setCollecteurOuvert] = useState<string | null>(null);
   // La barre latérale fait 260 px de large et ne se replie pas : sous `lg`,
   // elle ne laissait pas de quoi lire une ligne de tableau. En dessous de ce
   // seuil elle devient un tiroir, fermé par défaut.
   const [menuOuvert, setMenuOuvert] = useState(false);
+
+  // Un seul chargement pour les six écrans. Les découper en six appels
+  // afficherait les mêmes totaux au prix de six allers-retours, et laisserait
+  // deux écrans ouverts sur des instantanés différents — ce qu'un
+  // administrateur lirait comme une incohérence de la base, pas de l'interface.
+  const donnees = useVueGlobale();
 
   // Échap ferme le tiroir. Sans ça, sur une tablette avec clavier, le seul
   // moyen de refermer est de viser la croix.
@@ -88,12 +97,36 @@ export function Coquille() {
             </p>
           )}
 
-          {page === 'tableau' && <TableauDeBord />}
-          {page === 'collecteurs' && <Collecteurs onOuvrirCollecteur={() => setPage('detail')} />}
-          {page === 'detail' && <DetailCollecteur onRetour={() => setPage('collecteurs')} />}
-          {page === 'encours' && <EncoursSoldes />}
-          {page === 'encaisser' && <EncaisserMise />}
-          {page === 'abonnements' && <Abonnements />}
+          {donnees.statut === 'chargement' && <EcranChargement />}
+
+          {donnees.statut === 'erreur' && (
+            <EcranErreur message={donnees.message} onReessayer={donnees.recharger} />
+          )}
+
+          {donnees.statut === 'ok' && (
+            <>
+              {page === 'tableau' && <TableauDeBord vue={donnees.vue} />}
+              {page === 'collecteurs' && (
+                <Collecteurs
+                  vue={donnees.vue}
+                  onOuvrirCollecteur={(id) => {
+                    setCollecteurOuvert(id);
+                    setPage('detail');
+                  }}
+                />
+              )}
+              {page === 'detail' && (
+                <DetailCollecteur
+                  vue={donnees.vue}
+                  collecteurId={collecteurOuvert}
+                  onRetour={() => setPage('collecteurs')}
+                />
+              )}
+              {page === 'encours' && <EncoursSoldes vue={donnees.vue} />}
+              {page === 'encaisser' && <EncaisserMise />}
+              {page === 'abonnements' && <Abonnements vue={donnees.vue} />}
+            </>
+          )}
         </div>
       </div>
 
@@ -118,6 +151,38 @@ export function Coquille() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Les deux états que la maquette n'avait pas à représenter, puisqu'elle ne
+ * chargeait rien. Ils comptent autant que l'écran garni : une page vide sans
+ * explication se lit comme une panne, et une panne muette se lit comme une page
+ * vide.
+ */
+function EcranChargement() {
+  return (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <p className="font-body text-muted-foreground text-sm" role="status">
+        Chargement des chiffres…
+      </p>
+    </div>
+  );
+}
+
+function EcranErreur({ message, onReessayer }: { message: string; onReessayer: () => void }) {
+  return (
+    <div className="flex-1 flex items-center justify-center p-8">
+      <div className="max-w-md text-center">
+        <h2 className="font-headings font-bold text-xl text-ink mb-2">Chiffres indisponibles</h2>
+        <p role="alert" className="font-body text-muted-foreground text-sm mb-5">
+          {message}
+        </p>
+        <Bouton onClick={onReessayer} icone="history">
+          Réessayer
+        </Bouton>
+      </div>
     </div>
   );
 }

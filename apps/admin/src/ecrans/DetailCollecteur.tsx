@@ -1,50 +1,86 @@
-import { MISES_PAR_CYCLE } from '@kolek/core';
+import { MISES_PAR_CYCLE, formatMontant } from '@kolek/core';
 import {
   Avatar,
   BadgeStatut,
   BarreEmpilee,
   Bouton,
   Carte,
-  CarteCollecte,
   CarteStat,
   EnteteCarte,
   Icone,
-  LienBloc,
   LigneTransaction,
   type Statut,
 } from '@kolek/ui';
 
-/** Écran de démonstration — voir la note de TableauDeBord. */
-const TRANSACTIONS = [
-  { nom: 'Mariam Koné', meta: '14 jan · Mise', montant: '+1 000', type: 'positive' as const },
-  { nom: 'Jean-Luc Bamba', meta: '14 jan · Mise', montant: '+500', type: 'positive' as const },
-  {
-    nom: 'Adja Touré',
-    meta: '13 jan · Restitution',
-    montant: '-31 000',
-    type: 'negative' as const,
-  },
-  { nom: 'Ibrahima Sylla', meta: '13 jan · Mise', montant: '+1 000', type: 'positive' as const },
-  { nom: 'Rokia Doumbia', meta: '12 jan · Mise', montant: '+500', type: 'positive' as const },
-];
+import type { LigneCarte, VueGlobale } from '../donnees';
 
-const CLIENTS: Array<{ nom: string; mise: string; jour: number; statut: Statut }> = [
-  { nom: 'Mariam Koné', mise: '1 000', jour: 18, statut: 'À jour' },
-  { nom: 'Jean-Luc Bamba', mise: '500', jour: 31, statut: 'Clôturée' },
-  { nom: 'Adja Touré', mise: '2 000', jour: 12, statut: 'En retard' },
-  { nom: 'Ibrahima Sylla', mise: '1 000', jour: 24, statut: 'À jour' },
-  { nom: 'Rokia Doumbia', mise: '500', jour: 8, statut: 'En retard' },
-];
+const GRILLE_CLIENTS = 'grid-cols-[1fr_80px_80px_100px]';
 
-const REPARTITION = [
-  { libelle: 'Encaissements', pourcentage: 65, couleur: 'bg-chart-mint', valeur: '31 525' },
-  { libelle: 'Commissions', pourcentage: 20, couleur: 'bg-chart-slate', valeur: '9 700' },
-  { libelle: 'Restitutions', pourcentage: 15, couleur: 'bg-chart-blue', valeur: '7 275' },
-];
+function statutCarte(c: LigneCarte): Statut {
+  if (c.statut === 'cloturee') return 'Clôturée';
+  if (c.mises_encaissees >= MISES_PAR_CYCLE) return 'Versé aujourd’hui';
+  return 'À jour';
+}
 
-const GRILLE_CLIENTS = 'grid-cols-[1fr_80px_80px_100px_80px]';
+export function DetailCollecteur({
+  vue,
+  collecteurId,
+  onRetour,
+}: {
+  vue: VueGlobale;
+  collecteurId: string | null;
+  onRetour: () => void;
+}) {
+  const collecteur = vue.collecteurs.find((c) => c.id === collecteurId);
 
-export function DetailCollecteur({ onRetour }: { onRetour: () => void }) {
+  // Le cas où la fiche est demandée pour un collecteur absent de la vue. Il
+  // arrive pour de vrai : la liste peut avoir été chargée avant une suppression,
+  // ou l'écran rouvert après un rechargement. Une fiche vide serait illisible.
+  if (!collecteur) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="max-w-md text-center">
+          <h2 className="font-headings font-bold text-xl text-ink mb-2">Collecteur introuvable</h2>
+          <p className="font-body text-muted-foreground text-sm mb-5">
+            Cette fiche n’existe plus dans les chiffres chargés.
+          </p>
+          <Bouton onClick={onRetour} icone="arrow-left">
+            Retour à la liste
+          </Bouton>
+        </div>
+      </div>
+    );
+  }
+
+  // Filtrage par identifiant, jamais par nom : rien n'impose l'unicité de
+  // `collecteurs.nom` — seul le téléphone porte une contrainte unique — et deux
+  // homonymes verraient leurs cartes mélangées sur cette fiche.
+  const cartes = vue.cartes.filter((c) => c.collecteur_id === collecteur.id);
+  const mouvements = vue.mouvements.filter((m) => m.collecteur_id === collecteur.id);
+
+  const sommeParts = collecteur.encaisse + collecteur.restitutions;
+  const part = (v: number) => (sommeParts > 0 ? Math.round((v / sommeParts) * 100) : 0);
+  const repartition = [
+    {
+      libelle: 'Encaissements',
+      pourcentage: part(collecteur.encaisse - collecteur.commissions),
+      couleur: 'bg-chart-mint',
+      valeur: formatMontant(collecteur.encaisse - collecteur.commissions),
+    },
+    {
+      libelle: 'Commissions',
+      pourcentage: part(collecteur.commissions),
+      couleur: 'bg-chart-slate',
+      valeur: formatMontant(collecteur.commissions),
+    },
+    {
+      libelle: 'Restitutions',
+      pourcentage: part(collecteur.restitutions),
+      couleur: 'bg-chart-blue',
+      valeur: formatMontant(collecteur.restitutions),
+    },
+  ];
+
   return (
     <>
       {/* Fil d'Ariane et identité. Ce n'est pas `BarreHaute` : la fiche montre
@@ -61,31 +97,40 @@ export function DetailCollecteur({ onRetour }: { onRetour: () => void }) {
             Collecteurs
           </button>
           <Icone nom="chevron-right" taille={13} className="text-muted-foreground" />
-          <span className="text-sm font-body text-ink font-medium">Kouamé Assi</span>
+          <span className="text-sm font-body text-ink font-medium">{collecteur.nom}</span>
         </div>
 
         <div className="flex flex-col items-start gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-center gap-4">
-            <Avatar nom="Kouamé Assi" className="w-16 h-16 flex-shrink-0" />
+            <Avatar nom={collecteur.nom} className="w-16 h-16 flex-shrink-0" />
             <div className="min-w-0">
-              <h1 className="font-headings font-bold text-2xl sm:text-3xl text-ink">Kouamé Assi</h1>
+              <h1 className="font-headings font-bold text-2xl sm:text-3xl text-ink">
+                {collecteur.nom}
+              </h1>
               {/* Zone, téléphone et statut passent à la ligne plutôt que de
                   déborder : sur un téléphone, les trois tenaient sur 520 px. */}
               <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1">
                 <div className="flex items-center gap-1.5">
                   <Icone nom="map-pin" taille={13} className="text-muted-foreground" />
-                  <span className="text-sm font-body text-muted-foreground">Marché Adjamé</span>
+                  <span className="text-sm font-body text-muted-foreground">
+                    {collecteur.zone ?? 'Sans zone'}
+                  </span>
                 </div>
                 <span className="text-sm font-body text-muted-foreground">·</span>
                 <div className="flex items-center gap-1.5">
                   <Icone nom="phone" taille={13} className="text-muted-foreground" />
-                  <span className="text-sm font-body text-muted-foreground">+225 07 08 09 10</span>
+                  <span className="text-sm font-body text-muted-foreground">
+                    {collecteur.telephone}
+                  </span>
                 </div>
-                <BadgeStatut statut="Actif" className="px-2.5 py-0.5 ml-1" />
+                <BadgeStatut
+                  statut={collecteur.abonnement_statut === 'actif' ? 'Actif' : 'Inactif'}
+                  className="px-2.5 py-0.5 ml-1"
+                />
               </div>
             </div>
           </div>
-          {/* Contacter et Modifier attendent l'écriture côté serveur, en J4 :
+          {/* Contacter et Modifier attendent l'écriture côté serveur :
               désactivés avec la raison, pas laissés cliquables dans le vide. */}
           <div className="flex flex-wrap gap-2 mt-1">
             <Bouton variante="contour" icone="message-square" disabled title="Messagerie à venir">
@@ -100,26 +145,31 @@ export function DetailCollecteur({ onRetour }: { onRetour: () => void }) {
 
       <div className="px-4 sm:px-6 lg:px-8 mb-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <CarteStat
-          libelle="Encaissé aujourd’hui"
-          valeur="48 500"
+          libelle="Total encaissé"
+          valeur={formatMontant(collecteur.encaisse)}
           unite="FCFA"
-          tendance="+12 %"
+          precision="depuis l’ouverture"
           icone="trending-up"
         />
-        <CarteStat libelle="Clients actifs" valeur="24" tendance="+2" icone="users" />
         <CarteStat
-          libelle="Commissions du mois"
-          valeur="9 700"
+          libelle="Clients"
+          valeur={String(collecteur.clients)}
+          precision={`${collecteur.cartes_actives} carte${collecteur.cartes_actives > 1 ? 's' : ''} active${collecteur.cartes_actives > 1 ? 's' : ''}`}
+          icone="users"
+        />
+        <CarteStat
+          libelle="Commissions"
+          valeur={formatMontant(collecteur.commissions)}
           unite="FCFA"
-          tendance="+8 %"
+          precision="une par carte ouverte"
           icone="coins"
         />
         <CarteStat
-          libelle="En retard"
-          valeur="2"
-          tendance="+1"
-          tendancePositive={false}
-          icone="alert-circle"
+          libelle="Encours clients"
+          valeur={formatMontant(collecteur.encours)}
+          unite="FCFA"
+          precision="restitutions déduites"
+          icone="wallet"
         />
       </div>
 
@@ -127,92 +177,93 @@ export function DetailCollecteur({ onRetour }: { onRetour: () => void }) {
         <div className="flex flex-col gap-4">
           <Carte className="p-5">
             <BarreEmpilee
-              titre="Répartition — Kouamé Assi"
-              total="48 500"
-              parts={REPARTITION}
+              titre={`Répartition — ${collecteur.nom}`}
+              periode="Depuis l’ouverture"
+              total={formatMontant(sommeParts)}
+              parts={repartition}
             />
           </Carte>
 
           <Carte className="overflow-hidden">
-            <EnteteCarte
-              titre="Clients"
-              action={
-                <div className="flex items-center gap-1 border border-hairline rounded-pill px-3 py-1.5">
-                  <span className="text-sm font-body font-medium text-ink">Tous</span>
-                  <Icone nom="chevron-down" taille={13} className="text-muted-foreground" />
-                </div>
-              }
-            />
+            <EnteteCarte titre="Cartes" />
 
-            {/* Quatre colonnes fixes plus le nom : 340 px incompressibles. En
-                dessous de la largeur minimale, le tableau défile latéralement
-                plutôt que d'écraser les montants. */}
-            <div className="overflow-x-auto">
-            <div className="min-w-[560px]">
-            <div
-              className={`grid ${GRILLE_CLIENTS} px-5 py-2.5 bg-canvas border-b border-hairline text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground`}
-            >
-              <span>Client</span>
-              <span className="text-right">Mise</span>
-              <span className="text-right">Jour</span>
-              <span className="text-right">Statut</span>
-              <span />
-            </div>
-
-            {CLIENTS.map((c, i) => (
-              <div
-                key={c.nom}
-                className={`grid ${GRILLE_CLIENTS} items-center px-5 py-3.5 ${
-                  i < CLIENTS.length - 1 ? 'border-b border-hairline' : ''
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Avatar nom={c.nom} className="w-8 h-8 flex-shrink-0" />
-                  <span className="text-base font-body font-semibold text-ink truncate">
-                    {c.nom}
-                  </span>
-                </div>
-                <span className="text-right text-base font-body font-medium text-ink tabular-nums">
-                  {c.mise}
-                </span>
-                <span className="text-right text-base font-body font-medium text-ink tabular-nums">
-                  {c.jour}/{MISES_PAR_CYCLE}
-                </span>
-                <div className="flex justify-end">
-                  <BadgeStatut statut={c.statut} />
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    disabled
-                    aria-label={`Ouvrir la carte de ${c.nom}`}
-                    title="Fiche de carte à venir"
-                    className="opacity-50 cursor-default"
+            {cartes.length === 0 ? (
+              <p className="px-5 py-6 text-sm font-body text-muted-foreground">
+                Aucune carte ouverte pour ce collecteur.
+              </p>
+            ) : (
+              /* Trois colonnes fixes plus le nom : 260 px incompressibles. En
+                 dessous de la largeur minimale, le tableau défile latéralement
+                 plutôt que d'écraser les montants. */
+              <div className="overflow-x-auto">
+                <div className="min-w-[520px]">
+                  <div
+                    className={`grid ${GRILLE_CLIENTS} px-5 py-2.5 bg-canvas border-b border-hairline text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground`}
                   >
-                    <Icone nom="chevron-right" taille={16} className="text-muted-foreground" />
-                  </button>
+                    <span>Client</span>
+                    <span className="text-right">Mise</span>
+                    <span className="text-right">Jour</span>
+                    <span className="text-right">Statut</span>
+                  </div>
+
+                  {cartes.map((c, i) => (
+                    <div
+                      key={c.id}
+                      className={`grid ${GRILLE_CLIENTS} items-center px-5 py-3.5 ${
+                        i < cartes.length - 1 ? 'border-b border-hairline' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Avatar nom={c.client} className="w-8 h-8 flex-shrink-0" />
+                        <span className="text-base font-body font-semibold text-ink truncate">
+                          {c.client}
+                        </span>
+                      </div>
+                      <span className="text-right text-base font-body font-medium text-ink tabular-nums">
+                        {formatMontant(c.mise)}
+                      </span>
+                      <span className="text-right text-base font-body font-medium text-ink tabular-nums">
+                        {c.mises_encaissees}/{MISES_PAR_CYCLE}
+                      </span>
+                      <div className="flex justify-end">
+                        <BadgeStatut statut={statutCarte(c)} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-            </div>
-            </div>
+            )}
           </Carte>
         </div>
 
         <div className="flex flex-col gap-4">
-          <CarteCollecte
-            nomClient="Mariam Koné"
-            misePar="1 000"
-            jourCourant={18}
-            solde="18 000"
-            cycle="3"
-          />
-
           <Carte className="overflow-hidden">
-            <EnteteCarte titre="Transactions récentes" action={<LienBloc libelle="Voir tout" />} />
-            {TRANSACTIONS.map((t, i) => (
-              <LigneTransaction key={t.nom} {...t} derniere={i === TRANSACTIONS.length - 1} />
-            ))}
+            <EnteteCarte titre="Mouvements récents" />
+            {mouvements.length === 0 ? (
+              <p className="px-5 py-6 text-sm font-body text-muted-foreground">
+                Aucun mouvement récent.
+              </p>
+            ) : (
+              mouvements.map((m, i) => (
+                <LigneTransaction
+                  key={`${m.survenu_le}-${m.client}-${i}`}
+                  nom={m.client}
+                  meta={`${new Date(m.survenu_le).toLocaleDateString('fr-FR', {
+                    day: 'numeric',
+                    month: 'short',
+                  })} · ${m.type === 'restitution' ? 'Restitution' : m.type === 'commission' ? 'Commission' : 'Mise'}`}
+                  montant={`${m.montant >= 0 ? '+' : ''}${formatMontant(m.montant)}`}
+                  type={
+                    m.type === 'restitution'
+                      ? 'negative'
+                      : m.type === 'commission'
+                        ? 'neutre'
+                        : 'positive'
+                  }
+                  derniere={i === mouvements.length - 1}
+                />
+              ))
+            )}
           </Carte>
         </div>
       </div>

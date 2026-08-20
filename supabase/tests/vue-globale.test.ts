@@ -257,3 +257,107 @@ describe('admin_vue_globale — ce qu’elle compte', () => {
     );
   });
 });
+
+describe('admin_vue_globale — le détail par carte', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let carte: any;
+
+  beforeAll(async () => {
+    const { data, error } = await admin.rpc('admin_vue_globale');
+    if (error) throw error;
+    carte = (data as { cartes: Array<{ client: string }> }).cartes.find(
+      (c) => c.client === 'Client A1',
+    );
+  });
+
+  it('11. retranche la commission du solde restituable', () => {
+    // Deux mises de 1 000 encaissées, dont la première est la commission du
+    // collecteur : le client peut récupérer 1 000, pas 2 000. C'est la règle de
+    // `soldeRestituable` dans packages/core, et elle est appliquée côté serveur
+    // pour qu'il n'en existe pas une seconde version en TypeScript.
+    expect(carte).toBeDefined();
+    expect(carte.mises_encaissees).toBe(2);
+    expect(carte.mise).toBe(1000);
+    expect(carte.solde_restituable).toBe(1000);
+  });
+
+  it('12. ne rend jamais un solde négatif sur une carte neuve', async () => {
+    // `(mises_encaissees - 1) * mise` vaut -1 × mise sur une carte sans aucune
+    // mise. Le `greatest(..., 0)` est ce qui l'empêche, et voici ce qui
+    // l'empêche de disparaître.
+    const clientNeuf = crypto.randomUUID();
+    const carteNeuve = crypto.randomUUID();
+    exigerSucces(
+      'client neuf',
+      (await admin
+        .from('clients')
+        .insert({ id: clientNeuf, collecteur_id: b.id, nom: `Neuf ${MARQUE}` })).error,
+    );
+    exigerSucces(
+      'carte neuve',
+      (await admin
+        .from('cartes')
+        .insert({ id: carteNeuve, collecteur_id: b.id, client_id: clientNeuf, mise: 1000 })).error,
+    );
+
+    const { data } = await admin.rpc('admin_vue_globale');
+    const neuve = (data as { cartes: Array<{ id: string; solde_restituable: number }> }).cartes.find(
+      (c) => c.id === carteNeuve,
+    );
+
+    expect(neuve!.solde_restituable).toBe(0);
+  });
+
+  it('13. accompagne la liste bornée de son compte total', () => {
+    // La liste est plafonnée à 500 lignes. Sans ce compte, l'écran ne pourrait
+    // pas dire qu'il n'en montre qu'une partie — il afficherait 500 comme s'il
+    // s'agissait du tout.
+    expect(typeof carte).toBe('object');
+    return admin.rpc('admin_vue_globale').then(({ data }) => {
+      const vue = data as { cartes: unknown[]; cartes_total_lignes: number };
+      expect(vue.cartes_total_lignes).toBeGreaterThanOrEqual(vue.cartes.length);
+      expect(vue.cartes.length).toBeLessThanOrEqual(500);
+    });
+  });
+});
+
+describe('admin_vue_globale — deux collecteurs de même nom', () => {
+  it('14. distingue les homonymes par identifiant, pas par nom', async () => {
+    // `collecteurs.nom` ne porte aucune contrainte d'unicité — seul le téléphone
+    // en a une. Deux Kouamé Assi peuvent donc coexister, et la fiche détaillée
+    // filtre les cartes du collecteur ouvert. Si la vue ne rendait que le nom,
+    // cet écran mélangerait les cartes des deux — et personne ne s'en
+    // apercevrait avant qu'un litige ne porte sur la carte d'un client attribuée
+    // au mauvais collecteur.
+    const nomPartage = `Homonyme ${MARQUE}`;
+    const un = await creerCollecteur(nomPartage, `+225070${(Date.now() + 2) % 10000000}`);
+    const deux = await creerCollecteur(nomPartage, `+225071${(Date.now() + 3) % 10000000}`);
+
+    const clientUn = crypto.randomUUID();
+    const carteUn = crypto.randomUUID();
+    exigerSucces(
+      'client du premier homonyme',
+      (await admin
+        .from('clients')
+        .insert({ id: clientUn, collecteur_id: un.id, nom: `Client de un ${MARQUE}` })).error,
+    );
+    exigerSucces(
+      'carte du premier homonyme',
+      (await admin
+        .from('cartes')
+        .insert({ id: carteUn, collecteur_id: un.id, client_id: clientUn, mise: 1000 })).error,
+    );
+
+    const { data } = await admin.rpc('admin_vue_globale');
+    const cartes = (data as { cartes: Array<{ collecteur_id: string; collecteur: string }> }).cartes;
+
+    const parNom = cartes.filter((c) => c.collecteur === nomPartage);
+    const parIdentifiant = cartes.filter((c) => c.collecteur_id === deux.id);
+
+    // Le nom désigne les deux ; l'identifiant n'en désigne qu'un, et le second
+    // n'a aucune carte.
+    expect(parNom.length).toBe(1);
+    expect(parIdentifiant.length).toBe(0);
+    expect(cartes.find((c) => c.collecteur_id === un.id)).toBeDefined();
+  });
+});

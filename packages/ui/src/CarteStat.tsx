@@ -4,8 +4,23 @@ interface Props {
   libelle: string;
   valeur: string;
   unite?: string;
-  tendance: string;
+  /**
+   * Variation par rapport à la période précédente. **Facultative, et il faut
+   * qu'elle le reste.**
+   *
+   * Une tendance suppose un état passé auquel se comparer. La base ne garde
+   * aucun instantané : ni le chiffre d'affaires d'hier, ni le nombre de
+   * collecteurs de la semaine dernière. Tant qu'aucune table d'historique
+   * n'existe, tout pourcentage affiché ici serait inventé — et un chiffre
+   * inventé sur un tableau de bord de pilotage se croit longtemps.
+   *
+   * Omettre la tendance retire le bandeau. C'est le comportement voulu : mieux
+   * vaut une carte qui ne dit rien de l'évolution qu'une carte qui ment.
+   */
+  tendance?: string;
   tendancePositive?: boolean;
+  /** Précision factuelle sous la valeur, quand une tendance n'est pas calculable. */
+  precision?: string;
   icone: NomIcone;
 }
 
@@ -15,6 +30,7 @@ export function CarteStat({
   unite = '',
   tendance,
   tendancePositive = true,
+  precision,
   icone,
 }: Props) {
   return (
@@ -31,17 +47,21 @@ export function CarteStat({
           <span className="text-xl font-body font-medium text-muted-foreground ml-2">{unite}</span>
         )}
       </div>
-      <div className="flex items-center gap-1.5">
-        <span
-          className={`flex items-center gap-1 px-2 py-0.5 rounded-pill text-xs font-body font-semibold ${
-            tendancePositive ? 'bg-positive-tint text-positive' : 'bg-negative-tint text-negative'
-          }`}
-        >
-          <Icone nom={tendancePositive ? 'arrow-up-right' : 'arrow-down-right'} taille={11} />
-          {tendance}
-        </span>
-        <span className="text-sm text-muted-foreground font-body">vs période précédente</span>
-      </div>
+      {tendance ? (
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-pill text-xs font-body font-semibold ${
+              tendancePositive ? 'bg-positive-tint text-positive' : 'bg-negative-tint text-negative'
+            }`}
+          >
+            <Icone nom={tendancePositive ? 'arrow-up-right' : 'arrow-down-right'} taille={11} />
+            {tendance}
+          </span>
+          <span className="text-sm text-muted-foreground font-body">vs période précédente</span>
+        </div>
+      ) : (
+        <span className="text-sm text-muted-foreground font-body">{precision ?? ' '}</span>
+      )}
     </div>
   );
 }
