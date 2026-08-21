@@ -165,6 +165,56 @@ Ni Netlify ni la construction n'ont rien dit : de leur point de vue tout s'étai
 bien passé. C'est la raison d'être de ce script — un déploiement vert n'est pas
 un déploiement correct.
 
+> ### Panne du 2026-08-20 — sept constructions échouées, et personne pour le dire
+>
+> **Constaté le 2026-08-21**, sur signalement de l'exploitant : « les boutons ne
+> marchent toujours pas ». Ils marchaient — dans le dépôt. Pas en ligne.
+>
+> Mesuré : le paquet servi par `kolek-collecteur` ne contenait **aucune** chaîne
+> des six écrans livrés la veille. Les trois sites publiaient encore le commit
+> `179f86b` du 2026-08-20 à 10 h 57.
+>
+> L'historique des déploiements est sans ambiguïté — et **identique sur les trois
+> sites, commit par commit** :
+>
+> ```
+> 08-21T09:49 error   7f9760a
+> 08-20T22:09 error   0ce54c2
+> 08-20T21:55 error   4dd2b64
+> 08-20T21:37 error   584f979
+> 08-20T21:05 error   5a4397c
+> 08-20T20:52 error   67c1cb2
+> 08-20T15:56 error   67a1b58   ← première de la série
+> 08-20T10:57 ready   179f86b   ← ce que la production sert encore
+> ```
+>
+> Trois sites distincts, trois configurations différentes, exactement les mêmes
+> commits en succès et en échec. Ce n'est donc pas du code applicatif : `site`
+> ne partage avec `collecteur` que `@kolek/ui` et `@kolek/core`.
+>
+> **La cause n'a pas pu être établie d'ici.** Le jeton `NETLIFY_AUTH_TOKEN`
+> disponible est en lecture seule sur les sites : il liste les déploiements, mais
+> `/builds/{id}` et `/accounts` répondent `401 Access Denied`. Or les objets de
+> déploiement ne portent ni `error_message`, ni `log_access_attributes`, et leur
+> `summary` vaut `{"status":"unavailable"}` — l'absence totale de journal, sur
+> trois sites à la fois, oriente vers un blocage de compte (minutes de
+> construction) plutôt que vers une erreur de compilation, qui produirait un
+> journal.
+>
+> **Ce qu'il faut faire, et qui demande le tableau de bord :** ouvrir
+> app.netlify.com → un des trois sites → **Deploys** → cliquer un déploiement en
+> `Failed` → lire le journal. Il nomme la cause en une ligne.
+>
+> **Ce qui a été corrigé ici :** `verifier:en-ligne` ne comparait que la posture
+> de sécurité — en-têtes, CSP, fuites de clés — jamais le contenu. Il concluait
+> « les trois cibles servent ce que le dépôt déclare », phrase que **rien ne
+> mesurait**. Il compare désormais les artefacts servis à ceux du `dist/` local,
+> et l'absence de `dist/` est un échec, pas un saut silencieux.
+>
+> Le principe était pourtant déjà écrit, juste en dessous, depuis le 2026-08-18 :
+> *« une divergence d'empreinte se lit comme une divergence de source »*. Il aura
+> fallu deux jours de production figée pour qu'il devienne un contrôle.
+
 Une observation utile au passage : la construction Netlify du site public a
 produit `index-BEeLuKI6.js`, empreinte identique au bit près à celle du build
 local. Deux machines, deux systèmes, même sortie. Une divergence d'empreinte,

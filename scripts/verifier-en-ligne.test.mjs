@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CIBLES, analyserCsp, assetsDe, hstsSuffisant } from './verifier-en-ligne.mjs';
+import { CIBLES, analyserCsp, assetsDe, comparerAssets, hstsSuffisant } from './verifier-en-ligne.mjs';
 
 // Le script parle au réseau : ce qui est testable ici, ce sont les deux
 // fonctions qui décident si la réponse est conforme. Une CSP mal découpée fait
@@ -82,5 +82,60 @@ describe('assetsDe', () => {
   it('ignore ce qui ne vient pas de /assets', () => {
     const html = '<link rel="icon" href="/icone-192.png"><script src="https://ailleurs.example/x.js">';
     expect(assetsDe(html)).toEqual([]);
+  });
+});
+
+describe('comparerAssets — le contrôle de fraîcheur', () => {
+  // Ajouté le 2026-08-21. Ce script a répondu « conforme » trois fois pendant
+  // que les trois sites servaient une construction vieille de deux jours : six
+  // écrans livrés, aucun en ligne. Rien ne comparait le contenu servi à celui
+  // du dépôt — la phrase finale du script était une affirmation, pas une mesure.
+
+  it('accepte deux listes identiques', () => {
+    const a = ['/assets/index-aaa.js', '/assets/index-bbb.css'];
+    expect(comparerAssets(a, [...a]).identique).toBe(true);
+  });
+
+  it("ne se laisse pas berner par l'ordre", () => {
+    // Vite n'ordonne pas ses balises comme on les lit. Un contrôle sensible à
+    // l'ordre échouerait sur une version parfaitement à jour, et on finirait
+    // par le désactiver.
+    const servis = ['/assets/index-bbb.css', '/assets/index-aaa.js'];
+    const locaux = ['/assets/index-aaa.js', '/assets/index-bbb.css'];
+    expect(comparerAssets(servis, locaux).identique).toBe(true);
+  });
+
+  it('signale une version périmée en nommant les deux empreintes', () => {
+    // Le cas réel du 2026-08-21. Nommer les deux côtés est ce qui permet de
+    // conclure en une lecture : celle du dépôt n'est jamais arrivée.
+    const r = comparerAssets(['/assets/index-VIEUX.js'], ['/assets/index-NEUF.js']);
+
+    expect(r.identique).toBe(false);
+    expect(r.manquants).toEqual(['/assets/index-NEUF.js']);
+    expect(r.inattendus).toEqual(['/assets/index-VIEUX.js']);
+  });
+
+  it('signale un artefact servi que le dépôt ne produit plus', () => {
+    const r = comparerAssets(['/assets/a.js', '/assets/orphelin.js'], ['/assets/a.js']);
+
+    expect(r.identique).toBe(false);
+    expect(r.inattendus).toEqual(['/assets/orphelin.js']);
+    expect(r.manquants).toEqual([]);
+  });
+
+  it('refuse une page servie sans aucun asset', () => {
+    // Une construction ratée qui publie un index vide : le site répond 200 et
+    // n'affiche rien.
+    expect(comparerAssets([], ['/assets/index-a.js']).identique).toBe(false);
+  });
+});
+
+describe('CIBLES', () => {
+  it('déclare un dist local pour chaque cible', () => {
+    // Sans ce chemin, le contrôle de fraîcheur ne peut rien comparer — et un
+    // contrôle qui ne compare rien est un contrôle qui dit toujours oui.
+    for (const cible of CIBLES) {
+      expect(cible.dist).toMatch(/^apps\/[a-z]+\/dist$/);
+    }
   });
 });
