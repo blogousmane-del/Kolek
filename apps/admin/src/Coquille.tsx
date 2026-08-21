@@ -105,7 +105,7 @@ export function Coquille() {
 
           {donnees.statut === 'ok' && (
             <>
-              {page === 'tableau' && <TableauDeBord vue={donnees.vue} />}
+              {page === "tableau" && <TableauDeBord vue={donnees.vue} onNaviguer={setPage} />}
               {page === 'collecteurs' && (
                 <Collecteurs
                   vue={donnees.vue}
@@ -121,6 +121,14 @@ export function Coquille() {
                   vue={donnees.vue}
                   collecteurId={collecteurOuvert}
                   onRetour={() => setPage('collecteurs')}
+                  onModifie={donnees.recharger}
+                  onSupprime={() => {
+                    // Retour à la liste **et** rechargement : la fiche vient de
+                    // disparaître, et rester dessus afficherait « Collecteur
+                    // introuvable » à quelqu'un qui vient de réussir son geste.
+                    setPage('collecteurs');
+                    donnees.recharger();
+                  }}
                 />
               )}
               {page === 'encours' && <EncoursSoldes vue={donnees.vue} />}

@@ -230,3 +230,132 @@ et le module Deno.
 3. **Journaliser `clients` et `collecteurs`.** SQL déjà rédigé.
 4. **Les dix commandes de l'administration** — construire, ou retirer. Les
    laisser éteintes est le choix qu'on vient de juger insuffisant côté collecteur.
+
+---
+
+# Suite du 2026-08-21 — les quatre points, traités
+
+## 1. 🔴 → 🟢 : la suppression se fait maintenant depuis Kolek
+
+Le constat disait « quinze secondes au tableau de bord Supabase, je ne peux pas
+le faire ». C'était vrai, et c'était un mauvais produit : renvoyer l'exploitant
+chez l'éditeur pour réparer un dégât causé ici. Le besoin reviendra, d'ailleurs —
+tout compte créé pour un essai devra être retiré un jour.
+
+`admin-supprimer-collecteur` est en ligne, et la fiche d'un collecteur porte une
+zone de retrait en bas de page. Trois refus y sont écrits :
+
+- **Un compte qui a encaissé ne se supprime pas.** La fonction compte les mises
+  et les retraits avant de tenter quoi que ce soit. La base refuserait de toute
+  façon — `on delete restrict`, *« on ne fait pas disparaître de l'argent
+  encaissé en supprimant un compte »* — mais elle refuserait par une violation de
+  clé étrangère, illisible. Le message dit le nombre : « ce collecteur a 2 mises
+  à son nom ».
+- **On ne se supprime pas soi-même.** Un administrateur est aussi une ligne
+  `collecteurs` ; se retirer fermerait la porte de l'extérieur.
+- **On ne supprime pas un autre administrateur.** La table `admins` est la seule
+  source de ce droit, et son retrait n'a pas à tenir en un clic.
+
+**Le geste pour toi, maintenant :** Collecteurs → ouvrir la fiche du compte de
+sonde → bas de page → Supprimer.
+
+## 2. `CLOTURE_PARTIELLE` — traité le 2026-08-20 au soir
+
+Voir plus haut : le message n'aurait de toute façon jamais pu s'afficher, 207
+étant un succès de transport. Corrigé des deux côtés.
+
+## 3. Le journal des identités
+
+Migration `20260821090000_journal_identites.sql`, appliquée en production.
+
+`clients` et `collecteurs` sont journalisés en `insert or update`, et non en
+`insert` seul comme `mises` : une mise est immuable, donc son insertion dit tout ;
+une identité se corrige, et c'est la correction qu'on veut voir.
+
+Une seconde fonction a été nécessaire, `journaliser_collecteur()` : l'originale
+lit `new.collecteur_id`, colonne que `collecteurs` n'a pas — son identifiant
+**est** le collecteur. La réutiliser aurait levé une erreur à chaque écriture,
+donc rendu impossible la création d'un compte.
+
+**Trouvé au passage :** `cartes` ne journalisait que l'ouverture. La clôture — le
+moment où l'argent sort — ne laissait rien. Le retrait était bien tracé de son
+côté, mais rien ne disait que la carte avait changé d'état. Corrigé.
+
+Pas de `delete` au journal : la suppression passe par la fonction ci-dessus, qui
+refuse tout compte ayant manié de l'argent, et un `after delete` échouerait de
+toute façon puisque le journal référence `collecteur_id`.
+
+Huit tests.
+
+## 4. Les commandes inertes — et huit de plus que je n'avais pas vues
+
+**Le balayage initial était incomplet.** Il cherchait `disponible: false` et les
+`<button>` sans `onClick`. Il a manqué un cas que ni l'un ni l'autre ne révèle :
+
+> `<ActionsRapides compact />` — sans propriété `actions`.
+
+Le composant retombait sur une liste par défaut de **huit actions sans
+gestionnaire**, celles de l'application collecteur. Le tableau de bord
+d'administration affichait donc huit pastilles mortes portant les libellés d'une
+autre application, et **rien dans son code ne le laissait deviner** : la liste
+vivait dans le paquet d'interface.
+
+C'est exactement ce qu'une valeur par défaut silencieuse produit — un composant
+qui a l'air correct partout et faux à un endroit. La propriété `actions` est
+désormais **obligatoire**, et `ACTIONS_PAR_DEFAUT` n'est plus exporté. Le défaut
+ne peut plus se reproduire sans casser la compilation.
+
+### Ce qui a été construit pour de vrai
+
+| Commande | Devenue |
+|---|---|
+| Rechercher (Collecteurs) | recherche sur nom, téléphone et zone, plus trois filtres d'abonnement |
+| Exporter (Collecteurs) | CSV de **ce qui est affiché**, filtre compris |
+| Exporter (Abonnements) | CSV des abonnements avec le prix de la grille |
+| Accès rapide (Tableau de bord) | quatre destinations réelles au lieu de huit promesses |
+| Modifier (fiche collecteur) | nom, téléphone, zone, palier, statut d'abonnement |
+| *(nouveau)* Supprimer | voir le point 1 |
+
+L'export porte trois décisions qui décident s'il s'ouvre correctement à Abidjan :
+point-virgule et non virgule (Excel francophone), BOM UTF-8 sans laquelle
+« Adjamé » devient « AdjamÃ© », et montants en nombres bruts — `2 000 FCFA` est du
+texte pour un tableur, `2000` est un nombre. Onze tests, dont celui du décalage
+de colonnes qu'un nom de marché contenant un point-virgule provoquerait sur une
+seule ligne, la plus difficile à voir.
+
+### Ce qui a été retiré plutôt que construit
+
+Rechercher et Calendrier du tableau de bord — il n'y a pas de liste à chercher ni
+de rendez-vous en base. Créer un rapport — l'export vit dans les écrans qui ont
+des lignes. Nouvel abonnement — un abonnement n'existe pas seul, il est porté par
+la ligne `collecteurs`. Contacter — aucune messagerie n'existe et rien n'en
+prévoit ; le téléphone est affiché juste au-dessus. Transactions et Zones &
+Marchés de la barre latérale — leur contenu est déjà ailleurs.
+
+Et **Retirer** sur le tableau de bord : le retrait existe désormais, mais côté
+collecteur, et c'est définitif. Le cahier §11 pose que l'argent est manié par le
+collecteur ; un retrait déclenché depuis un bureau GTCS n'aurait pas d'espèces en
+face et fausserait son rapprochement de caisse. Ce bouton n'attendait pas son
+tour — il ne devait pas exister ici.
+
+## Deux de mes propres messages promettaient un écran inexistant
+
+`COMPLEMENT_INCOMPLET` disait « corrige-les depuis sa fiche ». Le refus de
+suppression disait « suspends son abonnement à la place ». Aucun des deux gestes
+n'était possible.
+
+C'est la même faute que celles déjà consignées, sous une autre forme : **écrire
+une phrase sans parcourir le chemin qu'elle décrit.** Les deux écrans existent
+maintenant.
+
+## État après cette passe
+
+| Mesure | Valeur |
+|---|---|
+| Fonctions Edge déployées | 5, toutes en `verify_jwt` |
+| Commandes inertes, applications collecteur et admin | 0 |
+| Migrations dépôt = production | 12 sur 12 |
+| Tests | **262** — 157 base, 83 applications, 22 scripts |
+
+Les cinq fonctions refusent un appel sans jeton (401), refusent un jeton anonyme
+(403), et ne rendent aucun en-tête CORS à une origine étrangère. Mesuré ce matin.

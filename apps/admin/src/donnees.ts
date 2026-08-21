@@ -280,3 +280,134 @@ export async function creerCollecteur(
       : undefined,
   };
 }
+
+// --- Suppression d'un collecteur ---
+
+const MESSAGES_SUPPRESSION: Record<string, string> = {
+  ACCES_RESERVE: "Ce compte n'est pas un compte d'administration GTCS.",
+  VERIFICATION_IMPOSSIBLE: "Impossible de v\u00e9rifier les droits d'acc\u00e8s.",
+  COLLECTEUR_INTROUVABLE: 'Ce collecteur n\u2019existe plus.',
+  SUPPRESSION_DE_SOI: 'Tu ne peux pas supprimer ton propre compte depuis cet \u00e9cran.',
+  CIBLE_ADMINISTRATEUR:
+    'Ce compte est un compte d\u2019administration. Son retrait se fait dans Supabase, pas ici.',
+  SUPPRESSION_IMPOSSIBLE: 'Suppression impossible. R\u00e9essaie.',
+  CORPS_ILLISIBLE: 'Requ\u00eate mal form\u00e9e.',
+};
+
+/**
+ * Supprime un compte collecteur, et refuse de le faire s'il a mani\u00e9 de l'argent.
+ *
+ * La base refuserait de toute fa\u00e7on : `mises` et `retraits` r\u00e9f\u00e9rencent le
+ * collecteur en `on delete restrict`, parce qu'on ne fait pas dispara\u00eetre de
+ * l'argent encaiss\u00e9 en supprimant un compte. Ce que la fonction ajoute, c'est de
+ * dire *pourquoi* avec un nombre, au lieu de laisser remonter une violation de
+ * cl\u00e9 \u00e9trang\u00e8re que personne ne sait lire.
+ */
+export async function supprimerCollecteur(
+  collecteurId: string,
+): Promise<{ ok: true; nom: string; clientsSupprimes: number } | { ok: false; message: string }> {
+  const { data, error } = await supabase.functions.invoke('admin-supprimer-collecteur', {
+    body: { collecteurId },
+  });
+
+  if (error) {
+    let code: string | undefined;
+    let mises = 0;
+    let retraits = 0;
+    try {
+      const contexte = (error as { context?: Response }).context;
+      if (contexte && typeof contexte.json === 'function') {
+        const corps = (await contexte.json()) as {
+          erreur?: string;
+          mises?: number;
+          retraits?: number;
+        };
+        code = corps.erreur;
+        mises = corps.mises ?? 0;
+        retraits = corps.retraits ?? 0;
+      }
+    } catch {
+      // Corps illisible : le message générique reste juste.
+    }
+
+    if (code === 'COMPTE_A_ENCAISSE') {
+      // Le refus le plus important de cet écran, donc celui qui mérite un
+      // chiffre : « 2 mises » se vérifie, « ce compte a de l'activité » ne se
+      // vérifie pas.
+      const parts: string[] = [];
+      if (mises > 0) parts.push(`${mises} mise${mises > 1 ? 's' : ''}`);
+      if (retraits > 0) parts.push(`${retraits} retrait${retraits > 1 ? 's' : ''}`);
+      return {
+        ok: false,
+        message: `Ce collecteur a ${parts.join(' et ')} \u00e0 son nom. Un compte qui a mani\u00e9 de l\u2019argent ne se supprime pas : le journal doit rester lisible. Suspends son abonnement \u00e0 la place.`,
+      };
+    }
+
+    return {
+      ok: false,
+      message: code ? (MESSAGES_SUPPRESSION[code] ?? code) : error.message,
+    };
+  }
+
+  const corps = data as { nom: string; clientsSupprimes: number };
+  return { ok: true, nom: corps.nom, clientsSupprimes: corps.clientsSupprimes };
+}
+
+// --- Modification d'un collecteur ---
+
+export interface ModificationCollecteur {
+  nom?: string;
+  telephone?: string;
+  zone?: string;
+  palier?: string;
+  abonnementStatut?: string;
+}
+
+const MESSAGES_MODIFICATION: Record<string, string> = {
+  NOM_REQUIS: 'Le nom du collecteur est obligatoire.',
+  NOM_TROP_LONG: 'Le nom dépasse 120 caractères.',
+  TELEPHONE_REQUIS: 'Le téléphone est obligatoire.',
+  TELEPHONE_TROP_LONG: 'Le téléphone dépasse 64 caractères.',
+  TELEPHONE_DEJA_PRIS: 'Un autre collecteur porte déjà ce numéro.',
+  ZONE_TROP_LONGUE: 'La zone dépasse 80 caractères.',
+  PALIER_INCONNU: 'Ce palier ne figure pas dans la grille tarifaire.',
+  STATUT_INCONNU: 'Statut d\u2019abonnement inconnu.',
+  RIEN_A_MODIFIER: 'Aucun changement à enregistrer.',
+  COLLECTEUR_INTROUVABLE: 'Ce collecteur n\u2019existe plus.',
+  ACCES_RESERVE: "Ce compte n'est pas un compte d'administration GTCS.",
+  VERIFICATION_IMPOSSIBLE: "Impossible de vérifier les droits d'accès.",
+  BORNE: 'Une des valeurs saisies dépasse la limite autorisée.',
+  MODIFICATION_IMPOSSIBLE: 'Modification impossible. Réessaie.',
+  CORPS_ILLISIBLE: 'Requête mal formée.',
+};
+
+/**
+ * Modifie la fiche d'un collecteur.
+ *
+ * Seuls les champs présents dans `changements` sont envoyes, et la fonction ne
+ * touche qu'à ceux-là : un `update` complet effacerait la zone d'un collecteur
+ * parce que le formulaire ne l'a pas rechargée.
+ */
+export async function modifierCollecteur(
+  collecteurId: string,
+  changements: ModificationCollecteur,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { error } = await supabase.functions.invoke('admin-modifier-collecteur', {
+    body: { collecteurId, ...changements },
+  });
+
+  if (error) {
+    let code: string | undefined;
+    try {
+      const contexte = (error as { context?: Response }).context;
+      if (contexte && typeof contexte.json === 'function') {
+        code = ((await contexte.json()) as { erreur?: string }).erreur;
+      }
+    } catch {
+      // Corps illisible : le message générique reste juste.
+    }
+    return { ok: false, message: code ? (MESSAGES_MODIFICATION[code] ?? code) : error.message };
+  }
+
+  return { ok: true };
+}

@@ -4,8 +4,6 @@ export type CleNavAdmin =
   | 'tableau'
   | 'collecteurs'
   | 'encours'
-  | 'transactions'
-  | 'zones'
   | 'encaisser'
   | 'abonnements';
 
@@ -23,8 +21,12 @@ const PILOTAGE: Entree[] = [
   { cle: 'collecteurs', icone: 'users', libelle: 'Collecteurs', disponible: true },
   { cle: 'encours', icone: 'wallet', libelle: 'Encours & Soldes', disponible: true },
   { cle: 'encaisser', icone: 'circle-dollar-sign', libelle: 'Encaisser', disponible: true },
-  { cle: 'transactions', icone: 'receipt', libelle: 'Transactions', disponible: false },
-  { cle: 'zones', icone: 'map-pin', libelle: 'Zones & Marchés', disponible: false },
+  // « Transactions » et « Zones & Marchés » ont été retirées le 2026-08-21.
+  // Elles n'étaient pas en attente d'être construites : leur contenu existe
+  // déjà ailleurs — les mouvements sur le tableau de bord, les zones dans
+  // l'écran Collecteurs. Deux entrées grises promettaient donc des destinations
+  // qui n'ont pas lieu d'exister, et un menu qui promet ce qu'il ne tiendra
+  // jamais est pire qu'un menu court.
 ];
 
 /** La monétisation est le métier de GTCS, pas celui d'un collecteur : elle a sa

@@ -2,6 +2,7 @@ import { PALIERS, formatMontant } from '@kolek/core';
 import { Avatar, BadgeStatut, BarreHaute, Carte, Icone } from '@kolek/ui';
 
 import type { LigneCollecteur, VueGlobale } from '../donnees';
+import { dateDuJour, telechargerCsv, versCsv } from '../exporter';
 
 /**
  * Gestion des abonnements.
@@ -128,14 +129,45 @@ export function Abonnements({ vue }: { vue: VueGlobale }) {
     },
   ];
 
+  function exporter() {
+    // Le fichier que GTCS ouvre pour préparer ses relances : qui paie combien,
+    // et quand ça tombe. Le prix vient de la grille tarifaire, pas de la base —
+    // `collecteurs` ne stocke que le palier, et c'est bien ainsi : un tarif qui
+    // change ne doit pas réécrire des milliers de lignes.
+    telechargerCsv(
+      `kolek-abonnements-${dateDuJour()}.csv`,
+      versCsv(
+        ['Collecteur', 'Téléphone', 'Zone', 'Palier', 'Prix mensuel', 'Statut', 'Échéance', 'Clients'],
+        vue.collecteurs.map((c: LigneCollecteur) => [
+          c.nom,
+          c.telephone,
+          c.zone ?? '',
+          c.palier,
+          PALIERS.find((p) => p.cle === c.palier)?.prix ?? '',
+          c.abonnement_statut,
+          c.abonnement_echeance,
+          c.clients,
+        ]),
+      ),
+    );
+  }
+
   return (
     <>
       <BarreHaute
         filAriane={['Accueil', 'Abonnements']}
         titre="Gestion des abonnements"
+        // « Nouvel abonnement » a été retiré : un abonnement n'existe pas seul,
+        // il est porté par la ligne `collecteurs`. On en crée un en créant un
+        // collecteur, et on le change en changeant son palier. Un bouton distinct
+        // laissait croire à un objet séparé qui n'existe pas dans le schéma.
         actions={[
-          { icone: 'download', libelle: 'Exporter', disponible: false },
-          { icone: 'plus', libelle: 'Nouvel abonnement', principale: true, disponible: false },
+          {
+            icone: 'download',
+            libelle: 'Exporter',
+            onActiver: exporter,
+            disponible: vue.collecteurs.length > 0,
+          },
         ]}
       />
 

@@ -1,4 +1,4 @@
-export { ActionsRapides, ACTIONS_PAR_DEFAUT, type ActionRapide } from './ActionsRapides';
+export { ActionsRapides, type ActionRapide } from './ActionsRapides';
 export { Avatar, fondPour, initiales } from './Avatar';
 export { BadgeStatut, type Statut } from './BadgeStatut';
 export { BandeauHorsLigne, BandeauOffre, useEnLigne } from './Bandeaux';

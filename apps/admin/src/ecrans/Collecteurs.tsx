@@ -11,6 +11,7 @@ import {
 import { useState } from 'react';
 
 import type { LigneCollecteur as Ligne, VueGlobale } from '../donnees';
+import { dateDuJour, telechargerCsv, versCsv } from '../exporter';
 import { FormulaireCollecteur } from './FormulaireCollecteur';
 
 /** Somme des colonnes fixes de `LigneCollecteur` plus la gouttière : en dessous,
@@ -34,6 +35,16 @@ function statutDe(c: Ligne): Statut {
   return 'À jour';
 }
 
+/** Les filtres proposés. Ils portent sur l'abonnement, seul état que la base
+    connaisse — voir la note sur « En synchro » plus haut. */
+const FILTRES = [
+  { cle: 'tous', libelle: 'Tous' },
+  { cle: 'actifs', libelle: 'À jour' },
+  { cle: 'defaut', libelle: 'En défaut' },
+] as const;
+
+type Filtre = (typeof FILTRES)[number]['cle'];
+
 export function Collecteurs({
   vue,
   onOuvrirCollecteur,
@@ -44,11 +55,70 @@ export function Collecteurs({
   onCollecteurCree: () => void;
 }) {
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);
+  const [recherche, setRecherche] = useState('');
+  const [filtre, setFiltre] = useState<Filtre>('tous');
+  const [outilsOuverts, setOutilsOuverts] = useState(false);
   const { collecteurs, zones, abonnements, totaux } = vue;
 
   const enRetard = collecteurs.filter((c) => c.abonnement_statut !== 'actif').length;
   const zonesTriees = [...zones].sort((a, b) => b.encaisse - a.encaisse);
   const zoneMax = zonesTriees[0]?.encaisse ?? 0;
+
+  // Recherche et filtre en mémoire, sans aller-retour serveur : la vue globale
+  // est déjà entièrement chargée, et le nombre de collecteurs est borné par le
+  // modèle d'affaires — ce sont des comptes payants créés à la main par GTCS.
+  const terme = recherche.trim().toLowerCase();
+  const listeFiltree = collecteurs.filter((c) => {
+    if (filtre === 'actifs' && c.abonnement_statut !== 'actif') return false;
+    if (filtre === 'defaut' && c.abonnement_statut === 'actif') return false;
+    if (!terme) return true;
+    return (
+      c.nom.toLowerCase().includes(terme) ||
+      c.telephone.toLowerCase().includes(terme) ||
+      (c.zone ?? '').toLowerCase().includes(terme)
+    );
+  });
+
+  function exporter() {
+    // On exporte **ce qui est affiché**, pas la table entière. Un export qui
+    // ignorerait le filtre en cours produirait un fichier que l'administrateur
+    // croirait filtré.
+    telechargerCsv(
+      `kolek-collecteurs-${dateDuJour()}.csv`,
+      versCsv(
+        [
+          'Nom',
+          'Téléphone',
+          'Zone',
+          'Palier',
+          'Statut abonnement',
+          'Échéance',
+          'Inscrit le',
+          'Clients',
+          'Cartes actives',
+          'Encaissé',
+          'Commissions',
+          'Restitutions',
+          'Encours client',
+        ],
+        listeFiltree.map((c) => [
+          c.nom,
+          c.telephone,
+          c.zone ?? '',
+          c.palier,
+          c.abonnement_statut,
+          c.abonnement_echeance,
+          c.cree_le.slice(0, 10),
+          c.clients,
+          c.cartes_actives,
+          c.encaisse,
+          c.commissions,
+          c.restitutions,
+          c.encours,
+        ]),
+      ),
+    );
+  }
 
   return (
     <>
@@ -56,9 +126,17 @@ export function Collecteurs({
         filAriane={['Accueil', 'Collecteurs']}
         titre="Collecteurs & Zones"
         actions={[
-          { icone: 'search', libelle: 'Rechercher', disponible: false },
-          { icone: 'sliders-horizontal', libelle: 'Filtrer', disponible: false },
-          { icone: 'download', libelle: 'Exporter', disponible: false },
+          {
+            icone: 'search',
+            libelle: outilsOuverts ? 'Masquer la recherche' : 'Rechercher',
+            onActiver: () => setOutilsOuverts((o) => !o),
+          },
+          {
+            icone: 'download',
+            libelle: 'Exporter',
+            onActiver: exporter,
+            disponible: listeFiltree.length > 0,
+          },
           {
             icone: 'plus',
             libelle: 'Ajouter un collecteur',
@@ -133,14 +211,49 @@ export function Collecteurs({
           <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-hairline">
             <h2 className="font-headings font-bold text-xl text-ink">Tous les collecteurs</h2>
             <span className="text-sm font-body text-muted-foreground tabular-nums">
-              {collecteurs.length} inscrit{collecteurs.length > 1 ? 's' : ''}
+              {listeFiltree.length === collecteurs.length
+                ? `${collecteurs.length} inscrit${collecteurs.length > 1 ? 's' : ''}`
+                : `${listeFiltree.length} sur ${collecteurs.length}`}
             </span>
           </div>
+
+          {outilsOuverts && (
+            <div className="px-4 sm:px-6 py-3 border-b border-hairline bg-canvas flex flex-wrap items-center gap-3">
+              <input
+                type="search"
+                value={recherche}
+                onChange={(e) => setRecherche(e.target.value)}
+                placeholder="Nom, téléphone ou zone"
+                aria-label="Rechercher un collecteur"
+                className="flex-1 min-w-50 h-11 px-3 rounded-md border border-input bg-surface font-body text-sm text-ink"
+              />
+              <div className="flex gap-1.5">
+                {FILTRES.map((f) => (
+                  <button
+                    key={f.cle}
+                    type="button"
+                    onClick={() => setFiltre(f.cle)}
+                    className={`px-3 h-11 rounded-md font-body text-sm font-medium cursor-pointer border ${
+                      filtre === f.cle
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-surface text-ink border-hairline'
+                    }`}
+                  >
+                    {f.libelle}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {collecteurs.length === 0 ? (
             <p className="px-4 sm:px-6 py-8 text-sm font-body text-muted-foreground">
               Aucun collecteur inscrit. Les comptes sont créés par GTCS —
               l’inscription publique est fermée.
+            </p>
+          ) : listeFiltree.length === 0 ? (
+            <p className="px-4 sm:px-6 py-8 text-sm font-body text-muted-foreground">
+              Aucun collecteur ne correspond. Vide la recherche ou repasse sur « Tous ».
             </p>
           ) : (
             /* `overflow-x-auto` et largeur minimale, comme dans EncoursSoldes :
@@ -167,7 +280,7 @@ export function Collecteurs({
                   <div className="w-10" />
                 </div>
 
-                {collecteurs.map((c, i) => (
+                {listeFiltree.map((c, i) => (
                   <LigneCollecteur
                     key={c.id}
                     nom={c.nom}

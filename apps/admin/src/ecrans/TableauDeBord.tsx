@@ -3,12 +3,11 @@ import {
   ActionsRapides,
   BarreEmpilee,
   BarreHaute,
-  Bouton,
   Carte,
   CarteStat,
   EnteteCarte,
-  Icone,
   LigneTransaction,
+  type CleNavAdmin,
 } from '@kolek/ui';
 
 import type { Mouvement, VueGlobale } from '../donnees';
@@ -42,7 +41,13 @@ function typeLigne(m: Mouvement): 'positive' | 'negative' | 'neutre' {
   return 'positive';
 }
 
-export function TableauDeBord({ vue }: { vue: VueGlobale }) {
+export function TableauDeBord({
+  vue,
+  onNaviguer,
+}: {
+  vue: VueGlobale;
+  onNaviguer: (cle: CleNavAdmin) => void;
+}) {
   const { totaux, abonnements, zones, mouvements } = vue;
 
   // Les trois parts de la répartition. Les pourcentages se déduisent du total
@@ -81,11 +86,13 @@ export function TableauDeBord({ vue }: { vue: VueGlobale }) {
       <BarreHaute
         filAriane={['Accueil', 'Tableau de bord']}
         titre="Tableau de bord"
-        actions={[
-          { icone: 'search', libelle: 'Rechercher', disponible: false },
-          { icone: 'calendar', libelle: 'Calendrier', disponible: false },
-          { icone: 'plus', libelle: 'Créer un rapport', principale: true, disponible: false },
-        ]}
+        // Trois actions grises ont été retirées le 2026-08-21 : Rechercher —
+        // cet écran n'affiche aucune liste à chercher, la recherche vit dans
+        // « Collecteurs » ; Calendrier — rien dans la base ne porte de rendez-vous ;
+        // Créer un rapport — l'export existe, dans les écrans qui ont des lignes
+        // à exporter. Aucune n'était en attente de construction : elles
+        // promettaient des choses qui n'ont pas lieu d'exister ici.
+        actions={[]}
       />
 
       <div className="px-4 sm:px-6 lg:px-8 pb-8 flex-1">
@@ -145,40 +152,62 @@ export function TableauDeBord({ vue }: { vue: VueGlobale }) {
                 {totaux.mises} mises · {totaux.cartes_actives} cartes actives · {totaux.clients}{' '}
                 clients
               </p>
-              {/* Retrait et historique passent par des Edge Functions qui
-                  n'existent pas encore : désactivés, avec la raison en
-                  infobulle. Un bouton actif qui ne fait rien est un bug ; un
-                  bouton éteint qui dit pourquoi est une information. */}
-              <div className="flex flex-wrap gap-2">
-                <Bouton icone="arrow-up-right" className="flex-1" disabled title="Retrait à venir">
-                  Retirer
-                </Bouton>
-                <Bouton
-                  variante="contour"
-                  icone="history"
-                  className="flex-1"
-                  disabled
-                  title="Historique à venir"
-                >
-                  Historique
-                </Bouton>
-                <button
-                  type="button"
-                  disabled
-                  aria-label="Autres actions"
-                  title="À venir"
-                  className="w-11 h-11 rounded-pill border border-hairline flex items-center justify-center opacity-50 cursor-default"
-                >
-                  <Icone nom="more-horizontal" taille={16} className="text-muted-foreground" />
-                </button>
-              </div>
+              {/* « Retirer », « Historique » et la pastille « Autres actions »
+                  ont été retirés le 2026-08-21.
+
+                  Le retrait existe désormais — mais côté collecteur, et c'est
+                  définitif : le cahier §11 pose que l'argent est manié par le
+                  collecteur, et la politique RLS de `retraits` le suit. Un
+                  retrait déclenché depuis un bureau GTCS n'aurait pas d'espèces
+                  en face, et fausserait le rapprochement de caisse du collecteur
+                  sans que personne comprenne pourquoi. Le bouton ne dormait donc
+                  pas en attendant son tour ; il ne devait pas exister ici.
+
+                  L'historique, lui, est déjà là : c'est la liste des mouvements,
+                  colonne de droite. */}
+              <p className="font-body text-sm text-muted-foreground">
+                Les mouvements récents figurent dans le volet de droite. Les
+                encaissements et les retraits se font sur le téléphone du
+                collecteur.
+              </p>
             </Carte>
 
             <Carte className="p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-headings font-bold text-lg text-ink">Accès rapide</h3>
               </div>
-              <ActionsRapides compact />
+              {/* `ActionsRapides` sans propriété `actions` retombait sur ses huit
+                  actions par défaut — celles de l'application collecteur, aucune
+                  ne portant de gestionnaire. Huit pastilles mortes sur le
+                  tableau de bord, et le défaut était invisible depuis ce fichier
+                  puisque la liste vit dans le paquet d'interface.
+
+                  Quatre destinations réelles valent mieux que huit promesses. */}
+              <ActionsRapides
+                compact
+                actions={[
+                  {
+                    icone: 'users',
+                    libelle: 'Collecteurs',
+                    onActiver: () => onNaviguer('collecteurs'),
+                  },
+                  {
+                    icone: 'wallet',
+                    libelle: 'Encours',
+                    onActiver: () => onNaviguer('encours'),
+                  },
+                  {
+                    icone: 'credit-card',
+                    libelle: 'Abonnements',
+                    onActiver: () => onNaviguer('abonnements'),
+                  },
+                  {
+                    icone: 'user-plus',
+                    libelle: 'Ajouter',
+                    onActiver: () => onNaviguer('collecteurs'),
+                  },
+                ]}
+              />
             </Carte>
           </div>
 

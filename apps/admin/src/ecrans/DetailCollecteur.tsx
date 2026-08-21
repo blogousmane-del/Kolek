@@ -11,8 +11,11 @@ import {
   LigneTransaction,
   type Statut,
 } from '@kolek/ui';
+import { useState } from 'react';
 
 import type { LigneCarte, VueGlobale } from '../donnees';
+import { supprimerCollecteur } from '../donnees';
+import { FicheModifiable } from './FicheModifiable';
 
 const GRILLE_CLIENTS = 'grid-cols-[1fr_80px_80px_100px]';
 
@@ -26,11 +29,19 @@ export function DetailCollecteur({
   vue,
   collecteurId,
   onRetour,
+  onSupprime,
+  onModifie,
 }: {
   vue: VueGlobale;
   collecteurId: string | null;
   onRetour: () => void;
+  onSupprime: () => void;
+  onModifie: () => void;
 }) {
+  const [confirmation, setConfirmation] = useState(false);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [edition, setEdition] = useState(false);
   const collecteur = vue.collecteurs.find((c) => c.id === collecteurId);
 
   // Le cas où la fiche est demandée pour un collecteur absent de la vue. Il
@@ -130,18 +141,46 @@ export function DetailCollecteur({
               </div>
             </div>
           </div>
-          {/* Contacter et Modifier attendent l'écriture côté serveur :
-              désactivés avec la raison, pas laissés cliquables dans le vide. */}
+          {/* « Contacter » a été retiré le 2026-08-21 : aucune messagerie
+              n'existe, et rien dans le produit n'en prévoit. Le téléphone du
+              collecteur est affiché juste au-dessus — c'est par là qu'on le
+              joint, comme partout ailleurs sur ce marché.
+
+              « Modifier » écrit désormais. Deux messages de l'administration le
+              promettaient déjà sans qu'aucun écran ne le rende possible :
+              `COMPLEMENT_INCOMPLET` renvoie « corrige-les depuis sa fiche », et
+              le refus de supprimer un compte actif dit « suspends son abonnement
+              à la place ». */}
           <div className="flex flex-wrap gap-2 mt-1">
-            <Bouton variante="contour" icone="message-square" disabled title="Messagerie à venir">
-              Contacter
-            </Bouton>
-            <Bouton icone="edit" disabled title="Modification à venir">
-              Modifier
+            <Bouton
+              icone="edit"
+              onClick={() => {
+                setErreur(null);
+                setEdition((e) => !e);
+              }}
+            >
+              {edition ? 'Fermer' : 'Modifier'}
             </Bouton>
           </div>
         </div>
       </div>
+
+      {edition && (
+        <div className="px-4 sm:px-6 lg:px-8 mb-4">
+          <FicheModifiable
+            collecteur={collecteur}
+            onAnnuler={() => setEdition(false)}
+            onEnregistre={() => {
+              setEdition(false);
+              // Rechargement plutôt que mise à jour locale : la vue globale est
+              // recalculée côté serveur, et un palier changé déplace le MRR de
+              // tous les écrans. Les laisser diverger produirait deux chiffres
+              // contradictoires dans la même session.
+              onModifie();
+            }}
+          />
+        </div>
+      )}
 
       <div className="px-4 sm:px-6 lg:px-8 mb-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <CarteStat
@@ -263,6 +302,76 @@ export function DetailCollecteur({
                   derniere={i === mouvements.length - 1}
                 />
               ))
+            )}
+          </Carte>
+
+          {/* Zone de retrait du compte. En bas de fiche, après tout le reste :
+              c'est le seul geste irréversible de l'administration, il n'a rien à
+              faire dans une barre d'actions où le pouce passe par accident. */}
+          <Carte className="p-5 border-negative">
+            <div className="flex items-start gap-3 mb-3">
+              <Icone nom="alert-circle" taille={20} className="text-negative mt-0.5" />
+              <div>
+                <h3 className="font-headings font-bold text-lg text-ink">Supprimer ce compte</h3>
+                <p className="font-body text-sm text-muted-foreground mt-1">
+                  Le compte d’accès, ses clients et leurs cartes disparaissent. Un collecteur qui a
+                  encaissé ne peut pas être supprimé — le journal doit rester lisible. Dans ce cas,
+                  suspends son abonnement.
+                </p>
+              </div>
+            </div>
+
+            {erreur && (
+              <p
+                role="alert"
+                className="bg-negative-tint text-negative text-sm font-body p-3 rounded-md mb-3"
+              >
+                {erreur}
+              </p>
+            )}
+
+            {!confirmation ? (
+              <Bouton
+                variante="contour"
+                onClick={() => {
+                  setErreur(null);
+                  setConfirmation(true);
+                }}
+              >
+                Supprimer le compte
+              </Bouton>
+            ) : (
+              <div className="space-y-3">
+                <p className="font-body text-sm text-ink bg-negative-tint rounded-md p-3">
+                  Supprimer définitivement <strong>{collecteur.nom}</strong>
+                  {collecteur.clients > 0 &&
+                    ` et ses ${collecteur.clients} client${collecteur.clients > 1 ? 's' : ''}`}{' '}
+                  ? Cette action ne se défait pas.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Bouton
+                    onClick={async () => {
+                      if (envoi) return;
+                      setEnvoi(true);
+                      setErreur(null);
+                      const resultat = await supprimerCollecteur(collecteur.id);
+                      setEnvoi(false);
+                      if (!resultat.ok) {
+                        setErreur(resultat.message);
+                        setConfirmation(false);
+                        return;
+                      }
+                      onSupprime();
+                    }}
+                    disabled={envoi}
+                  >
+                    {envoi ? 'Suppression…' : 'Oui, supprimer'}
+                  </Bouton>
+                  <Bouton variante="contour" onClick={() => setConfirmation(false)}>
+                    Annuler
+                  </Bouton>
+                </div>
+              </div>
             )}
           </Carte>
         </div>
