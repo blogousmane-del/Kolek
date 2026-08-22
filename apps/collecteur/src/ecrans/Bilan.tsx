@@ -1,8 +1,8 @@
 import { formatMontant } from '@kolek/core';
 import { Carte } from '@kolek/ui';
-import { useEffect, useState } from 'react';
 
-import { chargerBilan, type Bilan as DonneesBilan } from '../lectures-ecrans';
+import { useDonnees } from '../cache';
+import { chargerBilan } from '../lectures-ecrans';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 
 /**
@@ -17,24 +17,11 @@ import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
  * au collecteur. Les confondre est l'erreur qui fait qu'on dépense l'épargne de
  * ses clients sans s'en rendre compte.
  */
-export function Bilan({ onRetour }: { onRetour: () => void }) {
-  const [donnees, setDonnees] = useState<DonneesBilan | null>(null);
-  const [erreur, setErreur] = useState<string | null>(null);
-
-  useEffect(() => {
-    let vivant = true;
-    void (async () => {
-      try {
-        const b = await chargerBilan();
-        if (vivant) setDonnees(b);
-      } catch {
-        if (vivant) setErreur('Chiffres indisponibles. Vérifie le réseau.');
-      }
-    })();
-    return () => {
-      vivant = false;
-    };
-  }, []);
+export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: number }) {
+  const { donnees, erreur } = useDonnees('bilan', chargerBilan, {
+    revision,
+    messageErreur: 'Chiffres indisponibles. Vérifie le réseau.',
+  });
 
   return (
     <div className="flex-1 flex flex-col">
@@ -45,14 +32,18 @@ export function Bilan({ onRetour }: { onRetour: () => void }) {
         enfants={
           donnees && (
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white/10 rounded-lg p-3">
+              {/* `min-w-0` : une piste de grille ne descend pas sous la largeur
+                  de son contenu tant qu'on ne l'y autorise pas. Un encours à
+                  sept chiffres élargissait donc la tuile, puis l'en-tête, puis
+                  le document. */}
+              <div className="bg-white/10 rounded-lg p-3 min-w-0">
                 <p className="text-white/60 text-xs font-body mb-0.5">Encours client</p>
-                <p className="text-white font-headings font-bold text-xl tabular-nums">
+                <p className="text-white font-headings font-bold text-lg xs:text-xl tabular-nums">
                   {formatMontant(donnees.encoursTotal)}
                 </p>
                 <p className="text-white/50 text-xs font-body">FCFA à rendre</p>
               </div>
-              <div className="bg-white/10 rounded-lg p-3">
+              <div className="bg-white/10 rounded-lg p-3 min-w-0">
                 <p className="text-white/60 text-xs font-body mb-0.5">Cartes actives</p>
                 <p className="text-white font-headings font-bold text-xl tabular-nums">
                   {donnees.cartesActives}
@@ -91,25 +82,27 @@ export function Bilan({ onRetour }: { onRetour: () => void }) {
               <Carte key={tranche.libelle} className="p-4">
                 <p className="font-headings font-bold text-base text-ink mb-3">{tranche.libelle}</p>
 
-                <div className="flex items-baseline justify-between mb-1">
-                  <span className="font-body text-sm text-muted-foreground">Encaissé</span>
-                  <span className="font-headings font-bold text-xl text-ink tabular-nums">
+                <div className="flex items-baseline justify-between gap-2 mb-1">
+                  <span className="font-body text-sm text-muted-foreground shrink-0">Encaissé</span>
+                  <span className="font-headings font-bold text-xl text-ink tabular-nums text-right min-w-0">
                     {formatMontant(tranche.encaisse)}{' '}
                     <span className="text-xs font-body font-medium text-muted-foreground">FCFA</span>
                   </span>
                 </div>
 
                 {/* La ligne qui compte : ce qui reste au collecteur. */}
-                <div className="flex items-baseline justify-between mb-3 pb-3 border-b border-hairline">
-                  <span className="font-body text-sm text-positive font-medium">Ta commission</span>
-                  <span className="font-headings font-bold text-lg text-positive tabular-nums">
+                <div className="flex items-baseline justify-between gap-2 mb-3 pb-3 border-b border-hairline">
+                  <span className="font-body text-sm text-positive font-medium shrink-0">
+                    Ta commission
+                  </span>
+                  <span className="font-headings font-bold text-lg text-positive tabular-nums text-right min-w-0">
                     {formatMontant(tranche.commissions)}{' '}
                     <span className="text-xs font-body font-medium">FCFA</span>
                   </span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-headings font-bold text-base text-ink tabular-nums">
                       {tranche.nombreMises}
                     </p>

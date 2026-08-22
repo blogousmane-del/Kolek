@@ -70,7 +70,7 @@ export function Encaisser({
   return (
     <div className="flex-1 flex flex-col">
       {/* En-tête */}
-      <div className="bg-sidebar px-5 pt-12 pb-5">
+      <div className="bg-sidebar px-marge pt-entete pb-5">
         <div className="flex items-center justify-between mb-1">
           <button
             type="button"

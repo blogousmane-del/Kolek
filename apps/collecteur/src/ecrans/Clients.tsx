@@ -151,7 +151,7 @@ export function Clients({
   return (
     <div className="flex-1 flex flex-col">
       {/* En-tête sombre */}
-      <div className="bg-sidebar px-5 pt-12 pb-5">
+      <div className="bg-sidebar px-marge pt-entete pb-5">
         <div className="flex items-center justify-between mb-5">
           <div>
             <p className="text-white/60 text-sm font-body">Bonjour,</p>
@@ -171,21 +171,21 @@ export function Clients({
 
       {/* Résumé — trois nombres que la base sait vraiment donner. */}
       <div className="mx-4 -mt-4 bg-surface rounded-xl border border-hairline p-4 flex items-center justify-between shadow-md">
-        <div className="text-center flex-1">
+        <div className="text-center flex-1 min-w-0">
           <p className="text-xs text-muted-foreground font-body">Clients</p>
           <p className="font-headings font-bold text-xl text-ink tabular-nums">
             {lignes?.length ?? '—'}
           </p>
         </div>
         <div className="w-px h-8 bg-hairline" />
-        <div className="text-center flex-1">
+        <div className="text-center flex-1 min-w-0">
           <p className="text-xs text-muted-foreground font-body">Cartes actives</p>
           <p className="font-headings font-bold text-xl text-ink tabular-nums">
             {lignes ? cartesActives : '—'}
           </p>
         </div>
         <div className="w-px h-8 bg-hairline" />
-        <div className="text-center flex-1">
+        <div className="text-center flex-1 min-w-0">
           <p className="text-xs text-muted-foreground font-body">Cycles complets</p>
           <p className="font-headings font-bold text-xl text-ink tabular-nums">
             {lignes ? cyclesComplets : '—'}

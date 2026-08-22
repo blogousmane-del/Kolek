@@ -1,7 +1,7 @@
 import { Carte, Icone } from '@kolek/ui';
-import { useEffect, useState } from 'react';
 
-import { chargerAlertes, type Alerte, type GraviteAlerte } from '../lectures-ecrans';
+import { useDonnees } from '../cache';
+import { chargerAlertes, type GraviteAlerte } from '../lectures-ecrans';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 
 /**
@@ -31,24 +31,11 @@ const LIBELLE: Record<GraviteAlerte, string> = {
   information: 'Information',
 };
 
-export function Alertes({ onRetour }: { onRetour: () => void }) {
-  const [alertes, setAlertes] = useState<Alerte[] | null>(null);
-  const [erreur, setErreur] = useState<string | null>(null);
-
-  useEffect(() => {
-    let vivant = true;
-    void (async () => {
-      try {
-        const a = await chargerAlertes();
-        if (vivant) setAlertes(a);
-      } catch {
-        if (vivant) setErreur('Alertes indisponibles. Vérifie le réseau.');
-      }
-    })();
-    return () => {
-      vivant = false;
-    };
-  }, []);
+export function Alertes({ onRetour, revision }: { onRetour: () => void; revision: number }) {
+  const { donnees: alertes, erreur } = useDonnees('alertes', chargerAlertes, {
+    revision,
+    messageErreur: 'Alertes indisponibles. Vérifie le réseau.',
+  });
 
   const aFaire = alertes?.filter((a) => a.gravite === 'action').length ?? 0;
 

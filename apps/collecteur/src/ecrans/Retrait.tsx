@@ -1,7 +1,8 @@
 import { MISES_PAR_CYCLE, formatMontant } from '@kolek/core';
 import { Bouton, Carte, Icone } from '@kolek/ui';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
+import { useDonnees } from '../cache';
 import { cloturerCarte } from '../ecritures-ecrans';
 import { chargerCartesCloturables, type CarteCloturable } from '../lectures-ecrans';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
@@ -21,44 +22,55 @@ import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
  * porte un déclencheur d'immuabilité, et la carte clôturée ne se rouvre pas. Un
  * appui unique sur une liste défilante, dans un marché, se produirait par accident.
  */
-export function Retrait({ onRetour, onCloture }: { onRetour: () => void; onCloture: () => void }) {
-  const [cartes, setCartes] = useState<CarteCloturable[] | null>(null);
-  const [erreur, setErreur] = useState<string | null>(null);
+export function Retrait({
+  onRetour,
+  onCloture,
+  revision,
+}: {
+  onRetour: () => void;
+  onCloture: () => void;
+  revision: number;
+}) {
   const [aConfirmer, setAConfirmer] = useState<CarteCloturable | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [fait, setFait] = useState<{ nom: string; montant: number } | null>(null);
+  /** Chaque clôture fait avancer la révision, ce qui périme la liste gardée.
+      Après un retrait, la carte clôturée doit disparaître : un affichage
+      instantané de l'ancienne liste inviterait à la clôturer deux fois. C'est
+      le seul écran où le cache doit être franchement invalidé. */
+  const [tourLocal, setTourLocal] = useState(0);
 
-  useEffect(() => {
-    let vivant = true;
-    void (async () => {
-      try {
-        const c = await chargerCartesCloturables();
-        if (vivant) setCartes(c);
-      } catch {
-        if (vivant) setErreur('Cartes indisponibles. Vérifie le réseau.');
-      }
-    })();
-    return () => {
-      vivant = false;
-    };
-  }, [fait]);
+  const {
+    donnees: cartes,
+    erreur: erreurLecture,
+    rafraichir,
+  } = useDonnees('cartes-cloturables', chargerCartesCloturables, {
+    revision: revision + tourLocal,
+    messageErreur: 'Cartes indisponibles. Vérifie le réseau.',
+  });
+  const [erreurEcriture, setErreurEcriture] = useState<string | null>(null);
+  const erreur = erreurEcriture ?? erreurLecture;
 
   async function confirmer() {
     if (!aConfirmer || envoi) return;
     setEnvoi(true);
-    setErreur(null);
+    setErreurEcriture(null);
 
     const resultat = await cloturerCarte(aConfirmer.carteId);
 
     setEnvoi(false);
     if (!resultat.ok) {
-      setErreur(resultat.echec.message);
+      setErreurEcriture(resultat.echec.message);
       setAConfirmer(null);
+      // Un refus peut venir d'une carte clôturée ailleurs entre-temps : on
+      // relit, sinon l'écran continue de proposer une carte qui n'existe plus.
+      rafraichir();
       return;
     }
 
     setFait({ nom: aConfirmer.clientNom, montant: resultat.montantRestitue });
     setAConfirmer(null);
+    setTourLocal((t) => t + 1);
     onCloture();
   }
 

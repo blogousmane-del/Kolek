@@ -19,3 +19,63 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+/* --------------------------- Téléphone réel ----------------------------- */
+
+/* Les encoches et la barre de geste.
+
+   `env(safe-area-inset-*)` ne vaut zéro que si le document n'a pas demandé
+   `viewport-fit=cover`. Les deux vont ensemble : la balise `viewport` des
+   applications l'ajoute, ces utilitaires en tirent les conséquences.
+
+   Sans elles, sur un iPhone en mode installé — l'application collecteur est une
+   PWA, donc elle s'ouvre bien en plein écran — l'en-tête sombre passe sous
+   l'horloge et la barre du bas sous le trait de geste. Les deux zones les plus
+   cliquées du produit sont précisément celles que le système recouvre. */
+
+@utility pt-entete {
+  /* 3rem = l'ancien `pt-12`, conservé comme plancher : sur un appareil sans
+     encoche l'en-tête ne bouge pas. */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 3rem);
+}
+
+@utility pb-barre {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+}
+
+@utility px-marge {
+  padding-left: max(env(safe-area-inset-left, 0px), 1.25rem);
+  padding-right: max(env(safe-area-inset-right, 0px), 1.25rem);
+}
+
+@layer base {
+  html {
+    /* `clip` et non `hidden` : `hidden` sur `html` transforme l'élément en
+       conteneur de défilement et casse `position: sticky` sur la barre du bas.
+       `clip` coupe le débordement sans créer ce conteneur.
+
+       Ce n'est pas un correctif de mise en page — c'est un garde-fou. Un
+       nombre trop long dans une grille reste un défaut à corriger là où il
+       est ; mais tant qu'il en reste un quelque part, il ne doit pas rendre
+       toute l'application décalable latéralement, ce qui donne l'impression
+       que l'écran est cassé. */
+    overflow-x: clip;
+  }
+
+  body {
+    /* Le rebond vertical de la page entière quand une liste est déjà en butée.
+       Sur un téléphone, il fait passer le geste de défilement pour un geste de
+       rechargement. */
+    overscroll-behavior-y: none;
+    /* Le rectangle gris que WebKit peint sur chaque élément touché. Les
+       boutons du produit ont déjà leur propre état visuel. */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Les cibles tactiles descendent rarement sous 44 px dans le produit, mais
+     un bouton sans dimension propre — une pastille d'icône seule — y tombe. */
+  button,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+}

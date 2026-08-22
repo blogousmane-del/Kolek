@@ -105,7 +105,12 @@ export const mesures = {
   carte: '520px',
   liste: '640px',
   sidebar: '256px',
-  mobile: '420px',
+  // 420 px était la largeur de la maquette. Les téléphones l'ont dépassée :
+  // un iPhone 16 Pro Max fait 440 px de large en pixels CSS, un Pixel 9 Pro XL
+  // 448. Sur ces appareils, la coquille du collecteur laissait donc une bande
+  // de fond de chaque côté — l'application ne remplissait pas l'écran du
+  // téléphone, ce qui se lit exactement comme « pas responsive ».
+  mobile: '520px',
   volet: '320px',
 } as const;
 
@@ -145,6 +150,20 @@ export const degrades = {
   degradeZone3: 'linear-gradient(135deg, #AEB7D6 0%, #9FC2DA 100%)',
 } as const;
 
+/**
+ * Points de rupture.
+ *
+ * Tailwind en fournit déjà à partir de `sm` (640 px), tous conçus pour passer
+ * d'un téléphone à une tablette. Le collecteur, lui, a besoin d'un point
+ * *sous* le téléphone de référence : entre un Galaxy A03 en 360 px et un
+ * iPhone 16 en 393 px, un montant à sept chiffres tient d'un côté et pas de
+ * l'autre. `xs` est ce seuil — en dessous, les gros chiffres passent d'un cran
+ * plus petits plutôt que de déborder de leur tuile.
+ */
+export const ruptures = {
+  xs: '390px',
+} as const;
+
 function kebab(cle: string): string {
   return cle.replace(/([a-z])([A-Z0-9])/g, '$1-$2').toLowerCase();
 }
@@ -155,6 +174,7 @@ const GROUPES: Array<[Record<string, string>, string]> = [
   [taillesTexte, 'text-'],
   [polices, 'font-'],
   [mesures, 'container-'],
+  [ruptures, 'breakpoint-'],
   [elevations, ''],
   [degrades, ''],
 ];

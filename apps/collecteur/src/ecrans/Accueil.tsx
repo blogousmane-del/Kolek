@@ -12,10 +12,10 @@ import {
   useEnLigne,
   type ActionRapide,
 } from '@kolek/ui';
-import { useEffect, useState } from 'react';
 
+import { useDonnees } from '../cache';
 import type { Page } from '../Coquille';
-import { chargerTableauCollecteur, type TableauCollecteur } from '../lectures';
+import { chargerTableauCollecteur } from '../lectures';
 
 /**
  * Écran d'accueil du collecteur.
@@ -47,29 +47,10 @@ export function Accueil({
   onDeconnexion: () => void;
 }) {
   const enLigne = useEnLigne();
-  const [tableau, setTableau] = useState<TableauCollecteur | null>(null);
-  const [erreur, setErreur] = useState<string | null>(null);
-
-  useEffect(() => {
-    let vivant = true;
-    setErreur(null);
-
-    // Le `try` n'est pas décoratif : le constructeur de requête de supabase-js
-    // est un « thenable », pas une Promise. Sans cette enveloppe, une coupure
-    // laisse l'écran figé sur des tirets.
-    void (async () => {
-      try {
-        const t = await chargerTableauCollecteur();
-        if (vivant) setTableau(t);
-      } catch {
-        if (vivant) setErreur('Chiffres indisponibles. Vérifie le réseau.');
-      }
-    })();
-
-    return () => {
-      vivant = false;
-    };
-  }, [revision]);
+  const { donnees: tableau, erreur } = useDonnees('accueil', chargerTableauCollecteur, {
+    revision,
+    messageErreur: 'Chiffres indisponibles. Vérifie le réseau.',
+  });
 
   // Les huit mènent quelque part depuis le 2026-08-20. Six étaient grises,
   // faute d'écran derrière : `ActionsRapides` désactive toute action sans
@@ -94,13 +75,13 @@ export function Accueil({
   return (
     <div className="flex-1 flex flex-col">
       {/* En-tête sombre */}
-      <div className="bg-sidebar px-5 pt-12 pb-6">
+      <div className="bg-sidebar px-marge pt-entete pb-6">
         <div className="flex items-center justify-between mb-6">
           <div className="min-w-0">
             <p className="text-white/60 text-sm font-body">Bonjour,</p>
             <p className="text-white font-headings font-bold text-2xl truncate">{nom}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             {/* La maquette posait un portrait décoratif. Il devient la sortie de
                 session : sans elle, un téléphone prêté reste connecté. */}
             <button
@@ -117,7 +98,10 @@ export function Accueil({
 
         <div className="mb-2">
           <p className="text-white/60 text-sm font-body mb-1">Encaissé aujourd’hui</p>
-          <p className="font-headings font-bold text-white text-4xl leading-[1.1] tabular-nums">
+          {/* `text-3xl` sous 390 px : « 1 250 000 » en 36 px déborde de la
+              largeur utile d'un Galaxy A03 et se coupe en deux lignes au
+              milieu du nombre. */}
+          <p className="font-headings font-bold text-white text-3xl xs:text-4xl leading-[1.1] tabular-nums">
             {chiffre(tableau?.encaisseAujourdhui)}{' '}
             <span className="text-lg font-body font-medium text-white/60">FCFA</span>
           </p>
@@ -132,22 +116,26 @@ export function Accueil({
       </div>
 
       {/* Résumé du jour — trois nombres que la base sait vraiment donner. */}
-      <div className="mx-4 -mt-4 bg-surface rounded-xl border border-hairline p-4 grid grid-cols-3 gap-3 shadow-md">
-        <div className="text-center">
+      {/* `min-w-0` sur chaque piste : par défaut une colonne de grille refuse
+          de descendre sous la largeur de son contenu. « Encours » à sept
+          chiffres élargissait donc la carte au-delà de la largeur du téléphone,
+          et avec elle tout le document. */}
+      <div className="mx-4 -mt-4 bg-surface rounded-xl border border-hairline p-4 grid grid-cols-3 gap-2 xs:gap-3 shadow-md">
+        <div className="text-center min-w-0">
           <p className="text-xs text-muted-foreground font-body mb-0.5">Clients</p>
           <p className="font-headings font-bold text-xl text-ink tabular-nums">
             {tableau?.clients ?? '—'}
           </p>
         </div>
-        <div className="text-center border-x border-hairline">
+        <div className="text-center border-x border-hairline min-w-0">
           <p className="text-xs text-muted-foreground font-body mb-0.5">Cartes actives</p>
           <p className="font-headings font-bold text-xl text-ink tabular-nums">
             {tableau?.cartesActives ?? '—'}
           </p>
         </div>
-        <div className="text-center">
+        <div className="text-center min-w-0">
           <p className="text-xs text-muted-foreground font-body mb-0.5">Encours</p>
-          <p className="font-headings font-bold text-xl text-ink tabular-nums">
+          <p className="font-headings font-bold text-lg xs:text-xl text-ink tabular-nums">
             {chiffre(tableau?.encoursTotal)}
           </p>
         </div>

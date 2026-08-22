@@ -1,8 +1,9 @@
 import { formatMontant } from '@kolek/core';
 import { Carte, Icone } from '@kolek/ui';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-import { chargerRecus, type Recu } from '../lectures-ecrans';
+import { useDonnees } from '../cache';
+import { chargerRecus } from '../lectures-ecrans';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 
 /**
@@ -22,25 +23,12 @@ import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
  * imprimante, et un bouton qui n'imprime pas serait exactement le défaut qu'on
  * a passé la journée à retirer d'ici.
  */
-export function Recus({ onRetour }: { onRetour: () => void }) {
-  const [recus, setRecus] = useState<Recu[] | null>(null);
-  const [erreur, setErreur] = useState<string | null>(null);
+export function Recus({ onRetour, revision }: { onRetour: () => void; revision: number }) {
+  const { donnees: recus, erreur } = useDonnees('recus', () => chargerRecus(), {
+    revision,
+    messageErreur: 'Reçus indisponibles. Vérifie le réseau.',
+  });
   const [ouvert, setOuvert] = useState<string | null>(null);
-
-  useEffect(() => {
-    let vivant = true;
-    void (async () => {
-      try {
-        const r = await chargerRecus();
-        if (vivant) setRecus(r);
-      } catch {
-        if (vivant) setErreur('Reçus indisponibles. Vérifie le réseau.');
-      }
-    })();
-    return () => {
-      vivant = false;
-    };
-  }, []);
 
   return (
     <div className="flex-1 flex flex-col">

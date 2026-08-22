@@ -1,8 +1,8 @@
 import { PALIERS, formatMontant } from '@kolek/core';
 import { Bouton, Carte, Icone, useEnLigne } from '@kolek/ui';
-import { useEffect, useState } from 'react';
 
-import { chargerProfil, type Profil } from '../lectures-ecrans';
+import { useDonnees } from '../cache';
+import { chargerProfil } from '../lectures-ecrans';
 import { CorpsEcran, EnTeteEcran } from './EnTeteEcran';
 
 /**
@@ -22,24 +22,10 @@ export function Plus({ onRetour, onDeconnexion }: {
   onRetour: () => void;
   onDeconnexion: () => void;
 }) {
-  const [profil, setProfil] = useState<Profil | null>(null);
-  const [erreur, setErreur] = useState<string | null>(null);
+  const { donnees: profil, erreur } = useDonnees('profil', chargerProfil, {
+    messageErreur: 'Fiche indisponible. Vérifie le réseau.',
+  });
   const enLigne = useEnLigne();
-
-  useEffect(() => {
-    let vivant = true;
-    void (async () => {
-      try {
-        const p = await chargerProfil();
-        if (vivant) setProfil(p);
-      } catch {
-        if (vivant) setErreur('Fiche indisponible. Vérifie le réseau.');
-      }
-    })();
-    return () => {
-      vivant = false;
-    };
-  }, []);
 
   const tarif = PALIERS.find((p) => p.cle === profil?.palier);
 

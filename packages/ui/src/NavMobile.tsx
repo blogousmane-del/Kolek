@@ -39,7 +39,10 @@ export function NavMobile({ actif, onNaviguer }: Props) {
     // `sticky` : la maquette posait la barre en fin de colonne. Sur un écran
     // réel la liste des clients dépasse la hauteur du téléphone, et une barre
     // qui part au défilement oblige à remonter avant chaque encaissement.
-    <div className="sticky bottom-0 z-10 bg-surface border-t border-hairline flex items-center justify-around px-2 py-3">
+    // `pb-barre` ajoute la marge de la barre de geste iOS sous les onglets.
+    // Sans elle, en mode installé, le trait du bas recouvre les libellés et
+    // mange le tiers inférieur de la zone cliquable des cinq onglets.
+    <div className="sticky bottom-0 z-10 bg-surface border-t border-hairline flex items-center justify-around px-2 pt-3 pb-barre">
       {ONGLETS.map((onglet) => {
         const estActif = onglet.cle === actif;
 
@@ -49,7 +52,7 @@ export function NavMobile({ actif, onNaviguer }: Props) {
               key={onglet.cle}
               type="button"
               onClick={() => onNaviguer(onglet.cle)}
-              className="flex flex-col items-center gap-1 -mt-5 cursor-pointer"
+              className="flex flex-col items-center gap-1 -mt-5 px-2 cursor-pointer"
             >
               <div className="w-14 h-14 rounded-pill bg-primary flex items-center justify-center shadow-action">
                 <Icone nom={onglet.icone} taille={24} className="text-primary-foreground" />
@@ -71,7 +74,10 @@ export function NavMobile({ actif, onNaviguer }: Props) {
             type="button"
             disabled={!onglet.disponible}
             onClick={() => onNaviguer(onglet.cle)}
-            className={`flex flex-col items-center gap-1 px-2 ${
+            // `min-w-14 py-1.5` : icône 22 px plus libellé 11 px donnaient une
+            // cible de 37 px de haut, sous le minimum tactile de 44 px. Sur un
+            // téléphone tenu d'une main, dans un marché, on rate l'onglet.
+            className={`flex flex-col items-center gap-1 px-2 py-1.5 min-w-14 ${
               onglet.disponible ? 'cursor-pointer' : 'cursor-default'
             }`}
           >

@@ -2,8 +2,9 @@ import { formatMontant } from '@kolek/core';
 import { Bouton, Carte, Champ, Icone } from '@kolek/ui';
 import { useEffect, useState } from 'react';
 
+import { useDonnees } from '../cache';
 import { declarerCaisse } from '../ecritures-ecrans';
-import { chargerRapprochement, type Rapprochement as Donnees } from '../lectures-ecrans';
+import { chargerRapprochement } from '../lectures-ecrans';
 import { CorpsEcran, EnTeteEcran } from './EnTeteEcran';
 
 /**
@@ -25,44 +26,40 @@ export function Rapprochement({ collecteurId, onRetour }: {
   collecteurId: string | null;
   onRetour: () => void;
 }) {
-  const [donnees, setDonnees] = useState<Donnees | null>(null);
   const [saisie, setSaisie] = useState('');
-  const [erreur, setErreur] = useState<string | null>(null);
+  const [erreurEcriture, setErreurEcriture] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [revision, setRevision] = useState(0);
 
+  const { donnees, erreur: erreurLecture } = useDonnees('rapprochement', chargerRapprochement, {
+    revision,
+    messageErreur: 'Caisse indisponible. Vérifie le réseau.',
+  });
+  const erreur = erreurEcriture ?? erreurLecture;
+
+  // La saisie suit la déclaration déjà enregistrée, y compris quand elle arrive
+  // du cache au premier rendu.
   useEffect(() => {
-    let vivant = true;
-    void (async () => {
-      try {
-        const r = await chargerRapprochement();
-        if (!vivant) return;
-        setDonnees(r);
-        if (r.cashDeclare !== null) setSaisie(String(r.cashDeclare));
-      } catch {
-        if (vivant) setErreur('Caisse indisponible. Vérifie le réseau.');
-      }
-    })();
-    return () => {
-      vivant = false;
-    };
-  }, [revision]);
+    if (donnees?.cashDeclare !== null && donnees?.cashDeclare !== undefined) {
+      setSaisie(String(donnees.cashDeclare));
+    }
+  }, [donnees?.cashDeclare]);
 
   async function enregistrer() {
     if (!donnees || !collecteurId || envoi) return;
     const montant = Number.parseInt(saisie.replace(/\s/g, ''), 10);
     if (!Number.isInteger(montant) || montant < 0) {
-      setErreur('Entre le montant en francs, sans centimes.');
+      setErreurEcriture('Entre le montant en francs, sans centimes.');
       return;
     }
 
     setEnvoi(true);
-    setErreur(null);
+    setErreurEcriture(null);
     const resultat = await declarerCaisse(collecteurId, donnees.date, montant, donnees.ligneId);
     setEnvoi(false);
 
     if (!resultat.ok) {
-      setErreur(resultat.echec.message);
+      setErreurEcriture(resultat.echec.message);
       return;
     }
     setRevision((r) => r + 1);

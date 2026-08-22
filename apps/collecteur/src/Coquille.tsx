@@ -1,6 +1,7 @@
 import { NavMobile, type CleNavCollecteur } from '@kolek/ui';
 import { useEffect, useState } from 'react';
 
+import { viderCache } from './cache';
 import { Accueil } from './ecrans/Accueil';
 import { Alertes } from './ecrans/Alertes';
 import { Bilan } from './ecrans/Bilan';
@@ -50,6 +51,19 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       rechargement de la page. */
   const [revision, setRevision] = useState(0);
 
+  /**
+   * Remonter en haut à chaque changement d'écran.
+   *
+   * L'application est une page unique et c'est le document entier qui défile.
+   * Sans ce geste, quitter le bas d'une liste de quarante clients pour ouvrir
+   * le bilan ouvrait le bilan à la même hauteur — c'est-à-dire, le plus
+   * souvent, sur du vide. Un navigateur le ferait tout seul entre deux URL ;
+   * ici, personne ne le fait.
+   */
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [page]);
+
   useEffect(() => {
     // `collecteur_id` doit accompagner chaque écriture : la politique RLS
     // l'exige au `with check`. On le lit une fois, à l'ouverture.
@@ -74,6 +88,10 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       setErreurSortie('Déconnexion impossible. Vérifie le réseau et réessaie.');
       return;
     }
+    // Avant de rendre la main : les lectures gardées en mémoire portent les
+    // noms et les soldes des clients. Deux collecteurs se relaient sur le même
+    // téléphone, et le second ne doit rien voir du premier.
+    viderCache();
     onDeconnexion();
   }
 
@@ -83,10 +101,17 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
   }
 
   return (
-    // `max-w-mobile` ne change rien sur un téléphone — l'écran est plus étroit.
-    // Il empêche seulement la maquette mobile de s'étirer sur toute la largeur
-    // d'un écran de bureau, où l'application est ouverte pour la démonstration.
-    <div className="min-h-dvh w-full max-w-mobile mx-auto bg-canvas flex flex-col">
+    // `max-w-mobile` vaut 520 px depuis le 2026-08-22, contre 420 auparavant.
+    // L'ancienne valeur était celle de la maquette, et elle est passée sous la
+    // largeur des téléphones courants : un iPhone 16 Pro Max fait 440 px en
+    // pixels CSS, un Pixel 9 Pro XL 448. Sur ces appareils, la coquille laissait
+    // donc une bande de fond visible de chaque côté — l'application ne
+    // remplissait pas l'écran, ce qui se lit exactement comme « pas responsive ».
+    //
+    // Le plafond garde sa raison d'être au-delà : sur un écran de bureau, où
+    // l'application est ouverte pour la démonstration, il empêche une maquette
+    // téléphone de s'étirer sur 1 800 px.
+    <div className="min-h-dvh w-full max-w-mobile mx-auto bg-canvas flex flex-col overflow-x-clip">
       {erreurSortie && (
         <p
           role="alert"
@@ -136,16 +161,17 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
           serait enfermé. */}
       {page === 'retrait' && (
         <Retrait
+          revision={revision}
           onRetour={() => setPage('accueil')}
           onCloture={() => setRevision((r) => r + 1)}
         />
       )}
-      {page === 'bilans' && <Bilan onRetour={() => setPage('accueil')} />}
+      {page === 'bilans' && <Bilan revision={revision} onRetour={() => setPage('accueil')} />}
       {page === 'rapprochement' && (
         <Rapprochement collecteurId={collecteurId} onRetour={() => setPage('accueil')} />
       )}
-      {page === 'recus' && <Recus onRetour={() => setPage('accueil')} />}
-      {page === 'alertes' && <Alertes onRetour={() => setPage('accueil')} />}
+      {page === 'recus' && <Recus revision={revision} onRetour={() => setPage('accueil')} />}
+      {page === 'alertes' && <Alertes revision={revision} onRetour={() => setPage('accueil')} />}
       {(page === 'plus' || page === 'profil') && (
         <Plus onRetour={() => setPage('accueil')} onDeconnexion={deconnecter} />
       )}
