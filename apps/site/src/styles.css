@@ -7,10 +7,56 @@
    aucune feuille de style et la page sortirait sans mise en forme. */
 @source '../../../packages/ui/src';
 
-/* `base.css` pose un fond clair, celui des deux applications. La page de tarifs
-   est la seule surface sombre du produit : elle le corrige ici plutôt que sur
-   un `div`, pour que le sur-défilement d'un téléphone ne découvre pas une
-   bande blanche sous le pied de page. */
+/* Les deux voix propres à la vitrine. Elles ne rentrent pas dans `tokens.ts` :
+   les applications n'ont ni emphase dramatique ni flux monospace, et les y
+   mettre inviterait à s'en servir. */
+@theme {
+  --font-drama: 'Instrument Serif', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+/* Le fond du sur-défilement : la vitrine ouvre sombre (hero) et ferme sombre
+   (pied de page). Un fond clair dépasserait aux deux extrémités sur téléphone. */
 body {
   background: var(--color-dark-canvas);
+}
+
+/* Le bouton « magnétique » du système de design de la vitrine : lift subtil,
+   et un voile qui glisse au survol. En CSS pur — trois boutons ne justifient
+   pas un composant. */
+.magnetique {
+  position: relative;
+  display: inline-block;
+  transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.magnetique:hover {
+  transform: scale(1.03) translateY(-1px);
+}
+.voile-or {
+  position: absolute;
+  inset: 0;
+  background: var(--color-or-doux);
+  transform: translateX(-101%);
+  transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.magnetique:hover .voile-or {
+  transform: translateX(0);
+}
+
+/* La rotation de la rosace guillochée. 90 s par tour : à peine perceptible,
+   comme il se doit — un filigrane qui gigote n'est plus un filigrane. */
+@keyframes rosace-rotation {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .magnetique,
+  .voile-or {
+    transition: none;
+  }
+  [style*='rosace-rotation'] {
+    animation: none !important;
+  }
 }

@@ -54,6 +54,12 @@ export const couleurs = {
   chartTeal: '#7FB6A6',
   chartMint: '#B7D9BE',
   chartSlate: '#AEB7D6',
+  // L'or champagne de la vitrine. Le site de vente est la seule surface du
+  // produit qui parle d'argent au sens propre, et il porte la couleur des
+  // billets plutôt qu'un vert de plus. Les deux applications ne l'utilisent
+  // pas : dans l'outil, l'argent est un nombre, pas un ornement.
+  or: '#C9A84C',
+  orDoux: '#E5D5A3',
 } as const;
 
 /** Design System §3.4. `xl` est donné pour 20–24 px ; on prend le haut. */
@@ -148,6 +154,8 @@ export const degrades = {
   degradeZone1: 'linear-gradient(135deg, #9FC2DA 0%, #AEB7D6 100%)',
   degradeZone2: 'linear-gradient(135deg, #7FB6A6 0%, #B7D9BE 100%)',
   degradeZone3: 'linear-gradient(135deg, #AEB7D6 0%, #9FC2DA 100%)',
+  // Le fond du hero de la vitrine : la nuit d'un coffre plutôt qu'un aplat.
+  degradeHero: 'linear-gradient(180deg, #06140E 0%, #0E2E1F 60%, #14402C 100%)',
 } as const;
 
 /**

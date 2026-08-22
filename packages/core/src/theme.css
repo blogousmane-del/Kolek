@@ -31,6 +31,8 @@
   --color-chart-teal: #7FB6A6;
   --color-chart-mint: #B7D9BE;
   --color-chart-slate: #AEB7D6;
+  --color-or: #C9A84C;
+  --color-or-doux: #E5D5A3;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -63,4 +65,5 @@
   --degrade-zone-1: linear-gradient(135deg, #9FC2DA 0%, #AEB7D6 100%);
   --degrade-zone-2: linear-gradient(135deg, #7FB6A6 0%, #B7D9BE 100%);
   --degrade-zone-3: linear-gradient(135deg, #AEB7D6 0%, #9FC2DA 100%);
+  --degrade-hero: linear-gradient(180deg, #06140E 0%, #0E2E1F 60%, #14402C 100%);
 }
