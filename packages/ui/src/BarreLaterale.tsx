@@ -5,7 +5,8 @@ export type CleNavAdmin =
   | 'collecteurs'
   | 'encours'
   | 'encaisser'
-  | 'abonnements';
+  | 'abonnements'
+  | 'reglages';
 
 interface Entree {
   cle: CleNavAdmin;
@@ -35,9 +36,23 @@ const MONETISATION: Entree[] = [
   { cle: 'abonnements', icone: 'credit-card', libelle: 'Abonnements', disponible: true },
 ];
 
-const RACCOURCIS: Array<{ icone: NomIcone; libelle: string }> = [
-  { icone: 'bar-chart-2', libelle: 'Rapports' },
-  { icone: 'bell', libelle: 'Alertes' },
+/**
+ * La section « Système ».
+ *
+ * Elle remplace, le 2026-08-22, deux « raccourcis » — Rapports et Alertes —
+ * rendus en `<div>` grisés avec l'infobulle « Écran à venir ». Ils étaient là
+ * depuis les maquettes, ne menaient nulle part, et n'avaient échappé au balayage
+ * des commandes inertes du 2026-08-21 que parce qu'ils n'étaient pas des
+ * `<button>` : une entrée de menu morte n'a pas besoin d'être un bouton pour
+ * faire perdre du temps à celui qui la voit.
+ *
+ * Aucun des deux n'était en attente d'être construit. Les rapports sont devenus
+ * l'export CSV, dans les écrans qui ont des lignes à exporter ; les alertes de
+ * la plateforme sont les échéances d'abonnement, déjà visibles sur le tableau de
+ * bord et dans Abonnements.
+ */
+const SYSTEME: Entree[] = [
+  { cle: 'reglages', icone: 'settings', libelle: 'Réglages', disponible: true },
 ];
 
 interface Props {
@@ -146,23 +161,13 @@ export function BarreLaterale({ actif, onNaviguer, onDeconnexion, onFermer }: Pr
         className="px-4 mt-4 mb-1"
       />
 
-      <div className="px-4 mt-4 mb-1">
-        <p className="text-xs font-body font-semibold uppercase tracking-widest text-white/30 px-2 mb-2">
-          Raccourcis
-        </p>
-        {RACCOURCIS.map((entree) => (
-          <div
-            key={entree.libelle}
-            title="Écran à venir"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-md mb-0.5"
-          >
-            <Icone nom={entree.icone} className="text-white/25" />
-            <span className="text-base font-body font-medium text-white/30 whitespace-nowrap">
-              {entree.libelle}
-            </span>
-          </div>
-        ))}
-      </div>
+      <Section
+        titre="Système"
+        entrees={SYSTEME}
+        actif={actif}
+        onNaviguer={onNaviguer}
+        className="px-4 mt-4 mb-1"
+      />
 
       <div className="flex-1 min-h-20" />
 

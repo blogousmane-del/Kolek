@@ -6,6 +6,7 @@ import { Collecteurs } from './ecrans/Collecteurs';
 import { DetailCollecteur } from './ecrans/DetailCollecteur';
 import { EncaisserMise } from './ecrans/EncaisserMise';
 import { EncoursSoldes } from './ecrans/EncoursSoldes';
+import { Reglages } from './ecrans/Reglages';
 import { TableauDeBord } from './ecrans/TableauDeBord';
 import { useVueGlobale } from './donnees';
 import { supabase } from './supabase';
@@ -134,6 +135,7 @@ export function Coquille() {
               {page === 'encours' && <EncoursSoldes vue={donnees.vue} />}
               {page === 'encaisser' && <EncaisserMise />}
               {page === 'abonnements' && <Abonnements vue={donnees.vue} />}
+              {page === 'reglages' && <Reglages />}
             </>
           )}
         </div>
