@@ -1,6 +1,6 @@
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
  * Le socle d'animation de la vitrine.
@@ -49,6 +49,36 @@ export function useAnimations<T extends HTMLElement>(
   }, []);
 
   return ref;
+}
+
+/**
+ * Le visiteur accepte-t-il le mouvement ?
+ *
+ * `useAnimations` pose déjà la question à GSAP, mais les artefacts animés de la
+ * section Produit tournent sur `setInterval`, hors de GSAP. Ils l'ignoraient
+ * donc — dont un à 34 ms, en continu, y compris hors écran. Sur un téléphone
+ * d'entrée de gamme c'est de la batterie brûlée pour une animation que le
+ * visiteur a explicitement demandé de ne pas voir.
+ *
+ * La préférence est **suivie**, pas lue une fois : elle se change sans
+ * recharger la page, et un composant qui ne l'écoute qu'au montage rate le
+ * changement.
+ */
+export function useMouvementAccepte(): boolean {
+  const [accepte, setAccepte] = useState(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return true;
+    return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  });
+
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const requete = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const suivre = () => setAccepte(!requete.matches);
+    requete.addEventListener('change', suivre);
+    return () => requete.removeEventListener('change', suivre);
+  }, []);
+
+  return accepte;
 }
 
 /** L'entrée standard de la vitrine : fade-up pondéré, décalé. */

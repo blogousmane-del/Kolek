@@ -79,14 +79,26 @@ describe('l’invalidation par révision', () => {
     expect(lireCache('bilan', 1)).toBeNull();
   });
 
-  it('retire l’entrée périmée plutôt que de la laisser dormir', () => {
+  it('ne modifie rien en lisant', () => {
+    // Corrigé par l'audit du 2026-08-23. `lireCache` supprimait l'entrée
+    // périmée, et les écrans l'appellent depuis l'initialiseur de `useState` —
+    // donc pendant le rendu, que React peut abandonner ou rejouer. Une lecture
+    // doit être une lecture.
     ecrireCache('bilan', 1, 0);
     lireCache('bilan', 1);
 
-    // Sans la suppression, un retour à la révision 0 — impossible en pratique,
-    // mais rien dans le type ne l'empêche — ressusciterait la vieille valeur.
-    expect(lireCache('bilan', 0)).toBeNull();
-    expect(tailleCache()).toBe(0);
+    expect(tailleCache()).toBe(1);
+  });
+
+  it('écrase l’entrée périmée à la lecture suivante, sans la purger', () => {
+    // Ce qui rendait la purge inutile : les révisions ne font que croître, donc
+    // la vieille valeur n'est jamais resservie, et la lecture qui suit l'écrase.
+    ecrireCache('bilan', 1, 0);
+    expect(lireCache('bilan', 1)).toBeNull();
+
+    ecrireCache('bilan', 2, 1);
+    expect(lireCache<number>('bilan', 1)?.valeur).toBe(2);
+    expect(tailleCache()).toBe(1);
   });
 
   it('rend de nouveau la valeur une fois réécrite à la révision courante', () => {

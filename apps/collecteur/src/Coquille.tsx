@@ -168,7 +168,11 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       )}
       {page === 'bilans' && <Bilan revision={revision} onRetour={() => setPage('accueil')} />}
       {page === 'rapprochement' && (
-        <Rapprochement collecteurId={collecteurId} onRetour={() => setPage('accueil')} />
+        <Rapprochement
+          collecteurId={collecteurId}
+          revision={revision}
+          onRetour={() => setPage('accueil')}
+        />
       )}
       {page === 'recus' && <Recus revision={revision} onRetour={() => setPage('accueil')} />}
       {page === 'alertes' && <Alertes revision={revision} onRetour={() => setPage('accueil')} />}

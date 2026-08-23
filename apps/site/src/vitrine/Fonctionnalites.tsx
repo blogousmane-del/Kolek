@@ -1,6 +1,8 @@
 import { MISES_PAR_CYCLE } from '@kolek/core';
 import { useEffect, useState } from 'react';
 
+import { useMouvementAccepte } from './animation';
+
 /**
  * Trois artefacts fonctionnels — pas trois cartes marketing.
  *
@@ -27,8 +29,10 @@ const CARTES_INITIALES: CarteDemo[] = [
 
 function MelangeurCartes() {
   const [cartes, setCartes] = useState(CARTES_INITIALES);
+  const anime = useMouvementAccepte();
 
   useEffect(() => {
+    if (!anime) return;
     const minuterie = setInterval(() => {
       setCartes((prec) => {
         const suiv = [...prec];
@@ -38,7 +42,7 @@ function MelangeurCartes() {
       });
     }, 3000);
     return () => clearInterval(minuterie);
-  }, []);
+  }, [anime]);
 
   return (
     <div className="relative h-56">
@@ -89,10 +93,15 @@ const JOURNAL = [
 ] as const;
 
 function MachineTelemetrie() {
-  const [lignes, setLignes] = useState<string[]>([]);
+  const anime = useMouvementAccepte();
+  // Sans mouvement, le journal est montré fini : la carte doit rester
+  // informative, pas devenir vide. C'est la règle de toute la vitrine — on
+  // retire l'animation, jamais le contenu.
+  const [lignes, setLignes] = useState<string[]>(anime ? [] : [...JOURNAL].slice(-5));
   const [courante, setCourante] = useState('');
 
   useEffect(() => {
+    if (!anime) return;
     let ligne = 0;
     let caractere = 0;
     const minuterie = setInterval(() => {
@@ -115,7 +124,7 @@ function MachineTelemetrie() {
       }
     }, 34);
     return () => clearInterval(minuterie);
-  }, []);
+  }, [anime]);
 
   return (
     <div className="flex h-56 flex-col rounded-[1.25rem] border border-hairline bg-dark-canvas p-4">
@@ -129,10 +138,12 @@ function MachineTelemetrie() {
             {l}
           </p>
         ))}
-        <p className="text-white">
-          {courante}
-          <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-or align-middle" />
-        </p>
+        {anime && (
+          <p className="text-white">
+            {courante}
+            <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-or align-middle" />
+          </p>
+        )}
       </div>
     </div>
   );
@@ -159,10 +170,13 @@ const CHOREGRAPHIE: Etape[] = [
 ];
 
 function PlanificateurTournee() {
+  const anime = useMouvementAccepte();
   const [pas, setPas] = useState(0);
-  const [actifs, setActifs] = useState<number[]>([]);
+  // Au repos : les deux jours déjà choisis, comme à la fin de la chorégraphie.
+  const [actifs, setActifs] = useState<number[]>(anime ? [] : [2, 5]);
 
   useEffect(() => {
+    if (!anime) return;
     const minuterie = setInterval(() => {
       setPas((p) => {
         const suivant = (p + 1) % CHOREGRAPHIE.length;
@@ -173,7 +187,7 @@ function PlanificateurTournee() {
       });
     }, 1400);
     return () => clearInterval(minuterie);
-  }, []);
+  }, [anime]);
 
   const etape = CHOREGRAPHIE[pas];
   const jourVise = etape.type === 'survol' || etape.type === 'clic' ? etape.jour : null;
@@ -216,7 +230,7 @@ function PlanificateurTournee() {
         style={{
           left: surSauvegarde ? '78%' : jourVise !== null ? `${8 + jourVise * 12.5}%` : '45%',
           top: surSauvegarde ? '74%' : jourVise !== null ? '48%' : '30%',
-          opacity: etape.type === 'repos' ? 0 : 1,
+          opacity: !anime || etape.type === 'repos' ? 0 : 1,
           transform: etape.type === 'clic' || surSauvegarde ? 'scale(0.85)' : 'scale(1)',
         }}
       >

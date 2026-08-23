@@ -22,17 +22,27 @@ import { CorpsEcran, EnTeteEcran } from './EnTeteEcran';
  * manquant. L'écran dit les deux, parce qu'un collecteur qui craint l'écran
  * cesse de déclarer.
  */
-export function Rapprochement({ collecteurId, onRetour }: {
+export function Rapprochement({ collecteurId, revision, onRetour }: {
   collecteurId: string | null;
+  /** La révision de la coquille, incrémentée par **toute** écriture du
+      collecteur — un encaissement compris. Elle est indispensable ici et son
+      absence était un défaut : `cash_attendu` est la somme des mises du jour,
+      donc encaisser le change. Sans cette révision, l'écran servait pendant
+      quarante-cinq secondes un attendu d'avant la mise, et un collecteur qui
+      compare ce chiffre à sa caisse y lit un manquant qui n'existe pas. */
+  revision: number;
   onRetour: () => void;
 }) {
   const [saisie, setSaisie] = useState('');
   const [erreurEcriture, setErreurEcriture] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
-  const [revision, setRevision] = useState(0);
+  /** Les déclarations faites depuis cet écran. Distinct de la révision de la
+      coquille : déclarer sa caisse ne concerne aucun autre écran, donc rien ne
+      justifie de périmer leurs caches. Les deux s'additionnent pour la clé. */
+  const [declarations, setDeclarations] = useState(0);
 
   const { donnees, erreur: erreurLecture } = useDonnees('rapprochement', chargerRapprochement, {
-    revision,
+    revision: revision + declarations,
     messageErreur: 'Caisse indisponible. Vérifie le réseau.',
   });
   const erreur = erreurEcriture ?? erreurLecture;
@@ -62,7 +72,7 @@ export function Rapprochement({ collecteurId, onRetour }: {
       setErreurEcriture(resultat.echec.message);
       return;
     }
-    setRevision((r) => r + 1);
+    setDeclarations((d) => d + 1);
   }
 
   const ecart = donnees?.ecart;

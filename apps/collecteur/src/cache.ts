@@ -72,6 +72,17 @@ export function ecrireCache(
  * `null` dans deux cas qu'il ne faut pas confondre : rien n'a jamais été rangé
  * sous cette clé, ou ce qui y a été rangé date d'avant une écriture. Le second
  * est le cas important — voir l'en-tête du module.
+ *
+ * **Cette fonction ne modifie rien**, et c'est une correction de l'audit du
+ * 2026-08-23. Elle supprimait l'entrée périmée au passage ; comme les écrans
+ * l'appellent depuis l'initialiseur de `useState`, cette suppression avait lieu
+ * *pendant le rendu*. React n'en donne aucune garantie — il peut abandonner un
+ * rendu, ou le rejouer, et sous StrictMode il le rejoue systématiquement.
+ *
+ * La suppression n'était de toute façon pas nécessaire : une entrée périmée est
+ * écrasée par la lecture qui suit, et les révisions ne font que croître, donc
+ * la « résurrection » contre laquelle elle protégeait ne peut pas se produire.
+ * `oublier()` reste là pour les cas où l'on veut vraiment jeter.
  */
 export function lireCache<T>(
   cle: string,
@@ -80,13 +91,13 @@ export function lireCache<T>(
 ): Trouvaille<T> | null {
   const entree = memoire.get(cle);
   if (!entree) return null;
-  if (entree.revision !== revision) {
-    // Périmée par une écriture : on la retire plutôt que de la laisser traîner,
-    // sans quoi un retour à l'ancienne révision la ressusciterait.
-    memoire.delete(cle);
-    return null;
-  }
+  if (entree.revision !== revision) return null;
   return { valeur: entree.valeur as T, frais: maintenant - entree.ecritLe < PEREMPTION_MS };
+}
+
+/** Jette une entrée. Le seul appelant est `rafraichir`, hors rendu. */
+export function oublier(cle: string): void {
+  memoire.delete(cle);
 }
 
 /** Vide tout. Appelé à la déconnexion. */
@@ -180,7 +191,7 @@ export function useDonnees<T>(
   }, [cle, revision, tour]);
 
   const rafraichir = useCallback(() => {
-    memoire.delete(cle);
+    oublier(cle);
     setTour((t) => t + 1);
   }, [cle]);
 
