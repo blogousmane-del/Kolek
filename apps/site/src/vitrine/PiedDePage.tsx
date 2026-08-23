@@ -30,7 +30,7 @@ const COLONNES = [
 
 export function PiedDePage() {
   return (
-    <footer className="rounded-t-[4rem] bg-dark-canvas px-6 pb-10 pt-16 sm:px-12 lg:px-20">
+    <footer className="rounded-t-[2rem] bg-dark-canvas sm:rounded-t-[4rem] px-5 pb-10 pt-16 sm:px-12 lg:px-20">
       <div className="grid gap-10 md:grid-cols-3">
         <div>
           <p className="mb-2 flex items-center gap-2">

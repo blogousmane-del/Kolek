@@ -67,7 +67,7 @@ export function Acces() {
     <section
       id="acces"
       ref={ref}
-      className="relative overflow-hidden bg-sidebar px-6 py-24 sm:px-12 lg:px-20"
+      className="relative overflow-hidden bg-sidebar px-5 py-20 sm:px-12 sm:py-24 lg:px-20"
     >
       <Rosace
         petales={24}

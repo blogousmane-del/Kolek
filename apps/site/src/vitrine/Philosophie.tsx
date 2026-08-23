@@ -48,7 +48,7 @@ export function Philosophie() {
     <section
       id="methode"
       ref={ref}
-      className="relative overflow-hidden bg-dark-canvas px-6 py-32 sm:px-12 lg:px-20"
+      className="relative overflow-hidden bg-dark-canvas px-5 py-24 sm:px-12 sm:py-32 lg:px-20"
     >
       <div data-parallaxe className="pointer-events-none absolute inset-x-0 top-1/4 h-[150%] text-or/10">
         <Onde lignes={16} className="h-full w-full" />

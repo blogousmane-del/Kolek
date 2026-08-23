@@ -77,7 +77,10 @@ export function Hero() {
       {/* Bande de sécurité en pied. */}
       <Onde lignes={10} className="pointer-events-none absolute bottom-0 left-0 h-40 w-full text-or/15" />
 
-      <div data-parallaxe-hero className="relative z-10 px-6 pb-24 pt-40 sm:px-12 lg:px-20">
+      <div
+        data-parallaxe-hero
+        className="relative z-10 px-5 pb-20 pt-32 sm:px-12 sm:pb-24 sm:pt-40 lg:px-20"
+      >
         <p
           data-entree
           className="mb-5 inline-flex items-center gap-2 rounded-pill border border-or/30 px-4 py-1.5 font-mono text-xs tracking-widest text-or"
@@ -87,7 +90,10 @@ export function Hero() {
         </p>
 
         <h1 className="max-w-4xl">
-          <span data-entree className="block font-headings text-3xl font-bold leading-tight text-white sm:text-5xl">
+          <span
+            data-entree
+            className="block font-headings text-2xl font-bold leading-tight text-white xs:text-3xl sm:text-5xl"
+          >
             L’épargne du marché rencontre
           </span>
           {/* Le reflet est peint par un dégradé porté par le texte lui-même
@@ -103,7 +109,7 @@ export function Hero() {
           </span>
         </h1>
 
-        <p data-entree className="mt-6 max-w-xl font-body text-base leading-relaxed text-white/70 sm:text-lg">
+        <p data-entree className="mt-5 max-w-xl font-body text-base leading-relaxed text-white/70 sm:mt-6 sm:text-lg">
           Kolek remplace le carnet du banquier ambulant par un téléphone : chaque mise comptée,
           chaque caisse rapprochée le soir, chaque franc tracé. L’argent, lui, ne quitte jamais
           ta main.
@@ -114,17 +120,24 @@ export function Hero() {
             `mailto:` : sur une machine sans client de messagerie configuré,
             cliquer ne produisait rien de visible — et un bouton qui ne produit
             rien de visible est un bouton cassé, quoi qu'en dise le code. */}
-        <div data-entree className="mt-8 flex flex-wrap items-center gap-4">
+        {/* Empilés et pleine largeur sur téléphone, côte à côte ensuite. Deux
+            pilules de largeurs différentes posées l'une sous l'autre se lisent
+            comme un défaut d'alignement ; à `w-full` elles forment une colonne
+            franche, et la cible tactile occupe toute la largeur du pouce. */}
+        <div
+          data-entree
+          className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4"
+        >
           <a
             href={APP_COLLECTEUR}
-            className="magnetique overflow-hidden rounded-pill bg-or px-7 py-3.5 font-body text-base font-semibold text-dark-canvas"
+            className="magnetique overflow-hidden rounded-pill bg-or px-7 py-3.5 text-center font-body text-base font-semibold text-dark-canvas"
           >
             <span className="relative z-10">Ouvrir mon espace collecteur</span>
             <span aria-hidden className="voile-or" />
           </a>
           <a
             href={INSCRIPTION}
-            className="rounded-pill border border-white/20 px-7 py-3.5 font-body text-base font-medium text-white/80 transition-transform duration-300 hover:-translate-y-px hover:text-white"
+            className="rounded-pill border border-white/20 px-7 py-3.5 text-center font-body text-base font-medium text-white/80 transition-transform duration-300 hover:-translate-y-px hover:text-white"
           >
             Ouvrir un compte
           </a>

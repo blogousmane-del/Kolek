@@ -83,13 +83,21 @@ function MelangeurCartes() {
 
 /* --------------------- 2. La machine à écrire télémétrie ------------------ */
 
+/**
+ * Le journal joué par la machine à écrire.
+ *
+ * Les lignes ont été raccourcies le 2026-08-23. À quarante-huit caractères,
+ * elles mesuraient environ 317 px en 11 px monospace, pour 205 px utiles dans
+ * la carte sur un téléphone de 301 px : `overflow-hidden` les tronquait, et le
+ * montant — la seule information de la ligne — disparaissait le premier.
+ */
 const JOURNAL = [
-  '18:02  mise encaissée      500 FCFA   reçu 7F3A',
-  '18:04  mise encaissée    1 000 FCFA   reçu 91CE',
-  '18:09  mise encaissée      300 FCFA   reçu 04B7',
-  '18:31  caisse attendue  12 500 FCFA',
-  '18:32  caisse déclarée  12 500 FCFA',
-  '18:32  écart                 0 FCFA   ✓ caisse juste',
+  '18:02  mise      500 F  #7F3A',
+  '18:04  mise    1 000 F  #91CE',
+  '18:09  mise      300 F  #04B7',
+  '18:31  attendu  12 500 F',
+  '18:32  déclaré  12 500 F',
+  '18:32  écart  0 F  ✓ juste',
 ] as const;
 
 function MachineTelemetrie() {
@@ -132,7 +140,7 @@ function MachineTelemetrie() {
         <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-pill bg-or" />
         FLUX EN DIRECT — CAISSE DU SOIR
       </p>
-      <div className="flex-1 overflow-hidden font-mono text-xs leading-6 text-white/70">
+      <div className="flex-1 overflow-hidden font-mono text-[11px] leading-6 text-white/70 xs:text-xs">
         {lignes.map((l) => (
           <p key={l} className={l.includes('✓') ? 'text-chart-mint' : undefined}>
             {l}
@@ -265,7 +273,7 @@ const ARTEFACTS = [
 
 export function Fonctionnalites() {
   return (
-    <section id="produit" className="bg-canvas px-6 py-24 sm:px-12 lg:px-20">
+    <section id="produit" className="bg-canvas px-5 py-20 sm:px-12 sm:py-24 lg:px-20">
       <p className="mb-3 font-mono text-xs tracking-widest text-primary">LE PRODUIT</p>
       <h2 className="mb-12 max-w-2xl font-headings text-3xl font-bold text-ink sm:text-4xl">
         Trois instruments, un métier

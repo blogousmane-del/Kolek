@@ -92,7 +92,31 @@ export const taillesTexte = {
   xl: '20px', // H2 — section
   '2xl': '24px', // Montant de carte
   '3xl': '28px', // H1 — titre de page
-  '4xl': '36px', // Metric XL
+  '4xl': '36px',
+
+  /**
+   * Les tailles d'affiche — la vitrine, et elle seule.
+   *
+   * Elles sont **fluides**, et c'est une correction du 2026-08-23. L'échelle
+   * ci-dessus s'arrêtait à `4xl` ; les titres de la page de vente employaient
+   * donc `text-5xl` et `text-7xl`, qui n'existaient pas ici et retombaient
+   * silencieusement sur les défauts de Tailwind — 48 px et 72 px, fixes.
+   *
+   * Sur un téléphone de 320 px, « la précision. » en 72 px mesure environ
+   * 340 px de large pour 270 px utiles : le mot débordait, et le garde-fou
+   * `overflow-x: clip` le coupait proprement au lieu de le signaler. Un défaut
+   * masqué par sa propre protection.
+   *
+   * `clamp(plancher, part de la largeur, plafond)` supprime la classe entière
+   * du problème : il n'y a plus de palier où un titre passe brusquement de
+   * « tient » à « déborde », et un futur `text-7xl` est sûr par construction.
+   * Le plancher garde la hiérarchie lisible sur les plus petits écrans, le
+   * plafond empêche le titre d'avaler un écran de bureau.
+   */
+  '5xl': 'clamp(32px, 8vw, 48px)',
+  '6xl': 'clamp(36px, 10vw, 64px)',
+  '7xl': 'clamp(40px, 12vw, 88px)',
+  '8xl': 'clamp(48px, 15vw, 120px)', // Metric XL
 } as const;
 
 export const polices = {

@@ -21,7 +21,7 @@ export function Tarification() {
   });
 
   return (
-    <section id="tarifs" ref={ref} className="bg-paper px-6 py-24 sm:px-12 lg:px-20">
+    <section id="tarifs" ref={ref} className="bg-paper px-5 py-20 sm:px-12 sm:py-24 lg:px-20">
       <p className="mb-3 font-mono text-xs tracking-widest text-primary">ADHÉSION</p>
       <h2 className="mb-4 max-w-2xl font-headings text-3xl font-bold text-ink sm:text-4xl">
         Un abonnement de collecteur, pas une commission sur l’épargne

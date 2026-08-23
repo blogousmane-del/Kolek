@@ -117,7 +117,7 @@ export function Protocole() {
   });
 
   return (
-    <section ref={ref} className="bg-canvas px-4 pb-24 pt-24 sm:px-8">
+    <section ref={ref} className="bg-canvas px-4 pb-20 pt-20 sm:px-8 sm:pb-24 sm:pt-24">
       <div className="mx-auto max-w-5xl">
         <p className="mb-3 font-mono text-xs tracking-widest text-primary">LE PROTOCOLE</p>
         <h2 className="mb-16 max-w-2xl font-headings text-3xl font-bold text-ink sm:text-4xl">
@@ -128,7 +128,7 @@ export function Protocole() {
           <div
             key={etape.numero}
             data-carte-protocole
-            className="sticky top-16 mb-10 grid min-h-[70dvh] items-center gap-10 rounded-[2.5rem] border border-white/8 bg-sidebar p-8 shadow-lg sm:p-14 lg:grid-cols-2"
+            className="sticky top-16 mb-8 grid min-h-[62dvh] items-center gap-8 rounded-[1.75rem] border border-white/8 bg-sidebar p-6 shadow-lg sm:mb-10 sm:min-h-[70dvh] sm:gap-10 sm:rounded-[2.5rem] sm:p-14 lg:grid-cols-2"
           >
             <div>
               <p className="mb-4 font-mono text-sm text-or">{etape.numero}</p>
