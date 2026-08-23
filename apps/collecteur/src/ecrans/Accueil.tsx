@@ -65,6 +65,7 @@ export function Accueil({
     { icone: 'refresh-cw', libelle: 'Rapproch.', onActiver: () => onNaviguer('rapprochement') },
     { icone: 'receipt', libelle: 'Reçus', onActiver: () => onNaviguer('recus') },
     { icone: 'bell', libelle: 'Alertes', onActiver: () => onNaviguer('alertes') },
+    { icone: 'message-square', libelle: 'Avis', onActiver: () => onNaviguer('avis') },
     { icone: 'more-horizontal', libelle: 'Plus', onActiver: () => onNaviguer('plus') },
   ];
 

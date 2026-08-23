@@ -7,6 +7,7 @@ export type CleNavAdmin =
   | 'encaisser'
   | 'abonnements'
   | 'demandes'
+  | 'avis'
   | 'reglages';
 
 interface Entree {
@@ -57,6 +58,10 @@ const MONETISATION: Entree[] = [
  * bord et dans Abonnements.
  */
 const SYSTEME: Entree[] = [
+  // Les avis aux clients. Sous « Système » et non sous « Monétisation » : ce
+  // n'est pas une recette, c'est une dépense — et la seule commande du produit
+  // dont un réglage se traduit en facture opérateur.
+  { cle: 'avis', icone: 'bell', libelle: 'Avis clients', disponible: true },
   { cle: 'reglages', icone: 'settings', libelle: 'Réglages', disponible: true },
 ];
 

@@ -246,12 +246,18 @@ describe('ce qui part, et ce qu’il dit', () => {
     });
     expect(error).toBeNull();
 
-    // La carte neuve n'a produit aucun avis : sa première mise est la
+    // Aucun avis de **versement** : la première mise de la carte est la
     // commission du collecteur, pas une épargne du client.
+    //
+    // Le filtre sur `source_table` a été ajouté le 2026-08-23 : depuis que
+    // l'ouverture de carte déclenche son propre avis, ce client en a un — celui
+    // qui annonce l'ouverture. L'assertion large aurait fait échouer le test
+    // pour une raison qui n'a rien à voir avec la commission.
     const { data } = await admin
       .from('avis_clients')
       .select('id')
-      .eq('client_id', (c as { id: string }).id);
+      .eq('client_id', (c as { id: string }).id)
+      .eq('source_table', 'mises');
     expect(data ?? []).toHaveLength(0);
   });
 });
@@ -334,5 +340,211 @@ describe('les verrous', () => {
       .eq('collecteur_id', collecteur.id);
 
     expect(error).not.toBeNull();
+  });
+});
+
+describe('l’ouverture d’une carte', () => {
+  /**
+   * Le réglage `sur_ouverture` a existé pendant une migration entière sans
+   * qu'aucun déclencheur ne le lise : la colonne était là, la contrainte
+   * acceptait déjà la provenance `'cartes'`, et rien ne se passait. Un réglage
+   * qui n'agit sur rien est pire qu'un réglage absent — on l'active, on
+   * constate le silence, et on cherche la panne du mauvais côté.
+   */
+  async function ouvrirCarte(nom: string, telephone: string) {
+    const { data: c, error: eC } = await collecteur.client
+      .from('clients')
+      .insert({
+        id: crypto.randomUUID(),
+        collecteur_id: collecteur.id,
+        nom,
+        telephone,
+        avis_actifs: true,
+      })
+      .select('id')
+      .single();
+    if (eC) throw new Error(eC.message);
+
+    const { data: k, error: eK } = await collecteur.client
+      .from('cartes')
+      .insert({
+        id: crypto.randomUUID(),
+        collecteur_id: collecteur.id,
+        client_id: (c as { id: string }).id,
+        mise: 1000,
+      })
+      .select('id')
+      .single();
+    if (eK) throw new Error(eK.message);
+
+    return { clientId: (c as { id: string }).id, carteId: (k as { id: string }).id };
+  }
+
+  it('met en file un avis quand « sur_ouverture » est actif', async () => {
+    await poserReglages({
+      canal: 'sms',
+      sur_mise: false,
+      sur_retrait: false,
+      sur_ouverture: true,
+      quota_mensuel: 1000,
+    });
+
+    const { carteId: nouvelle } = await ouvrirCarte(`Ouv ${MARQUE}`, '+2250700000010');
+    const file = (await avis()).filter((a) => a.source_id === nouvelle);
+
+    expect(file).toHaveLength(1);
+    expect(file[0].source_table).toBe('cartes');
+    expect(String(file[0].corps)).toContain('1 000 FCFA par jour');
+  });
+
+  it('ne promet pas un message par versement quand « sur_mise » est éteint', async () => {
+    // La phrase « Vous recevrez un message a chaque versement » installerait
+    // chez le client une attente que le dispositif ne tiendra pas — et le
+    // silence qui suit ressemblerait à une mise non enregistrée.
+    await poserReglages({
+      canal: 'sms',
+      sur_mise: false,
+      sur_retrait: false,
+      sur_ouverture: true,
+      quota_mensuel: 1000,
+    });
+
+    const { carteId: nouvelle } = await ouvrirCarte(`Muet ${MARQUE}`, '+2250700000011');
+    const corps = String((await avis()).find((a) => a.source_id === nouvelle)!.corps);
+
+    expect(corps).not.toContain('chaque versement');
+  });
+
+  it('le promet quand « sur_mise » est actif', async () => {
+    await poserReglages({
+      canal: 'sms',
+      sur_mise: true,
+      sur_retrait: false,
+      sur_ouverture: true,
+      quota_mensuel: 1000,
+    });
+
+    const { carteId: nouvelle } = await ouvrirCarte(`Parlant ${MARQUE}`, '+2250700000012');
+    const corps = String((await avis()).find((a) => a.source_id === nouvelle)!.corps);
+
+    expect(corps).toContain('chaque versement');
+  });
+
+  it('n’envoie rien à l’ouverture quand « sur_ouverture » est éteint', async () => {
+    await poserReglages({
+      canal: 'sms',
+      sur_mise: true,
+      sur_retrait: true,
+      sur_ouverture: false,
+      quota_mensuel: 1000,
+    });
+
+    const { carteId: nouvelle } = await ouvrirCarte(`Discret ${MARQUE}`, '+2250700000013');
+    expect((await avis()).filter((a) => a.source_id === nouvelle)).toHaveLength(0);
+  });
+});
+
+describe('le pilotage par GTCS', () => {
+  it('fixe la politique d’un collecteur qui n’en avait aucune', async () => {
+    await admin.from('avis_reglages').delete().eq('collecteur_id', collecteur.id);
+
+    const { error } = await admin.rpc('admin_avis_definir', {
+      collecteur: collecteur.id,
+      nouveau_canal: 'sms',
+      mise: false,
+      retrait: true,
+      ouverture: true,
+      quota: 300,
+    });
+    expect(error).toBeNull();
+
+    const { data } = await admin
+      .from('avis_reglages')
+      .select('canal, sur_mise, quota_mensuel')
+      .eq('collecteur_id', collecteur.id)
+      .single();
+
+    expect(data).toMatchObject({ canal: 'sms', sur_mise: false, quota_mensuel: 300 });
+  });
+
+  it('refuse un quota aberrant', async () => {
+    // Un zéro de trop transforme 2 000 segments en 20 000, soit 400 000 FCFA au
+    // tarif A2P ivoirien. La borne refuse ce qui ne peut être qu'une faute de
+    // frappe.
+    const { error } = await admin.rpc('admin_avis_definir', {
+      collecteur: collecteur.id,
+      nouveau_canal: 'sms',
+      mise: true,
+      retrait: true,
+      ouverture: true,
+      quota: 500_000,
+    });
+    expect(error?.message).toContain('QUOTA_INVALIDE');
+  });
+
+  it('refuse un canal inconnu', async () => {
+    const { error } = await admin.rpc('admin_avis_definir', {
+      collecteur: collecteur.id,
+      nouveau_canal: 'pigeon',
+      mise: false,
+      retrait: true,
+      ouverture: true,
+      quota: 100,
+    });
+    expect(error?.message).toContain('CANAL_INVALIDE');
+  });
+
+  it('ne remet pas le compteur à zéro quand on change de canal', async () => {
+    // Sinon basculer sms → whatsapp → sms serait un moyen simple de dépenser
+    // sans plafond.
+    await poserReglages({ canal: 'sms', quota_mensuel: 500, segments_consommes: 120 });
+
+    await admin.rpc('admin_avis_definir', {
+      collecteur: collecteur.id,
+      nouveau_canal: 'whatsapp',
+      mise: false,
+      retrait: true,
+      ouverture: true,
+      quota: 500,
+    });
+
+    const { data } = await admin
+      .from('avis_reglages')
+      .select('segments_consommes')
+      .eq('collecteur_id', collecteur.id)
+      .single();
+
+    expect((data as { segments_consommes: number }).segments_consommes).toBe(120);
+  });
+
+  it('interdit à un collecteur d’exécuter les fonctions d’administration', async () => {
+    for (const appel of [
+      collecteur.client.rpc('admin_avis'),
+      collecteur.client.rpc('admin_avis_definir', {
+        collecteur: collecteur.id,
+        nouveau_canal: 'sms',
+        mise: true,
+        retrait: true,
+        ouverture: true,
+        quota: 50_000,
+      }),
+    ]) {
+      const { error } = await appel;
+      expect(error).not.toBeNull();
+    }
+  });
+
+  it('rend l’état de tous les collecteurs, réglés ou non', async () => {
+    const { data, error } = await admin.rpc('admin_avis');
+    expect(error).toBeNull();
+
+    const etat = data as { collecteurs: Array<Record<string, unknown>> };
+    const ligne = etat.collecteurs.find((c) => c.id === collecteur.id);
+
+    expect(ligne).toBeDefined();
+    // Le consentement est l'autre moitié du verrou : un canal ouvert sur un
+    // portefeuille où personne n'a consenti n'enverra rien, et GTCS doit le
+    // voir avant de conclure à une panne.
+    expect(Number(ligne!.clients_consentants)).toBeGreaterThan(0);
   });
 });

@@ -458,3 +458,84 @@ export async function chargerCartesCloturables(): Promise<CarteCloturable[]> {
     }))
     .sort((a, b) => b.misesEncaissees - a.misesEncaissees);
 }
+
+/* ------------------------------ Avis clients ----------------------------- */
+
+export interface AvisEnvoye {
+  id: string;
+  clientNom: string;
+  destinataire: string;
+  corps: string;
+  statut: 'a_envoyer' | 'envoye' | 'echoue' | 'abandonne' | 'quota_atteint';
+  creeLe: string;
+  envoyeLe: string | null;
+}
+
+export interface EtatAvis {
+  /** `null` tant que GTCS n'a rien réglé : l'état par défaut du produit. */
+  canal: 'aucun' | 'sms' | 'whatsapp' | null;
+  surMise: boolean;
+  surRetrait: boolean;
+  surOuverture: boolean;
+  quotaMensuel: number;
+  segmentsConsommes: number;
+  clientsConsentants: number;
+  avis: AvisEnvoye[];
+}
+
+/**
+ * Ce que le collecteur peut savoir des avis envoyés à ses clients.
+ *
+ * Lecture seule, et c'est structurel : `avis_reglages` et `avis_clients`
+ * n'accordent que le `select` à `authenticated`. Le collecteur voit ce qui est
+ * parti — c'est sa preuve à lui le jour où un client conteste — mais il ne peut
+ * ni rédiger un message ni relever son propre quota.
+ *
+ * Le nom du client est joint ici plutôt que stocké dans l'avis : le corps du
+ * message ne nomme personne, délibérément, et cet écran a besoin de savoir de
+ * qui il parle.
+ */
+export async function chargerEtatAvis(limite = 30): Promise<EtatAvis> {
+  const [rReglages, rAvis, rClients] = await Promise.all([
+    supabase
+      .from('avis_reglages')
+      .select('canal, sur_mise, sur_retrait, sur_ouverture, quota_mensuel, segments_consommes')
+      .maybeSingle(),
+    supabase
+      .from('avis_clients')
+      .select('id, client_id, destinataire, corps, statut, cree_le, envoye_le')
+      .order('cree_le', { ascending: false })
+      .limit(limite),
+    supabase.from('clients').select('id, nom, avis_actifs, telephone'),
+  ]);
+
+  const r = (rReglages.data ?? null) as Record<string, unknown> | null;
+  const clients = (rClients.data ?? []) as Array<{
+    id: string;
+    nom: string;
+    avis_actifs: boolean;
+    telephone: string | null;
+  }>;
+  const noms = new Map(clients.map((c) => [c.id, c.nom]));
+
+  return {
+    canal: (r?.canal as EtatAvis['canal']) ?? null,
+    surMise: Boolean(r?.sur_mise),
+    surRetrait: Boolean(r?.sur_retrait),
+    surOuverture: Boolean(r?.sur_ouverture),
+    quotaMensuel: Number(r?.quota_mensuel ?? 0),
+    segmentsConsommes: Number(r?.segments_consommes ?? 0),
+    clientsConsentants: clients.filter((c) => c.avis_actifs && c.telephone).length,
+    avis: (
+      (rAvis.data ?? []) as Array<Record<string, string | null>>
+    ).map((a) => ({
+      id: String(a.id),
+      clientNom: noms.get(String(a.client_id)) ?? 'Client retiré',
+      destinataire: String(a.destinataire),
+      corps: String(a.corps),
+      statut: a.statut as AvisEnvoye['statut'],
+      creeLe: String(a.cree_le),
+      envoyeLe: a.envoye_le,
+    })),
+  };
+}

@@ -12,13 +12,15 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 
 import type { CarteChoisie } from '../Coquille';
-import { creerClientAvecCarte } from '../ecritures';
+import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
 import { supabase } from '../supabase';
 
 interface Client {
   id: string;
   nom: string;
   marche: string | null;
+  telephone: string | null;
+  avis_actifs: boolean;
 }
 
 interface CarteClient {
@@ -33,6 +35,8 @@ interface Ligne {
   id: string;
   nom: string;
   marche: string | null;
+  telephone: string | null;
+  avisActifs: boolean;
   carte: CarteClient | null;
 }
 
@@ -92,7 +96,10 @@ export function Clients({
     void (async () => {
       try {
         const [reponseClients, reponseCartes] = await Promise.all([
-          supabase.from('clients').select('id, nom, marche').order('nom'),
+          supabase
+            .from('clients')
+            .select('id, nom, marche, telephone, avis_actifs')
+            .order('nom'),
           supabase.from('cartes').select('id, client_id, mise, statut, mises_encaissees'),
         ]);
 
@@ -114,7 +121,11 @@ export function Clients({
 
         setLignes(
           ((reponseClients.data ?? []) as Client[]).map((c) => ({
-            ...c,
+            id: c.id,
+            nom: c.nom,
+            marche: c.marche,
+            telephone: c.telephone,
+            avisActifs: c.avis_actifs,
             carte: parClient.get(c.id) ?? null,
           })),
         );
@@ -292,7 +303,12 @@ export function Clients({
         )}
 
         {visibles.map((ligne) => (
-          <LigneClient key={ligne.id} ligne={ligne} onEncaisser={onEncaisser} />
+          <LigneClient
+            key={ligne.id}
+            ligne={ligne}
+            onEncaisser={onEncaisser}
+            onConsentementChange={onEcriture}
+          />
         ))}
       </div>
 
@@ -304,10 +320,15 @@ export function Clients({
 function LigneClient({
   ligne,
   onEncaisser,
+  onConsentementChange,
 }: {
   ligne: Ligne;
   onEncaisser: (carte: CarteChoisie) => void;
+  onConsentementChange: () => void;
 }) {
+  const [demandeEnCours, setDemandeEnCours] = useState(false);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreurAvis, setErreurAvis] = useState<string | null>(null);
   const carte = ligne.carte;
   const encaissees = carte?.mises_encaissees ?? 0;
   const avancement = Math.round((encaissees / MISES_PAR_CYCLE) * 100);
@@ -323,8 +344,22 @@ function LigneClient({
   // un geste dont on sait qu'il sera refusé.
   const encaissable = carte !== null && carte.statut === 'active' && encaissees < MISES_PAR_CYCLE;
 
+  async function poser(accepte: boolean) {
+    setEnvoi(true);
+    setErreurAvis(null);
+    const resultat = await definirConsentementAvis(ligne.id, accepte);
+    setEnvoi(false);
+    setDemandeEnCours(false);
+    if (!resultat.ok) {
+      setErreurAvis(resultat.echec.message);
+      return;
+    }
+    onConsentementChange();
+  }
+
   return (
-    <div className="bg-surface rounded-lg border border-hairline p-4 flex items-center gap-3 shadow-sm">
+    <div className="bg-surface rounded-lg border border-hairline p-4 shadow-sm">
+      <div className="flex items-center gap-3">
       <Avatar nom={ligne.nom} className="w-11 h-11 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="font-body font-semibold text-base text-ink truncate">{ligne.nom}</p>
@@ -364,6 +399,119 @@ function LigneClient({
           Sans carte
         </span>
       )}
+      </div>
+
+      <BasculeAvis
+        ligne={ligne}
+        demandeEnCours={demandeEnCours}
+        envoi={envoi}
+        erreur={erreurAvis}
+        onDemander={() => setDemandeEnCours(true)}
+        onAnnuler={() => setDemandeEnCours(false)}
+        onPoser={poser}
+      />
+    </div>
+  );
+}
+
+/**
+ * Le consentement du client aux avis, sur sa ligne.
+ *
+ * Trois principes, et chacun a coûté une décision.
+ *
+ * **Rien ne s'active d'un seul geste.** Le collecteur doit d'abord confirmer
+ * que le client a accepté. Un interrupteur qui s'allume au premier appui
+ * enverrait le solde d'épargne de quelqu'un sur un téléphone souvent partagé en
+ * famille, sur la foi d'un doigt qui a glissé.
+ *
+ * **Le retrait, lui, est immédiat.** Un seul appui suffit à éteindre. Un
+ * consentement qu'on ne peut retirer aussi vite qu'on l'a donné n'en est pas un.
+ *
+ * **Sans numéro, la commande est là mais inerte**, avec sa raison. La masquer
+ * laisserait le collecteur chercher pourquoi ce client-là n'a pas l'option.
+ */
+function BasculeAvis({
+  ligne,
+  demandeEnCours,
+  envoi,
+  erreur,
+  onDemander,
+  onAnnuler,
+  onPoser,
+}: {
+  ligne: Ligne;
+  demandeEnCours: boolean;
+  envoi: boolean;
+  erreur: string | null;
+  onDemander: () => void;
+  onAnnuler: () => void;
+  onPoser: (accepte: boolean) => void;
+}) {
+  const sansNumero = !ligne.telephone;
+
+  if (demandeEnCours) {
+    return (
+      <div className="mt-3 pt-3 border-t border-hairline">
+        <p className="text-sm font-body text-ink m-0">
+          {ligne.nom} accepte-t-il de recevoir un message à chaque mouvement sur son{' '}
+          {ligne.telephone} ?
+        </p>
+        <p className="text-xs font-body text-muted-foreground mt-1">
+          Demande-lui avant de confirmer. Le message dira le montant versé et la somme à lui rendre.
+        </p>
+        <div className="flex gap-2 mt-2">
+          <button
+            type="button"
+            disabled={envoi}
+            onClick={() => onPoser(true)}
+            className="px-3 py-2 rounded-pill bg-primary text-primary-foreground text-sm font-body font-bold cursor-pointer disabled:opacity-50"
+          >
+            {envoi ? 'Enregistrement…' : 'Il a accepté'}
+          </button>
+          <button
+            type="button"
+            disabled={envoi}
+            onClick={onAnnuler}
+            className="px-3 py-2 rounded-pill border border-hairline text-ink text-sm font-body font-semibold cursor-pointer disabled:opacity-50"
+          >
+            Annuler
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-hairline flex items-center justify-between gap-3">
+      <span className="flex items-center gap-2 min-w-0">
+        <Icone
+          nom={ligne.avisActifs ? 'bell' : 'bell-off'}
+          taille={15}
+          className={ligne.avisActifs ? 'text-positive' : 'text-muted-foreground'}
+        />
+        <span className="text-xs font-body text-muted-foreground truncate">
+          {sansNumero
+            ? 'Pas de numéro : aucun avis possible'
+            : ligne.avisActifs
+              ? 'Prévenu à chaque mouvement'
+              : 'Non prévenu'}
+        </span>
+      </span>
+      <button
+        type="button"
+        disabled={sansNumero || envoi}
+        aria-pressed={ligne.avisActifs}
+        title={sansNumero ? 'Ce client n’a pas de numéro enregistré.' : undefined}
+        onClick={() => (ligne.avisActifs ? onPoser(false) : onDemander())}
+        className="px-3 py-1.5 rounded-pill border border-hairline text-ink text-xs font-body font-semibold whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {ligne.avisActifs ? 'Ne plus prévenir' : 'Prévenir'}
+      </button>
+      {erreur && (
+        <p role="alert" className="text-xs font-body text-negative m-0">
+          {erreur}
+        </p>
+      )}
     </div>
   );
 }
@@ -393,6 +541,7 @@ function FormulaireClient({
   const [telephone, setTelephone] = useState('');
   const [marche, setMarche] = useState('');
   const [mise, setMise] = useState(1000);
+  const [avisActifs, setAvisActifs] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -408,6 +557,7 @@ function FormulaireClient({
       telephone,
       marche,
       mise,
+      avisActifs,
     });
 
     setEnvoi(false);
@@ -498,6 +648,35 @@ function FormulaireClient({
           FCFA.
         </p>
       )}
+
+      {/* Le consentement se demande au moment où l'on prend le numéro, pas
+          après : c'est le seul instant où le client est en face et où la
+          question est naturelle. Sans numéro la case est inerte — cocher un
+          accord pour un canal inexistant enverrait des avis dès qu'un numéro
+          serait ajouté plus tard, sans que personne les ait acceptés. */}
+      <label
+        className={`flex items-start gap-3 rounded-md p-3 mb-3 border border-hairline ${
+          telephone.trim() ? 'cursor-pointer' : 'opacity-50'
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={avisActifs && telephone.trim().length > 0}
+          disabled={!telephone.trim()}
+          onChange={(e) => setAvisActifs(e.target.checked)}
+          className="mt-0.5 w-4 h-4 shrink-0"
+        />
+        <span className="min-w-0">
+          <span className="block text-sm font-body font-semibold text-ink">
+            Le prévenir par message à chaque mouvement
+          </span>
+          <span className="block text-xs font-body text-muted-foreground">
+            {telephone.trim()
+              ? 'À ne cocher que s’il a accepté. Le message dira le montant versé et la somme à lui rendre.'
+              : 'Saisis un numéro pour pouvoir proposer cet avis.'}
+          </span>
+        </span>
+      </label>
 
       {erreur && (
         <p role="alert" className="text-sm font-body text-negative mb-2">

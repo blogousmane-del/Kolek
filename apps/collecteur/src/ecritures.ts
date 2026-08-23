@@ -94,6 +94,9 @@ export interface NouveauClient {
   activite?: string;
   /** Mise journalière de la première carte. */
   mise: number;
+  /** Le client accepte de recevoir un avis à chaque mouvement. Faux par
+      défaut : laisser un numéro n'est pas consentir à être notifié. */
+  avisActifs?: boolean;
 }
 
 export interface ResultatCreation {
@@ -141,6 +144,10 @@ export async function creerClientAvecCarte(
     telephone: saisie.telephone?.trim() || null,
     marche: saisie.marche?.trim() || null,
     activite: saisie.activite?.trim() || null,
+    // Sans numéro, le consentement n'a pas d'objet : on ne l'enregistre pas,
+    // sinon un numéro ajouté plus tard déclencherait des avis que personne
+    // n'a acceptés à ce moment-là.
+    avis_actifs: Boolean(saisie.avisActifs) && Boolean(saisie.telephone?.trim()),
   });
   if (erreurClient) return { ok: false, echec: echec(erreurClient) };
 
@@ -200,4 +207,33 @@ export async function enregistrerMise(
 
   if (error) return { ok: false, echec: echec(error) };
   return { ok: true, miseId };
+}
+
+/**
+ * Enregistre — ou retire — le consentement d'un client aux avis.
+ *
+ * C'est la seule colonne de `clients` que cet écran écrit après coup, et la
+ * seule écriture du produit qui engage la vie privée de quelqu'un qui n'est pas
+ * l'utilisateur de l'application. Deux choses en découlent.
+ *
+ * **Le collecteur est le bon porteur du geste.** Il est devant le client, il
+ * peut lui demander ; personne d'autre n'est en position de le faire. Le
+ * `GRANT UPDATE (avis_actifs)` de la migration `20260823140000` existe pour
+ * exactement ce geste, et pour aucun autre.
+ *
+ * **Le retrait doit être aussi facile que l'octroi.** La fonction prend un
+ * booléen plutôt que de s'appeler `activerAvis` : un dispositif de
+ * consentement qu'on ne peut qu'allumer n'est pas un consentement.
+ */
+export async function definirConsentementAvis(
+  clientId: string,
+  accepte: boolean,
+): Promise<{ ok: true } | { ok: false; echec: EchecEcriture }> {
+  const { error } = await supabase
+    .from('clients')
+    .update({ avis_actifs: accepte })
+    .eq('id', clientId);
+
+  if (error) return { ok: false, echec: echec(error) };
+  return { ok: true };
 }

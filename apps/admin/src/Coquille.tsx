@@ -2,6 +2,7 @@ import { BandeauOffre, BarreLaterale, Bouton, Icone, type CleNavAdmin } from '@k
 import { useEffect, useState } from 'react';
 
 import { Abonnements } from './ecrans/Abonnements';
+import { Avis } from './ecrans/Avis';
 import { Collecteurs } from './ecrans/Collecteurs';
 import { DetailCollecteur } from './ecrans/DetailCollecteur';
 import { EncaisserMise } from './ecrans/EncaisserMise';
@@ -137,6 +138,7 @@ export function Coquille() {
               {page === 'encaisser' && <EncaisserMise />}
               {page === 'abonnements' && <Abonnements vue={donnees.vue} />}
               {page === 'demandes' && <Demandes />}
+              {page === 'avis' && <Avis />}
               {page === 'reglages' && <Reglages />}
             </>
           )}

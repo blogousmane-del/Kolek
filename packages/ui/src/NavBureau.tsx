@@ -32,6 +32,7 @@ export type CleNavBureau =
   | 'rapprochement'
   | 'recus'
   | 'alertes'
+  | 'avis'
   | 'profil';
 
 interface Entree {
@@ -60,7 +61,14 @@ const SOIR: Entree[] = [
   { cle: 'alertes', icone: 'bell', libelle: 'Alertes' },
 ];
 
-const COMPTE: Entree[] = [{ cle: 'profil', icone: 'user', libelle: 'Mon compte' }];
+// Les avis partis aux clients. Sous « Mon compte » et non sous « Le soir » :
+// ce n'est pas une tâche de fin de journée, c'est une preuve qu'on va chercher
+// le jour où un client conteste.
+
+const COMPTE: Entree[] = [
+  { cle: 'avis', icone: 'message-square', libelle: 'Avis clients' },
+  { cle: 'profil', icone: 'user', libelle: 'Mon compte' },
+];
 
 interface Props {
   actif: string;

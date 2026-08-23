@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { viderCache } from './cache';
 import { Accueil } from './ecrans/Accueil';
 import { Alertes } from './ecrans/Alertes';
+import { Avis } from './ecrans/Avis';
 import { Bilan } from './ecrans/Bilan';
 import { Clients } from './ecrans/Clients';
 import { Encaisser } from './ecrans/Encaisser';
@@ -21,7 +22,7 @@ import { supabase } from './supabase';
  * s'atteignent par la grille d'actions de l'accueil, et en sortent par la flèche
  * de leur en-tête.
  */
-type EcranSecondaire = 'retrait' | 'rapprochement' | 'recus' | 'alertes' | 'plus';
+type EcranSecondaire = 'retrait' | 'rapprochement' | 'recus' | 'alertes' | 'avis' | 'plus';
 
 export type Page = CleNavCollecteur | EcranSecondaire;
 
@@ -166,6 +167,7 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       )}
       {page === 'recus' && <Recus revision={revision} onRetour={() => setPage('accueil')} />}
       {page === 'alertes' && <Alertes revision={revision} onRetour={() => setPage('accueil')} />}
+      {page === 'avis' && <Avis revision={revision} onRetour={() => setPage('accueil')} />}
       {(page === 'plus' || page === 'profil') && (
         <Plus onRetour={() => setPage('accueil')} onDeconnexion={deconnecter} />
       )}
