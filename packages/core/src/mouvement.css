@@ -1,0 +1,199 @@
+/* Le vocabulaire de mouvement de Kolek.
+ *
+ * Déclaré ici, et nulle part ailleurs. Une animation écrite dans la feuille
+ * d'une seule application laisserait les deux autres immobiles — c'est la
+ * raison qui a fait remonter la rosace dans `base.css` le 2026-08-23, et elle
+ * vaut pour tout le reste.
+ *
+ * ## Deux règles qui ne se négocient pas
+ *
+ * 1. **`transform` et `opacity` uniquement.** Animer `width`, `height`, `top`
+ *    ou `margin` force le navigateur à recalculer la mise en page à chaque
+ *    frame. Sur le téléphone d'entrée de gamme où ce produit passe sa vie,
+ *    c'est la différence entre 60 images par seconde et une saccade visible.
+ *    Ces deux propriétés-là sont les seules que le compositeur sait traiter
+ *    sans repasser par la mise en page.
+ *
+ * 2. **`prefers-reduced-motion` éteint tout**, en bas de ce fichier. Le
+ *    contenu ne change pas, seul le mouvement disparaît.
+ *
+ * ## Trois durées, deux courbes
+ *
+ * Une animation qui réclame une quatrième durée est une animation qui n'a pas
+ * trouvé sa catégorie. Le vocabulaire est volontairement pauvre : c'est ce qui
+ * fait qu'un produit paraît d'une seule main.
+ */
+
+:root {
+  --duree-toucher: 150ms;
+  --duree-entree: 250ms;
+  --duree-signature: 400ms;
+
+  /* Décélération franche : le mouvement part vite et se pose. C'est ce qui
+     donne l'impression de réactivité même à durée égale. */
+  --courbe-sortie: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Léger dépassement, réservé aux moments de réussite. */
+  --courbe-rebond: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ------------------------------ 1. Entrée -------------------------------- */
+
+/* L'entrée d'un écran. La navigation du collecteur est un état React, pas un
+   routeur : le composant se monte, l'animation part. Aucun JavaScript. */
+@keyframes kolek-entree {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@utility anim-entree {
+  animation: kolek-entree var(--duree-entree) var(--courbe-sortie) both;
+}
+
+/* ------------------------------ 2. Cascade ------------------------------- */
+
+/* Les rangées d'une liste entrent en escalier. Chaque rangée porte son rang
+   dans `--rang`, posé en style inline par le `map()` qui la produit.
+
+   Le délai est plafonné à 400 ms : au-delà de dix rangées, l'escalier cesse
+   d'être une élégance et devient une attente. Un collecteur qui ouvre sa liste
+   de clients veut la voir, pas la regarder arriver.
+
+   `both` couvre `backwards` : sans lui, chaque rangée s'affiche à sa position
+   finale puis disparaît le temps de son délai — un clignotement pire que pas
+   d'animation du tout. */
+@keyframes kolek-cascade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@utility anim-cascade {
+  animation: kolek-cascade var(--duree-entree) var(--courbe-sortie) both;
+  animation-delay: min(calc(var(--rang, 0) * 40ms), 400ms);
+}
+
+/* ------------------------------ 3. Compteur ------------------------------ */
+
+/* Les grands montants montent de zéro à leur valeur.
+ *
+ * ## Le repli n'est pas optionnel
+ *
+ * `@property` et `@starting-style` ne sont pas partout, et un montant est la
+ * donnée la plus importante de son écran. La valeur vraie est donc **toujours**
+ * dans le document, dans un élément que les lecteurs d'écran lisent ; le
+ * compteur animé est un pseudo-élément décoratif, masqué à l'accessibilité. Un
+ * navigateur qui ignore ces règles affiche la valeur, sans animation, et
+ * personne ne perd rien.
+ *
+ * Réservé aux chiffres d'en-tête — encaissé du jour, total du bilan. Un
+ * compteur sur chaque cellule d'un tableau serait du bruit.
+ */
+@property --kolek-valeur {
+  syntax: '<integer>';
+  initial-value: 0;
+  inherits: false;
+}
+
+@utility anim-compteur {
+  counter-reset: kolek-compteur var(--kolek-valeur);
+  transition: --kolek-valeur var(--duree-signature) var(--courbe-sortie);
+
+  /* `@starting-style` est ce qui fait partir la montée au premier rendu. Sans
+     lui, la valeur est déjà à sa cible quand l'élément apparaît : rien ne
+     change, donc rien ne transitionne, et le compteur affiche le montant final
+     sans jamais monter. L'alternative serait de poser 0 puis la valeur depuis
+     un effet React — du JavaScript par frame pour un effet décoratif. */
+  @starting-style {
+    --kolek-valeur: 0;
+  }
+}
+
+/* La valeur cible est posée en style inline sur l'élément. */
+@utility anim-compteur-cible {
+  &::after {
+    content: counter(kolek-compteur);
+  }
+}
+
+/* ------------------------------ 4. Pression ------------------------------ */
+
+/* Le retour d'appui. Posé une fois sur chaque composant partagé cliquable,
+   jamais sur un écran : c'est ce qui garantit que toutes les cibles tactiles
+   du produit répondent de la même façon.
+
+   `scale(0.97)` et non `0.9` : le doigt couvre déjà la cible, l'effet se
+   perçoit à la périphérie. Trop de réduction donne l'impression que le bouton
+   s'enfonce dans l'écran. */
+@utility anim-pression {
+  transition: transform var(--duree-toucher) var(--courbe-sortie);
+
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+/* ------------------------------ 5. Réussite ------------------------------ */
+
+/* Les deux moments signature, et eux seuls : la mise encaissée et la carte
+   clôturée. C'est le seul endroit du produit qui dépasse 250 ms.
+ *
+ * L'encaissement est le geste qui fait vivre Kolek. Un collecteur le répète
+ * trente fois par jour, debout, devant sa cliente. Qu'il ait une récompense
+ * visuelle n'est pas de la décoration : c'est la confirmation que l'argent est
+ * enregistré, lisible d'un coup d'œil et sans lire un mot. */
+@keyframes kolek-case {
+  from {
+    transform: scale(0);
+  }
+}
+
+@utility anim-case {
+  animation: kolek-case var(--duree-signature) var(--courbe-rebond) both;
+}
+
+@keyframes kolek-reussite {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+@utility anim-reussite {
+  animation: kolek-reussite var(--duree-signature) var(--courbe-rebond) both;
+}
+
+/* La coche qui se dessine. `stroke-dashoffset` est une propriété de tracé, pas
+   de mise en page : elle n'entraîne aucun recalcul. */
+@keyframes kolek-coche {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@utility anim-coche {
+  stroke-dasharray: 24;
+  animation: kolek-coche var(--duree-signature) var(--courbe-sortie) both;
+}
+
+/* ------------------------- Le commutateur général ------------------------ */
+
+/* Un seul bloc, en bas du fichier, qui couvre toute primitive présente et
+   future. Une exception ajoutée ailleurs finirait par échapper à cette règle. */
+@media (prefers-reduced-motion: reduce) {
+  .anim-entree,
+  .anim-cascade,
+  .anim-compteur,
+  .anim-pression,
+  .anim-case,
+  .anim-reussite,
+  .anim-coche {
+    animation: none !important;
+    transition: none !important;
+  }
+}

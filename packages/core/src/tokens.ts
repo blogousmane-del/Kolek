@@ -142,6 +142,13 @@ export const mesures = {
   // téléphone, ce qui se lit exactement comme « pas responsive ».
   mobile: '520px',
   volet: '320px',
+  // Les deux plafonds bureau, ajoutés le 2026-08-23. `liste` (640 px) reste le
+  // plafond des écrans de saisie : un champ étiré sur 1 400 px est plus dur à
+  // remplir, pas plus facile — l'œil perd la ligne entre l'étiquette et le
+  // champ. `page` porte les rangées d'historique, `large` les grilles de cartes
+  // à deux colonnes.
+  page: '860px',
+  large: '960px',
 } as const;
 
 /**

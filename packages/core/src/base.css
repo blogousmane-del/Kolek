@@ -1,3 +1,5 @@
+@import './mouvement.css';
+
 /* Socle commun aux deux applications. Tout le reste passe par les classes
    utilitaires : ce fichier ne définit aucun composant, sans quoi on aurait de
    nouveau deux systèmes visuels en parallèle.
