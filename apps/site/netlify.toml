@@ -32,17 +32,29 @@
 # Contrairement aux deux applications, ce site a vocation à être indexé : c'est
 # la surface commerciale. Pas de `X-Robots-Tag: noindex` ici.
 #
-# La CSP est plus stricte que celle des applications : aucune donnée ne quitte
-# cette page, donc `connect-src 'self'` sans exception Supabase. À élargir le
-# jour où le tunnel de commande s'adresse à un partenaire de paiement — et ce
-# jour-là, à l'origine exacte de ce partenaire, pas à un joker.
+# `connect-src` s'ouvre sur Supabase depuis le 2026-08-23, et sur rien d'autre.
+#
+# Jusque-là cette page n'émettait aucune requête et la directive disait
+# `'self'`. Le formulaire d'ouverture de compte en émet une : un POST vers
+# l'Edge Function `demander-ouverture`. L'origine est nommée exactement — pas de
+# joker, pas de `*.supabase.co`, qui autoriserait le projet Supabase de
+# n'importe qui.
+#
+# Ce que cette ouverture concède, précisément : la page peut désormais parler à
+# ce projet-là. Elle n'y gagne aucun droit — la clé anonyme qu'elle porte se
+# voit refuser les neuf tables, et la fonction appelée valide, borne et
+# n'accuse réception de rien de ce qu'elle écrit.
+#
+# `form-action 'none'` reste : le formulaire est envoyé par `fetch`, jamais par
+# une soumission de navigateur. La directive continue donc d'interdire qu'une
+# page injectée poste vers un tiers.
 #
 # `style-src` accepte l'inline pour la même raison que dans les applications :
 # le repli statique de `index.html` porte ses styles en attribut.
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://yfnwmokxkznejotgpfgf.supabase.co; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"

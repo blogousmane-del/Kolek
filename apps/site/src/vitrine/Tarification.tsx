@@ -1,6 +1,6 @@
 import { PALIERS, PALIER_RECOMMANDE, formatMontant } from '@kolek/core';
 import { entree, useAnimations } from './animation';
-import { APP_COLLECTEUR, CONTACT_DEMO } from './liens';
+import { APP_COLLECTEUR, inscriptionPour } from './liens';
 
 /**
  * La grille tarifaire.
@@ -99,14 +99,19 @@ export function Tarification() {
                 ))}
               </ul>
 
+              {/* Chaque palier mène au formulaire **avec son offre déjà
+                  choisie**. Avant le 2026-08-23, les quatre cartes pointaient
+                  sur le même `mailto:` : le visiteur qui cliquait sur
+                  « Illimité » ne laissait aucune trace de ce choix, et GTCS
+                  rappelait sans savoir ce qu'il voulait. */}
               <a
-                href={CONTACT_DEMO}
+                href={inscriptionPour(palier.cle)}
                 className={`magnetique mt-auto overflow-hidden rounded-pill py-3 text-center font-body text-sm font-semibold ${
                   vedette ? 'bg-or text-dark-canvas' : 'border border-primary text-primary'
                 }`}
               >
                 <span className="relative z-10">
-                  {palier.prix === 0 ? 'Commencer l’essai' : 'Demander une démo'}
+                  {palier.prix === 0 ? 'Commencer l’essai' : `Choisir ${palier.nom}`}
                 </span>
                 {vedette && <span aria-hidden className="voile-or" />}
               </a>

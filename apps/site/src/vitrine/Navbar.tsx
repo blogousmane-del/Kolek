@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { APP_COLLECTEUR } from './liens';
+import { APP_COLLECTEUR, INSCRIPTION } from './liens';
 
 /**
  * L'île flottante.
@@ -63,8 +63,14 @@ export function Navbar() {
       ))}
 
       <a
+        href={INSCRIPTION}
+        className="hidden rounded-pill px-3 py-1.5 font-body text-sm font-medium text-or transition-transform duration-300 hover:-translate-y-px sm:block"
+      >
+        Ouvrir un compte
+      </a>
+      <a
         href={APP_COLLECTEUR}
-        className="magnetique ml-2 overflow-hidden rounded-pill bg-or px-4 py-2 font-body text-sm font-semibold text-dark-canvas"
+        className="magnetique ml-1 overflow-hidden rounded-pill bg-or px-4 py-2 font-body text-sm font-semibold text-dark-canvas"
       >
         <span className="relative z-10">Se connecter</span>
         <span aria-hidden className="voile-or" />

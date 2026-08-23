@@ -21,8 +21,27 @@ export const APP_COLLECTEUR = 'https://kolek-collecteur.netlify.app';
     figure dans la section Accès, nommée pour ce qu'elle est. */
 export const APP_ADMIN = 'https://kolek-admin.netlify.app';
 
-/** Le contact commercial. Reste un `mailto:`, mais n'est plus le geste
-    principal : il vit dans la section Accès, où le visiteur arrive en sachant
-    ce qu'il demande. */
+/**
+ * Le formulaire d'ouverture de compte.
+ *
+ * Il remplace le `mailto:` partout où l'on demandait « une démo ». Le motif est
+ * celui du 2026-08-23 : un `mailto:` ne produit **rien de visible** sur une
+ * machine sans client de messagerie configuré, et le visiteur repart en croyant
+ * le bouton cassé — sans que GTCS sache seulement qu'il est venu.
+ *
+ * `pour()` accroche le palier choisi sur la grille tarifaire, que le formulaire
+ * présélectionne. Le serveur le revalide : un palier inconnu y est refusé, pas
+ * corrigé en silence.
+ */
+export const INSCRIPTION = '/inscription';
+
+export function inscriptionPour(palier: string): string {
+  return `${INSCRIPTION}?palier=${encodeURIComponent(palier)}`;
+}
+
+/**
+ * L'adresse de GTCS. Elle reste offerte en dernier recours, sous le formulaire
+ * — pour qui préfère écrire — mais n'est plus jamais le geste principal.
+ */
 export const CONTACT_DEMO =
-  'mailto:gsmtechnoloy@gmail.com?subject=Kolek%20—%20demande%20de%20démo&body=Bonjour,%0A%0AJe%20souhaite%20une%20démonstration%20de%20Kolek.%0A%0ANom%20:%0AZone%20de%20collecte%20:%0ANombre%20de%20clients%20:%0A';
+  'mailto:gsmtechnoloy@gmail.com?subject=Kolek%20—%20demande%20de%20démo';

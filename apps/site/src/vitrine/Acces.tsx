@@ -1,7 +1,7 @@
 import { Rosace } from '@kolek/ui';
 
 import { entree, useAnimations } from './animation';
-import { APP_ADMIN, APP_COLLECTEUR, CONTACT_DEMO } from './liens';
+import { APP_ADMIN, APP_COLLECTEUR, INSCRIPTION } from './liens';
 
 /**
  * La section Accès — la porte, et non la promesse d'une porte.
@@ -121,20 +121,21 @@ export function Acces() {
           <div className="flex flex-col gap-5">
             <a
               data-porte
-              href={CONTACT_DEMO}
+              href={INSCRIPTION}
               className="group flex-1 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 transition-transform duration-300 hover:-translate-y-1"
             >
               <p className="mb-2 font-mono text-xs tracking-widest text-white/40">
                 PAS ENCORE DE COMPTE
               </p>
               <h3 className="mb-2 font-headings text-xl font-bold text-white">
-                Demander une démo
+                Ouvrir un compte
               </h3>
               <p className="mb-4 font-body text-sm leading-relaxed text-white/50">
-                GTCS ouvre les comptes après un premier échange. Le premier mois est un essai.
+                Laisse ton nom et ton numéro. GTCS te rappelle, ouvre ton compte, et tu encaisses
+                dès le lendemain.
               </p>
               <span className="inline-flex items-center gap-2 font-body text-sm font-semibold text-or">
-                Écrire à GTCS
+                Remplir le formulaire
                 <FlecheEntrante />
               </span>
             </a>

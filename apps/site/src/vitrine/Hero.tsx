@@ -1,7 +1,7 @@
 import { Onde, Rosace } from '@kolek/ui';
 
 import { gsap, useAnimations } from './animation';
-import { APP_COLLECTEUR } from './liens';
+import { APP_COLLECTEUR, INSCRIPTION } from './liens';
 
 /**
  * Le plan d'ouverture.
@@ -123,10 +123,10 @@ export function Hero() {
             <span aria-hidden className="voile-or" />
           </a>
           <a
-            href="#produit"
+            href={INSCRIPTION}
             className="rounded-pill border border-white/20 px-7 py-3.5 font-body text-base font-medium text-white/80 transition-transform duration-300 hover:-translate-y-px hover:text-white"
           >
-            Voir le produit
+            Ouvrir un compte
           </a>
         </div>
       </div>

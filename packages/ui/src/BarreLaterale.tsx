@@ -6,6 +6,7 @@ export type CleNavAdmin =
   | 'encours'
   | 'encaisser'
   | 'abonnements'
+  | 'demandes'
   | 'reglages';
 
 interface Entree {
@@ -34,6 +35,10 @@ const PILOTAGE: Entree[] = [
     propre section plutôt que de se glisser dans le pilotage terrain. */
 const MONETISATION: Entree[] = [
   { cle: 'abonnements', icone: 'credit-card', libelle: 'Abonnements', disponible: true },
+  // Les demandes déposées depuis la vitrine. Sous « Monétisation » et non sous
+  // « Pilotage » : ce sont des prospects, pas des collecteurs — le travail
+  // qu'elles appellent est commercial.
+  { cle: 'demandes', icone: 'user-plus', libelle: 'Demandes', disponible: true },
 ];
 
 /**

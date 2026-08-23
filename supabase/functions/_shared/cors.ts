@@ -88,6 +88,17 @@ export function entetesCors({
 export const ORIGINES_ADMIN = 'https://kolek-admin.netlify.app,http://localhost:5173';
 export const ORIGINES_COLLECTEUR = 'https://kolek-collecteur.netlify.app,http://localhost:5173';
 
+/**
+ * La vitrine. Ajoutée le 2026-08-23 avec `demander-ouverture`, la seule
+ * fonction publique du produit.
+ *
+ * Elle a sa propre liste, comme les deux autres : le site n'a rien à faire des
+ * fonctions d'administration, et le laisser les appeler — même pour se voir
+ * refuser par `est_admin()` — reviendrait à ouvrir une porte pour la refermer
+ * derrière.
+ */
+export const ORIGINES_SITE = 'https://kolek-site.netlify.app,http://localhost:5173';
+
 export function listerOrigines(
   brut: string | undefined | null,
   defaut = ORIGINES_ADMIN,

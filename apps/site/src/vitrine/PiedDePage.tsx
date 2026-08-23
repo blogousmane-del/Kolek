@@ -1,4 +1,4 @@
-import { APP_COLLECTEUR, CONTACT_DEMO } from './liens';
+import { APP_COLLECTEUR, CONTACT_DEMO, INSCRIPTION } from './liens';
 
 /**
  * Le pied de page.
@@ -22,8 +22,8 @@ const COLONNES = [
     titre: 'Accès',
     liens: [
       { href: APP_COLLECTEUR, libelle: 'Espace collecteur' },
-      { href: '#acces', libelle: 'Toutes les entrées' },
-      { href: CONTACT_DEMO, libelle: 'Demander une démo' },
+      { href: INSCRIPTION, libelle: 'Ouvrir un compte' },
+      { href: CONTACT_DEMO, libelle: 'Écrire à GTCS' },
     ],
   },
 ] as const;
