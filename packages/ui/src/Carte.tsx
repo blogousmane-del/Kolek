@@ -1,14 +1,30 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 /**
  * Design System §3.5 : « Bordure standard des cartes : 1px solid hairline
  * + shadow-sm. Discret, jamais lourd. » La maquette recopiait cette
  * combinaison dans une quinzaine d'endroits, avec trois valeurs d'ombre
  * légèrement différentes. Une seule ici.
+ *
+ * `style` n'est ouvert que pour une chose, et c'est assumé : porter la variable
+ * `--rang` de la cascade d'entrée, que seul le `map()` producteur connaît. Une
+ * couleur ou une marge écrite ici contournerait le Design System — la revue
+ * doit le refuser.
  */
-export function Carte({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Carte({
+  children,
+  className = '',
+  style,
+}: {
+  children: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}) {
   return (
-    <div className={`bg-surface rounded-lg border border-hairline shadow-sm ${className}`}>
+    <div
+      className={`bg-surface rounded-lg border border-hairline shadow-sm ${className}`}
+      style={style}
+    >
       {children}
     </div>
   );

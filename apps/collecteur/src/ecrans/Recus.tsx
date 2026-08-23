@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { useDonnees } from '../cache';
 import { chargerRecus } from '../lectures-ecrans';
+import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 
 /**
@@ -29,6 +30,10 @@ export function Recus({ onRetour, revision }: { onRetour: () => void; revision: 
     messageErreur: 'Reçus indisponibles. Vérifie le réseau.',
   });
   const [ouvert, setOuvert] = useState<string | null>(null);
+  // La cascade ne joue qu'à l'ouverture de l'écran. `revision` relit la liste
+  // après chaque écriture ; rejouer l'escalier à ce moment ferait clignoter
+  // l'historique sous les yeux du collecteur.
+  const premier = usePremierRendu();
 
   return (
     <div className="flex-1 flex flex-col">
@@ -36,9 +41,11 @@ export function Recus({ onRetour, revision }: { onRetour: () => void; revision: 
         titre="Reçus"
         sousTitre={recus ? `${recus.length} derniers encaissements` : 'Historique'}
         onRetour={onRetour}
+        largeur="liste"
       />
 
       <CorpsEcran
+        largeur="liste"
         enfants={
           <>
             {erreur && (
@@ -59,12 +66,16 @@ export function Recus({ onRetour, revision }: { onRetour: () => void; revision: 
               />
             )}
 
-            {recus?.map((recu) => {
+            {recus?.map((recu, rang) => {
               const quand = new Date(recu.encaisseLe);
               const estOuvert = ouvert === recu.id;
 
               return (
-                <Carte key={recu.id} className="p-0 overflow-hidden">
+                <Carte
+                  key={recu.id}
+                  className={`p-0 overflow-hidden ${premier ? 'anim-cascade' : ''}`}
+                  style={rangCascade(rang, premier)}
+                >
                   <button
                     type="button"
                     onClick={() => setOuvert(estOuvert ? null : recu.id)}

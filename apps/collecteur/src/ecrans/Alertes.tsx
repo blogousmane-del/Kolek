@@ -2,6 +2,7 @@ import { Carte, Icone } from '@kolek/ui';
 
 import { useDonnees } from '../cache';
 import { chargerAlertes, type GraviteAlerte } from '../lectures-ecrans';
+import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 
 /**
@@ -38,6 +39,8 @@ export function Alertes({ onRetour, revision }: { onRetour: () => void; revision
   });
 
   const aFaire = alertes?.filter((a) => a.gravite === 'action').length ?? 0;
+  // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit.
+  const premier = usePremierRendu();
 
   return (
     <div className="flex-1 flex flex-col">
@@ -51,9 +54,11 @@ export function Alertes({ onRetour, revision }: { onRetour: () => void; revision
               : 'Rien d’urgent'
         }
         onRetour={onRetour}
+        largeur="liste"
       />
 
       <CorpsEcran
+        largeur="liste"
         enfants={
           <>
             {erreur && (
@@ -74,10 +79,14 @@ export function Alertes({ onRetour, revision }: { onRetour: () => void; revision
               />
             )}
 
-            {alertes?.map((alerte) => {
+            {alertes?.map((alerte, rang) => {
               const style = APPARENCE[alerte.gravite];
               return (
-                <Carte key={alerte.cle} className={`p-4 ${style.bordure}`}>
+                <Carte
+                  key={alerte.cle}
+                  className={`p-4 ${style.bordure} ${premier ? 'anim-cascade' : ''}`}
+                  style={rangCascade(rang, premier)}
+                >
                   <div className="flex items-start gap-3">
                     <div
                       className={`w-9 h-9 rounded-pill flex items-center justify-center shrink-0 ${style.puce}`}

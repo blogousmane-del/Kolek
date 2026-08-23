@@ -2,6 +2,7 @@ import { Carte, Icone } from '@kolek/ui';
 
 import { useDonnees } from '../cache';
 import { chargerEtatAvis, type AvisEnvoye } from '../lectures-ecrans';
+import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 
 /**
@@ -60,6 +61,8 @@ export function Avis({ onRetour, revision }: { onRetour: () => void; revision: n
   });
 
   const eteint = !etat?.canal || etat.canal === 'aucun';
+  // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit.
+  const premier = usePremierRendu();
 
   return (
     <div className="flex-1 flex flex-col">
@@ -67,9 +70,11 @@ export function Avis({ onRetour, revision }: { onRetour: () => void; revision: n
         titre="Avis clients"
         sousTitre={etat ? (eteint ? 'Éteint' : etat.canal!.toUpperCase()) : 'Messages envoyés'}
         onRetour={onRetour}
+        largeur="liste"
       />
 
       <CorpsEcran
+        largeur="liste"
         enfants={
           <>
             {erreur && (
@@ -137,8 +142,12 @@ export function Avis({ onRetour, revision }: { onRetour: () => void; revision: n
                   />
                 )}
 
-                {etat.avis.map((avis) => (
-                  <Carte key={avis.id} className="p-4">
+                {etat.avis.map((avis, rang) => (
+                  <Carte
+                    key={avis.id}
+                    className={`p-4 ${premier ? 'anim-cascade' : ''}`}
+                    style={rangCascade(rang, premier)}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-body font-semibold text-base text-ink truncate m-0">
