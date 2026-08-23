@@ -106,7 +106,16 @@ export const CIBLES = [
     nom: 'site',
     url: 'https://kolek-site.netlify.app',
     dist: 'apps/site/dist',
-    supabase: false,
+    // Passé à `true` le 2026-08-23. La vitrine était une brochure : elle ne
+    // parlait à personne, et le contrôle exigeait `connect-src 'self'` seul.
+    // Elle porte désormais le formulaire de demande d'ouverture et l'accès au
+    // compte collecteur — elle appelle donc le projet, légitimement.
+    //
+    // Le contrôle n'est pas affaibli : `connect-src` doit toujours **nommer**
+    // le projet, et le joker reste interdit. Ce qui change, c'est l'attente,
+    // pas la sévérité. Laisser l'ancienne aurait produit un manquement à chaque
+    // exécution — et un contrôle qui crie toujours n'est plus lu.
+    supabase: true,
     pwa: false,
     permissions: 'camera=(), geolocation=(), microphone=()',
     // Le seul des trois qui doit rester indexable : aucun en-tête, et une règle

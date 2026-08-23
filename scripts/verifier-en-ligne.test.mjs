@@ -44,8 +44,16 @@ describe('les attentes déclarées par cible', () => {
     }
   });
 
-  it('ne donne la clé Supabase qu’aux deux applications', () => {
-    expect(CIBLES.filter((c) => c.supabase).map((c) => c.nom)).toEqual(['collecteur', 'admin']);
+  it('nomme les cibles qui parlent au projet Supabase', () => {
+    // La vitrine a rejoint la liste le 2026-08-23 : elle porte le formulaire de
+    // demande d'ouverture et l'accès au compte collecteur. Ce test garde sa
+    // raison d'être — il fige la liste, de sorte qu'une quatrième cible ne
+    // puisse pas s'y glisser sans qu'on le décide.
+    expect(CIBLES.filter((c) => c.supabase).map((c) => c.nom)).toEqual([
+      'collecteur',
+      'admin',
+      'site',
+    ]);
   });
 });
 
