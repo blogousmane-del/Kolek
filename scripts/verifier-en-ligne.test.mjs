@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { CIBLES, analyserCsp, assetsDe, comparerAssets, hstsSuffisant } from './verifier-en-ligne.mjs';
+import {
+  CIBLES,
+  analyserCsp,
+  assetsDe,
+  cleAnonyme,
+  comparerAssets,
+  hstsSuffisant,
+} from './verifier-en-ligne.mjs';
 
 // Le script parle au réseau : ce qui est testable ici, ce sont les deux
 // fonctions qui décident si la réponse est conforme. Une CSP mal découpée fait
@@ -145,5 +152,26 @@ describe('CIBLES', () => {
     for (const cible of CIBLES) {
       expect(cible.dist).toMatch(/^apps\/[a-z]+\/dist$/);
     }
+  });
+});
+
+describe('cleAnonyme', () => {
+  const ENTIERE =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJhbm9uIn0.signature-quelconque';
+
+  it('extrait la clé d’un artefact minifié', () => {
+    expect(cleAnonyme('var _l=`https://x.supabase.co`,vl=`' + ENTIERE + '`;')).toBe(ENTIERE);
+  });
+
+  it('ne rend rien quand la clé est absente', () => {
+    expect(cleAnonyme('var _l=`https://x.supabase.co`,vl=``;')).toBeNull();
+  });
+
+  it('ne se raccroche pas au segment de charge utile', () => {
+    // Le piège du 2026-08-23 : la charge utile commence elle aussi par `eyJ`.
+    // Une expression qui accepte n'importe quel `eyJ` transforme un jeton
+    // amputé en jeton plausible — et c'est exactement ce qu'on cherche à voir.
+    const amputee = ENTIERE.slice(1);
+    expect(cleAnonyme('vl=`' + amputee + '`')).toBeNull();
   });
 });

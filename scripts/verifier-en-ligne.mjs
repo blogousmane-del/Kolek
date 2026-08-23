@@ -81,6 +81,19 @@ export function hstsSuffisant(valeur) {
   return Boolean(age) && Number(age[1]) >= 31536000 && /includeSubDomains/i.test(valeur);
 }
 
+/**
+ * Extrait la clé anonyme d'un artefact servi.
+ *
+ * L'expression part de `eyJ` — l'en-tête JWT encodé — et **pas** du segment de
+ * charge utile, qui commence lui aussi par `eyJ`. C'est la nuance qui rendait
+ * une clé amputée indiscernable d'une clé entière : une correspondance qui
+ * démarre au milieu du jeton en rend un fragment plausible.
+ */
+export function cleAnonyme(texte) {
+  const trouve = texte.match(/eyJhbGciOi[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
+  return trouve ? trouve[0] : null;
+}
+
 export const CIBLES = [
   {
     nom: 'collecteur',
@@ -230,6 +243,7 @@ async function verifier(cible) {
   }
 
   let voitSupabase = false;
+  let cleServie = null;
   for (const chemin of assets) {
     const reponse = await fetch(cible.url + chemin);
     constat(reponse.ok, `${chemin} renvoie ${reponse.status}`);
@@ -239,6 +253,7 @@ async function verifier(cible) {
         echecs.push(`FUITE dans ${chemin} — ${fuite}`);
       }
       if (corps.includes(`${PROJET}.supabase.co`)) voitSupabase = true;
+      cleServie ??= cleAnonyme(corps);
     }
     const cache = reponse.headers.get('cache-control') ?? '';
     constat(cache.includes('immutable'), `${chemin} sans cache immuable : ${cache}`);
@@ -249,6 +264,35 @@ async function verifier(cible) {
       ? "l'URL Supabase est absente du bundle — variable d'environnement non injectée"
       : 'le site public embarque une URL Supabase, il ne devrait appeler personne',
   );
+
+  // La clé servie est-elle **acceptée** ?
+  //
+  // Ce contrôle est né d'un défaut réel, le 2026-08-23 : la vitrine en ligne
+  // portait une clé anonyme amputée de son premier caractère — 207 octets au
+  // lieu de 208, une variable d'environnement mal recopiée dans Netlify. Le
+  // site se chargeait, la CSP était parfaite, la clé *ressemblait* à une clé.
+  // Et chaque appel au projet répondait 401 : formulaire de demande, connexion
+  // collecteur, connexion Google — tout muet.
+  //
+  // Constater la présence de la clé ne suffisait pas ; c'est sa validité qu'il
+  // faut éprouver, et seul le serveur d'authentification peut la trancher.
+  if (cible.supabase) {
+    if (cleServie === null) {
+      echecs.push(
+        'aucune clé anonyme reconnaissable dans les artefacts servis — ' +
+          "variable d'environnement absente au build, ou clé tronquée (elle doit commencer par « eyJhbGciOi »)",
+      );
+    } else {
+      const essai = await fetch(`https://${PROJET}.supabase.co/auth/v1/settings`, {
+        headers: { apikey: cleServie },
+      });
+      constat(
+        essai.ok,
+        `la clé anonyme servie est refusée par le projet (${essai.status}) — ` +
+          `${cleServie.length} caractères ; vérifier la variable d'environnement du site`,
+      );
+    }
+  }
 
   // Réécriture d'application à page unique : une route inconnue rend l'index.
   const inconnue = await fetch(`${cible.url}/route-qui-nexiste-pas`);
