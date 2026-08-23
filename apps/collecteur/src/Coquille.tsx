@@ -183,11 +183,11 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
      * avec la barre du bas. C'est la forme d'origine, et celle qui compte — le
      * collecteur travaille debout, dans un marché.
      *
-     * **À partir de `lg`** : une barre latérale fixe et un contenu centré. Le
-     * plafond passe à `max-w-liste` (640 px) plutôt que de disparaître : les
-     * écrans sont composés de cartes empilées et de listes, et une ligne de
-     * texte étirée sur 1 600 px devient illisible. On gagne la navigation
-     * directe vers les dix écrans, pas une mise en page différente.
+     * **À partir de `lg`** : une barre latérale fixe, et un contenu dont le
+     * plafond n'est plus décidé ici. Chaque écran déclare sa nature — `saisie`,
+     * `liste` ou `large` — et `CorpsEcran` en tire la largeur. Un plafond unique
+     * imposé par la coquille obligeait une grille de cartes à deux colonnes à
+     * tenir dans 640 px, c'est-à-dire à ne pas exister.
      *
      * `overflow-x-clip` reste sur les deux : c'est le garde-fou posé le
      * 2026-08-22 contre un débordement latéral, et il ne dépend pas de la
@@ -206,7 +206,7 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
         />
       </div>
 
-      <div className="mx-auto flex min-h-dvh w-full max-w-mobile flex-col overflow-x-clip lg:min-h-0 lg:max-w-liste lg:py-8">
+      <div className="mx-auto flex min-h-dvh w-full max-w-mobile flex-col overflow-x-clip lg:min-h-0 lg:max-w-none lg:py-8">
         {contenu}
       </div>
 
