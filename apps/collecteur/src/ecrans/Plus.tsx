@@ -31,9 +31,15 @@ export function Plus({ onRetour, onDeconnexion }: {
 
   return (
     <div className="flex-1 flex flex-col">
-      <EnTeteEcran titre="Plus" sousTitre={profil?.nom ?? 'Ta fiche'} onRetour={onRetour} />
+      <EnTeteEcran
+        titre="Plus"
+        sousTitre={profil?.nom ?? 'Ta fiche'}
+        onRetour={onRetour}
+        largeur="liste"
+      />
 
       <CorpsEcran
+        largeur="liste"
         enfants={
           <>
             {erreur && (
@@ -48,6 +54,11 @@ export function Plus({ onRetour, onDeconnexion }: {
 
             {profil && (
               <>
+                {/* Identité et abonnement côte à côte sur bureau : ce sont deux
+                    sujets distincts, et les empiler sur 1 440 px laisse la moitié
+                    droite vide. `items-start` pour que la carte la plus courte ne
+                    s'étire pas à la hauteur de l'autre. */}
+                <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 lg:items-start">
                 <Carte className="p-4">
                   <p className="font-headings font-bold text-base text-ink mb-3">Ma fiche</p>
                   <dl className="text-sm font-body space-y-2">
@@ -102,6 +113,7 @@ export function Plus({ onRetour, onDeconnexion }: {
                     Le changement de formule se fait auprès de GTCS, pas depuis l’application.
                   </p>
                 </Carte>
+                </div>
 
                 <Carte className="p-4">
                   <p className="font-headings font-bold text-base text-ink mb-3">Application</p>

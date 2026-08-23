@@ -84,6 +84,7 @@ export function Rapprochement({ collecteurId, revision, onRetour }: {
         titre="Rapprochement"
         sousTitre="Ta caisse du jour"
         onRetour={onRetour}
+        largeur="saisie"
         enfants={
           donnees && (
             <div className="bg-white/10 rounded-lg p-4">
@@ -103,6 +104,7 @@ export function Rapprochement({ collecteurId, revision, onRetour }: {
       />
 
       <CorpsEcran
+        largeur="saisie"
         enfants={
           <>
             {erreur && (
