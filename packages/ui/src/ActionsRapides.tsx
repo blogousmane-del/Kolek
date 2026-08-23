@@ -41,7 +41,7 @@ export function ActionsRapides({ actions, compact = false }: Props) {
           disabled={!action.onActiver}
           title={action.onActiver ? undefined : 'À venir'}
           onClick={action.onActiver}
-          className={`flex flex-col items-center ${compact ? 'gap-1.5' : 'gap-2'} ${
+          className={`anim-pression flex flex-col items-center ${compact ? 'gap-1.5' : 'gap-2'} ${
             action.onActiver ? 'cursor-pointer' : 'opacity-60 cursor-default'
           }`}
         >
