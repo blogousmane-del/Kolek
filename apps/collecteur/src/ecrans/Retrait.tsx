@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useDonnees } from '../cache';
 import { cloturerCarte } from '../ecritures-ecrans';
 import { chargerCartesCloturables, type CarteCloturable } from '../lectures-ecrans';
+import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 
 /**
@@ -32,6 +33,8 @@ export function Retrait({
   revision: number;
 }) {
   const [aConfirmer, setAConfirmer] = useState<CarteCloturable | null>(null);
+  // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit.
+  const premier = usePremierRendu();
   const [envoi, setEnvoi] = useState(false);
   const [fait, setFait] = useState<{ nom: string; montant: number } | null>(null);
   /** Chaque clôture fait avancer la révision, ce qui périme la liste gardée.
@@ -104,9 +107,11 @@ export function Retrait({
         titre="Retrait"
         sousTitre="Clôturer une carte et rendre le solde"
         onRetour={onRetour}
+        largeur="large"
       />
 
       <CorpsEcran
+        largeur="large"
         enfants={
           <>
             {erreur && (
@@ -127,13 +132,20 @@ export function Retrait({
               />
             )}
 
-            {cartes?.map((carte) => {
+            {/* Deux colonnes sur bureau : la liste des cartes à clôturer est
+                la plus longue du produit, et chaque carte tient dans la moitié
+                de la largeur. */}
+            <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 lg:items-start">
+              {cartes?.map((carte, rang) => {
               const enConfirmation = aConfirmer?.carteId === carte.carteId;
 
               return (
                 <Carte
                   key={carte.carteId}
-                  className={`p-4 ${carte.cycleComplet ? 'border-positive' : ''}`}
+                  className={`p-4 ${carte.cycleComplet ? 'border-positive' : ''} ${
+                    premier ? 'anim-cascade' : ''
+                  }`}
+                  style={rangCascade(rang, premier)}
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="min-w-0">
@@ -191,7 +203,8 @@ export function Retrait({
                   )}
                 </Carte>
               );
-            })}
+              })}
+            </div>
           </>
         }
       />

@@ -3,6 +3,7 @@ import { Carte } from '@kolek/ui';
 
 import { useDonnees } from '../cache';
 import { chargerBilan } from '../lectures-ecrans';
+import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 
 /**
@@ -22,6 +23,8 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
     revision,
     messageErreur: 'Chiffres indisponibles. Vérifie le réseau.',
   });
+  // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit.
+  const premier = usePremierRendu();
 
   return (
     <div className="flex-1 flex flex-col">
@@ -58,6 +61,7 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
       />
 
       <CorpsEcran
+        largeur="large"
         enfants={
           <>
             {erreur && (
@@ -78,8 +82,16 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
               />
             )}
 
-            {donnees?.tranches.map((tranche) => (
-              <Carte key={tranche.libelle} className="p-4">
+            {/* Les trois tranches côte à côte sur bureau. Empilées, elles
+                obligeaient à faire défiler pour comparer aujourd'hui à trente
+                jours — or la comparaison est tout l’intérêt de cet écran. */}
+            <div className="space-y-4 lg:grid lg:grid-cols-3 lg:gap-4 lg:space-y-0 lg:items-start">
+              {donnees?.tranches.map((tranche, rang) => (
+                <Carte
+                  key={tranche.libelle}
+                  className={`p-4 ${premier ? 'anim-cascade' : ''}`}
+                  style={rangCascade(rang, premier)}
+                >
                 <p className="font-headings font-bold text-base text-ink mb-3">{tranche.libelle}</p>
 
                 <div className="flex items-baseline justify-between gap-2 mb-1">
@@ -128,8 +140,9 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
                     <strong className="text-ink">{formatMontant(tranche.restitue)} FCFA</strong>
                   </p>
                 )}
-              </Carte>
-            ))}
+                </Carte>
+              ))}
+            </div>
           </>
         }
       />
