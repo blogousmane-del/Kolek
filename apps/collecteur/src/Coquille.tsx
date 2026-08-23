@@ -1,4 +1,4 @@
-import { NavMobile, type CleNavCollecteur } from '@kolek/ui';
+import { NavBureau, NavMobile, type CleNavCollecteur } from '@kolek/ui';
 import { useEffect, useState } from 'react';
 
 import { viderCache } from './cache';
@@ -100,18 +100,8 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
     setPage('encaisser');
   }
 
-  return (
-    // `max-w-mobile` vaut 520 px depuis le 2026-08-22, contre 420 auparavant.
-    // L'ancienne valeur était celle de la maquette, et elle est passée sous la
-    // largeur des téléphones courants : un iPhone 16 Pro Max fait 440 px en
-    // pixels CSS, un Pixel 9 Pro XL 448. Sur ces appareils, la coquille laissait
-    // donc une bande de fond visible de chaque côté — l'application ne
-    // remplissait pas l'écran, ce qui se lit exactement comme « pas responsive ».
-    //
-    // Le plafond garde sa raison d'être au-delà : sur un écran de bureau, où
-    // l'application est ouverte pour la démonstration, il empêche une maquette
-    // téléphone de s'étirer sur 1 800 px.
-    <div className="min-h-dvh w-full max-w-mobile mx-auto bg-canvas flex flex-col overflow-x-clip">
+  const contenu = (
+    <>
       {erreurSortie && (
         <p
           role="alert"
@@ -180,10 +170,50 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
         <Plus onRetour={() => setPage('accueil')} onDeconnexion={deconnecter} />
       )}
 
-      {/* La barre ne connaît que ses cinq clés. Sur un écran secondaire, aucun
-          onglet n'est actif — d'où le repli sur 'accueil', qui est bien l'endroit
-          d'où l'on vient et où la flèche ramène. */}
-      <NavMobile actif={estOnglet(page) ? page : 'accueil'} onNaviguer={setPage} />
+    </>
+  );
+
+  return (
+    /**
+     * Deux mises en page, une seule application.
+     *
+     * **Sous `lg`** : la colonne téléphone, plafonnée à `max-w-mobile` (520 px),
+     * avec la barre du bas. C'est la forme d'origine, et celle qui compte — le
+     * collecteur travaille debout, dans un marché.
+     *
+     * **À partir de `lg`** : une barre latérale fixe et un contenu centré. Le
+     * plafond passe à `max-w-liste` (640 px) plutôt que de disparaître : les
+     * écrans sont composés de cartes empilées et de listes, et une ligne de
+     * texte étirée sur 1 600 px devient illisible. On gagne la navigation
+     * directe vers les dix écrans, pas une mise en page différente.
+     *
+     * `overflow-x-clip` reste sur les deux : c'est le garde-fou posé le
+     * 2026-08-22 contre un débordement latéral, et il ne dépend pas de la
+     * largeur.
+     */
+    <div className="min-h-dvh bg-canvas lg:flex">
+      {/* `sticky` et non `fixed` : la barre suit le défilement sans sortir du
+          flux, donc le contenu n'a pas besoin d'une marge compensatoire qu'il
+          faudrait tenir à jour à chaque changement de largeur. */}
+      <div className="hidden lg:block lg:sticky lg:top-0 lg:h-dvh">
+        <NavBureau
+          actif={page}
+          nom={nomCollecteur}
+          onNaviguer={setPage}
+          onDeconnexion={deconnecter}
+        />
+      </div>
+
+      <div className="mx-auto flex min-h-dvh w-full max-w-mobile flex-col overflow-x-clip lg:min-h-0 lg:max-w-liste lg:py-8">
+        {contenu}
+      </div>
+
+      {/* La barre du bas ne connaît que ses cinq clés. Sur un écran secondaire,
+          aucun onglet n'est actif — d'où le repli sur 'accueil', qui est bien
+          l'endroit d'où l'on vient et où la flèche ramène. */}
+      <div className="lg:hidden">
+        <NavMobile actif={estOnglet(page) ? page : 'accueil'} onNaviguer={setPage} />
+      </div>
     </div>
   );
 }

@@ -75,7 +75,7 @@ export function Accueil({
   return (
     <div className="flex-1 flex flex-col">
       {/* En-tête sombre */}
-      <div className="bg-sidebar px-marge pt-entete pb-6">
+      <div className="bg-sidebar px-marge pt-entete pb-6 lg:mx-4 lg:rounded-2xl lg:pt-6">
         <div className="flex items-center justify-between mb-6">
           <div className="min-w-0">
             <p className="text-white/60 text-sm font-body">Bonjour,</p>
@@ -152,12 +152,33 @@ export function Accueil({
         <ActionsRapides actions={actions} />
       </div>
 
-      <div className="mx-4 mt-5">
+      {/* Sur écran large, la carte et l'historique se lisent côte à côte :
+          c'est la comparaison que fait le collecteur en préparant sa tournée. */}
+      <div className="lg:mx-4 lg:grid lg:grid-cols-2 lg:gap-4">
+      <div className="mx-4 mt-5 lg:mx-0">
+        {/*
+          « Carte du jour », au singulier, se lisait comme *la* carte du compte.
+          Un collecteur a signalé le 2026-08-23 croire que son compte
+          appartenait au client affiché, les autres n'étant que des noms en bas
+          d'écran.
+
+          Le calcul était juste — c'est la carte active la plus avancée, celle
+          dont le cycle de 31 mises se termine en premier. Le libellé, lui, ne
+          le disait pas. Un titre qui laisse deviner ce qu'il montre finit
+          toujours par être mal deviné.
+        */}
         <EnteteSection
-          titre="Carte du jour"
-          className="mb-2"
+          titre="La carte à finir en premier"
+          className="mb-1"
           action={<LienBloc libelle="Toutes les cartes" onActiver={() => onNaviguer('clients')} />}
         />
+        {tableau && tableau.cartesActives > 0 && (
+          <p className="text-xs font-body text-muted-foreground mb-2">
+            La plus avancée de tes {tableau.cartesActives} carte
+            {tableau.cartesActives > 1 ? 's' : ''} active
+            {tableau.cartesActives > 1 ? 's' : ''}.
+          </p>
+        )}
         {tableau?.carteDuJour ? (
           <CarteCollecte
             nomClient={tableau.carteDuJour.nom}
@@ -180,7 +201,7 @@ export function Accueil({
         )}
       </div>
 
-      <div className="mx-4 mt-5">
+      <div className="mx-4 mt-5 lg:mx-0">
         <EnteteSection
           titre="Dernières mises"
           className="mb-2"
@@ -209,6 +230,8 @@ export function Accueil({
             ))
           )}
         </Carte>
+      </div>
+
       </div>
 
       <div className="flex-1 min-h-6" />
