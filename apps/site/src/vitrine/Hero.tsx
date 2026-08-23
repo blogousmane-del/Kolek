@@ -1,6 +1,7 @@
-import { CONTACT_DEMO } from './Navbar';
-import { Onde, Rosace } from './texture';
-import { entree, useAnimations } from './animation';
+import { Onde, Rosace } from '@kolek/ui';
+
+import { gsap, useAnimations } from './animation';
+import { APP_COLLECTEUR } from './liens';
 
 /**
  * Le plan d'ouverture.
@@ -16,8 +17,40 @@ import { entree, useAnimations } from './animation';
  * moteur de calcul applique.
  */
 export function Hero() {
-  const ref = useAnimations<HTMLElement>(() => {
-    entree('[data-entree]', { delay: 0.15 });
+  const ref = useAnimations<HTMLElement>((conteneur) => {
+    const chrono = gsap.timeline({ delay: 0.15 });
+
+    // L'ouverture, en trois temps qui se chevauchent. Une timeline plutôt que
+    // trois tweens indépendants : c'est le chevauchement qui donne le poids —
+    // trois entrées strictement séquentielles se lisent comme un diaporama.
+    chrono
+      .from('[data-entree]', { y: 40, opacity: 0, duration: 1, ease: 'power3.out', stagger: 0.08 })
+      // Le filigrane arrive après le texte, en s'ouvrant : sur un billet, la
+      // gravure est sous l'encre, pas devant.
+      .from(
+        '[data-filigrane]',
+        { scale: 0.85, opacity: 0, duration: 1.6, ease: 'power2.out' },
+        '-=1.1',
+      )
+      .from('[data-faciale]', { opacity: 0, duration: 2, ease: 'none' }, '-=1.4');
+
+    // Le reflet or qui traverse le mot « précision », une fois. C'est le seul
+    // moment de la page où l'or bouge de lui-même — le réserver au mot que la
+    // marque revendique lui garde sa valeur.
+    chrono.fromTo(
+      '[data-reflet]',
+      { backgroundPosition: '-150% 0' },
+      { backgroundPosition: '250% 0', duration: 1.8, ease: 'power2.inOut' },
+      '-=0.6',
+    );
+
+    // Parallaxe de sortie : le hero s'enfonce pendant que la page monte.
+    gsap.to('[data-parallaxe-hero]', {
+      yPercent: 22,
+      opacity: 0.35,
+      ease: 'none',
+      scrollTrigger: { trigger: conteneur, start: 'top top', end: 'bottom top', scrub: true },
+    });
   });
 
   return (
@@ -30,11 +63,13 @@ export function Hero() {
         petales={22}
         excentricite={0.38}
         animee
+        data-filigrane
         className="pointer-events-none absolute -right-[12%] top-1/2 w-[70vmin] -translate-y-1/2 text-or/25"
       />
       {/* Valeur faciale. */}
       <p
         aria-hidden
+        data-faciale
         className="pointer-events-none absolute right-[4%] top-[8%] font-headings text-[34vw] font-bold leading-none text-white/[0.04] sm:text-[26rem]"
       >
         31
@@ -42,7 +77,7 @@ export function Hero() {
       {/* Bande de sécurité en pied. */}
       <Onde lignes={10} className="pointer-events-none absolute bottom-0 left-0 h-40 w-full text-or/15" />
 
-      <div className="relative z-10 px-6 pb-24 pt-40 sm:px-12 lg:px-20">
+      <div data-parallaxe-hero className="relative z-10 px-6 pb-24 pt-40 sm:px-12 lg:px-20">
         <p
           data-entree
           className="mb-5 inline-flex items-center gap-2 rounded-pill border border-or/30 px-4 py-1.5 font-mono text-xs tracking-widest text-or"
@@ -55,9 +90,14 @@ export function Hero() {
           <span data-entree className="block font-headings text-3xl font-bold leading-tight text-white sm:text-5xl">
             L’épargne du marché rencontre
           </span>
+          {/* Le reflet est peint par un dégradé porté par le texte lui-même
+              (`background-clip: text`), pas par un calque au-dessus : un calque
+              en `mix-blend-mode` coûte une couche de composition permanente, et
+              cette page tourne sur des téléphones d'entrée de gamme. */}
           <span
             data-entree
-            className="mt-1 block font-drama text-7xl italic leading-[0.95] text-or sm:text-[9rem]"
+            data-reflet
+            className="reflet-or mt-1 block font-drama text-7xl italic leading-[0.95] sm:text-[9rem]"
           >
             la précision.
           </span>
@@ -69,12 +109,17 @@ export function Hero() {
           ta main.
         </p>
 
+        {/* Le geste principal mène **dans le produit**, pas dans une boîte
+            aux tres. Avant le 2026-08-23 ces deux boutons pointaient sur un
+            `mailto:` : sur une machine sans client de messagerie configuré,
+            cliquer ne produisait rien de visible — et un bouton qui ne produit
+            rien de visible est un bouton cassé, quoi qu'en dise le code. */}
         <div data-entree className="mt-8 flex flex-wrap items-center gap-4">
           <a
-            href={CONTACT_DEMO}
+            href={APP_COLLECTEUR}
             className="magnetique overflow-hidden rounded-pill bg-or px-7 py-3.5 font-body text-base font-semibold text-dark-canvas"
           >
-            <span className="relative z-10">Demander une démo</span>
+            <span className="relative z-10">Ouvrir mon espace collecteur</span>
             <span aria-hidden className="voile-or" />
           </a>
           <a

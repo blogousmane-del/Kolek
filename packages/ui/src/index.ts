@@ -11,6 +11,7 @@ export { CarteCollecte } from './CarteCollecte';
 export { CarteStat } from './CarteStat';
 export { CarteZone } from './CarteZone';
 export { Champ } from './Champ';
+export { Bruit, Onde, Rosace } from './Guilloche';
 export { EcranConnexion } from './EcranConnexion';
 export { EcranMessage } from './EcranMessage';
 export { Filet } from './Filet';

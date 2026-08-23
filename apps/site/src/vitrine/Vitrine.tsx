@@ -1,3 +1,6 @@
+import { Bruit } from '@kolek/ui';
+
+import { Acces } from './Acces';
 import { Fonctionnalites } from './Fonctionnalites';
 import { Hero } from './Hero';
 import { Navbar } from './Navbar';
@@ -5,7 +8,6 @@ import { Philosophie } from './Philosophie';
 import { PiedDePage } from './PiedDePage';
 import { Protocole } from './Protocole';
 import { Tarification } from './Tarification';
-import { Bruit } from './texture';
 
 /**
  * La vitrine — la page de vente de Kolek, reconstruite le 2026-08-22.
@@ -29,6 +31,7 @@ export function Vitrine() {
       <Philosophie />
       <Protocole />
       <Tarification />
+      <Acces />
       <PiedDePage />
     </div>
   );

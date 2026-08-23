@@ -1,4 +1,5 @@
-import { Rosace } from './texture';
+import { Rosace } from '@kolek/ui';
+
 import { gsap, useAnimations } from './animation';
 
 /**

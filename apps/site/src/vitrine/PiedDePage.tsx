@@ -1,4 +1,4 @@
-import { CONTACT_DEMO } from './Navbar';
+import { APP_COLLECTEUR, CONTACT_DEMO } from './liens';
 
 /**
  * Le pied de page.
@@ -19,8 +19,12 @@ const COLONNES = [
     ],
   },
   {
-    titre: 'Contact',
-    liens: [{ href: CONTACT_DEMO, libelle: 'Demander une démo' }],
+    titre: 'Accès',
+    liens: [
+      { href: APP_COLLECTEUR, libelle: 'Espace collecteur' },
+      { href: '#acces', libelle: 'Toutes les entrées' },
+      { href: CONTACT_DEMO, libelle: 'Demander une démo' },
+    ],
   },
 ] as const;
 

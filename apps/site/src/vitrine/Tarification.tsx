@@ -1,6 +1,6 @@
 import { PALIERS, PALIER_RECOMMANDE, formatMontant } from '@kolek/core';
-import { CONTACT_DEMO } from './Navbar';
 import { entree, useAnimations } from './animation';
+import { APP_COLLECTEUR, CONTACT_DEMO } from './liens';
 
 /**
  * La grille tarifaire.
@@ -117,7 +117,10 @@ export function Tarification() {
 
       <p className="mt-8 font-body text-sm text-muted-foreground">
         Les comptes sont ouverts par l’équipe GTCS après un premier échange — le premier mois est
-        un essai, sans engagement.
+        un essai, sans engagement.{' '}
+        <a href={APP_COLLECTEUR} className="font-semibold text-primary underline underline-offset-2">
+          Déjà client ? Connecte-toi.
+        </a>
       </p>
     </section>
   );

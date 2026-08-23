@@ -1,0 +1,28 @@
+/**
+ * Les destinations réelles de la vitrine.
+ *
+ * Elles sont ici, en un seul endroit, parce que le défaut qu'on corrige le
+ * 2026-08-23 était précisément leur absence : les boutons du hero pointaient
+ * sur un `mailto:`. Un `mailto:` n'est pas un lien mort, mais sur une machine
+ * sans client de messagerie configuré il ne produit **rien de visible** — et un
+ * bouton qui ne produit rien de visible est un bouton cassé, quoi qu'en dise
+ * le code.
+ *
+ * La règle qui en sort : **le geste principal d'une page de vente doit mener à
+ * l'intérieur du produit**, pas dans la boîte aux lettres de quelqu'un.
+ */
+
+/** L'application du collecteur. Site Netlify distinct — la vitrine y renvoie
+    par une navigation ordinaire, ce qu'aucune directive CSP n'entrave. */
+export const APP_COLLECTEUR = 'https://kolek-collecteur.netlify.app';
+
+/** L'administration GTCS. Non annoncée dans la navigation : elle ne s'adresse
+    pas aux visiteurs, et la lister reviendrait à publier une cible. Elle
+    figure dans la section Accès, nommée pour ce qu'elle est. */
+export const APP_ADMIN = 'https://kolek-admin.netlify.app';
+
+/** Le contact commercial. Reste un `mailto:`, mais n'est plus le geste
+    principal : il vit dans la section Accès, où le visiteur arrive en sachant
+    ce qu'il demande. */
+export const CONTACT_DEMO =
+  'mailto:gsmtechnoloy@gmail.com?subject=Kolek%20—%20demande%20de%20démo&body=Bonjour,%0A%0AJe%20souhaite%20une%20démonstration%20de%20Kolek.%0A%0ANom%20:%0AZone%20de%20collecte%20:%0ANombre%20de%20clients%20:%0A';

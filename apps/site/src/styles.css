@@ -43,20 +43,53 @@ body {
   transform: translateX(0);
 }
 
-/* La rotation de la rosace guillochée. 90 s par tour : à peine perceptible,
-   comme il se doit — un filigrane qui gigote n'est plus un filigrane. */
-@keyframes rosace-rotation {
-  to {
-    transform: rotate(360deg);
+/* Le reflet or qui traverse « la précision » à l'ouverture.
+
+   Le dégradé est porté par le texte lui-même via `background-clip: text`, et
+   non par un calque au-dessus en `mix-blend-mode`. La différence n'est pas
+   théorique : un calque de fusion force le navigateur à garder une couche de
+   composition supplémentaire pendant toute la vie de la page, alors que ce
+   dégradé n'est composé que pendant les 1,8 s de l'animation. Sur le téléphone
+   d'entrée de gamme qui est notre cible, c'est la différence entre un
+   défilement fluide et un défilement qui accroche.
+
+   `background-position` est animé par GSAP ; la valeur de départ est ici pour
+   que le mot soit déjà or si le script ne démarre pas. */
+.reflet-or {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-or) 0%,
+    var(--color-or) 38%,
+    #fff8e1 50%,
+    var(--color-or) 62%,
+    var(--color-or) 100%
+  );
+  background-size: 250% 100%;
+  background-position: 0 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Repli : sans `background-clip: text`, le texte serait invisible. */
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .reflet-or {
+    background-image: none;
+    color: var(--color-or);
   }
 }
+
+/* `rosace-rotation` vit dans `@kolek/core/base.css` avec le composant qu'elle
+   anime — les trois cibles s'en servent maintenant. */
 
 @media (prefers-reduced-motion: reduce) {
   .magnetique,
   .voile-or {
     transition: none;
   }
-  [style*='rosace-rotation'] {
-    animation: none !important;
+  /* Le reflet ne joue pas : le mot reste or, plein. */
+  .reflet-or {
+    background-image: none;
+    color: var(--color-or);
   }
 }

@@ -1,4 +1,5 @@
-import { Onde } from './texture';
+import { Onde } from '@kolek/ui';
+
 import { gsap, useAnimations } from './animation';
 
 /**

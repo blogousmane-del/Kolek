@@ -6,6 +6,30 @@
    fournit déjà `tabular-nums`, et les composants l'appliquent là où on lit des
    montants en colonne. */
 
+/* La rotation de la rosace guillochée, employée par `Rosace` de `@kolek/ui`.
+   Elle vit ici depuis le 2026-08-23 : le composant est passé dans le paquet
+   partagé, et une animation déclarée dans la feuille d'une seule application
+   laisserait le motif immobile dans les deux autres.
+
+   90 s par tour, à peine perceptible : un filigrane qui gigote n'en est plus
+   un. Et `prefers-reduced-motion` l'arrête — la rosace est décorative, elle
+   n'apprend rien à personne. */
+@keyframes rosace-rotation {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rosace-tourne {
+  animation: rosace-rotation 90s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rosace-tourne {
+    animation: none;
+  }
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
