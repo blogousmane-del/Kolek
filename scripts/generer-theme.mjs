@@ -20,9 +20,22 @@ export function contenuAttendu() {
   return ENTETE + genererCssTheme();
 }
 
+/**
+ * Les fins de ligne ne comptent pas dans la comparaison.
+ *
+ * Git les convertit en CRLF au `checkout` sous Windows, alors que ce script
+ * écrit du LF. Une comparaison octet à octet rendait donc le garde-fou rouge
+ * après **tout** `git checkout`, sans qu'aucun jeton n'ait bougé — un contrôle
+ * qui crie au loup finit par être ignoré, ce qui est exactement ce qu'il ne
+ * faut pas d'un garde-fou. Constaté le 2026-08-24.
+ */
+function normaliser(texte) {
+  return texte.replace(/\r\n/g, '\n');
+}
+
 export function estAJour() {
   try {
-    return readFileSync(CIBLE, 'utf8') === contenuAttendu();
+    return normaliser(readFileSync(CIBLE, 'utf8')) === normaliser(contenuAttendu());
   } catch {
     return false;
   }
