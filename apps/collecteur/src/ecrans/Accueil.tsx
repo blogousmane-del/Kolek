@@ -102,7 +102,7 @@ export function Accueil({
           {/* `text-3xl` sous 390 px : « 1 250 000 » en 36 px déborde de la
               largeur utile d'un Galaxy A03 et se coupe en deux lignes au
               milieu du nombre. */}
-          <p className="font-headings font-bold text-white text-3xl xs:text-4xl leading-[1.1] tabular-nums">
+          <p className="anim-montant font-headings font-bold text-white text-3xl xs:text-4xl leading-[1.1] tabular-nums">
             {chiffre(tableau?.encaisseAujourdhui)}{' '}
             <span className="text-lg font-body font-medium text-white/60">FCFA</span>
           </p>

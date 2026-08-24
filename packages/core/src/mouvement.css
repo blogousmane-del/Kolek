@@ -75,47 +75,36 @@
   animation-delay: min(calc(var(--rang, 0) * 40ms), 400ms);
 }
 
-/* ------------------------------ 3. Compteur ------------------------------ */
+/* ------------------------------ 3. Montant ------------------------------- */
 
-/* Les grands montants montent de zéro à leur valeur.
+/* Le grand chiffre d'un en-tête entre en se posant.
  *
- * ## Le repli n'est pas optionnel
+ * ## Ce que cette primitive n'est pas, et pourquoi
  *
- * `@property` et `@starting-style` ne sont pas partout, et un montant est la
- * donnée la plus importante de son écran. La valeur vraie est donc **toujours**
- * dans le document, dans un élément que les lecteurs d'écran lisent ; le
- * compteur animé est un pseudo-élément décoratif, masqué à l'accessibilité. Un
- * navigateur qui ignore ces règles affiche la valeur, sans animation, et
- * personne ne perd rien.
+ * La conception prévoyait un compteur qui monte de zéro à la valeur, par
+ * `@property` et `counter()`. Écrit, puis retiré : **les compteurs CSS ne
+ * savent pas grouper les milliers.** `counter()` rend « 10000 » là où le
+ * Design System §3.2 impose « 10 000 », et aucune règle CSS ne corrige ça —
+ * ni `counter-style`, ni une unité de nombre.
  *
- * Réservé aux chiffres d'en-tête — encaissé du jour, total du bilan. Un
- * compteur sur chaque cellule d'un tableau serait du bruit.
+ * Le choix était donc : un chiffre qui monte mais qu'on lit mal, ou un chiffre
+ * juste qui entre bien. Sur le montant encaissé du jour — la première chose
+ * que le collecteur regarde en ouvrant l'application, souvent en plein
+ * soleil — la lisibilité passe avant l'effet.
+ *
+ * Faire monter un montant formaté exigerait de réécrire le texte à chaque
+ * frame en JavaScript. C'est exactement ce que la contrainte de cette
+ * conception exclut.
  */
-@property --kolek-valeur {
-  syntax: '<integer>';
-  initial-value: 0;
-  inherits: false;
-}
-
-@utility anim-compteur {
-  counter-reset: kolek-compteur var(--kolek-valeur);
-  transition: --kolek-valeur var(--duree-signature) var(--courbe-sortie);
-
-  /* `@starting-style` est ce qui fait partir la montée au premier rendu. Sans
-     lui, la valeur est déjà à sa cible quand l'élément apparaît : rien ne
-     change, donc rien ne transitionne, et le compteur affiche le montant final
-     sans jamais monter. L'alternative serait de poser 0 puis la valeur depuis
-     un effet React — du JavaScript par frame pour un effet décoratif. */
-  @starting-style {
-    --kolek-valeur: 0;
+@keyframes kolek-montant {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(6px);
   }
 }
 
-/* La valeur cible est posée en style inline sur l'élément. */
-@utility anim-compteur-cible {
-  &::after {
-    content: counter(kolek-compteur);
-  }
+@utility anim-montant {
+  animation: kolek-montant var(--duree-signature) var(--courbe-rebond) both;
 }
 
 /* ------------------------------ 4. Pression ------------------------------ */
@@ -188,7 +177,7 @@
 @media (prefers-reduced-motion: reduce) {
   .anim-entree,
   .anim-cascade,
-  .anim-compteur,
+  .anim-montant,
   .anim-pression,
   .anim-case,
   .anim-reussite,

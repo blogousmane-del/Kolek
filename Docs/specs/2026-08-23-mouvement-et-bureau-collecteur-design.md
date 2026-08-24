@@ -88,14 +88,23 @@ existant ; le délai est `calc(var(--rang) * 40ms)`, plafonné par
 devient une attente. `animation-fill-mode: backwards` évite l'éclair de
 contenu avant le délai.
 
-**`anim-compteur`** — les grands montants montent de 0 à leur valeur :
-`@property --valeur { syntax: '<integer>'; }` + `counter-reset` sur un
-pseudo-élément, transition sur `--valeur`. **Repli obligatoire** : la valeur
-réelle est toujours dans le document (`<span class="sr-only">`), le compteur
-est le pseudo-élément ; un navigateur sans `@property` affiche la valeur
-directement. Les lecteurs d'écran lisent le vrai chiffre, jamais le compteur.
-Appliqué aux seuls chiffres d'en-tête (encaissé du jour, solde restituable,
-total du bilan) — un compteur sur chaque cellule de tableau serait du bruit.
+**`anim-montant`** — les grands chiffres d'en-tête entrent en se posant :
+opacité, `scale(0.94)` et 6 px de translation, sur `--duree-signature` avec la
+courbe de rebond.
+
+> **Correction du 2026-08-24, à l'implémentation.** Cette primitive devait être
+> un compteur montant de zéro à la valeur, par `@property` et `counter()`.
+> Écrite, puis retirée : **les compteurs CSS ne savent pas grouper les
+> milliers.** `counter()` rend « 10000 » là où le Design System §3.2 impose
+> « 10 000 », et aucune règle CSS ne corrige cela. Sur le montant encaissé du
+> jour — la première chose que le collecteur regarde, souvent en plein soleil —
+> la lisibilité passe avant l'effet. Faire monter un montant formaté exigerait
+> de réécrire le texte à chaque frame en JavaScript, ce que la contrainte de
+> cette conception exclut. Le repli `sr-only` décrit ici devient sans objet :
+> le chiffre affiché **est** le vrai chiffre.
+
+Appliqué aux seuls chiffres d'en-tête (encaissé du jour, encours du bilan) — la
+même animation sur chaque cellule de tableau serait du bruit.
 
 **`anim-pression`** — le retour d'appui : `transform: scale(0.97)` sur
 `:active`, transition `--duree-toucher`. Posée sur `Bouton`, les pastilles
@@ -107,7 +116,7 @@ seul endroit par composant partagé — les écrans n'ont rien à faire.
 - *Mise encaissée* : la nouvelle case de la carte de collecte se remplit en
   `scale(0)→scale(1)` avec `--courbe-rebond`, et une coche SVG se dessine par
   `stroke-dashoffset` sur `--duree-signature`.
-- *Carte clôturée* : le montant restitué entre par `anim-compteur`, le panneau
+- *Carte clôturée* : le montant restitué entre par `anim-montant`, le panneau
   de confirmation par `anim-entree` avec `--courbe-rebond`.
 
 C'est le seul endroit où l'on dépasse 250 ms. L'encaissement est le geste qui
@@ -123,7 +132,7 @@ fait vivre le produit ; il mérite sa récompense visuelle, et il est le seul.
 
 ```css
 @media (prefers-reduced-motion: reduce) {
-  .anim-entree, .anim-cascade, .anim-compteur::after, .anim-pression, .anim-reussite {
+  .anim-entree, .anim-cascade, .anim-montant, .anim-pression, .anim-reussite {
     animation: none;
     transition: none;
   }
@@ -200,9 +209,9 @@ La barre du bas mobile, la navigation, l'ordre des écrans, les textes. Le
   cascade ne s'applique qu'au **premier** montage de l'écran (une classe posée
   conditionnellement sur `premierRendu`, mémorisé par `useRef`). Une liste qui
   clignote à chaque écriture est pire que pas d'animation.
-- **`@property` et Firefox Android ancien.** Le repli du compteur (§2.3) est
-  non négociable : la valeur vraie est dans le document, le compteur est
-  décoratif.
+- **Le compteur montant est abandonné** (§2.3) : les compteurs CSS ne groupent
+  pas les milliers. Le risque qu'il portait — un repli à tenir sur les
+  navigateurs sans `@property` — disparaît avec lui.
 - **Le déficit de contraste au soleil.** Aucune animation ne doit passer par des
   états d'opacité longs : l'opacité transitoire ne dure jamais plus que
   `--duree-entree`.

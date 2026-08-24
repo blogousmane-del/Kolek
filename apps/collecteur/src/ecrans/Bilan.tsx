@@ -41,7 +41,7 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
                   le document. */}
               <div className="bg-white/10 rounded-lg p-3 min-w-0">
                 <p className="text-white/60 text-xs font-body mb-0.5">Encours client</p>
-                <p className="text-white font-headings font-bold text-lg xs:text-xl tabular-nums">
+                <p className="anim-montant text-white font-headings font-bold text-lg xs:text-xl tabular-nums">
                   {formatMontant(donnees.encoursTotal)}
                 </p>
                 <p className="text-white/50 text-xs font-body">FCFA à rendre</p>
