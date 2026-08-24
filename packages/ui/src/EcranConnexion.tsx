@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Bouton } from './Bouton';
 import { Champ } from './Champ';
 import { Onde, Rosace } from './Guilloche';
+import { Marque } from './Logo';
 
 /** Le bouton d'un fournisseur d'identité. Optionnel : l'administration n'en a
     pas, et n'en veut pas — un compte d'administration se protège par un mot de
@@ -112,9 +113,9 @@ export function EcranConnexion({
         className="relative z-10 w-full max-w-formulaire rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-6 shadow-lg backdrop-blur-xl"
       >
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-or">
-            <span className="font-headings text-base font-bold text-dark-canvas">K</span>
-          </div>
+          {/* La pièce seule : le texte à côté est le titre de l'écran, pas le
+              nom du produit. Poser le mot-symbole ici le ferait dire deux fois. */}
+          <Marque className="h-9 w-9 shrink-0" />
           <div>
             <h1 className="font-headings text-xl font-bold leading-tight text-white">{titre}</h1>
             <p className="font-body text-sm text-white/50">{sousTitre}</p>

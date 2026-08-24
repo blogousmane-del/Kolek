@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 316 120" width="316" height="120" role="img" aria-label="Kolek">
+  <g transform="translate(4 12) scale(0.96)"><circle cx="50" cy="50" r="50" fill="#0E2A1E"></circle><path d="M32 22 V78" stroke="#D2B24C" stroke-width="12" stroke-linecap="round" fill="none"></path>
+    <path d="M74 22 L44 50 L74 78" fill="none" stroke="#D2B24C" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"></path></g>
+  <g transform="translate(128 34) scale(0.52)"><g fill="none" stroke="#0E2A1E" stroke-width="15" stroke-linecap="butt">
+    <path d="M7.5 0 V100"></path><path d="M57 0 L20 52 L60 100" stroke-linejoin="round"></path>
+    <circle cx="117" cy="65" r="27.5"></circle><path d="M174.5 0 V100"></path>
+    <path d="M 259.5 65 L 204.5 65 A 27.5 27.5 0 0 0 249.7 86.1 M 204.5 65 A 27.5 27.5 0 0 1 259.5 65"></path>
+    <path d="M289.5 0 V100"></path><path d="M330 30 L299 60 L332 100" stroke-linejoin="round"></path>
+  </g></g>
+</svg>

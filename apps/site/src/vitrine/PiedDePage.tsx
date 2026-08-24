@@ -1,3 +1,5 @@
+import { Logo } from '@kolek/ui';
+
 import { APP_COLLECTEUR, CONTACT_DEMO, INSCRIPTION } from './liens';
 
 /**
@@ -33,12 +35,7 @@ export function PiedDePage() {
     <footer className="rounded-t-[2rem] bg-dark-canvas sm:rounded-t-[4rem] px-5 pb-10 pt-16 sm:px-12 lg:px-20">
       <div className="grid gap-10 md:grid-cols-3">
         <div>
-          <p className="mb-2 flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-or">
-              <span className="font-headings text-sm font-bold text-dark-canvas">K</span>
-            </span>
-            <span className="font-headings text-xl font-bold text-white">Kolek</span>
-          </p>
+          <Logo className="mb-2 h-9 text-white" />
           <p className="max-w-xs font-body text-sm leading-relaxed text-white/50">
             L’épargne du marché, enfin sécurisée. Un produit GTCS, construit à Abidjan pour les
             banquiers ambulants de Côte d’Ivoire.

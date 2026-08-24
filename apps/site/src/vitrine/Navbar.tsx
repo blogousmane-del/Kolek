@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { Logo, Marque } from '@kolek/ui';
+
 import { APP_COLLECTEUR, INSCRIPTION } from './liens';
 
 /**
@@ -53,14 +55,13 @@ export function Navbar() {
         className="mr-1.5 flex shrink-0 items-center gap-2 sm:mr-3"
         aria-label="Kolek — haut de page"
       >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-or">
-          <span className="font-headings text-sm font-bold text-dark-canvas">K</span>
-        </span>
-        {/* Le mot disparaît sous 380 px : le logo suffit à identifier la page,
-            et les pixels rendus valent mieux pour la seule commande qui compte. */}
-        <span className="hidden font-headings text-lg font-bold tracking-tight text-white xs:inline">
-          Kolek
-        </span>
+        {/* Le mot disparaît sous 380 px : la pièce suffit à identifier la page,
+            et les pixels rendus valent mieux pour la seule commande qui compte.
+            Deux formes plutôt qu'une, parce que le mot est un tracé dans le même
+            SVG que la pièce — on ne peut pas en masquer la moitié en CSS.
+            `decoratif` : le lien porte déjà `aria-label`. */}
+        <Marque decoratif className="h-7 w-7 shrink-0 xs:hidden" />
+        <Logo decoratif className="hidden h-7 shrink-0 text-white xs:block" />
       </a>
 
       {LIENS.map((lien) => (

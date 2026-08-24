@@ -1,4 +1,5 @@
 import { Icone, type NomIcone } from './Icone';
+import { Logo } from './Logo';
 
 export type CleNavAdmin =
   | 'tableau'
@@ -136,12 +137,12 @@ export function BarreLaterale({ actif, onNaviguer, onDeconnexion, onFermer }: Pr
     // encart de promotion. Sur un portable en 768 px de haut, le bas était
     // coupé sans possibilité d'y accéder.
     <div className="flex flex-col bg-sidebar w-sidebar flex-shrink-0 h-full overflow-y-auto">
-      {/* Logo */}
+      {/* Logo. `text-surface` peint le mot : la pièce, elle, garde ses deux
+          couleurs de marque. Cette barre était la seule à poser un carré vert
+          là où les quatre autres emplacements posaient un carré or — deux
+          barres latérales côte à côte dans le produit, deux marques. */}
       <div className="px-6 py-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-md bg-primary flex items-center justify-center">
-          <span className="text-primary-foreground font-headings font-bold text-base">K</span>
-        </div>
-        <span className="font-headings font-bold text-surface text-xl tracking-tight">Kolek</span>
+        <Logo className="h-9 text-surface" />
         {onFermer && (
           <button
             type="button"

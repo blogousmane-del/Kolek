@@ -18,5 +18,6 @@ export { Filet } from './Filet';
 export { Icone, type NomIcone } from './Icone';
 export { LigneCollecteur } from './LigneCollecteur';
 export { LigneTransaction, type TypeMontant } from './LigneTransaction';
+export { Logo, Marque } from './Logo';
 export { NavBureau, type CleNavBureau } from './NavBureau';
 export { NavMobile, type CleNavCollecteur } from './NavMobile';

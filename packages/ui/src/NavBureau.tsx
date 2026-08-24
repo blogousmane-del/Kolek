@@ -1,4 +1,5 @@
 import { Icone, type NomIcone } from './Icone';
+import { Logo } from './Logo';
 
 /**
  * La navigation du collecteur sur écran large.
@@ -126,10 +127,7 @@ export function NavBureau({ actif, onNaviguer, onDeconnexion, nom }: Props) {
   return (
     <aside className="flex h-dvh w-sidebar flex-shrink-0 flex-col overflow-y-auto bg-sidebar">
       <div className="flex items-center gap-3 px-6 py-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-or">
-          <span className="font-headings text-base font-bold text-dark-canvas">K</span>
-        </div>
-        <span className="font-headings text-xl font-bold tracking-tight text-surface">Kolek</span>
+        <Logo className="h-9 text-surface" />
       </div>
 
       {/* L'encaissement, détaché et en couleur : sur la barre du bas il sort du
