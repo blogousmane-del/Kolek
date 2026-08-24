@@ -312,8 +312,14 @@ Cinq couches empilées, activées par phases. Le socle est récurrent ; les rela
 | Couleur | Hex | Usage |
 |---|---|---|
 | Vert Kolek | `#14402C` | Primaire — confiance, épargne |
-| Or / pièce | `#D9A84E` | Accent — la valeur qui s'accumule |
+| Or / pièce | `#D2B24C` | Accent — la valeur qui s'accumule |
 | Or foncé | `#B07D2B` | Accent secondaire |
+
+> **Correction du 2026-08-24.** L'or valait `#D9A84E` ici, `#C9A84C` dans
+> `tokens.ts` et `#D2B24C` sur la planche de logo — trois or pour une marque.
+> C'est la planche qui a tranché : la pièce est ce que le collecteur voit sur
+> l'écran d'accueil de son téléphone. `tokens.ts` est la source d'exécution ;
+> cette ligne ne fait que la refléter.
 | Encre | `#171A17` | Texte |
 | Papier | `#FBFAF6` | Fond |
 

@@ -54,11 +54,17 @@ export const couleurs = {
   chartTeal: '#7FB6A6',
   chartMint: '#B7D9BE',
   chartSlate: '#AEB7D6',
-  // L'or champagne de la vitrine. Le site de vente est la seule surface du
-  // produit qui parle d'argent au sens propre, et il porte la couleur des
-  // billets plutôt qu'un vert de plus. Les deux applications ne l'utilisent
-  // pas : dans l'outil, l'argent est un nombre, pas un ornement.
-  or: '#C9A84C',
+  // L'or champagne. Le site de vente est la surface du produit qui parle
+  // d'argent au sens propre, et il porte la couleur des billets plutôt qu'un
+  // vert de plus. Depuis le 2026-08-24, c'est aussi l'or de la pièce du logo :
+  // les deux applications le portent donc elles aussi, mais nulle part ailleurs
+  // que dans la marque — dans l'outil, l'argent est un nombre, pas un ornement.
+  //
+  // La valeur vient de la planche de logo et non plus du cahier de charges.
+  // Trois or circulaient : `#C9A84C` ici, `#D9A84E` au cahier §313, `#D2B24C`
+  // sur la planche. C'est la pièce qui tranche — elle est ce que le collecteur
+  // voit sur son écran d'accueil, et une marque ne se décline pas en trois ors.
+  or: '#D2B24C',
   orDoux: '#E5D5A3',
 } as const;
 
