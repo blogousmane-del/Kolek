@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 import { Icone, type NomIcone } from './Icone';
 
 export interface ActionRapide {
@@ -27,23 +29,33 @@ interface Props {
   actions: ActionRapide[];
   /** Le tableau de bord serre la grille : pastilles de 48 px au lieu de 56. */
   compact?: boolean;
+  /**
+   * Fait entrer les pastilles en escalier.
+   *
+   * Éteint par défaut, et pas seulement par prudence : l'appelant est le seul à
+   * savoir s'il s'agit d'une première apparition. Rejouer la cascade à chaque
+   * relecture ferait clignoter le menu au moment où le collecteur vérifie qu'un
+   * encaissement est bien enregistré — voir `usePremierRendu`.
+   */
+  anime?: boolean;
 }
 
-export function ActionsRapides({ actions, compact = false }: Props) {
+export function ActionsRapides({ actions, compact = false, anime = false }: Props) {
   return (
     // Deux colonnes sur téléphone : à quatre, le libellé sous la pastille
     // passait sur trois lignes et coupait les mots.
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      {actions.map((action) => (
+      {actions.map((action, rang) => (
         <button
           key={action.libelle}
           type="button"
           disabled={!action.onActiver}
           title={action.onActiver ? undefined : 'À venir'}
           onClick={action.onActiver}
+          style={anime ? ({ '--rang': rang } as CSSProperties) : undefined}
           className={`anim-pression flex flex-col items-center ${compact ? 'gap-1.5' : 'gap-2'} ${
-            action.onActiver ? 'cursor-pointer' : 'opacity-60 cursor-default'
-          }`}
+            anime ? 'anim-cascade' : ''
+          } ${action.onActiver ? 'cursor-pointer' : 'opacity-60 cursor-default'}`}
         >
           <div
             className={`${

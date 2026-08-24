@@ -16,6 +16,7 @@ import {
 import { useDonnees } from '../cache';
 import type { Page } from '../Coquille';
 import { chargerTableauCollecteur } from '../lectures';
+import { usePremierRendu } from '../premier-rendu';
 
 /**
  * Écran d'accueil du collecteur.
@@ -68,6 +69,11 @@ export function Accueil({
     { icone: 'message-square', libelle: 'Avis', onActiver: () => onNaviguer('avis') },
     { icone: 'more-horizontal', libelle: 'Plus', onActiver: () => onNaviguer('plus') },
   ];
+
+  // Voir `Recus` : l'escalier ne rejoue pas quand l'écran se relit après une
+  // écriture. Un menu qui clignote à chaque mise encaissée est une distraction
+  // au pire moment.
+  const premier = usePremierRendu();
 
   const nom = nomCollecteur ?? 'Collecteur';
   const chiffre = (valeur: number | undefined) =>
@@ -147,11 +153,6 @@ export function Accueil({
           {erreur}
         </p>
       )}
-
-      <div className="mx-4 mt-5">
-        <EnteteSection titre="Actions" />
-        <ActionsRapides actions={actions} />
-      </div>
 
       {/* Sur écran large, la carte et l'historique se lisent côte à côte :
           c'est la comparaison que fait le collecteur en préparant sa tournée. */}
@@ -233,6 +234,32 @@ export function Accueil({
         </Carte>
       </div>
 
+      </div>
+
+      {/*
+        Les actions passent sous la carte du jour le 2026-08-24, à la demande
+        du collecteur qui utilise l'application.
+
+        L'ordre d'un écran d'accueil dit ce qu'on vient y chercher. Neuf
+        pastilles en tête repoussaient sous la ligne de flottaison la seule
+        information qui change d'heure en heure : quelle carte finit en premier,
+        et ce qui vient d'être encaissé. Le collecteur ouvrait donc son
+        application sur un menu, pas sur son travail.
+
+        En bas, les actions redeviennent ce qu'elles sont — un point de départ
+        vers les autres écrans, consulté une fois qu'on a lu l'essentiel. Elles
+        gagnent au passage un fond de carte : posées à même le canevas, neuf
+        pastilles alignées se lisaient comme un débordement de l'écran
+        précédent plutôt que comme un bloc.
+      */}
+      <div className="mx-4 mt-6 lg:mx-0">
+        <Carte className="p-4 sm:p-5">
+          <EnteteSection titre="Actions" className="mb-1" />
+          <p className="text-xs font-body text-muted-foreground mb-4">
+            Tout ce que tu peux faire depuis ici.
+          </p>
+          <ActionsRapides actions={actions} anime={premier} />
+        </Carte>
       </div>
 
       <div className="flex-1 min-h-6" />
