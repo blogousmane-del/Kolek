@@ -162,11 +162,33 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://127.0.0.1:3000"
+# 5173 et non 3000 : c'est le port de Vite, donc celui d'où part réellement un
+# clic « Continuer avec Google » sur le poste du développeur. L'ancienne valeur
+# renvoyait sur un port que rien n'écoute, et le retour de Google tombait dans
+# le vide sans message.
+#
+# **Cette valeur diverge légitimement du distant.** En production, la Site URL
+# vaut `https://kolek-collecteur.netlify.app`, et elle se pose dans le tableau
+# de bord Supabase — voir `Docs/deploiement.md` §2. C'est le seul réglage du
+# fichier dont la bonne valeur locale n'est pas la bonne valeur distante, et il
+# est nommé ici pour que la divergence soit une décision plutôt qu'un oubli.
+site_url = "http://localhost:5173"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+# Le code appelle `signInWithOAuth({ redirectTo: window.location.origin })` :
+# l'adresse de retour est donc l'origine d'où part le clic, et non une constante.
+# Sur un poste où les trois applications tournent en même temps, Vite prend le
+# premier port libre — d'où les trois.
+#
+# Une origine absente de cette liste ne provoque aucune erreur visible : GoTrue
+# renvoie silencieusement sur `site_url` à la place. C'est ce qui fait chercher
+# longtemps.
+additional_redirect_urls = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -356,6 +378,32 @@ url = ""
 skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
+
+# Google. Éteint ici, allumé en production.
+#
+# Le fournisseur se configure dans le tableau de bord Supabase, avec un
+# identifiant et un secret délivrés par Google Cloud — que ce dépôt public ne
+# peut pas porter. Ce bloc existe pour que la CLI ne redécouvre pas le
+# fournisseur à chaque mise à jour, et pour que les deux réglages qui comptent
+# soient écrits quelque part.
+#
+# Côté Google Cloud, une seule adresse de redirection est à déclarer, et ce
+# n'est **pas** celle de l'application :
+#
+#     https://yfnwmokxkznejotgpfgf.supabase.co/auth/v1/callback
+#
+# Google ne redirige jamais vers Netlify. Il redirige vers Supabase, qui renvoie
+# ensuite vers l'origine demandée par `redirectTo` — si elle figure dans
+# `additional_redirect_urls` ci-dessus, ou dans la liste équivalente du tableau
+# de bord pour le distant.
+[auth.external.google]
+enabled = false
+client_id = ""
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+url = ""
+# Requis pour une connexion Google sur la pile locale.
+skip_nonce_check = true
 
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.

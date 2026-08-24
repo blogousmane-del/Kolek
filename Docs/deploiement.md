@@ -102,6 +102,46 @@ quelque chose. Elle en a déjà fait tomber un — voir la note sous le tableau.
 > bord Supabase, vérifier qu'on ferme bien *Allow new users to sign up* et pas
 > le fournisseur *Email* lui-même.
 
+### Connexion Google — les deux endroits, et l'erreur classique
+
+Google ne redirige **jamais** vers Netlify. Il redirige vers Supabase, et c'est
+Supabase qui renvoie ensuite vers l'application. Mettre les adresses Netlify
+côté Google fait refuser chaque tentative, avec un message qui n'explique rien.
+
+**Google Cloud Console — identifiant OAuth 2.0, type « Application Web »**
+
+| Champ | Valeur |
+|---|---|
+| Authorized redirect URIs | `https://yfnwmokxkznejotgpfgf.supabase.co/auth/v1/callback` |
+| Authorized JavaScript origins | `https://yfnwmokxkznejotgpfgf.supabase.co` |
+
+Une seule adresse de redirection. Rien d'autre.
+
+**Supabase — Authentication → URL Configuration**
+
+| Champ | Valeur |
+|---|---|
+| Site URL | `https://kolek-collecteur.netlify.app` |
+| Redirect URLs | `https://kolek-collecteur.netlify.app`<br>`https://kolek-collecteur.netlify.app/**` |
+
+**Supabase — Authentication → Providers → Google** : activer, coller le *Client
+ID* et le *Client Secret*.
+
+> **Pourquoi la liste des Redirect URLs compte.** Le code appelle
+> `signInWithOAuth({ redirectTo: window.location.origin })` — l'adresse de
+> retour est l'origine d'où part le clic, pas une constante. Une origine absente
+> de la liste ne lève aucune erreur : GoTrue renvoie silencieusement sur la
+> *Site URL*. Le symptôme est une connexion qui « marche » mais atterrit au
+> mauvais endroit, ce qui envoie chercher partout sauf ici.
+
+Une seule application est concernée : `apps/collecteur`. Un seul
+`signInWithOAuth` existe dans le dépôt. L'administration et la vitrine n'ont pas
+de connexion Google, et n'ont rien à déclarer.
+
+`disable_signup` reste en vigueur : une adresse Google sans fiche collecteur est
+refusée, et le code répond en français au lieu de laisser passer le message
+anglais de GoTrue. C'est voulu — le compte se crée par GTCS, pas par Google.
+
 **Sauvegardes.** Vérifier que les sauvegardes automatiques sont actives. C'est
 l'épargne réelle de commerçants ; l'exigence de sauvegarde du cahier §7 ne se
 satisfait pas d'un défaut supposé.
