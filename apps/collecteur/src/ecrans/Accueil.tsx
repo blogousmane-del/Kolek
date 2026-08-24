@@ -74,9 +74,9 @@ export function Accueil({
     tableau ? formatMontant(valeur ?? 0) : '—';
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-large">
       {/* En-tête sombre */}
-      <div className="bg-sidebar px-marge pt-entete pb-6 lg:mx-4 lg:rounded-2xl lg:pt-6">
+      <div className="bg-sidebar px-marge pt-entete pb-6 lg:rounded-2xl lg:pt-6">
         <div className="flex items-center justify-between mb-6">
           <div className="min-w-0">
             <p className="text-white/60 text-sm font-body">Bonjour,</p>
@@ -155,7 +155,7 @@ export function Accueil({
 
       {/* Sur écran large, la carte et l'historique se lisent côte à côte :
           c'est la comparaison que fait le collecteur en préparant sa tournée. */}
-      <div className="lg:mx-4 lg:grid lg:grid-cols-2 lg:gap-4">
+      <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
       <div className="mx-4 mt-5 lg:mx-0">
         {/*
           « Carte du jour », au singulier, se lisait comme *la* carte du compte.

@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { CarteChoisie } from '../Coquille';
 import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
+import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { supabase } from '../supabase';
 
 interface Client {
@@ -158,11 +159,14 @@ export function Clients({
   const cartesActives = lignes?.filter((l) => l.carte?.statut === 'active').length ?? 0;
   const cyclesComplets =
     lignes?.filter((l) => (l.carte?.mises_encaissees ?? 0) >= MISES_PAR_CYCLE).length ?? 0;
+  // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit — et
+  // cette liste-ci se relit après chaque inscription et chaque encaissement.
+  const premier = usePremierRendu();
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-large">
       {/* En-tête sombre */}
-      <div className="bg-sidebar px-marge pt-entete pb-5">
+      <div className="bg-sidebar px-marge pt-entete pb-5 lg:rounded-2xl lg:pt-6">
         <div className="flex items-center justify-between mb-5">
           <div>
             <p className="text-white/60 text-sm font-body">Bonjour,</p>
@@ -266,7 +270,9 @@ export function Clients({
       </div>
 
       {/* Liste */}
-      <div className="px-4 mt-4 flex flex-col gap-3">
+      {/* Deux colonnes sur bureau : c’est la liste la plus longue du produit,
+          et une fiche de client tient dans la moitié de la largeur. */}
+      <div className="px-4 mt-4 flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
         {erreur && (
           <Carte className="p-4 border-negative">
             <p className="text-base font-body text-negative m-0">{erreur}</p>
@@ -302,13 +308,18 @@ export function Clients({
           </Carte>
         )}
 
-        {visibles.map((ligne) => (
-          <LigneClient
+        {visibles.map((ligne, rang) => (
+          <div
             key={ligne.id}
+            className={premier ? 'anim-cascade' : undefined}
+            style={rangCascade(rang, premier)}
+          >
+          <LigneClient
             ligne={ligne}
             onEncaisser={onEncaisser}
             onConsentementChange={onEcriture}
           />
+          </div>
         ))}
       </div>
 

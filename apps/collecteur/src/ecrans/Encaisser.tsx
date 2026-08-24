@@ -68,9 +68,9 @@ export function Encaisser({
   }
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-liste">
       {/* En-tête */}
-      <div className="bg-sidebar px-marge pt-entete pb-5">
+      <div className="bg-sidebar px-marge pt-entete pb-5 lg:rounded-2xl lg:pt-6">
         <div className="flex items-center justify-between mb-1">
           <button
             type="button"
