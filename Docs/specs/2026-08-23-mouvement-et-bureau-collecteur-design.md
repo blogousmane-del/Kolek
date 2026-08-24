@@ -74,7 +74,7 @@ classes ; personne ne redéclare de `@keyframes` localement.
 Trois durées, deux courbes, et rien d'autre. Une animation qui a besoin d'une
 quatrième durée est une animation qui n'a pas trouvé sa catégorie.
 
-### 2.3 Les cinq primitives
+### 2.3 Les quatre primitives
 
 **`anim-entree`** — l'entrée d'un écran : opacité 0→1 et translation verticale
 12 px→0, `--duree-entree`, `--courbe-sortie`. Posée sur le conteneur de chaque
@@ -111,13 +111,19 @@ même animation sur chaque cellule de tableau serait du bruit.
 d'`ActionsRapides`, les onglets de `NavMobile`, les rangées cliquables. Un
 seul endroit par composant partagé — les écrans n'ont rien à faire.
 
-**`anim-reussite`** — les deux moments signature, et eux seuls :
+**`anim-reussite`** — le moment signature : la confirmation d'un encaissement
+entre en `scale(0.92)→scale(1)` avec `--courbe-rebond`.
 
-- *Mise encaissée* : la nouvelle case de la carte de collecte se remplit en
-  `scale(0)→scale(1)` avec `--courbe-rebond`, et une coche SVG se dessine par
-  `stroke-dashoffset` sur `--duree-signature`.
-- *Carte clôturée* : le montant restitué entre par `anim-montant`, le panneau
-  de confirmation par `anim-entree` avec `--courbe-rebond`.
+> **Correction du 2026-08-24, à l'implémentation.** La conception plaçait cette
+> animation sur la case fraîchement remplie de la carte de collecte. Impossible :
+> la coquille remet `carteChoisie` à `null` après un encaissement réussi, donc
+> `CarteCollecte` est **démontée** au moment précis où l'animation devrait
+> jouer. Le composant `derniereCase` prévu aurait été du code jamais exécuté.
+> Ce que le collecteur voit après son geste, c'est le message de réussite : c'est
+> donc lui qui porte la récompense, avec un fond teinté qui le rend lisible sans
+> le lire. Les primitives `anim-case` et `anim-coche`, devenues sans usage, ont
+> été retirées du fichier : du vocabulaire déclaré et jamais employé finit par
+> être copié par erreur.
 
 C'est le seul endroit où l'on dépasse 250 ms. L'encaissement est le geste qui
 fait vivre le produit ; il mérite sa récompense visuelle, et il est le seul.

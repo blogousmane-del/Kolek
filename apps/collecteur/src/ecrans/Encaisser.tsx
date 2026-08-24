@@ -146,8 +146,23 @@ export function Encaisser({
               {erreur}
             </p>
           )}
+          {/* Le moment signature du produit.
+
+              La conception prévoyait d'animer la case fraîchement remplie de la
+              carte de collecte. Impossible ici, et il vaut mieux le dire que le
+              contourner : la coquille remet `carteChoisie` à `null` après un
+              encaissement réussi, donc `CarteCollecte` est démontée au moment
+              précis où l'animation devrait jouer. Ce que le collecteur voit,
+              c'est ce message — c'est donc lui qui porte la récompense.
+
+              Le geste est répété trente fois par jour, debout, devant une
+              cliente. La confirmation doit se lire d'un coup d'œil, sans lire
+              un mot. */}
           {succes && (
-            <p role="status" className="mx-4 mb-2 text-sm font-body text-positive">
+            <p
+              role="status"
+              className="anim-reussite mx-4 mb-2 rounded-md bg-positive-tint px-3 py-2 text-sm font-body font-medium text-positive"
+            >
               {succes}
             </p>
           )}

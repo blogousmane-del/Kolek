@@ -126,23 +126,22 @@
 
 /* ------------------------------ 5. Réussite ------------------------------ */
 
-/* Les deux moments signature, et eux seuls : la mise encaissée et la carte
-   clôturée. C'est le seul endroit du produit qui dépasse 250 ms.
+/* Le moment signature : la confirmation d'un encaissement.
  *
- * L'encaissement est le geste qui fait vivre Kolek. Un collecteur le répète
- * trente fois par jour, debout, devant sa cliente. Qu'il ait une récompense
- * visuelle n'est pas de la décoration : c'est la confirmation que l'argent est
- * enregistré, lisible d'un coup d'œil et sans lire un mot. */
-@keyframes kolek-case {
-  from {
-    transform: scale(0);
-  }
-}
-
-@utility anim-case {
-  animation: kolek-case var(--duree-signature) var(--courbe-rebond) both;
-}
-
+ * C'est le seul endroit du produit qui dépasse 250 ms, et le seul qui emploie
+ * la courbe de rebond sur une entrée. L'encaissement est le geste qui fait
+ * vivre Kolek — un collecteur le répète trente fois par jour, debout, devant sa
+ * cliente. Qu'il ait une récompense visuelle n'est pas de la décoration : c'est
+ * la confirmation que l'argent est enregistré, lisible d'un coup d'œil et sans
+ * lire un mot.
+ *
+ * La conception prévoyait aussi d'animer la case fraîchement remplie de la
+ * carte de collecte, et une coche dessinée au trait. Les deux ont été écrites
+ * puis retirées : la carte est démontée au moment où l'animation devrait jouer
+ * — voir la spec, §2.3. Du vocabulaire déclaré et jamais employé finit par être
+ * copié par erreur ; ce fichier prétend être la source unique, il doit rester
+ * exact.
+ */
 @keyframes kolek-reussite {
   from {
     opacity: 0;
@@ -154,22 +153,6 @@
   animation: kolek-reussite var(--duree-signature) var(--courbe-rebond) both;
 }
 
-/* La coche qui se dessine. `stroke-dashoffset` est une propriété de tracé, pas
-   de mise en page : elle n'entraîne aucun recalcul. */
-@keyframes kolek-coche {
-  from {
-    stroke-dashoffset: 24;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-@utility anim-coche {
-  stroke-dasharray: 24;
-  animation: kolek-coche var(--duree-signature) var(--courbe-sortie) both;
-}
-
 /* ------------------------- Le commutateur général ------------------------ */
 
 /* Un seul bloc, en bas du fichier, qui couvre toute primitive présente et
@@ -179,9 +162,7 @@
   .anim-cascade,
   .anim-montant,
   .anim-pression,
-  .anim-case,
-  .anim-reussite,
-  .anim-coche {
+  .anim-reussite {
     animation: none !important;
     transition: none !important;
   }
