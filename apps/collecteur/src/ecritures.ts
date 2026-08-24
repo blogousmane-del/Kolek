@@ -45,6 +45,7 @@ const PHRASES: Record<string, string> = {
   MONTANT_INVALIDE: 'Le montant doit être égal à la mise de la carte.',
   BORNE: 'Une des informations saisies est trop longue.',
   DROIT_REFUSE: 'Tu n’as pas le droit d’écrire cette ligne.',
+  RIEN_ECRIT: 'Le serveur n’a rien changé. Reconnecte-toi et réessaie.',
   RESEAU: 'Pas de réseau. Réessaie une fois connecté.',
   INCONNU: 'Enregistrement impossible. Réessaie.',
 };
@@ -229,11 +230,27 @@ export async function definirConsentementAvis(
   clientId: string,
   accepte: boolean,
 ): Promise<{ ok: true } | { ok: false; echec: EchecEcriture }> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('clients')
     .update({ avis_actifs: accepte })
-    .eq('id', clientId);
+    .eq('id', clientId)
+    .select('id');
 
   if (error) return { ok: false, echec: echec(error) };
+
+  // Le `.select()` ci-dessus n'est pas là pour lire la ligne : il est là pour
+  // la **compter**. Un `update().eq()` nu ne rend aucune erreur quand RLS ou un
+  // privilège de colonne écarte la ligne — PostgREST répond 204, zéro ligne
+  // touchée, `error` à null. L'appelant concluait au succès, l'écran se relisait
+  // et retrouvait l'ancienne valeur : le bouton semblait mort, sans qu'aucune
+  // trace n'existe nulle part. Constaté le 2026-08-24.
+  //
+  // Ce geste engage la vie privée d'un tiers. Un retrait de consentement qu'on
+  // croit enregistré et qui ne l'est pas continue d'envoyer le solde d'épargne
+  // de quelqu'un sur un téléphone qu'il partage.
+  if (!data || data.length === 0) {
+    return { ok: false, echec: { code: 'RIEN_ECRIT', message: PHRASES.RIEN_ECRIT! } };
+  }
+
   return { ok: true };
 }

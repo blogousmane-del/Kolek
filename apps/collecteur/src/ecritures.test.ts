@@ -15,15 +15,30 @@ import { describe, expect, it, vi } from 'vitest';
  */
 
 const insert = vi.fn();
+const majChamps = vi.fn();
+const majSelect = vi.fn();
 
 vi.mock('./supabase', () => ({
-  supabase: { from: () => ({ insert: (l: unknown) => insert(l) }) },
+  supabase: {
+    from: () => ({
+      insert: (l: unknown) => insert(l),
+      // La chaîne complète est simulée — `update().eq().select()` — parce que
+      // c'est justement le `.select()` final qui est en cause : sans lui,
+      // PostgREST ne dit pas combien de lignes il a touchées.
+      update: (l: unknown) => {
+        majChamps(l);
+        return { eq: () => ({ select: () => majSelect() }) };
+      },
+    }),
+  },
 }));
 
-const { codeDErreur, creerClientAvecCarte, enregistrerMise } = await import('./ecritures');
+const { codeDErreur, creerClientAvecCarte, definirConsentementAvis, enregistrerMise } =
+  await import('./ecritures');
 
 const COLLECTEUR = '11111111-1111-4111-8111-111111111111';
 const CARTE = '22222222-2222-4222-8222-222222222222';
+const CLIENT = '33333333-3333-4333-8333-333333333333';
 
 describe('traduction des refus du serveur', () => {
   it('reconnaît les messages des déclencheurs, qui voyagent tous en P0001', () => {
@@ -135,6 +150,57 @@ describe('ce que le téléphone envoie, et ce qu’il n’envoie pas', () => {
     const ligne = insert.mock.calls[0]![0] as Record<string, unknown>;
     expect(ligne.telephone).toBeNull();
     expect(ligne.marche).toBeNull();
+  });
+});
+
+describe('le consentement ne peut pas échouer en silence', () => {
+  /**
+   * Le défaut du 2026-08-24. `update().eq()` sans `.select()` : quand RLS ou un
+   * privilège de colonne écarte la ligne, PostgREST ne touche rien, ne rend
+   * **aucune erreur**, et l'appelant conclut au succès. L'écran se relit,
+   * retrouve l'ancienne valeur, et n'a rien à montrer — le collecteur appuie,
+   * il ne se passe rien, et rien nulle part ne dit pourquoi.
+   *
+   * Le geste engage la vie privée d'un tiers : un retrait de consentement qu'on
+   * croit enregistré et qui ne l'est pas continue d'envoyer le solde d'épargne
+   * de quelqu'un sur un téléphone qu'il partage. Le silence est ici le pire des
+   * comportements possibles.
+   */
+  it('rend un échec quand le serveur n’a touché aucune ligne', async () => {
+    majSelect.mockReset().mockResolvedValue({ data: [], error: null });
+
+    const r = await definirConsentementAvis(CLIENT, false);
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.echec.code).toBe('RIEN_ECRIT');
+  });
+
+  it('rend un succès quand la ligne a bien été écrite', async () => {
+    majSelect.mockReset().mockResolvedValue({ data: [{ id: CLIENT }], error: null });
+
+    const r = await definirConsentementAvis(CLIENT, false);
+
+    expect(r.ok).toBe(true);
+  });
+
+  it('réclame au serveur la ligne écrite, seul moyen de la compter', async () => {
+    majSelect.mockReset().mockResolvedValue({ data: [{ id: CLIENT }], error: null });
+
+    await definirConsentementAvis(CLIENT, true);
+
+    expect(majSelect).toHaveBeenCalled();
+    expect(majChamps).toHaveBeenLastCalledWith({ avis_actifs: true });
+  });
+
+  it('traduit un refus de droit plutôt que de le taire', async () => {
+    majSelect
+      .mockReset()
+      .mockResolvedValue({ data: null, error: { code: '42501', message: 'permission denied' } });
+
+    const r = await definirConsentementAvis(CLIENT, false);
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.echec.code).toBe('DROIT_REFUSE');
   });
 });
 

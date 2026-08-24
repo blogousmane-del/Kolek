@@ -492,34 +492,45 @@ function BasculeAvis({
     );
   }
 
+  // Deux rangées et non une. Le message d'erreur était le troisième enfant
+  // d'un `flex justify-between` déjà rempli par le libellé et le bouton : sur
+  // un téléphone, il n'avait nulle part où aller et se réduisait à rien. Une
+  // erreur qu'on ne peut pas lire ne vaut pas mieux que pas d'erreur du tout —
+  // c'est ce qui faisait passer un refus du serveur pour un bouton mort.
   return (
-    <div className="mt-3 pt-3 border-t border-hairline flex items-center justify-between gap-3">
-      <span className="flex items-center gap-2 min-w-0">
-        <Icone
-          nom={ligne.avisActifs ? 'bell' : 'bell-off'}
-          taille={15}
-          className={ligne.avisActifs ? 'text-positive' : 'text-muted-foreground'}
-        />
-        <span className="text-xs font-body text-muted-foreground truncate">
-          {sansNumero
-            ? 'Pas de numéro : aucun avis possible'
-            : ligne.avisActifs
-              ? 'Prévenu à chaque mouvement'
-              : 'Non prévenu'}
+    <div className="mt-3 pt-3 border-t border-hairline">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2 min-w-0">
+          <Icone
+            nom={ligne.avisActifs ? 'bell' : 'bell-off'}
+            taille={15}
+            className={ligne.avisActifs ? 'text-positive' : 'text-muted-foreground'}
+          />
+          <span className="text-xs font-body text-muted-foreground truncate">
+            {sansNumero
+              ? 'Pas de numéro : aucun avis possible'
+              : ligne.avisActifs
+                ? 'Prévenu à chaque mouvement'
+                : 'Non prévenu'}
+          </span>
         </span>
-      </span>
-      <button
-        type="button"
-        disabled={sansNumero || envoi}
-        aria-pressed={ligne.avisActifs}
-        title={sansNumero ? 'Ce client n’a pas de numéro enregistré.' : undefined}
-        onClick={() => (ligne.avisActifs ? onPoser(false) : onDemander())}
-        className="px-3 py-1.5 rounded-pill border border-hairline text-ink text-xs font-body font-semibold whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        {ligne.avisActifs ? 'Ne plus prévenir' : 'Prévenir'}
-      </button>
+        <button
+          type="button"
+          disabled={sansNumero || envoi}
+          aria-pressed={ligne.avisActifs}
+          title={sansNumero ? 'Ce client n’a pas de numéro enregistré.' : undefined}
+          onClick={() => (ligne.avisActifs ? onPoser(false) : onDemander())}
+          // `anim-pression` et le libellé d'attente disent tous deux la même
+          // chose : l'appui a été pris. Sans eux, entre le doigt et la réponse
+          // du serveur, rien ne bougeait — et en 3G cette attente se compte en
+          // secondes, pendant lesquelles le collecteur appuie à nouveau.
+          className="anim-pression px-3 py-1.5 rounded-pill border border-hairline text-ink text-xs font-body font-semibold whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {envoi ? 'Enregistrement…' : ligne.avisActifs ? 'Ne plus prévenir' : 'Prévenir'}
+        </button>
+      </div>
       {erreur && (
-        <p role="alert" className="text-xs font-body text-negative m-0">
+        <p role="alert" className="text-xs font-body text-negative m-0 mt-2">
           {erreur}
         </p>
       )}
