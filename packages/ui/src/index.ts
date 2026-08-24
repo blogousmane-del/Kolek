@@ -14,6 +14,7 @@ export { Champ } from './Champ';
 export { Bruit, Onde, Rosace } from './Guilloche';
 export { EcranConnexion } from './EcranConnexion';
 export { EcranMessage } from './EcranMessage';
+export { Feuille } from './Feuille';
 export { Filet } from './Filet';
 export { Icone, type NomIcone } from './Icone';
 export { LigneCollecteur } from './LigneCollecteur';

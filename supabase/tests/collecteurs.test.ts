@@ -61,6 +61,65 @@ describe('contraintes du schéma cartes', () => {
     }
   });
 
+  it('laisse rouvrir une carte une fois la précédente clôturée', async () => {
+    // La promesse du produit : quand un client retire son argent, la carte se
+    // ferme mais le client reste — il peut reprendre, au même montant ou à un
+    // autre. Le test complète celui du dessus : l'un vérifie qu'on ne peut pas
+    // tenir deux carnets à la fois, celui-ci qu'on n'est pas enfermé pour
+    // autant.
+    const a = await creerCollecteur('Aya Konan', `+225074${Date.now() % 10000000}`);
+    const clientId = crypto.randomUUID();
+    await admin.from('clients').insert({ id: clientId, collecteur_id: a.id, nom: 'Aminata' });
+
+    const premiere = crypto.randomUUID();
+    await admin
+      .from('cartes')
+      .insert({ id: premiere, collecteur_id: a.id, client_id: clientId, mise: 1000 });
+
+    await admin
+      .from('cartes')
+      .update({ statut: 'cloturee', cloturee_le: new Date().toISOString() })
+      .eq('id', premiere);
+
+    const { error } = await admin.from('cartes').insert({
+      id: crypto.randomUUID(),
+      collecteur_id: a.id,
+      client_id: clientId,
+      mise: 2000,
+    });
+    expect(error).toBeNull();
+
+    // La carte close n'est pas effacée : c'est l'historique du client, et le
+    // collecteur doit pouvoir dire « c'est ta deuxième carte ».
+    const { data } = await admin.from('cartes').select('id, statut').eq('client_id', clientId);
+    expect(data).toHaveLength(2);
+    expect((data ?? []).filter((k) => k.statut === 'active')).toHaveLength(1);
+  });
+
+  it('accepte une mise composée hors des cinq paliers usuels', async () => {
+    // `cartes.mise` est borné par un intervalle, pas par une liste. Une cliente
+    // qui convient de 750 FCFA par jour avec son collecteur a le droit ;
+    // l'interface a longtemps proposé cinq montants et rien d'autre, ce qui
+    // était une limite d'écran prise pour une règle du métier.
+    const a = await creerCollecteur('Sekou Diarra', `+225075${Date.now() % 10000000}`);
+    const clientId = crypto.randomUUID();
+    await admin.from('clients').insert({ id: clientId, collecteur_id: a.id, nom: 'Fatou' });
+
+    for (const mise of [500, 750, 1250, 3300, 10000]) {
+      const carteId = crypto.randomUUID();
+      const { error } = await admin
+        .from('cartes')
+        .insert({ id: carteId, collecteur_id: a.id, client_id: clientId, mise });
+      expect(error, `mise de ${mise} refusée`).toBeNull();
+
+      // Clôturée aussitôt : une seule carte active par client à la fois.
+      await admin
+        .from('cartes')
+        .update({ statut: 'cloturee', cloturee_le: new Date().toISOString() })
+        .eq('id', carteId);
+    }
+  });
+
   it('exige une date de clôture cohérente avec le statut', async () => {
     const a = await creerCollecteur('Fanta Cissé', `+225073${Date.now() % 10000000}`);
     const clientId = crypto.randomUUID();

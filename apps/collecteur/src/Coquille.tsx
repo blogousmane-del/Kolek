@@ -133,6 +133,7 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
           onDeconnexion={deconnecter}
           onEncaisser={encaisserSur}
           onEcriture={() => setRevision((r) => r + 1)}
+          onNaviguer={setPage}
         />
       )}
       {page === 'encaisser' && (

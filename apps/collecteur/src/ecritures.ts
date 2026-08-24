@@ -254,3 +254,66 @@ export async function definirConsentementAvis(
 
   return { ok: true };
 }
+
+/**
+ * Ouvre une nouvelle carte pour un client qui en avait déjà une.
+ *
+ * ## Pourquoi c'est un geste séparé de l'inscription
+ *
+ * Un client ne s'inscrit qu'une fois ; il ouvre des cartes toute sa vie. Après
+ * les 31 mises d'un cycle, après une restitution en cours de route, ou parce
+ * qu'il veut changer de montant — 500 FCFA en saison creuse, 2 000 quand le
+ * commerce marche. La carte est l'unité qui se répète, pas le client.
+ *
+ * ## La contrainte qui gouverne ce geste
+ *
+ * `cartes_une_active_par_client` : un index unique partiel autorise **une seule
+ * carte active par client**. Ouvrir la nouvelle exige donc que l'ancienne soit
+ * clôturée — c'est-à-dire que l'argent ait été rendu.
+ *
+ * Ce n'est pas une gêne technique, c'est la règle du métier rendue
+ * inviolable : deux carnets ouverts en même temps sur le même client, c'est
+ * deux soldes à retenir, et la première dispute au moment de rendre l'argent.
+ *
+ * Une violation remonte en `23505`, traduite ici en une phrase qui dit quoi
+ * faire — et non « doublon », qui ferait croire à un double appui.
+ */
+export async function ouvrirCarte(
+  collecteurId: string,
+  clientId: string,
+  mise: number,
+): Promise<{ ok: true; carteId: string } | { ok: false; echec: EchecEcriture }> {
+  if (!validerMise(mise)) {
+    return {
+      ok: false,
+      echec: {
+        code: 'MISE_HORS_BORNES',
+        message: `La mise doit être comprise entre ${MISE_MIN} et ${MISE_MAX} FCFA.`,
+      },
+    };
+  }
+
+  const carteId = crypto.randomUUID();
+  const { error } = await supabase.from('cartes').insert({
+    id: carteId,
+    collecteur_id: collecteurId,
+    client_id: clientId,
+    mise,
+  });
+
+  if (error) {
+    if (error.code === '23505') {
+      return {
+        ok: false,
+        echec: {
+          code: 'CARTE_ACTIVE_EXISTANTE',
+          message:
+            'Ce client a déjà une carte en cours. Clôture-la depuis « Retrait » — tu lui rends son argent — avant d’en ouvrir une nouvelle.',
+        },
+      };
+    }
+    return { ok: false, echec: echec(error) };
+  }
+
+  return { ok: true, carteId };
+}

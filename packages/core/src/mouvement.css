@@ -153,6 +153,51 @@
   animation: kolek-reussite var(--duree-signature) var(--courbe-rebond) both;
 }
 
+/* ------------------------------- 6. Feuille ------------------------------ */
+
+/* Le panneau flottant : voile et feuille entrent ensemble, mais pas pareil.
+ *
+ * Le voile se contente d'une opacité. Lui donner un mouvement ferait bouger
+ * tout l'arrière-plan, et l'arrière-plan est précisément ce qui doit rester
+ * immobile pour que la feuille se lise comme posée dessus.
+ *
+ * La feuille, elle, monte du bas sur téléphone. C'est le geste que l'appareil
+ * a appris à ses porteurs : ce qui vient du bas se referme vers le bas. Sur
+ * écran large elle se pose au centre en grandissant très peu — la même feuille
+ * qui glisserait sur 400 px traverserait la moitié de l'écran pour rien.
+ */
+@keyframes kolek-voile {
+  from {
+    opacity: 0;
+  }
+}
+
+@utility anim-voile {
+  animation: kolek-voile var(--duree-entree) var(--courbe-sortie) both;
+}
+
+@keyframes kolek-feuille {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+
+@keyframes kolek-feuille-centree {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@utility anim-feuille {
+  animation: kolek-feuille var(--duree-entree) var(--courbe-sortie) both;
+
+  @variant sm {
+    animation-name: kolek-feuille-centree;
+  }
+}
+
 /* ------------------------- Le commutateur général ------------------------ */
 
 /* Un seul bloc, en bas du fichier, qui couvre toute primitive présente et
@@ -162,7 +207,9 @@
   .anim-cascade,
   .anim-montant,
   .anim-pression,
-  .anim-reussite {
+  .anim-reussite,
+  .anim-voile,
+  .anim-feuille {
     animation: none !important;
     transition: none !important;
   }

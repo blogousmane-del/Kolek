@@ -1,4 +1,4 @@
-import { formatMontant, MISE_MAX, MISE_MIN, MISES_PAR_CYCLE, validerMise } from '@kolek/core';
+import { formatMontant, MISES_PAR_CYCLE, validerMise } from '@kolek/core';
 import {
   Avatar,
   BadgeStatut,
@@ -11,10 +11,12 @@ import {
 } from '@kolek/ui';
 import { useEffect, useMemo, useState } from 'react';
 
-import type { CarteChoisie } from '../Coquille';
+import type { CarteChoisie, Page } from '../Coquille';
 import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { supabase } from '../supabase';
+import { ChoixMise } from './ChoixMise';
+import { FicheClient } from './FicheClient';
 
 interface Client {
   id: string;
@@ -58,6 +60,7 @@ export function Clients({
   onDeconnexion,
   onEncaisser,
   onEcriture,
+  onNaviguer,
 }: {
   collecteurId: string | null;
   revision: number;
@@ -67,8 +70,11 @@ export function Clients({
   onDeconnexion: () => void;
   onEncaisser: (carte: CarteChoisie) => void;
   onEcriture: () => void;
+  onNaviguer: (cle: Page) => void;
 }) {
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);
+  /** Le client dont la fiche flottante est ouverte. `null` = aucune. */
+  const [fiche, setFiche] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ouvrirFormulaire) return;
@@ -318,12 +324,31 @@ export function Clients({
             ligne={ligne}
             onEncaisser={onEncaisser}
             onConsentementChange={onEcriture}
+            onOuvrirFiche={() => setFiche(ligne.id)}
           />
           </div>
         ))}
       </div>
 
       <div className="flex-1 min-h-4" />
+
+      {/* Montée une fois pour tout l'écran, et non une par ligne : quarante
+          clients donneraient quarante panneaux dans le document, dont
+          trente-neuf inutiles. */}
+      <FicheClient
+        clientId={fiche}
+        revision={revision}
+        onFermer={() => setFiche(null)}
+        onEncaisser={(carte) => {
+          setFiche(null);
+          onEncaisser(carte);
+        }}
+        onEcriture={onEcriture}
+        onRetrait={() => {
+          setFiche(null);
+          onNaviguer('retrait');
+        }}
+      />
     </div>
   );
 }
@@ -332,10 +357,12 @@ function LigneClient({
   ligne,
   onEncaisser,
   onConsentementChange,
+  onOuvrirFiche,
 }: {
   ligne: Ligne;
   onEncaisser: (carte: CarteChoisie) => void;
   onConsentementChange: () => void;
+  onOuvrirFiche: () => void;
 }) {
   const [demandeEnCours, setDemandeEnCours] = useState(false);
   const [envoi, setEnvoi] = useState(false);
@@ -371,6 +398,16 @@ function LigneClient({
   return (
     <div className="bg-surface rounded-lg border border-hairline p-4 shadow-sm">
       <div className="flex items-center gap-3">
+      {/* Un `button` et non la carte entière : « Encaisser » et la bascule des
+          avis sont déjà des commandes, et un bouton dans un bouton n'est pas du
+          HTML valide — le navigateur défait l'imbrication et l'un des deux
+          cesse de répondre. Seule la zone d'identité ouvre la fiche. */}
+      <button
+        type="button"
+        onClick={onOuvrirFiche}
+        aria-label={`Ouvrir la fiche de ${ligne.nom}`}
+        className="anim-pression flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
+      >
       <Avatar nom={ligne.nom} className="w-11 h-11 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="font-body font-semibold text-base text-ink truncate">{ligne.nom}</p>
@@ -388,6 +425,7 @@ function LigneClient({
           </div>
         )}
       </div>
+      </button>
       {encaissable ? (
         <button
           type="button"
@@ -538,9 +576,6 @@ function BasculeAvis({
   );
 }
 
-/** Paliers usuels du marché, tous compris dans [MISE_MIN, MISE_MAX]. */
-const MISES_USUELLES = [500, 1000, 2000, 5000, 10000] as const;
-
 /**
  * Inscrire un client, c'est aussi lui ouvrir sa première carte : un client sans
  * carte n'encaisse rien, et le collecteur au marché fait les deux gestes d'un
@@ -647,29 +682,9 @@ function FormulaireClient({
         className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-base font-body text-ink outline-none focus:border-primary placeholder:text-muted-foreground mb-3"
       />
 
-      <p className="text-sm font-body font-semibold text-ink mb-2">Mise journalière</p>
-      <div className="flex gap-2 flex-wrap mb-2">
-        {MISES_USUELLES.map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMise(m)}
-            className={`px-3 py-2 rounded-pill text-base font-body font-semibold border tabular-nums cursor-pointer ${
-              m === mise
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-surface text-ink border-hairline'
-            }`}
-          >
-            {formatMontant(m)}
-          </button>
-        ))}
+      <div className="mb-3">
+        <ChoixMise mise={mise} onChoisir={setMise} identifiant="nouveau" />
       </div>
-      {!validerMise(mise) && (
-        <p className="text-sm font-body text-negative mb-2">
-          La mise doit être comprise entre {formatMontant(MISE_MIN)} et {formatMontant(MISE_MAX)}{' '}
-          FCFA.
-        </p>
-      )}
 
       {/* Le consentement se demande au moment où l'on prend le numéro, pas
           après : c'est le seul instant où le client est en face et où la

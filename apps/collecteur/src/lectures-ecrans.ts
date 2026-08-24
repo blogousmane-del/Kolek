@@ -539,3 +539,108 @@ export async function chargerEtatAvis(limite = 30): Promise<EtatAvis> {
     })),
   };
 }
+
+/* ------------------------------ Fiche client ----------------------------- */
+
+export interface CarteFiche {
+  id: string;
+  mise: number;
+  statut: 'active' | 'cloturee';
+  misesEncaissees: number;
+  ouverteLe: string;
+  clotureeLe: string | null;
+}
+
+export interface MiseFiche {
+  id: string;
+  montant: number;
+  encaisseLe: string;
+  estCommission: boolean;
+}
+
+export interface FicheClient {
+  id: string;
+  nom: string;
+  telephone: string | null;
+  marche: string | null;
+  activite: string | null;
+  avisActifs: boolean;
+  /** Toutes ses cartes, la plus récente d'abord. */
+  cartes: CarteFiche[];
+  /** Ses derniers versements, toutes cartes confondues. */
+  mises: MiseFiche[];
+}
+
+/**
+ * Tout ce que le collecteur doit savoir d'un client, en une lecture.
+ *
+ * Trois requêtes plutôt qu'une imbrication : la clé étrangère de `cartes` vers
+ * `clients` est composite `(client_id, collecteur_id)`, et faire deviner ce
+ * chemin à PostgREST est une dépendance fragile — c'est déjà le choix fait
+ * dans l'écran des clients, pour la même raison.
+ *
+ * Les mises sont lues par carte et non par client : `mises` ne porte pas de
+ * `client_id`. C'est voulu — la mise appartient à la carte, et la carte au
+ * client. Une mise rattachée directement au client aurait deux chemins vers le
+ * même fait, donc deux façons de se contredire.
+ */
+export async function chargerFicheClient(clientId: string): Promise<FicheClient | null> {
+  const { data: brut, error } = await supabase
+    .from('clients')
+    .select('id, nom, telephone, marche, activite, avis_actifs')
+    .eq('id', clientId)
+    .maybeSingle();
+
+  if (error || !brut) return null;
+  const c = brut as Record<string, string | boolean | null>;
+
+  const { data: cartesBrutes } = await supabase
+    .from('cartes')
+    .select('id, mise, statut, mises_encaissees, ouverte_le, cloturee_le')
+    .eq('client_id', clientId)
+    .order('ouverte_le', { ascending: false });
+
+  const cartes = ((cartesBrutes ?? []) as Array<Record<string, string | number | null>>).map(
+    (k) => ({
+      id: String(k.id),
+      mise: Number(k.mise),
+      statut: k.statut as CarteFiche['statut'],
+      misesEncaissees: Number(k.mises_encaissees),
+      ouverteLe: String(k.ouverte_le),
+      clotureeLe: k.cloturee_le === null ? null : String(k.cloturee_le),
+    }),
+  );
+
+  // Sans carte, pas de mise à chercher : un `in` sur une liste vide ferait un
+  // aller-retour pour rien.
+  let mises: MiseFiche[] = [];
+  if (cartes.length > 0) {
+    const { data: misesBrutes } = await supabase
+      .from('mises')
+      .select('id, montant, encaisse_le, est_commission')
+      .in(
+        'carte_id',
+        cartes.map((k) => k.id),
+      )
+      .order('encaisse_le', { ascending: false })
+      .limit(40);
+
+    mises = ((misesBrutes ?? []) as Array<Record<string, string | number | boolean>>).map((m) => ({
+      id: String(m.id),
+      montant: Number(m.montant),
+      encaisseLe: String(m.encaisse_le),
+      estCommission: Boolean(m.est_commission),
+    }));
+  }
+
+  return {
+    id: String(c.id),
+    nom: String(c.nom),
+    telephone: (c.telephone as string | null) ?? null,
+    marche: (c.marche as string | null) ?? null,
+    activite: (c.activite as string | null) ?? null,
+    avisActifs: Boolean(c.avis_actifs),
+    cartes,
+    mises,
+  };
+}
