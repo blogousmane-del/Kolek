@@ -26,6 +26,19 @@ type EcranSecondaire = 'retrait' | 'rapprochement' | 'recus' | 'alertes' | 'avis
 
 export type Page = CleNavCollecteur | EcranSecondaire;
 
+/**
+ * Le client sur lequel l'écran de retrait est réduit.
+ *
+ * Le nom voyage avec l'identifiant plutôt que d'être redéduit à l'arrivée :
+ * l'écran le tirait des cartes qu'il venait de lire, donc un client qui n'en a
+ * plus — juste après son dernier retrait — perdait son nom, et avec lui le
+ * bandeau qui porte la sortie du filtre.
+ */
+export interface ClientCible {
+  id: string;
+  nom: string;
+}
+
 /** La carte choisie pour l'encaissement, portée par la coquille : l'écran
     « Encaisser » a besoin de savoir sur quelle carte il écrit, et c'est la
     liste des clients qui le décide. */
@@ -47,6 +60,10 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       C'est le bouton « Souscrire » de l'accueil qui la pose. */
   const [souscrire, setSouscrire] = useState(false);
   const [carteChoisie, setCarteChoisie] = useState<CarteChoisie | null>(null);
+  /** Le client sur lequel l'écran de retrait s'ouvre réduit. `null` = toutes les
+      cartes. Porté ici et non dans l'écran : c'est la navigation qui le décide,
+      et un état local se perdrait au premier aller-retour. */
+  const [clientPourRetrait, setClientPourRetrait] = useState<ClientCible | null>(null);
   /** Incrémenté après chaque écriture : la liste des clients s'y abonne pour
       se relire. Sans ça, un client tout juste inscrit n'apparaît qu'au
       rechargement de la page. */
@@ -96,9 +113,32 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
     onDeconnexion();
   }
 
+  /**
+   * Changer d'écran, et rendre au retrait sa liste entière.
+   *
+   * Le filtre appartient au geste qui l'a posé — « Retirer » sur une carte
+   * précise. Toute autre navigation demande la liste complète, à commencer par
+   * la tuile « Retrait » de l'accueil : sans cette remise à zéro, elle rouvrait
+   * l'écran encore réduit au client de la visite précédente, qui n'a parfois
+   * plus aucune carte. Le collecteur venait chercher ses cartes et trouvait un
+   * écran vide.
+   *
+   * Tous les changements d'écran passent par ici. Un seul `setPage` laissé de
+   * côté suffirait à rouvrir la porte.
+   */
+  function naviguer(cle: Page) {
+    setClientPourRetrait(null);
+    setPage(cle);
+  }
+
+  function allerAuRetrait(client: ClientCible) {
+    setClientPourRetrait(client);
+    setPage('retrait');
+  }
+
   function encaisserSur(carte: CarteChoisie) {
     setCarteChoisie(carte);
-    setPage('encaisser');
+    naviguer('encaisser');
   }
 
   const contenu = (
@@ -116,10 +156,10 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
         <Accueil
           nomCollecteur={nomCollecteur}
           revision={revision}
-          onNaviguer={setPage}
+          onNaviguer={naviguer}
           onSouscrire={() => {
             setSouscrire(true);
-            setPage('clients');
+            naviguer('clients');
           }}
           onDeconnexion={deconnecter}
         />
@@ -133,14 +173,14 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
           onDeconnexion={deconnecter}
           onEncaisser={encaisserSur}
           onEcriture={() => setRevision((r) => r + 1)}
-          onNaviguer={setPage}
+          onRetrait={allerAuRetrait}
         />
       )}
       {page === 'encaisser' && (
         <Encaisser
           collecteurId={collecteurId}
           carte={carteChoisie}
-          onNaviguer={setPage}
+          onNaviguer={naviguer}
           onEncaisse={() => {
             setRevision((r) => r + 1);
             setCarteChoisie(null);
@@ -154,23 +194,26 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       {page === 'retrait' && (
         <Retrait
           revision={revision}
-          onRetour={() => setPage('accueil')}
-          onCloture={() => setRevision((r) => r + 1)}
+          collecteurId={collecteurId}
+          client={clientPourRetrait}
+          onToutesLesCartes={() => setClientPourRetrait(null)}
+          onRetour={() => naviguer('accueil')}
+          onEcriture={() => setRevision((r) => r + 1)}
         />
       )}
-      {page === 'bilans' && <Bilan revision={revision} onRetour={() => setPage('accueil')} />}
+      {page === 'bilans' && <Bilan revision={revision} onRetour={() => naviguer('accueil')} />}
       {page === 'rapprochement' && (
         <Rapprochement
           collecteurId={collecteurId}
           revision={revision}
-          onRetour={() => setPage('accueil')}
+          onRetour={() => naviguer('accueil')}
         />
       )}
-      {page === 'recus' && <Recus revision={revision} onRetour={() => setPage('accueil')} />}
-      {page === 'alertes' && <Alertes revision={revision} onRetour={() => setPage('accueil')} />}
-      {page === 'avis' && <Avis revision={revision} onRetour={() => setPage('accueil')} />}
+      {page === 'recus' && <Recus revision={revision} onRetour={() => naviguer('accueil')} />}
+      {page === 'alertes' && <Alertes revision={revision} onRetour={() => naviguer('accueil')} />}
+      {page === 'avis' && <Avis revision={revision} onRetour={() => naviguer('accueil')} />}
       {(page === 'plus' || page === 'profil') && (
-        <Plus onRetour={() => setPage('accueil')} onDeconnexion={deconnecter} />
+        <Plus onRetour={() => naviguer('accueil')} onDeconnexion={deconnecter} />
       )}
 
     </>
@@ -202,7 +245,7 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
         <NavBureau
           actif={page}
           nom={nomCollecteur}
-          onNaviguer={setPage}
+          onNaviguer={naviguer}
           onDeconnexion={deconnecter}
         />
       </div>
@@ -235,7 +278,7 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       <NavMobile
         className="lg:hidden"
         actif={estOnglet(page) ? page : 'accueil'}
-        onNaviguer={setPage}
+        onNaviguer={naviguer}
       />
     </div>
   );

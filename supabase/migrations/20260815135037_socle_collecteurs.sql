@@ -58,6 +58,12 @@ create table public.cartes (
 );
 
 -- Décision de cadrage Phase 1 : un client possède une seule carte active à la fois.
+--
+-- Levée le 2026-08-25 par `20260825090000_cartes_multiples.sql`, qui porte le
+-- raisonnement. L'index reste créé ici : une migration ne se réécrit pas après
+-- coup, sinon les bases déjà migrées et les bases neuves cessent d'avoir la même
+-- histoire. Ce renvoi existe pour qu'on ne cherche pas longtemps pourquoi il a
+-- disparu.
 create unique index cartes_une_active_par_client
   on public.cartes(client_id) where statut = 'active';
 

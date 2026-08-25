@@ -265,18 +265,29 @@ export async function definirConsentementAvis(
  * qu'il veut changer de montant — 500 FCFA en saison creuse, 2 000 quand le
  * commerce marche. La carte est l'unité qui se répète, pas le client.
  *
- * ## La contrainte qui gouverne ce geste
+ * ## Plusieurs carnets à la fois
  *
- * `cartes_une_active_par_client` : un index unique partiel autorise **une seule
- * carte active par client**. Ouvrir la nouvelle exige donc que l'ancienne soit
- * clôturée — c'est-à-dire que l'argent ait été rendu.
+ * Jusqu'au 2026-08-25, `cartes_une_active_par_client` imposait de clôturer
+ * l'ancienne carte avant d'en ouvrir une nouvelle — c'est-à-dire de rendre
+ * l'argent. C'était présenté ici comme « la règle du métier rendue inviolable :
+ * deux carnets ouverts, c'est deux soldes à retenir, et la première dispute au
+ * moment de rendre l'argent ».
  *
- * Ce n'est pas une gêne technique, c'est la règle du métier rendue
- * inviolable : deux carnets ouverts en même temps sur le même client, c'est
- * deux soldes à retenir, et la première dispute au moment de rendre l'argent.
+ * L'objection valait pour le carnet papier. Une application ne retient pas, elle
+ * affiche : chaque carte porte son solde, et `retraits.carte_id` est unique, donc
+ * on rend l'argent d'une carte et jamais d'un client. La contrainte est levée par
+ * `20260825090000_cartes_multiples.sql`, qui porte le raisonnement complet.
  *
- * Une violation remonte en `23505`, traduite ici en une phrase qui dit quoi
- * faire — et non « doublon », qui ferait croire à un double appui.
+ * Conséquence sur ce geste : il ne peut plus échouer pour cause de carte déjà
+ * ouverte, et la branche qui traduisait ce refus a été retirée plutôt que laissée
+ * en veille.
+ *
+ * `23505` n'a pas disparu pour autant, et il ne faut pas le croire : c'est le
+ * code de toute violation d'unicité, et `cartes.id` reste une clé primaire dont
+ * l'identifiant vient du téléphone. Une collision y tomberait encore, et serait
+ * nommée « doublon » par le traitement générique — un mot qui parle de mise, pas
+ * de carte. C'est assumé : un UUID v4 n'entre pas en collision, et lui écrire une
+ * phrase dédiée serait du texte que personne ne lira jamais.
  */
 export async function ouvrirCarte(
   collecteurId: string,
@@ -301,19 +312,7 @@ export async function ouvrirCarte(
     mise,
   });
 
-  if (error) {
-    if (error.code === '23505') {
-      return {
-        ok: false,
-        echec: {
-          code: 'CARTE_ACTIVE_EXISTANTE',
-          message:
-            'Ce client a déjà une carte en cours. Clôture-la depuis « Retrait » — tu lui rends son argent — avant d’en ouvrir une nouvelle.',
-        },
-      };
-    }
-    return { ok: false, echec: echec(error) };
-  }
+  if (error) return { ok: false, echec: echec(error) };
 
   return { ok: true, carteId };
 }

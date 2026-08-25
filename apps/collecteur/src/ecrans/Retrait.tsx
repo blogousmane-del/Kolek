@@ -2,10 +2,12 @@ import { MISES_PAR_CYCLE, formatMontant } from '@kolek/core';
 import { Bouton, Carte, Icone } from '@kolek/ui';
 import { useState } from 'react';
 
+import type { ClientCible } from '../Coquille';
 import { useDonnees } from '../cache';
 import { cloturerCarte } from '../ecritures-ecrans';
 import { chargerCartesCloturables, type CarteCloturable } from '../lectures-ecrans';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
+import { ActiverCarte } from './ActiverCarte';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 
 /**
@@ -25,12 +27,41 @@ import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
  */
 export function Retrait({
   onRetour,
-  onCloture,
+  onEcriture,
   revision,
+  collecteurId,
+  client = null,
+  onToutesLesCartes,
 }: {
   onRetour: () => void;
-  onCloture: () => void;
+  /** Un retrait vient d'être inscrit, ou une carte de plus vient d'être
+      ouverte : la liste doit se relire. La propriété s'appelait `onCloture`
+      quand la clôture était la seule écriture de cet écran. */
+  onEcriture: () => void;
   revision: number;
+  /** Donné par la coquille : le bloc « Activer une carte » écrit, et
+      `collecteur_id` accompagne l'écriture. Le lire ici par carte pleine
+      affichée coûterait un aller-retour réseau par carte. */
+  collecteurId: string | null;
+  /**
+   * Le client sur lequel la liste est réduite, quand on arrive ici depuis sa
+   * ligne ou sa fiche.
+   *
+   * Sans ce filtre, toucher « Retirer » sur une carte précise renvoyait sur la
+   * liste de **toutes** les cartes de **tous** les clients, sans préselection.
+   * Le collecteur venait de désigner une carte, et devait la retrouver à la
+   * main — par nom, montant et nombre de jours — avant un geste qui ne se
+   * défait pas. Debout dans un marché, c'est fabriquer l'erreur qu'on veut
+   * éviter, d'autant qu'un même client peut avoir deux cartes dans cette liste.
+   *
+   * Le nom arrive avec l'identifiant, et n'est plus déduit des cartes lues :
+   * quand la liste réduite est vide — juste après le dernier retrait de ce
+   * client — il n'y avait plus de nom, donc plus de bandeau, donc plus aucune
+   * sortie du filtre.
+   */
+  client?: ClientCible | null;
+  /** Retire le filtre. Absent quand aucun filtre n'est posé. */
+  onToutesLesCartes?: () => void;
 }) {
   const [aConfirmer, setAConfirmer] = useState<CarteCloturable | null>(null);
   // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit.
@@ -54,6 +85,11 @@ export function Retrait({
   const [erreurEcriture, setErreurEcriture] = useState<string | null>(null);
   const erreur = erreurEcriture ?? erreurLecture;
 
+  // `cartes` reste la liste entière : le filtre ne change que ce qu'on montre,
+  // jamais ce qu'on a lu. Une seule lecture sert les deux vues, et revenir à
+  // toutes les cartes ne coûte pas un aller-retour réseau.
+  const visibles = client ? (cartes ?? []).filter((c) => c.clientId === client.id) : cartes;
+
   async function confirmer() {
     if (!aConfirmer || envoi) return;
     setEnvoi(true);
@@ -74,7 +110,7 @@ export function Retrait({
     setFait({ nom: aConfirmer.clientNom, montant: resultat.montantRestitue });
     setAConfirmer(null);
     setTourLocal((t) => t + 1);
-    onCloture();
+    onEcriture();
   }
 
   if (fait) {
@@ -120,15 +156,34 @@ export function Retrait({
               </p>
             )}
 
+            {/* Une liste réduite sans explication se lit comme des cartes
+                disparues. Le bandeau dit sur qui on est, et rend la sortie
+                visible — sinon le seul moyen de revoir les autres est de
+                repartir de l'accueil. */}
+            {client && (
+              <div className="flex items-center justify-between gap-3 bg-info-tint rounded-md px-3 py-2">
+                <p className="font-body text-sm text-ink m-0">Cartes de {client.nom}</p>
+                {onToutesLesCartes && (
+                  <Bouton variante="contour" onClick={onToutesLesCartes}>
+                    Voir toutes les cartes
+                  </Bouton>
+                )}
+              </div>
+            )}
+
             {!cartes && !erreur && (
               <p className="font-body text-sm text-muted-foreground text-center py-8">Lecture…</p>
             )}
 
-            {cartes?.length === 0 && (
+            {visibles?.length === 0 && (
               <RienAMontrer
                 icone="coins"
-                titre="Aucune carte active"
-                detail="Une carte apparaît ici dès qu'un client en ouvre une."
+                titre={client ? 'Aucune carte active pour ce client' : 'Aucune carte active'}
+                detail={
+                  client
+                    ? 'Ses cartes ont toutes été clôturées. Ouvre-lui-en une depuis sa fiche.'
+                    : "Une carte apparaît ici dès qu'un client en ouvre une."
+                }
               />
             )}
 
@@ -136,7 +191,7 @@ export function Retrait({
                 la plus longue du produit, et chaque carte tient dans la moitié
                 de la largeur. */}
             <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 lg:items-start">
-              {cartes?.map((carte, rang) => {
+              {visibles?.map((carte, rang) => {
               const enConfirmation = aConfirmer?.carteId === carte.carteId;
 
               return (
@@ -182,20 +237,44 @@ export function Retrait({
                   </div>
 
                   {!enConfirmation ? (
-                    <Bouton variante="contour" onClick={() => setAConfirmer(carte)}>
-                      Clôturer cette carte
-                    </Bouton>
+                    // Deux portes, et elles se valent : rendre l'argent, ou le
+                    // laisser et repartir sur une carte de plus. Le collecteur
+                    // est devant le client quand celui-ci choisit — la seconde
+                    // ne peut pas être deux écrans plus loin.
+                    //
+                    // La seconde n'apparaît que sur une carte terminée. Sur une
+                    // carte en cours, elle prélèverait une commission — la
+                    // première mise du nouveau cycle — que personne n'a demandée.
+                    <div className="flex flex-wrap gap-2">
+                      <Bouton variante="contour" onClick={() => setAConfirmer(carte)}>
+                        Faire le retrait
+                      </Bouton>
+                      {carte.cycleComplet && (
+                        <ActiverCarte
+                          collecteurId={collecteurId}
+                          clientId={carte.clientId}
+                          misePreremplie={carte.mise}
+                          identifiant={`retrait-${carte.carteId}`}
+                          onOuverte={onEcriture}
+                        />
+                      )}
+                    </div>
                   ) : (
                     <div className="space-y-2">
+                      {/* Les deux faits, et pas un seul : ce qu'on rend, et ce
+                          que la carte devient. Un collecteur qui croit pouvoir
+                          rouvrir la carte après coup n'a pas eu la bonne
+                          information au bon moment. */}
                       <p className="font-body text-sm text-ink bg-info-tint rounded-md p-3">
-                        Confirmer la clôture de la carte de {carte.clientNom} et la remise de{' '}
-                        <strong>{formatMontant(carte.restituable)} FCFA</strong> ? C’est définitif.
+                        Confirmer le retrait de{' '}
+                        <strong>{formatMontant(carte.restituable)} FCFA</strong> pour{' '}
+                        {carte.clientNom} ? La carte se clôture, c’est définitif.
                       </p>
                       <div className="flex gap-2">
                         <Bouton onClick={confirmer} disabled={envoi}>
-                          {envoi ? 'Clôture…' : 'Oui, clôturer'}
+                          {envoi ? 'Retrait…' : 'Oui, faire le retrait'}
                         </Bouton>
-                        <Bouton variante="contour" onClick={() => setAConfirmer(null)}>
+                        <Bouton variante="contour" onClick={() => setAConfirmer(null)} disabled={envoi}>
                           Annuler
                         </Bouton>
                       </div>

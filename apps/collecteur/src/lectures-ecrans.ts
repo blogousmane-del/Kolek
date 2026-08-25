@@ -256,7 +256,14 @@ export async function chargerAlertes(): Promise<Alerte[]> {
         cle: `complete-${carte.id}`,
         gravite: 'action',
         titre: `${nom} — cycle terminé`,
-        detail: `Les ${MISES_PAR_CYCLE} mises sont encaissées. La carte doit être clôturée et ${formatMontant(du)} FCFA restitués.`,
+        // « La carte doit être clôturée » : c'était vrai tant qu'un client ne
+        // pouvait tenir qu'une carte à la fois — il fallait fermer l'ancienne
+        // pour en ouvrir une neuve, donc rendre l'argent. La contrainte est
+        // tombée le 2026-08-25, et l'obligation avec elle. Une alerte qui
+        // présente un choix comme un devoir pousse le collecteur à réclamer une
+        // clôture que personne ne demande, et à rendre un argent que le client
+        // voulait garder.
+        detail: `Les ${MISES_PAR_CYCLE} mises sont encaissées. Tu peux lui restituer ${formatMontant(du)} FCFA, ou lui activer une carte de plus : son solde lui reste dû tant qu'il n'y a pas eu de retrait.`,
       });
       continue;
     }
@@ -419,6 +426,11 @@ export async function chargerProfil(): Promise<Profil> {
 
 export interface CarteCloturable {
   carteId: string;
+  /** Nécessaire pour ouvrir une carte de plus depuis l'écran Retrait, quand le
+      client préfère laisser son argent plutôt que le reprendre. Le `select`
+      lisait déjà `client_id` pour résoudre le nom : c'est une propriété de plus
+      dans l'objet, pas une requête de plus. */
+  clientId: string;
   clientNom: string;
   mise: number;
   misesEncaissees: number;
@@ -433,8 +445,12 @@ export interface CarteCloturable {
  * Une carte incomplète est clôturable, et c'est voulu : un client peut vouloir
  * récupérer son épargne avant la fin du cycle. C'est justement le cas où le
  * montant à rendre n'est pas évident de tête, donc celui où l'écran sert le
- * plus. Les cartes complètes remontent en tête, parce qu'elles, elles **doivent**
- * être clôturées.
+ * plus.
+ *
+ * Les cartes complètes remontent en tête — non parce qu'elles devraient être
+ * clôturées, ce qui n'est plus vrai depuis le 2026-08-25, mais parce que c'est
+ * là qu'une décision se présente : rendre l'argent, ou ouvrir une carte de plus.
+ * Le client garde son solde tant qu'il ne l'a pas repris.
  */
 export async function chargerCartesCloturables(): Promise<CarteCloturable[]> {
   const [rCartes, rClients] = await Promise.all([
@@ -450,6 +466,7 @@ export async function chargerCartesCloturables(): Promise<CarteCloturable[]> {
     .filter((c) => c.statut === 'active')
     .map((c) => ({
       carteId: c.id,
+      clientId: c.client_id,
       clientNom: noms.get(c.client_id) ?? 'Client',
       mise: c.mise,
       misesEncaissees: c.mises_encaissees,
