@@ -182,6 +182,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
       <FicheClient
         clientId="cli1"
         revision={0}
+        collecteurId="col1"
         onFermer={vi.fn()}
         onEncaisser={vi.fn()}
         onEcriture={vi.fn()}
@@ -211,6 +212,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
       <FicheClient
         clientId="cli1"
         revision={0}
+        collecteurId="col1"
         onFermer={vi.fn()}
         onEncaisser={vi.fn()}
         onEcriture={vi.fn()}
@@ -230,6 +232,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
       <FicheClient
         clientId="cli1"
         revision={0}
+        collecteurId="col1"
         onFermer={vi.fn()}
         onEncaisser={vi.fn()}
         onEcriture={vi.fn()}
@@ -250,6 +253,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
       <FicheClient
         clientId="cli3"
         revision={0}
+        collecteurId="col1"
         onFermer={vi.fn()}
         onEncaisser={vi.fn()}
         onEcriture={vi.fn()}
@@ -273,6 +277,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
       <FicheClient
         clientId="cli3"
         revision={0}
+        collecteurId="col1"
         onFermer={vi.fn()}
         onEncaisser={onEncaisser}
         onEcriture={vi.fn()}
@@ -312,6 +317,7 @@ describe('numéro de cycle : l’ancienneté, jamais l’avancement', () => {
       <FicheClient
         clientId="cli2"
         revision={0}
+        collecteurId="col1"
         onFermer={vi.fn()}
         onEncaisser={vi.fn()}
         onEcriture={vi.fn()}
@@ -344,6 +350,7 @@ describe('client sans carte active : le bloc d’ouverture reste atteignable', (
       <FicheClient
         clientId="cli4"
         revision={0}
+        collecteurId="col1"
         onFermer={vi.fn()}
         onEncaisser={vi.fn()}
         onEcriture={vi.fn()}
@@ -364,6 +371,7 @@ describe('client sans carte active : le bloc d’ouverture reste atteignable', (
       <FicheClient
         clientId="cli5"
         revision={0}
+        collecteurId="col1"
         onFermer={vi.fn()}
         onEncaisser={vi.fn()}
         onEcriture={vi.fn()}

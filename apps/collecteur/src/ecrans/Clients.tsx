@@ -386,8 +386,9 @@ export function Clients({
           >
           <LigneClient
             ligne={ligne}
+            collecteurId={collecteurId}
             onEncaisser={onEncaisser}
-            onConsentementChange={onEcriture}
+            onEcriture={onEcriture}
             onOuvrirFiche={() => setFiche(ligne.client.id)}
             onRetrait={() => onRetrait({ id: ligne.client.id, nom: ligne.client.nom })}
           />
@@ -402,6 +403,7 @@ export function Clients({
           trente-neuf inutiles. */}
       <FicheClient
         clientId={fiche}
+        collecteurId={collecteurId}
         revision={revision}
         onFermer={() => setFiche(null)}
         onEncaisser={(carte) => {
@@ -424,14 +426,20 @@ export function Clients({
 
 function LigneClient({
   ligne,
+  collecteurId,
   onEncaisser,
-  onConsentementChange,
+  onEcriture,
   onOuvrirFiche,
   onRetrait,
 }: {
   ligne: Ligne;
+  collecteurId: string | null;
   onEncaisser: (carte: CarteChoisie) => void;
-  onConsentementChange: () => void;
+  /** Une écriture a eu lieu sur cette ligne — un consentement posé, une carte
+      ouverte — et la liste doit se relire. La propriété s'appelait
+      `onConsentementChange` quand le consentement était la seule écriture
+      possible ici ; elle en porte deux depuis. */
+  onEcriture: () => void;
   onOuvrirFiche: () => void;
   onRetrait: () => void;
 }) {
@@ -476,7 +484,7 @@ function LigneClient({
       setErreurAvis(resultat.echec.message);
       return;
     }
-    onConsentementChange();
+    onEcriture();
   }
 
   return (
@@ -523,10 +531,11 @@ function LigneClient({
             Retirer
           </Bouton>
           <ActiverCarte
+            collecteurId={collecteurId}
             clientId={client.id}
             misePreremplie={carte.mise}
             identifiant={`ligne-${carte.id}`}
-            onOuverte={onConsentementChange}
+            onOuverte={onEcriture}
           />
         </div>
       ) : encaissable ? (

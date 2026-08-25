@@ -27,14 +27,22 @@ import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
  */
 export function Retrait({
   onRetour,
-  onCloture,
+  onEcriture,
   revision,
+  collecteurId,
   client = null,
   onToutesLesCartes,
 }: {
   onRetour: () => void;
-  onCloture: () => void;
+  /** Un retrait vient d'être inscrit, ou une carte de plus vient d'être
+      ouverte : la liste doit se relire. La propriété s'appelait `onCloture`
+      quand la clôture était la seule écriture de cet écran. */
+  onEcriture: () => void;
   revision: number;
+  /** Donné par la coquille : le bloc « Activer une carte » écrit, et
+      `collecteur_id` accompagne l'écriture. Le lire ici par carte pleine
+      affichée coûterait un aller-retour réseau par carte. */
+  collecteurId: string | null;
   /**
    * Le client sur lequel la liste est réduite, quand on arrive ici depuis sa
    * ligne ou sa fiche.
@@ -102,7 +110,7 @@ export function Retrait({
     setFait({ nom: aConfirmer.clientNom, montant: resultat.montantRestitue });
     setAConfirmer(null);
     setTourLocal((t) => t + 1);
-    onCloture();
+    onEcriture();
   }
 
   if (fait) {
@@ -243,10 +251,11 @@ export function Retrait({
                       </Bouton>
                       {carte.cycleComplet && (
                         <ActiverCarte
+                          collecteurId={collecteurId}
                           clientId={carte.clientId}
                           misePreremplie={carte.mise}
                           identifiant={`retrait-${carte.carteId}`}
-                          onOuverte={onCloture}
+                          onOuverte={onEcriture}
                         />
                       )}
                     </div>

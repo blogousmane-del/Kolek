@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from 'react';
 import type { CarteChoisie } from '../Coquille';
 import { definirConsentementAvis, ouvrirCarte } from '../ecritures';
 import { chargerFicheClient, type CarteFiche, type FicheClient as Fiche } from '../lectures-ecrans';
-import { supabase } from '../supabase';
 import { ActiverCarte } from './ActiverCarte';
 import { ChoixMise } from './ChoixMise';
 
@@ -41,6 +40,7 @@ import { ChoixMise } from './ChoixMise';
  */
 export function FicheClient({
   clientId,
+  collecteurId,
   revision,
   onFermer,
   onEncaisser,
@@ -48,6 +48,10 @@ export function FicheClient({
   onRetrait,
 }: {
   clientId: string | null;
+  /** Donné par la coquille, qui le lit une fois à l'ouverture. Les blocs
+      d'écriture de cette fiche le reçoivent au lieu de relire la session
+      chacun de leur côté — chaque lecture est un aller-retour réseau. */
+  collecteurId: string | null;
   revision: number;
   onFermer: () => void;
   onEncaisser: (carte: CarteChoisie) => void;
@@ -131,6 +135,7 @@ export function FicheClient({
                   nomClient={fiche.nom}
                   cycle={cycle}
                   clientId={fiche.id}
+                  collecteurId={collecteurId}
                   onEncaisser={onEncaisser}
                   onRetrait={onRetrait}
                   onEcriture={onEcriture}
@@ -140,6 +145,7 @@ export function FicheClient({
           ) : (
             <NouvelleCarte
               clientId={fiche.id}
+              collecteurId={collecteurId}
               premiere={fiche.cartes.length === 0}
               onOuverte={() => {
                 void relire();
@@ -286,6 +292,7 @@ function CarteEnCours({
   nomClient,
   cycle,
   clientId,
+  collecteurId,
   onEncaisser,
   onRetrait,
   onEcriture,
@@ -294,6 +301,7 @@ function CarteEnCours({
   nomClient: string;
   cycle: number;
   clientId: string;
+  collecteurId: string | null;
   onEncaisser: (carte: CarteChoisie) => void;
   /** Le nom accompagne la demande : l'écran de retrait s'ouvre réduit à ce
       client et doit pouvoir le nommer même quand il ne lui reste aucune carte. */
@@ -330,6 +338,7 @@ function CarteEnCours({
               Aller au retrait
             </Bouton>
             <ActiverCarte
+              collecteurId={collecteurId}
               clientId={clientId}
               misePreremplie={carte.mise}
               identifiant={`fiche-${carte.id}`}
@@ -369,24 +378,19 @@ function CarteEnCours({
  */
 function NouvelleCarte({
   clientId,
+  collecteurId,
   premiere,
   onOuverte,
 }: {
   clientId: string;
+  /** Donné, jamais relu ici : voir la propriété de même nom sur `FicheClient`. */
+  collecteurId: string | null;
   premiere: boolean;
   onOuverte: () => void;
 }) {
   const [mise, setMise] = useState(1000);
-  const [collecteurId, setCollecteurId] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-
-  useEffect(() => {
-    // `collecteur_id` accompagne l'écriture : la politique RLS l'exige au
-    // `with check`. La coquille le connaît déjà, mais le passer à travers cinq
-    // composants pour un usage unique coûte plus qu'une lecture de session.
-    void supabase.auth.getUser().then(({ data }) => setCollecteurId(data.user?.id ?? null));
-  }, []);
 
   async function ouvrir() {
     if (!collecteurId) return;

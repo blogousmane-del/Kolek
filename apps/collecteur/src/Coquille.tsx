@@ -194,10 +194,11 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       {page === 'retrait' && (
         <Retrait
           revision={revision}
+          collecteurId={collecteurId}
           client={clientPourRetrait}
           onToutesLesCartes={() => setClientPourRetrait(null)}
           onRetour={() => naviguer('accueil')}
-          onCloture={() => setRevision((r) => r + 1)}
+          onEcriture={() => setRevision((r) => r + 1)}
         />
       )}
       {page === 'bilans' && <Bilan revision={revision} onRetour={() => naviguer('accueil')} />}

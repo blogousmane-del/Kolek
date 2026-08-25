@@ -1,8 +1,7 @@
 import { Bouton } from '@kolek/ui';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { ouvrirCarte } from '../ecritures';
-import { supabase } from '../supabase';
 import { ChoixMise } from './ChoixMise';
 
 /**
@@ -22,11 +21,22 @@ import { ChoixMise } from './ChoixMise';
  * l'écran de retrait. Écrit trois fois, il divergerait à la première correction.
  */
 export function ActiverCarte({
+  collecteurId,
   clientId,
   misePreremplie,
   identifiant,
   onOuverte,
 }: {
+  /**
+   * L'identifiant du collecteur, donné et non lu ici.
+   *
+   * `collecteur_id` accompagne l'écriture : la politique RLS l'exige au
+   * `with check`. Ce bloc le lisait lui-même par `supabase.auth.getUser()`, qui
+   * fait un aller-retour réseau — et la liste des clients en affiche un
+   * exemplaire par carte pleine. Cinq cartes pleines, cinq appels, en 3G, pour
+   * une valeur que la coquille tient déjà et passe en propriété.
+   */
+  collecteurId: string | null;
   clientId: string;
   /** Le montant de la carte qui vient d'être remplie. Proposé, pas imposé. */
   misePreremplie: number;
@@ -36,17 +46,8 @@ export function ActiverCarte({
 }) {
   const [deplie, setDeplie] = useState(false);
   const [mise, setMise] = useState(misePreremplie);
-  const [collecteurId, setCollecteurId] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-
-  useEffect(() => {
-    // `collecteur_id` accompagne l'écriture : la politique RLS l'exige au
-    // `with check`. Même lecture que dans `FicheClient` — la faire passer à
-    // travers cinq composants pour un usage unique coûte plus qu'une lecture
-    // de session.
-    void supabase.auth.getUser().then(({ data }) => setCollecteurId(data.user?.id ?? null));
-  }, []);
 
   async function ouvrir() {
     // `envoi` dans la garde : sans lui, un « Annuler » touché pendant la

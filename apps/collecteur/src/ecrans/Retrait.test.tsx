@@ -96,7 +96,13 @@ const HJ = { id: 'cli1', nom: 'Hj' };
 
 function rendre(supplement: Record<string, unknown> = {}) {
   return render(
-    <Retrait revision={0} onRetour={vi.fn()} onCloture={vi.fn()} {...supplement} />,
+    <Retrait
+      revision={0}
+      collecteurId="col1"
+      onRetour={vi.fn()}
+      onEcriture={vi.fn()}
+      {...supplement}
+    />,
   );
 }
 

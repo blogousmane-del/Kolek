@@ -46,16 +46,35 @@ afterEach(() => {
 });
 
 describe('activer une carte de plus', () => {
+  it('ne lit pas la session : l’identifiant lui est donné', () => {
+    render(
+      <ActiverCarte
+        collecteurId={COLLECTEUR}
+        clientId={CLIENT}
+        misePreremplie={5000}
+        identifiant="essai"
+        onOuverte={vi.fn()}
+      />,
+    );
+
+    // Trois écrans montrent ce bloc, et la liste des clients en montre autant
+    // d'exemplaires qu'elle a de cartes pleines. Une lecture de session par
+    // exemplaire, c'est autant d'allers-retours réseau en 3G pour une valeur que
+    // la coquille tient déjà.
+    expect(getUser).not.toHaveBeenCalled();
+    // Et le bouton est armé au premier rendu : plus rien à attendre.
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+    expect(screen.getByRole('button', { name: /Ouvrir la carte/ })).toBeTruthy();
+  });
+
   it('ouvre la carte au montant de celle qui vient d’être remplie', async () => {
     const onOuverte = vi.fn();
     render(
-      <ActiverCarte clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
+      <ActiverCarte collecteurId={COLLECTEUR} clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
-    // `findBy…` : la lecture de session est asynchrone, et le bouton reste
-    // désactivé tant que `collecteurId` est nul.
-    fireEvent.click(await screen.findByRole('button', { name: /Ouvrir la carte/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Ouvrir la carte/ }));
 
     await vi.waitFor(() => expect(onOuverte).toHaveBeenCalled());
     // Le cas courant est de reprendre au même rythme : le montant est proposé
@@ -66,7 +85,7 @@ describe('activer une carte de plus', () => {
   it('ouvre la carte au montant choisi quand le collecteur en change', async () => {
     const onOuverte = vi.fn();
     render(
-      <ActiverCarte clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
+      <ActiverCarte collecteurId={COLLECTEUR} clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
@@ -88,6 +107,7 @@ describe('activer une carte de plus', () => {
 
     render(
       <ActiverCarte
+        collecteurId={COLLECTEUR}
         clientId={CLIENT}
         misePreremplie={5000}
         identifiant="essai"
@@ -96,7 +116,7 @@ describe('activer une carte de plus', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Ouvrir la carte/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Ouvrir la carte/ }));
 
     expect((await screen.findByRole('alert')).textContent).toContain('500');
     // Refermer effacerait le montant choisi et obligerait à tout refaire.
@@ -116,11 +136,11 @@ describe('activer une carte de plus', () => {
     const onOuverte = vi.fn();
 
     render(
-      <ActiverCarte clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
+      <ActiverCarte collecteurId={COLLECTEUR} clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Ouvrir la carte/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Ouvrir la carte/ }));
 
     const annuler = screen.getByRole('button', { name: 'Annuler' });
     expect((annuler as HTMLButtonElement).disabled).toBe(true);
@@ -139,11 +159,11 @@ describe('activer une carte de plus', () => {
     const onOuverte = vi.fn();
 
     render(
-      <ActiverCarte clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
+      <ActiverCarte collecteurId={COLLECTEUR} clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Ouvrir la carte/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Ouvrir la carte/ }));
 
     expect(await screen.findByRole('alert')).toBeTruthy();
 
@@ -161,11 +181,11 @@ describe('activer une carte de plus', () => {
     const onOuverte = vi.fn();
 
     render(
-      <ActiverCarte clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
+      <ActiverCarte collecteurId={COLLECTEUR} clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Ouvrir la carte/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Ouvrir la carte/ }));
 
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Annuler' }) as HTMLButtonElement).disabled).toBe(

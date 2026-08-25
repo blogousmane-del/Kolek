@@ -445,8 +445,12 @@ export interface CarteCloturable {
  * Une carte incomplète est clôturable, et c'est voulu : un client peut vouloir
  * récupérer son épargne avant la fin du cycle. C'est justement le cas où le
  * montant à rendre n'est pas évident de tête, donc celui où l'écran sert le
- * plus. Les cartes complètes remontent en tête, parce qu'elles, elles **doivent**
- * être clôturées.
+ * plus.
+ *
+ * Les cartes complètes remontent en tête — non parce qu'elles devraient être
+ * clôturées, ce qui n'est plus vrai depuis le 2026-08-25, mais parce que c'est
+ * là qu'une décision se présente : rendre l'argent, ou ouvrir une carte de plus.
+ * Le client garde son solde tant qu'il ne l'a pas repris.
  */
 export async function chargerCartesCloturables(): Promise<CarteCloturable[]> {
   const [rCartes, rClients] = await Promise.all([
