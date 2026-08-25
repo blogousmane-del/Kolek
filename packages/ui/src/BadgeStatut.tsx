@@ -11,6 +11,11 @@ const STATUTS = {
   'En synchro': 'bg-info-tint text-info',
   'Versé aujourd’hui': 'bg-secondary text-secondary-foreground',
   Clôturée: 'bg-secondary text-secondary-foreground',
+  // Le mot est déjà pris : `Retrait.tsx` et `FicheClient.tsx` disent tous deux
+  // « Cycle terminé » pour une carte à 31/31 encore ouverte. Une carte pleine
+  // reste positive — c'est un objectif atteint, pas un abandon — donc la même
+  // teinte que « À jour », et jamais un second mot pour le même état.
+  'Cycle terminé': 'bg-positive-tint text-positive',
 } as const;
 
 export type Statut = keyof typeof STATUTS;

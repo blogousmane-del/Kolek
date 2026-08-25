@@ -15,8 +15,14 @@ import type { CarteChoisie, Page } from '../Coquille';
 import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { supabase } from '../supabase';
+import { ActiverCarte } from './ActiverCarte';
 import { ChoixMise } from './ChoixMise';
 import { FicheClient } from './FicheClient';
+
+/** « 1 août » : assez pour distinguer deux cartes, assez court pour une ligne. */
+function dateCourte(iso: string): string {
+  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
 
 interface Client {
   id: string;
@@ -32,16 +38,20 @@ interface CarteClient {
   mise: number;
   statut: 'active' | 'cloturee';
   mises_encaissees: number;
+  /** Ce qui distingue deux cartes actives de même montant. */
+  ouverte_le: string;
 }
 
-interface Ligne {
-  id: string;
-  nom: string;
-  marche: string | null;
-  telephone: string | null;
-  avisActifs: boolean;
-  carte: CarteClient | null;
-}
+/**
+ * Une ligne de la liste.
+ *
+ * Le type est une union parce que la liste porte deux choses différentes, et
+ * qu'un champ `carte: CarteClient | null` obligeait chaque lecteur à retester la
+ * nullité — ce qui est exactement l'erreur que l'ancienne `Map` fabriquait.
+ */
+type Ligne =
+  | { genre: 'carte'; cle: string; client: Client; carte: CarteClient }
+  | { genre: 'client'; cle: string; client: Client };
 
 const FILTRES = ['Tous', 'Avec carte', 'Clôturées', 'Sans carte'] as const;
 type Filtre = (typeof FILTRES)[number];
@@ -84,6 +94,10 @@ export function Clients({
     onFormulaireVu();
   }, [ouvrirFormulaire, onFormulaireVu]);
   const [lignes, setLignes] = useState<Ligne[] | null>(null);
+  /** Les cartes brutes, actives et clôturées confondues. Le dépliage de
+      `lignes` ne garde que les actives ; le filtre `Clôturées` a besoin des
+      autres, et c'est ici qu'il va les chercher. */
+  const [toutesCartes, setToutesCartes] = useState<CarteClient[]>([]);
   const [erreur, setErreur] = useState<string | null>(null);
   const [recherche, setRecherche] = useState('');
   const [filtre, setFiltre] = useState<Filtre>('Tous');
@@ -107,7 +121,9 @@ export function Clients({
             .from('clients')
             .select('id, nom, marche, telephone, avis_actifs')
             .order('nom'),
-          supabase.from('cartes').select('id, client_id, mise, statut, mises_encaissees'),
+          supabase
+            .from('cartes')
+            .select('id, client_id, mise, statut, mises_encaissees, ouverte_le'),
         ]);
 
         if (!vivant) return;
@@ -118,24 +134,36 @@ export function Clients({
           return;
         }
 
-        const parClient = new Map<string, CarteClient>();
-        for (const carte of (reponseCartes.data ?? []) as CarteClient[]) {
-          // Une seule carte active par client est garantie en base ; si une
-          // carte clôturée traîne à côté, l'active gagne l'affichage.
-          const existante = parClient.get(carte.client_id);
-          if (!existante || carte.statut === 'active') parClient.set(carte.client_id, carte);
+        const clients = (reponseClients.data ?? []) as Client[];
+        const cartes = (reponseCartes.data ?? []) as CarteClient[];
+
+        const parClient = new Map<string, CarteClient[]>();
+        for (const carte of cartes) {
+          const liste = parClient.get(carte.client_id);
+          if (liste) liste.push(carte);
+          else parClient.set(carte.client_id, [carte]);
         }
 
-        setLignes(
-          ((reponseClients.data ?? []) as Client[]).map((c) => ({
-            id: c.id,
-            nom: c.nom,
-            marche: c.marche,
-            telephone: c.telephone,
-            avisActifs: c.avis_actifs,
-            carte: parClient.get(c.id) ?? null,
-          })),
-        );
+        // Les clients arrivent déjà triés par nom. Les cartes d'un même client
+        // sont rangées par avancement décroissant : celle qui se termine en
+        // premier est celle qu'il ne faut pas oublier.
+        const construites: Ligne[] = [];
+        for (const client of clients) {
+          const siennes = (parClient.get(client.id) ?? [])
+            .filter((k) => k.statut === 'active')
+            .sort((a, b) => b.mises_encaissees - a.mises_encaissees);
+
+          if (siennes.length === 0) {
+            construites.push({ genre: 'client', cle: client.id, client });
+            continue;
+          }
+          for (const carte of siennes) {
+            construites.push({ genre: 'carte', cle: carte.id, client, carte });
+          }
+        }
+
+        setToutesCartes(cartes);
+        setLignes(construites);
       } catch {
         if (!vivant) return;
         setErreur('Impossible de charger tes clients.');
@@ -153,18 +181,37 @@ export function Clients({
   const visibles = useMemo(() => {
     if (!lignes) return [];
     const terme = recherche.trim().toLowerCase();
+
+    // `Clôturées` ne lit pas `lignes` : le dépliage n'y met que les cartes
+    // actives. Il repart des cartes brutes, et se construit ses propres lignes.
+    if (filtre === 'Clôturées') {
+      const nomParClient = new Map(lignes.map((l) => [l.client.id, l.client]));
+      return toutesCartes
+        .filter((k) => k.statut === 'cloturee')
+        .flatMap<Ligne>((carte) => {
+          const client = nomParClient.get(carte.client_id);
+          if (!client) return [];
+          if (terme && !client.nom.toLowerCase().includes(terme)) return [];
+          return [{ genre: 'carte', cle: carte.id, client, carte }];
+        });
+    }
+
     return lignes.filter((l) => {
-      if (terme && !l.nom.toLowerCase().includes(terme)) return false;
-      if (filtre === 'Avec carte') return l.carte?.statut === 'active';
-      if (filtre === 'Clôturées') return l.carte?.statut === 'cloturee';
-      if (filtre === 'Sans carte') return l.carte === null;
+      if (terme && !l.client.nom.toLowerCase().includes(terme)) return false;
+      if (filtre === 'Avec carte') return l.genre === 'carte';
+      // `Sans carte` valait « aucune carte, jamais ». Il vaut désormais « aucune
+      // carte active » : c'est le filtre du geste à faire, ouvrir une carte.
+      if (filtre === 'Sans carte') return l.genre === 'client';
       return true;
     });
-  }, [lignes, recherche, filtre]);
+  }, [lignes, toutesCartes, recherche, filtre]);
 
-  const cartesActives = lignes?.filter((l) => l.carte?.statut === 'active').length ?? 0;
+  // `lignes` ne porte déjà que les cartes actives : compter ses lignes « carte »
+  // compte les cartes, pas les clients — un même client peut en apporter deux.
+  const cartesActives = lignes?.filter((l) => l.genre === 'carte').length ?? 0;
   const cyclesComplets =
-    lignes?.filter((l) => (l.carte?.mises_encaissees ?? 0) >= MISES_PAR_CYCLE).length ?? 0;
+    lignes?.filter((l) => l.genre === 'carte' && l.carte.mises_encaissees >= MISES_PAR_CYCLE)
+      .length ?? 0;
   // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit — et
   // cette liste-ci se relit après chaque inscription et chaque encaissement.
   const premier = usePremierRendu();
@@ -316,7 +363,7 @@ export function Clients({
 
         {visibles.map((ligne, rang) => (
           <div
-            key={ligne.id}
+            key={ligne.cle}
             className={premier ? 'anim-cascade' : undefined}
             style={rangCascade(rang, premier)}
           >
@@ -324,7 +371,7 @@ export function Clients({
             ligne={ligne}
             onEncaisser={onEncaisser}
             onConsentementChange={onEcriture}
-            onOuvrirFiche={() => setFiche(ligne.id)}
+            onOuvrirFiche={() => setFiche(ligne.client.id)}
           />
           </div>
         ))}
@@ -367,25 +414,38 @@ function LigneClient({
   const [demandeEnCours, setDemandeEnCours] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const [erreurAvis, setErreurAvis] = useState<string | null>(null);
-  const carte = ligne.carte;
+  const carte = ligne.genre === 'carte' ? ligne.carte : null;
+  const client = ligne.client;
   const encaissees = carte?.mises_encaissees ?? 0;
   const avancement = Math.round((encaissees / MISES_PAR_CYCLE) * 100);
 
   // « En retard » exige la date de la dernière mise, que J2a apportera. Tant
   // qu'on ne l'a pas, le badge dit ce qui est établi : la carte existe et
-  // tourne, ou elle est close, ou il n'y en a pas.
+  // tourne, ou elle est close, ou son cycle est fini, ou il n'y en a pas.
   const statut: Statut | null =
-    carte === null ? null : carte.statut === 'cloturee' ? 'Clôturée' : 'À jour';
+    carte === null
+      ? null
+      : carte.statut === 'cloturee'
+        ? 'Clôturée'
+        : encaissees >= MISES_PAR_CYCLE
+          ? 'Cycle terminé'
+          : 'À jour';
 
-  // Une carte active est encaissable tant que le cycle n'est pas complet ;
-  // au-delà, le déclencheur répondrait CYCLE_COMPLET. Autant ne pas proposer
-  // un geste dont on sait qu'il sera refusé.
-  const encaissable = carte !== null && carte.statut === 'active' && encaissees < MISES_PAR_CYCLE;
+  const sousTitre =
+    carte === null
+      ? (client.marche ?? 'Pas encore de carte')
+      : `Mise ${formatMontant(carte.mise)} FCFA · ${encaissees}/${MISES_PAR_CYCLE} · ouverte le ${dateCourte(carte.ouverte_le)}`;
+
+  // Le cycle est fini mais la carte reste ouverte : la décision (retirer ou
+  // ouvrir la suivante) appartient au client, pas à un bouton d'encaissement
+  // qui de toute façon serait refusé par le déclencheur CYCLE_COMPLET.
+  const complete = carte !== null && carte.statut === 'active' && encaissees >= MISES_PAR_CYCLE;
+  const encaissable = carte !== null && carte.statut === 'active' && !complete;
 
   async function poser(accepte: boolean) {
     setEnvoi(true);
     setErreurAvis(null);
-    const resultat = await definirConsentementAvis(ligne.id, accepte);
+    const resultat = await definirConsentementAvis(client.id, accepte);
     setEnvoi(false);
     setDemandeEnCours(false);
     if (!resultat.ok) {
@@ -405,17 +465,13 @@ function LigneClient({
       <button
         type="button"
         onClick={onOuvrirFiche}
-        aria-label={`Ouvrir la fiche de ${ligne.nom}`}
+        aria-label={`Ouvrir la fiche de ${client.nom}`}
         className="anim-pression flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
       >
-      <Avatar nom={ligne.nom} className="w-11 h-11 flex-shrink-0" />
+      <Avatar nom={client.nom} className="w-11 h-11 flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <p className="font-body font-semibold text-base text-ink truncate">{ligne.nom}</p>
-        <p className="text-sm text-muted-foreground font-body truncate">
-          {carte
-            ? `Mise ${formatMontant(carte.mise)} FCFA · ${encaissees}/${MISES_PAR_CYCLE}`
-            : (ligne.marche ?? 'Pas encore de carte')}
-        </p>
+        <p className="font-body font-semibold text-base text-ink truncate">{client.nom}</p>
+        <p className="text-sm text-muted-foreground font-body truncate">{sousTitre}</p>
         {carte && (
           <div className="w-full h-1 bg-muted rounded-pill mt-1.5 overflow-hidden">
             <div
@@ -426,22 +482,7 @@ function LigneClient({
         )}
       </div>
       </button>
-      {encaissable ? (
-        <button
-          type="button"
-          onClick={() =>
-            onEncaisser({
-              carteId: carte.id,
-              clientNom: ligne.nom,
-              mise: carte.mise,
-              misesEncaissees: encaissees,
-            })
-          }
-          className="px-3 py-2 rounded-pill bg-primary text-primary-foreground text-sm font-body font-bold flex-shrink-0 cursor-pointer"
-        >
-          Encaisser
-        </button>
-      ) : statut ? (
+      {statut ? (
         <BadgeStatut statut={statut} className="px-2.5 py-1 flex-shrink-0" />
       ) : (
         <span className="px-2.5 py-1 rounded-pill text-xs font-body font-semibold bg-muted text-muted-foreground flex-shrink-0">
@@ -450,8 +491,39 @@ function LigneClient({
       )}
       </div>
 
+      {complete ? (
+        // Le cycle est fini : la décision appartient au client. Un bouton
+        // d'encaissement éteint ne la lui poserait pas.
+        <div className="flex flex-wrap gap-2 mt-3">
+          <Bouton variante="contour" icone="arrow-up-right" onClick={onOuvrirFiche}>
+            Retirer
+          </Bouton>
+          <ActiverCarte
+            clientId={client.id}
+            misePreremplie={carte.mise}
+            identifiant={`ligne-${carte.id}`}
+            onOuverte={onConsentementChange}
+          />
+        </div>
+      ) : encaissable ? (
+        <Bouton
+          className="mt-3"
+          icone="circle-dollar-sign"
+          onClick={() =>
+            onEncaisser({
+              carteId: carte.id,
+              clientNom: client.nom,
+              mise: carte.mise,
+              misesEncaissees: encaissees,
+            })
+          }
+        >
+          Encaisser
+        </Bouton>
+      ) : null}
+
       <BasculeAvis
-        ligne={ligne}
+        client={client}
         demandeEnCours={demandeEnCours}
         envoi={envoi}
         erreur={erreurAvis}
@@ -480,7 +552,7 @@ function LigneClient({
  * laisserait le collecteur chercher pourquoi ce client-là n'a pas l'option.
  */
 function BasculeAvis({
-  ligne,
+  client,
   demandeEnCours,
   envoi,
   erreur,
@@ -488,7 +560,7 @@ function BasculeAvis({
   onAnnuler,
   onPoser,
 }: {
-  ligne: Ligne;
+  client: Client;
   demandeEnCours: boolean;
   envoi: boolean;
   erreur: string | null;
@@ -496,14 +568,14 @@ function BasculeAvis({
   onAnnuler: () => void;
   onPoser: (accepte: boolean) => void;
 }) {
-  const sansNumero = !ligne.telephone;
+  const sansNumero = !client.telephone;
 
   if (demandeEnCours) {
     return (
       <div className="mt-3 pt-3 border-t border-hairline">
         <p className="text-sm font-body text-ink m-0">
-          {ligne.nom} accepte-t-il de recevoir un message à chaque mouvement sur son{' '}
-          {ligne.telephone} ?
+          {client.nom} accepte-t-il de recevoir un message à chaque mouvement sur son{' '}
+          {client.telephone} ?
         </p>
         <p className="text-xs font-body text-muted-foreground mt-1">
           Demande-lui avant de confirmer. Le message dira le montant versé et la somme à lui rendre.
@@ -540,14 +612,14 @@ function BasculeAvis({
       <div className="flex items-center justify-between gap-3">
         <span className="flex items-center gap-2 min-w-0">
           <Icone
-            nom={ligne.avisActifs ? 'bell' : 'bell-off'}
+            nom={client.avis_actifs ? 'bell' : 'bell-off'}
             taille={15}
-            className={ligne.avisActifs ? 'text-positive' : 'text-muted-foreground'}
+            className={client.avis_actifs ? 'text-positive' : 'text-muted-foreground'}
           />
           <span className="text-xs font-body text-muted-foreground truncate">
             {sansNumero
               ? 'Pas de numéro : aucun avis possible'
-              : ligne.avisActifs
+              : client.avis_actifs
                 ? 'Prévenu à chaque mouvement'
                 : 'Non prévenu'}
           </span>
@@ -555,16 +627,16 @@ function BasculeAvis({
         <button
           type="button"
           disabled={sansNumero || envoi}
-          aria-pressed={ligne.avisActifs}
+          aria-pressed={client.avis_actifs}
           title={sansNumero ? 'Ce client n’a pas de numéro enregistré.' : undefined}
-          onClick={() => (ligne.avisActifs ? onPoser(false) : onDemander())}
+          onClick={() => (client.avis_actifs ? onPoser(false) : onDemander())}
           // `anim-pression` et le libellé d'attente disent tous deux la même
           // chose : l'appui a été pris. Sans eux, entre le doigt et la réponse
           // du serveur, rien ne bougeait — et en 3G cette attente se compte en
           // secondes, pendant lesquelles le collecteur appuie à nouveau.
           className="anim-pression px-3 py-1.5 rounded-pill border border-hairline text-ink text-xs font-body font-semibold whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {envoi ? 'Enregistrement…' : ligne.avisActifs ? 'Ne plus prévenir' : 'Prévenir'}
+          {envoi ? 'Enregistrement…' : client.avis_actifs ? 'Ne plus prévenir' : 'Prévenir'}
         </button>
       </div>
       {erreur && (
