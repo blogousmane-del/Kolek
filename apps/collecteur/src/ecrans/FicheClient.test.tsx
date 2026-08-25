@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -95,6 +95,80 @@ const FICHE_CYCLE_ET_AVANCEMENT = {
   mises: [],
 };
 
+/**
+ * Deux cartes actives, non pleines toutes les deux : les cartes pleines
+ * n'ont pas de bouton d'encaissement, elles ne participent donc pas au
+ * verrouillage du bon dispatch de `carteId`.
+ */
+const FICHE_DEUX_CARTES_ENCAISSABLES = {
+  id: 'cli3',
+  nom: 'Diarra',
+  telephone: null,
+  marche: null,
+  activite: null,
+  avisActifs: false,
+  cartes: [
+    {
+      id: 'kA',
+      mise: 2000,
+      statut: 'active' as const,
+      misesEncaissees: 5,
+      ouverteLe: '2026-08-05T08:00:00.000Z',
+      clotureeLe: null,
+    },
+    {
+      id: 'kB',
+      mise: 6000,
+      statut: 'active' as const,
+      misesEncaissees: 20,
+      ouverteLe: '2026-07-10T08:00:00.000Z',
+      clotureeLe: null,
+    },
+  ],
+  mises: [],
+};
+
+/** Un client inscrit qui n'a encore jamais ouvert de carte. */
+const FICHE_SANS_CARTE = {
+  id: 'cli4',
+  nom: 'Coulibaly',
+  telephone: null,
+  marche: null,
+  activite: null,
+  avisActifs: false,
+  cartes: [],
+  mises: [],
+};
+
+/** Un client dont les cartes existent, mais sont toutes closes. */
+const FICHE_TOUTES_CLOTUREES = {
+  id: 'cli5',
+  nom: 'Traore',
+  telephone: null,
+  marche: null,
+  activite: null,
+  avisActifs: false,
+  cartes: [
+    {
+      id: 'k9',
+      mise: 3000,
+      statut: 'cloturee' as const,
+      misesEncaissees: 31,
+      ouverteLe: '2026-01-01T08:00:00.000Z',
+      clotureeLe: '2026-03-01T08:00:00.000Z',
+    },
+    {
+      id: 'k8',
+      mise: 1500,
+      statut: 'cloturee' as const,
+      misesEncaissees: 10,
+      ouverteLe: '2025-10-01T08:00:00.000Z',
+      clotureeLe: '2025-11-01T08:00:00.000Z',
+    },
+  ],
+  mises: [],
+};
+
 afterEach(() => {
   cleanup();
   chargerFicheClient.mockReset();
@@ -116,7 +190,10 @@ describe('fiche d’un client à plusieurs cartes', () => {
     );
 
     expect(await screen.findByText(/Cartes en cours/)).toBeTruthy();
-    expect(await screen.findAllByText(/FCFA/)).not.toHaveLength(0);
+    // Un simple compte de « FCFA » passerait déjà avec une seule carte rendue :
+    // ce qui distingue vraiment deux cartes, ce sont leurs deux montants.
+    expect(await screen.findByText(/5\s*000/)).toBeTruthy();
+    expect(await screen.findByText(/1\s*000/)).toBeTruthy();
   });
 
   it('offre les deux portes sur la carte au bout de son cycle', async () => {
@@ -157,6 +234,44 @@ describe('fiche d’un client à plusieurs cartes', () => {
     // active. Elle est tombée avec l'index.
     expect(screen.queryByText(/s’ouvre ensuite/)).toBeNull();
   });
+
+  it('envoie l’identifiant de la carte touchée, pas celui de sa voisine', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+    const onEncaisser = vi.fn();
+
+    render(
+      <FicheClient
+        clientId="cli3"
+        revision={0}
+        onFermer={vi.fn()}
+        onEncaisser={onEncaisser}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    // Le tri affiche la carte la plus avancée en premier : kB (20 mises)
+    // précède kA (5 mises) parmi les boutons rendus. Vérifié plutôt que
+    // supposé — c'est cet ordre-là qui rend la confusion possible si le tri
+    // venait à changer, et un index nu la cliquerait en silence.
+    const boutons = await screen.findAllByRole('button', { name: 'Encaisser une mise' });
+    expect(boutons).toHaveLength(2);
+    expect(boutons[0].parentElement?.textContent).toMatch(/6\s*000/);
+    expect(boutons[1].parentElement?.textContent).toMatch(/2\s*000/);
+
+    // boutons[1] porte le bloc de kA : c'est celui-là qu'on touche, et non son
+    // voisin — une mise est immuable, encaisser sur la mauvaise carte ne se
+    // rattrape pas.
+    fireEvent.click(boutons[1]);
+
+    expect(onEncaisser).toHaveBeenCalledTimes(1);
+    expect(onEncaisser).toHaveBeenCalledWith({
+      carteId: 'kA',
+      clientNom: 'Diarra',
+      mise: 2000,
+      misesEncaissees: 5,
+    });
+  });
 });
 
 describe('numéro de cycle : l’ancienneté, jamais l’avancement', () => {
@@ -188,5 +303,45 @@ describe('numéro de cycle : l’ancienneté, jamais l’avancement', () => {
     // avancée et se retrouve donc affichée en second (tri par avancement).
     const carteRecente = screen.getByText('Cycle 2').closest('.rounded-xl') as HTMLElement;
     expect(within(carteRecente).getByText(/2\s*000/)).toBeTruthy();
+  });
+});
+
+describe('client sans carte active : le bloc d’ouverture reste atteignable', () => {
+  it('propose d’ouvrir une première carte au client qui n’en a jamais eu', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_SANS_CARTE);
+
+    render(
+      <FicheClient
+        clientId="cli4"
+        revision={0}
+        onFermer={vi.fn()}
+        onEncaisser={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    // Le libellé change selon que le client a déjà eu une carte ou non : les
+    // deux cas ne doivent pas se confondre.
+    expect(await screen.findByText('Ouvrir sa première carte')).toBeTruthy();
+    expect(screen.queryByText('Ouvrir une nouvelle carte')).toBeNull();
+  });
+
+  it('propose d’en rouvrir une au client dont toutes les cartes sont clôturées', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
+
+    render(
+      <FicheClient
+        clientId="cli5"
+        revision={0}
+        onFermer={vi.fn()}
+        onEncaisser={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText('Ouvrir une nouvelle carte')).toBeTruthy();
+    expect(screen.queryByText('Ouvrir sa première carte')).toBeNull();
   });
 });
