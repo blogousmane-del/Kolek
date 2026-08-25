@@ -47,6 +47,10 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       C'est le bouton « Souscrire » de l'accueil qui la pose. */
   const [souscrire, setSouscrire] = useState(false);
   const [carteChoisie, setCarteChoisie] = useState<CarteChoisie | null>(null);
+  /** Le client sur lequel l'écran de retrait s'ouvre réduit. `null` = toutes les
+      cartes. Porté ici et non dans l'écran : c'est la navigation qui le décide,
+      et un état local se perdrait au premier aller-retour. */
+  const [clientPourRetrait, setClientPourRetrait] = useState<string | null>(null);
   /** Incrémenté après chaque écriture : la liste des clients s'y abonne pour
       se relire. Sans ça, un client tout juste inscrit n'apparaît qu'au
       rechargement de la page. */
@@ -96,6 +100,11 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
     onDeconnexion();
   }
 
+  function allerAuRetrait(clientId: string | null) {
+    setClientPourRetrait(clientId);
+    setPage('retrait');
+  }
+
   function encaisserSur(carte: CarteChoisie) {
     setCarteChoisie(carte);
     setPage('encaisser');
@@ -133,7 +142,7 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
           onDeconnexion={deconnecter}
           onEncaisser={encaisserSur}
           onEcriture={() => setRevision((r) => r + 1)}
-          onNaviguer={setPage}
+          onRetrait={allerAuRetrait}
         />
       )}
       {page === 'encaisser' && (
@@ -154,6 +163,8 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       {page === 'retrait' && (
         <Retrait
           revision={revision}
+          clientId={clientPourRetrait}
+          onToutesLesCartes={() => setClientPourRetrait(null)}
           onRetour={() => setPage('accueil')}
           onCloture={() => setRevision((r) => r + 1)}
         />

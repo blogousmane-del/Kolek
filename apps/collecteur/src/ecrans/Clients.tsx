@@ -11,7 +11,7 @@ import {
 } from '@kolek/ui';
 import { useEffect, useMemo, useState } from 'react';
 
-import type { CarteChoisie, Page } from '../Coquille';
+import type { CarteChoisie } from '../Coquille';
 import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { supabase } from '../supabase';
@@ -70,7 +70,7 @@ export function Clients({
   onDeconnexion,
   onEncaisser,
   onEcriture,
-  onNaviguer,
+  onRetrait,
 }: {
   collecteurId: string | null;
   revision: number;
@@ -80,7 +80,11 @@ export function Clients({
   onDeconnexion: () => void;
   onEncaisser: (carte: CarteChoisie) => void;
   onEcriture: () => void;
-  onNaviguer: (cle: Page) => void;
+  /** Ouvre l'écran de retrait, réduit aux cartes de ce client.
+      L'identifiant voyage jusque-là parce que le collecteur vient de désigner
+      une carte : le renvoyer sur la liste de tous ses clients l'obligerait à la
+      retrouver à la main, avant un geste qui ne se défait pas. */
+  onRetrait: (clientId: string) => void;
 }) {
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);
   /** Le client dont la fiche flottante est ouverte. `null` = aucune. */
@@ -385,6 +389,7 @@ export function Clients({
             onEncaisser={onEncaisser}
             onConsentementChange={onEcriture}
             onOuvrirFiche={() => setFiche(ligne.client.id)}
+            onRetrait={() => onRetrait(ligne.client.id)}
           />
           </div>
         ))}
@@ -405,8 +410,10 @@ export function Clients({
         }}
         onEcriture={onEcriture}
         onRetrait={() => {
+          // La fiche se referme, mais l'identifiant du client la suit : l'écran
+          // de retrait s'ouvre sur ses cartes à lui, pas sur celles de tous.
+          if (fiche) onRetrait(fiche);
           setFiche(null);
-          onNaviguer('retrait');
         }}
       />
     </div>
@@ -418,11 +425,13 @@ function LigneClient({
   onEncaisser,
   onConsentementChange,
   onOuvrirFiche,
+  onRetrait,
 }: {
   ligne: Ligne;
   onEncaisser: (carte: CarteChoisie) => void;
   onConsentementChange: () => void;
   onOuvrirFiche: () => void;
+  onRetrait: () => void;
 }) {
   const [demandeEnCours, setDemandeEnCours] = useState(false);
   const [envoi, setEnvoi] = useState(false);
@@ -508,7 +517,7 @@ function LigneClient({
         // Le cycle est fini : la décision appartient au client. Un bouton
         // d'encaissement éteint ne la lui poserait pas.
         <div className="flex flex-wrap gap-2 mt-3">
-          <Bouton variante="contour" icone="arrow-up-right" onClick={onOuvrirFiche}>
+          <Bouton variante="contour" icone="arrow-up-right" onClick={onRetrait}>
             Retirer
           </Bouton>
           <ActiverCarte

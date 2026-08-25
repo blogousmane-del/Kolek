@@ -78,7 +78,7 @@ function brancherSupabase() {
   });
 }
 
-function rendre() {
+function rendre(supplement: Record<string, unknown> = {}) {
   return render(
     <Clients
       collecteurId="col1"
@@ -88,7 +88,8 @@ function rendre() {
       onDeconnexion={vi.fn()}
       onEncaisser={vi.fn()}
       onEcriture={vi.fn()}
-      onNaviguer={vi.fn()}
+      onRetrait={vi.fn()}
+      {...supplement}
     />,
   );
 }
@@ -145,18 +146,7 @@ describe('liste des clients devenue liste de cartes', () => {
   it('envoie l’identifiant de la carte touchée, pas celui de sa voisine', async () => {
     brancherSupabase();
     const onEncaisser = vi.fn();
-    render(
-      <Clients
-        collecteurId="col1"
-        revision={0}
-        ouvrirFormulaire={false}
-        onFormulaireVu={vi.fn()}
-        onDeconnexion={vi.fn()}
-        onEncaisser={onEncaisser}
-        onEcriture={vi.fn()}
-        onNaviguer={vi.fn()}
-      />,
-    );
+    rendre({ onEncaisser });
 
     // Le tri range la carte la plus avancée en premier : k2 (17 mises) doit
     // précéder k1 (2 mises) parmi les boutons rendus. Vérifié plutôt que
@@ -195,5 +185,20 @@ describe('liste des clients devenue liste de cartes', () => {
     // Encaisser ici serait refusé par la base (déclencheur CYCLE_COMPLET) :
     // c'est justement ce que la refonte en cartes doit empêcher de proposer.
     expect(within(ligne).queryByRole('button', { name: 'Encaisser' })).toBeNull();
+  });
+
+  it('mène au retrait du bon client depuis la carte terminée', async () => {
+    const onRetrait = vi.fn();
+    brancherSupabase();
+    rendre({ onRetrait });
+
+    await screen.findByText('Sy');
+    const ligne = screen.getByText('Sy').closest('.bg-surface') as HTMLElement;
+    fireEvent.click(within(ligne).getByRole('button', { name: 'Retirer' }));
+
+    // Sans cet identifiant, le collecteur atterrissait sur toutes les cartes de
+    // tous ses clients et devait retrouver la ligne à la main — avant un geste
+    // qui ne se défait pas, et alors qu'un même client peut en avoir deux.
+    expect(onRetrait).toHaveBeenCalledWith('cli3');
   });
 });
