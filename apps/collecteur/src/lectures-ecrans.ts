@@ -340,13 +340,17 @@ export interface Rapprochement {
 export async function chargerRapprochement(): Promise<Rapprochement> {
   const date = dateUtcDuJour();
 
-  const [rCaisse, rMises] = await Promise.all([
+  const [rCaisse, rMises, rRetraits] = await Promise.all([
     supabase
       .from('caisses_jour')
       .select('id, cash_attendu, cash_declare, ecart')
       .eq('date', date)
       .maybeSingle(),
     supabase.from('mises').select('montant, encaisse_le').gte('encaisse_le', `${date}T00:00:00Z`),
+    supabase
+      .from('retraits')
+      .select('montant_restitue, effectue_le')
+      .gte('effectue_le', `${date}T00:00:00Z`),
   ]);
 
   const ligne = rCaisse.data as {
@@ -374,9 +378,21 @@ export async function chargerRapprochement(): Promise<Rapprochement> {
     (m) => m.encaisse_le.slice(0, 10) === date,
   );
 
+  // Et les restitutions du jour se soustraient, comme côté serveur depuis le
+  // 2026-08-25. Deux calculs du même nombre à deux endroits : celui-ci existe
+  // parce qu'aucune ligne n'est encore écrite, donc aucune fonction n'a été
+  // appelée. S'ils divergent, le collecteur voit un attendu changer au moment
+  // où il déclare — c'est-à-dire au moment où il compte son argent.
+  const restitue = ((rRetraits.data ?? []) as Array<{
+    montant_restitue: number;
+    effectue_le: string;
+  }>)
+    .filter((r) => r.effectue_le.slice(0, 10) === date)
+    .reduce((t, r) => t + r.montant_restitue, 0);
+
   return {
     date,
-    cashAttendu: dujour.reduce((t, m) => t + m.montant, 0),
+    cashAttendu: dujour.reduce((t, m) => t + m.montant, 0) - restitue,
     cashDeclare: null,
     ecart: null,
     ligneId: null,

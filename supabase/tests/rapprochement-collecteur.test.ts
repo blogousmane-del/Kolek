@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
+import { admin, creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
 
 /**
  * Le rapprochement de caisse, **écrit par le collecteur lui-même**.
@@ -172,5 +172,114 @@ describe('cloisonnement entre collecteurs', () => {
     // elle, un collecteur salirait le rapprochement d'un autre.
     expect(error).not.toBeNull();
     expect(error?.code).toBe('42501');
+  });
+});
+
+
+/**
+ * Le cash attendu, quand la journée comporte une restitution.
+ *
+ * Le défaut réparé le 2026-08-25 : `cash_attendu_du_jour` n'additionnait que
+ * les mises. Un collecteur qui rendait 4 000 FCFA le matin voyait le soir un
+ * attendu qui les contenait encore, donc un manquant de 4 000 qui n'existait
+ * pas. Sur un produit dont le sujet est la confiance entre un collecteur et son
+ * argent, le dispositif censé le rassurer devenait celui qui l'accusait.
+ *
+ * Le test exerce la journée entière, dans l'ordre réel : encaisser, rendre,
+ * déclarer. C'est ce que l'audit demandait, et ce qui aurait attrapé au passage
+ * la colonne inexistante que sa correction proposait — `cloture_le` au lieu de
+ * `effectue_le`.
+ */
+describe('le cash attendu face aux restitutions', () => {
+  it('soustrait ce qui est sorti de la sacoche', async () => {
+    const seul = await creerCollecteur(`Sacoche ${MARQUE}`, `+225076${MARQUE}`);
+
+    const clientId = crypto.randomUUID();
+    const carteId = crypto.randomUUID();
+    await seul.client
+      .from('clients')
+      .insert({ id: clientId, collecteur_id: seul.id, nom: `Rendu ${MARQUE}` });
+    await seul.client
+      .from('cartes')
+      .insert({ id: carteId, collecteur_id: seul.id, client_id: clientId, mise: 1000 });
+
+    for (let i = 0; i < 3; i += 1) {
+      const { error } = await seul.client.from('mises').insert({
+        id: crypto.randomUUID(),
+        collecteur_id: seul.id,
+        carte_id: carteId,
+        montant: 1000,
+        encaisse_le: new Date().toISOString(),
+      });
+      if (error) throw error;
+    }
+
+    // La restitution passe par la clé de service : la table est fermée en
+    // écriture au collecteur, c'est l'Edge Function qui la rédige.
+    // (3 − 1) × 1 000 — la première mise est la commission.
+    const { error: eRetrait } = await admin.from('retraits').insert({
+      collecteur_id: seul.id,
+      carte_id: carteId,
+      montant_restitue: 2000,
+      commission: 1000,
+    });
+    expect(eRetrait).toBeNull();
+
+    const { data, error } = await seul.client
+      .from('caisses_jour')
+      .insert({ collecteur_id: seul.id, date: dateUtcDuJour(), cash_declare: 1000 })
+      .select('cash_attendu, ecart')
+      .single();
+
+    expect(error).toBeNull();
+    // 3 000 encaissés − 2 000 rendus = 1 000 en main.
+    expect((data as { cash_attendu: number }).cash_attendu).toBe(1000);
+    // Et donc aucun écart : le collecteur a exactement ce qu'il doit avoir.
+    expect((data as { ecart: number }).ecart).toBe(0);
+  });
+
+  it('rafraîchit une caisse déjà déclarée quand une carte se clôture après', async () => {
+    // Le jumeau du déclencheur des mises. Sans lui, `cash_attendu` resterait
+    // figé sur sa valeur d'avant la restitution — une lecture périmée côté
+    // serveur, qu'aucune invalidation de cache côté téléphone ne rattrape.
+    const seul = await creerCollecteur(`Tardif ${MARQUE}`, `+225077${MARQUE}`);
+
+    const clientId = crypto.randomUUID();
+    const carteId = crypto.randomUUID();
+    await seul.client
+      .from('clients')
+      .insert({ id: clientId, collecteur_id: seul.id, nom: `Tardif ${MARQUE}` });
+    await seul.client
+      .from('cartes')
+      .insert({ id: carteId, collecteur_id: seul.id, client_id: clientId, mise: 2000 });
+    await seul.client.from('mises').insert({
+      id: crypto.randomUUID(),
+      collecteur_id: seul.id,
+      carte_id: carteId,
+      montant: 2000,
+      encaisse_le: new Date().toISOString(),
+    });
+
+    const { data: avant } = await seul.client
+      .from('caisses_jour')
+      .insert({ collecteur_id: seul.id, date: dateUtcDuJour(), cash_declare: 2000 })
+      .select('id, cash_attendu')
+      .single();
+    expect((avant as { cash_attendu: number }).cash_attendu).toBe(2000);
+
+    await admin.from('retraits').insert({
+      collecteur_id: seul.id,
+      carte_id: carteId,
+      montant_restitue: 500,
+      commission: 2000,
+    });
+
+    const { data: apres } = await seul.client
+      .from('caisses_jour')
+      .select('cash_attendu')
+      .eq('id', (avant as { id: string }).id)
+      .single();
+
+    expect((apres as { cash_attendu: number }).cash_attendu).toBe(1500);
   });
 });
