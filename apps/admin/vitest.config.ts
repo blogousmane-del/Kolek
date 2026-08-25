@@ -5,5 +5,10 @@ import { defineConfig } from 'vitest/config';
 // le dépôt, pour que celui qui ouvre l'un reconnaisse l'autre.
 export default defineConfig({
   plugins: [react()],
-  test: { environment: 'jsdom' },
+  test: {
+    environment: 'jsdom',
+    // Même valeur et même raison que `packages/ui/vitest.config.ts`, qui la
+    // porte en toutes lettres.
+    testTimeout: 20000,
+  },
 });
