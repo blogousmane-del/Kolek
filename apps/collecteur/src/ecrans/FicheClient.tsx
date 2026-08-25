@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { CarteChoisie } from '../Coquille';
 import { definirConsentementAvis, ouvrirCarte } from '../ecritures';
-import { chargerFicheClient, type FicheClient as Fiche } from '../lectures-ecrans';
+import { chargerFicheClient, type CarteFiche, type FicheClient as Fiche } from '../lectures-ecrans';
 import { supabase } from '../supabase';
+import { ActiverCarte } from './ActiverCarte';
 import { ChoixMise } from './ChoixMise';
 
 /**
@@ -81,8 +82,19 @@ export function FicheClient({
     void relire();
   }, [relire, revision]);
 
-  const active = fiche?.cartes.find((k) => k.statut === 'active') ?? null;
-  const complete = active !== null && active.misesEncaissees >= MISES_PAR_CYCLE;
+  // Le numéro de cycle est une donnée chronologique — la énième carte que ce
+  // client a ouverte — et se lit dans la position au sein de `fiche.cartes`,
+  // l'ordre d'ouverture décroissant que rend `chargerFicheClient` (la plus
+  // ancienne en dernier, donc au cycle 1). Il est calculé ici, avant tout tri
+  // d'affichage : un tri par avancement ne doit jamais faire varier le numéro
+  // d'une carte qui, elle, n'a pas bougé.
+  const total = fiche?.cartes.length ?? 0;
+  const actives = (fiche?.cartes ?? [])
+    .map((carte, indice) => ({ carte, cycle: total - indice }))
+    .filter(({ carte }) => carte.statut === 'active')
+    // La plus avancée d'abord : c'est celle dont le cycle se termine en premier,
+    // donc celle sur laquelle une décision se présente le plus tôt.
+    .sort((a, b) => b.carte.misesEncaissees - a.carte.misesEncaissees);
 
   return (
     <Feuille
@@ -105,47 +117,23 @@ export function FicheClient({
         <>
           <Coordonnees fiche={fiche} onChange={onEcriture} onRelire={relire} />
 
-          {active ? (
+          {actives.length > 0 ? (
             <section>
-              <p className="font-headings font-bold text-base text-ink mb-2">Carte en cours</p>
-              <CarteCollecte
-                nomClient={fiche.nom}
-                misePar={formatMontant(active.mise)}
-                jourCourant={active.misesEncaissees}
-                solde={formatMontant(soldeRestituable(active.misesEncaissees, active.mise))}
-                cycle={String(fiche.cartes.length)}
-              />
-
-              {complete ? (
-                <div className="bg-positive-tint rounded-md p-3 mt-3">
-                  <p className="font-body text-sm text-ink m-0">
-                    Cycle terminé — {MISES_PAR_CYCLE} mises sur {MISES_PAR_CYCLE}.
-                  </p>
-                  <p className="font-body text-xs text-muted-foreground mt-1">
-                    Rends-lui {formatMontant(soldeRestituable(active.misesEncaissees, active.mise))}{' '}
-                    FCFA depuis « Retrait ». La nouvelle carte s’ouvre ensuite.
-                  </p>
-                  <Bouton variante="contour" className="mt-3" onClick={onRetrait}>
-                    Aller au retrait
-                  </Bouton>
-                </div>
-              ) : (
-                <Bouton
-                  pleineLargeur
-                  className="mt-3"
-                  icone="circle-dollar-sign"
-                  onClick={() =>
-                    onEncaisser({
-                      carteId: active.id,
-                      clientNom: fiche.nom,
-                      mise: active.mise,
-                      misesEncaissees: active.misesEncaissees,
-                    })
-                  }
-                >
-                  Encaisser {formatMontant(active.mise)} FCFA
-                </Bouton>
-              )}
+              <p className="font-headings font-bold text-base text-ink mb-2">
+                {actives.length > 1 ? 'Cartes en cours' : 'Carte en cours'}
+              </p>
+              {actives.map(({ carte, cycle }) => (
+                <CarteEnCours
+                  key={carte.id}
+                  carte={carte}
+                  nomClient={fiche.nom}
+                  cycle={cycle}
+                  clientId={fiche.id}
+                  onEncaisser={onEncaisser}
+                  onRetrait={onRetrait}
+                  onEcriture={onEcriture}
+                />
+              ))}
             </section>
           ) : (
             <NouvelleCarte
@@ -278,6 +266,89 @@ function Coordonnees({
         <p role="alert" className="font-body text-xs text-negative m-0">
           {erreur}
         </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Une carte en cours, et ce qu'on peut en faire.
+ *
+ * Sous 31 mises, un seul geste : encaisser. À 31, le cycle est fini et la
+ * décision appartient au client — reprendre son argent, ou le laisser et repartir
+ * sur une carte de plus. Les deux portes se valent, donc les deux boutons se
+ * valent.
+ */
+function CarteEnCours({
+  carte,
+  nomClient,
+  cycle,
+  clientId,
+  onEncaisser,
+  onRetrait,
+  onEcriture,
+}: {
+  carte: CarteFiche;
+  nomClient: string;
+  cycle: number;
+  clientId: string;
+  onEncaisser: (carte: CarteChoisie) => void;
+  onRetrait: () => void;
+  onEcriture: () => void;
+}) {
+  const complete = carte.misesEncaissees >= MISES_PAR_CYCLE;
+
+  return (
+    <div className="mb-4">
+      <CarteCollecte
+        nomClient={nomClient}
+        misePar={formatMontant(carte.mise)}
+        jourCourant={carte.misesEncaissees}
+        solde={formatMontant(soldeRestituable(carte.misesEncaissees, carte.mise))}
+        cycle={String(cycle)}
+      />
+
+      {complete ? (
+        <div className="bg-positive-tint rounded-md p-3 mt-3 space-y-3">
+          <div>
+            <p className="font-body text-sm text-ink m-0">
+              Cycle terminé — {MISES_PAR_CYCLE} mises sur {MISES_PAR_CYCLE}.
+            </p>
+            <p className="font-body text-xs text-muted-foreground mt-1">
+              Tu peux lui rendre ses{' '}
+              {formatMontant(soldeRestituable(carte.misesEncaissees, carte.mise))} FCFA, ou lui
+              activer une carte de plus. Tant qu'il n'y a pas de retrait, cette carte reste
+              ouverte et son solde lui est dû.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Bouton variante="contour" icone="arrow-up-right" onClick={onRetrait}>
+              Aller au retrait
+            </Bouton>
+            <ActiverCarte
+              clientId={clientId}
+              misePreremplie={carte.mise}
+              identifiant={`fiche-${carte.id}`}
+              onOuverte={onEcriture}
+            />
+          </div>
+        </div>
+      ) : (
+        <Bouton
+          pleineLargeur
+          className="mt-3"
+          icone="circle-dollar-sign"
+          onClick={() =>
+            onEncaisser({
+              carteId: carte.id,
+              clientNom: nomClient,
+              mise: carte.mise,
+              misesEncaissees: carte.misesEncaissees,
+            })
+          }
+        >
+          Encaisser une mise
+        </Bouton>
       )}
     </div>
   );
