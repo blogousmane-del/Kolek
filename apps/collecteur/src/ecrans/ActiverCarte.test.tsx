@@ -102,4 +102,53 @@ describe('activer une carte de plus', () => {
     // Refermer effacerait le montant choisi et obligerait à tout refaire.
     expect(onOuverte).not.toHaveBeenCalled();
   });
+
+  it('ne laisse pas quitter le bloc pendant qu’une carte s’ouvre', async () => {
+    // Un « Annuler » cliquable pendant l'envoi replie le bloc sans rien montrer
+    // du résultat : croyant n'avoir rien déclenché, le collecteur retouche
+    // « Ouvrir la carte » et une seconde commission part sur la même carte.
+    let resoudre: (valeur: { ok: true; carteId: string }) => void;
+    ouvrirCarte.mockReturnValue(
+      new Promise((resolve) => {
+        resoudre = resolve;
+      }),
+    );
+    const onOuverte = vi.fn();
+
+    render(
+      <ActiverCarte clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Ouvrir la carte/ }));
+
+    const annuler = screen.getByRole('button', { name: 'Annuler' });
+    expect((annuler as HTMLButtonElement).disabled).toBe(true);
+
+    resoudre!({ ok: true, carteId: 'c1' });
+    await vi.waitFor(() => expect(onOuverte).toHaveBeenCalledTimes(1));
+  });
+
+  it('efface le refus précédent quand le montant change', async () => {
+    // Un message de refus qui survit à un changement de montant se lit comme
+    // un second refus — sur une saisie que le serveur n'a pourtant jamais vue.
+    ouvrirCarte.mockResolvedValue({
+      ok: false,
+      echec: { code: 'MISE_HORS_BORNES', message: 'La mise doit être comprise entre 500 et 10000 FCFA.' },
+    });
+    const onOuverte = vi.fn();
+
+    render(
+      <ActiverCarte clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Ouvrir la carte/ }));
+
+    expect(await screen.findByRole('alert')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /1\s*000/ }));
+
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });

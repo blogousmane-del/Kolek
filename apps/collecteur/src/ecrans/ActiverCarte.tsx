@@ -49,7 +49,11 @@ export function ActiverCarte({
   }, []);
 
   async function ouvrir() {
-    if (!collecteurId) return;
+    // `envoi` dans la garde : sans lui, un « Annuler » touché pendant la
+    // requête en vol retombe à `envoi = false` à la réponse, et un second
+    // appui sur « Ouvrir la carte » repart pour un second appel — donc une
+    // seconde commission, sur une carte que le client n'a jamais demandée.
+    if (!collecteurId || envoi) return;
     setEnvoi(true);
     setErreur(null);
     const resultat = await ouvrirCarte(collecteurId, clientId, mise);
@@ -78,7 +82,17 @@ export function ActiverCarte({
         La carte pleine reste ouverte, et son solde reste dû au client.
       </p>
 
-      <ChoixMise mise={mise} onChoisir={setMise} identifiant={identifiant} />
+      <ChoixMise
+        mise={mise}
+        onChoisir={(montant) => {
+          setMise(montant);
+          // Changer de montant est une correction : laisser le refus précédent
+          // à l'écran le ferait passer pour un second refus, sur une saisie que
+          // le serveur n'a jamais vue.
+          setErreur(null);
+        }}
+        identifiant={identifiant}
+      />
 
       {erreur && (
         <p role="alert" className="font-body text-sm text-negative m-0">
@@ -90,7 +104,10 @@ export function ActiverCarte({
         <Bouton onClick={ouvrir} disabled={envoi || collecteurId === null}>
           {envoi ? 'Ouverture…' : 'Ouvrir la carte'}
         </Bouton>
-        <Bouton variante="contour" onClick={() => setDeplie(false)}>
+        <Bouton variante="contour" onClick={() => setDeplie(false)} disabled={envoi}>
+          {/* Tant que l'écriture est en vol, on ne quitte pas le bloc qui en
+              montrera le résultat : replier ici, c'est perdre l'alerte de
+              refus et laisser croire qu'aucun appel n'est parti. */}
           Annuler
         </Bouton>
       </div>
