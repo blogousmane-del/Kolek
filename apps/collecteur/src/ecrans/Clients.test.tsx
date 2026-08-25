@@ -199,6 +199,6 @@ describe('liste des clients devenue liste de cartes', () => {
     // Sans cet identifiant, le collecteur atterrissait sur toutes les cartes de
     // tous ses clients et devait retrouver la ligne à la main — avant un geste
     // qui ne se défait pas, et alors qu'un même client peut en avoir deux.
-    expect(onRetrait).toHaveBeenCalledWith('cli3');
+    expect(onRetrait).toHaveBeenCalledWith({ id: 'cli3', nom: 'Sy' });
   });
 });

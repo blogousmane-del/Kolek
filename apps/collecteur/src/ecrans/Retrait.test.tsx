@@ -89,6 +89,11 @@ const CARTE_PLEINE_KA = {
   cycleComplet: true,
 };
 
+/** Le client sur lequel on réduit la liste. Son nom voyage avec son
+    identifiant : l'écran le déduisait des cartes lues, donc le perdait en même
+    temps qu'elles. */
+const HJ = { id: 'cli1', nom: 'Hj' };
+
 function rendre(supplement: Record<string, unknown> = {}) {
   return render(
     <Retrait revision={0} onRetour={vi.fn()} onCloture={vi.fn()} {...supplement} />,
@@ -152,7 +157,7 @@ describe('les deux portes de la fin de cycle', () => {
 
 describe('le filtre par client', () => {
   it('ne montre que les cartes du client demandé', () => {
-    rendre({ clientId: 'cli1' });
+    rendre({ client: HJ });
 
     // Hj en a deux, Ka n'a rien à faire ici : le collecteur vient de désigner
     // une carte, on ne le renvoie pas la chercher.
@@ -161,7 +166,7 @@ describe('le filtre par client', () => {
   });
 
   it('dit sur quel client il est filtré', () => {
-    rendre({ clientId: 'cli1' });
+    rendre({ client: HJ });
 
     // Une liste tronquée sans explication se lit comme des cartes disparues.
     expect(screen.getByText(/Cartes de Hj/)).toBeTruthy();
@@ -169,10 +174,24 @@ describe('le filtre par client', () => {
 
   it('laisse revenir à toutes les cartes', () => {
     const onToutesLesCartes = vi.fn();
-    rendre({ clientId: 'cli1', onToutesLesCartes });
+    rendre({ client: HJ, onToutesLesCartes });
 
     fireEvent.click(screen.getByRole('button', { name: 'Voir toutes les cartes' }));
 
+    expect(onToutesLesCartes).toHaveBeenCalled();
+  });
+
+  it('laisse sortir du filtre même quand ce client n’a plus de carte', () => {
+    // Cas atteint juste après son dernier retrait : la liste réduite est vide.
+    // Le bandeau se déduisait des cartes qu'on venait de lire, donc il
+    // disparaissait avec elles — et il portait la seule sortie du filtre. Ne
+    // restait que la flèche vers l'accueil.
+    donnees = [CARTE_PLEINE_KA];
+    const onToutesLesCartes = vi.fn();
+    rendre({ client: HJ, onToutesLesCartes });
+
+    expect(screen.getByText(/Cartes de Hj/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Voir toutes les cartes' }));
     expect(onToutesLesCartes).toHaveBeenCalled();
   });
 

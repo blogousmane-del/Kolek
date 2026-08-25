@@ -11,7 +11,7 @@ import {
 } from '@kolek/ui';
 import { useEffect, useMemo, useState } from 'react';
 
-import type { CarteChoisie } from '../Coquille';
+import type { CarteChoisie, ClientCible } from '../Coquille';
 import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { supabase } from '../supabase';
@@ -81,10 +81,10 @@ export function Clients({
   onEncaisser: (carte: CarteChoisie) => void;
   onEcriture: () => void;
   /** Ouvre l'écran de retrait, réduit aux cartes de ce client.
-      L'identifiant voyage jusque-là parce que le collecteur vient de désigner
-      une carte : le renvoyer sur la liste de tous ses clients l'obligerait à la
+      Le client voyage jusque-là parce que le collecteur vient de désigner une
+      carte : le renvoyer sur la liste de tous ses clients l'obligerait à la
       retrouver à la main, avant un geste qui ne se défait pas. */
-  onRetrait: (clientId: string) => void;
+  onRetrait: (client: ClientCible) => void;
 }) {
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);
   /** Le client dont la fiche flottante est ouverte. `null` = aucune. */
@@ -389,7 +389,7 @@ export function Clients({
             onEncaisser={onEncaisser}
             onConsentementChange={onEcriture}
             onOuvrirFiche={() => setFiche(ligne.client.id)}
-            onRetrait={() => onRetrait(ligne.client.id)}
+            onRetrait={() => onRetrait({ id: ligne.client.id, nom: ligne.client.nom })}
           />
           </div>
         ))}
@@ -409,10 +409,12 @@ export function Clients({
           onEncaisser(carte);
         }}
         onEcriture={onEcriture}
-        onRetrait={() => {
-          // La fiche se referme, mais l'identifiant du client la suit : l'écran
-          // de retrait s'ouvre sur ses cartes à lui, pas sur celles de tous.
-          if (fiche) onRetrait(fiche);
+        onRetrait={(nom) => {
+          // La fiche se referme, mais le client la suit : l'écran de retrait
+          // s'ouvre sur ses cartes à lui, pas sur celles de tous. Le nom vient
+          // de la fiche, seule à l'avoir sûrement — la ligne d'origine peut
+          // avoir disparu de la liste entre-temps.
+          if (fiche) onRetrait({ id: fiche, nom });
           setFiche(null);
         }}
       />

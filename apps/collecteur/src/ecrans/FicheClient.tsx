@@ -52,8 +52,10 @@ export function FicheClient({
   onFermer: () => void;
   onEncaisser: (carte: CarteChoisie) => void;
   onEcriture: () => void;
-  /** Renvoie vers l'écran de clôture : c'est là que l'argent se rend. */
-  onRetrait: () => void;
+  /** Renvoie vers l'écran de retrait, réduit à ce client. Le nom part avec la
+      demande : l'écran doit pouvoir le nommer même quand il ne lui reste
+      aucune carte à montrer. */
+  onRetrait: (clientNom: string) => void;
 }) {
   const [fiche, setFiche] = useState<Fiche | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -293,7 +295,9 @@ function CarteEnCours({
   cycle: number;
   clientId: string;
   onEncaisser: (carte: CarteChoisie) => void;
-  onRetrait: () => void;
+  /** Le nom accompagne la demande : l'écran de retrait s'ouvre réduit à ce
+      client et doit pouvoir le nommer même quand il ne lui reste aucune carte. */
+  onRetrait: (clientNom: string) => void;
   onEcriture: () => void;
 }) {
   const complete = carte.misesEncaissees >= MISES_PAR_CYCLE;
@@ -322,7 +326,7 @@ function CarteEnCours({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Bouton variante="contour" icone="arrow-up-right" onClick={onRetrait}>
+            <Bouton variante="contour" icone="arrow-up-right" onClick={() => onRetrait(nomClient)}>
               Aller au retrait
             </Bouton>
             <ActiverCarte
@@ -334,6 +338,9 @@ function CarteEnCours({
           </div>
         </div>
       ) : (
+        // Le montant est sur le bouton, pas seulement dans le bloc au-dessus :
+        // deux cartes actives font deux boutons pleine largeur l'un sous
+        // l'autre, dans un panneau qui défile. Une mise est immuable.
         <Bouton
           pleineLargeur
           className="mt-3"
@@ -347,7 +354,7 @@ function CarteEnCours({
             })
           }
         >
-          Encaisser une mise
+          Encaisser {formatMontant(carte.mise)} FCFA
         </Bouton>
       )}
     </div>

@@ -190,10 +190,18 @@ describe('fiche d’un client à plusieurs cartes', () => {
     );
 
     expect(await screen.findByText(/Cartes en cours/)).toBeTruthy();
-    // Un simple compte de « FCFA » passerait déjà avec une seule carte rendue :
-    // ce qui distingue vraiment deux cartes, ce sont leurs deux montants.
-    expect(await screen.findByText(/5\s*000/)).toBeTruthy();
-    expect(await screen.findByText(/1\s*000/)).toBeTruthy();
+
+    // On compte les blocs de carte, et non les occurrences d'un montant : le
+    // bouton d'encaissement porte lui aussi la mise, et un `getByText` sur
+    // « 1 000 » en trouve désormais deux sans qu'une seule carte de plus soit
+    // rendue. « Mise / jour » n'appartient qu'à `CarteCollecte`.
+    const enTetes = await screen.findAllByText('Mise / jour');
+    expect(enTetes).toHaveLength(2);
+
+    // Et ce sont bien deux cartes distinctes : deux montants, pas le même deux fois.
+    const montants = enTetes.map((n) => n.nextElementSibling?.textContent ?? '');
+    expect(montants.some((t) => /5\s*000/.test(t))).toBe(true);
+    expect(montants.some((t) => /1\s*000/.test(t))).toBe(true);
   });
 
   it('offre les deux portes sur la carte au bout de son cycle', async () => {
@@ -235,6 +243,28 @@ describe('fiche d’un client à plusieurs cartes', () => {
     expect(screen.queryByText(/s’ouvre ensuite/)).toBeNull();
   });
 
+  it('porte le montant de sa propre carte sur chaque bouton', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+
+    render(
+      <FicheClient
+        clientId="cli3"
+        revision={0}
+        onFermer={vi.fn()}
+        onEncaisser={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    // Deux cartes actives, deux boutons pleine largeur l'un sous l'autre. Un
+    // libellé commun — « Encaisser une mise » — laisse le montant au seul bloc
+    // du dessus, dans un panneau qui défile. La mise est immuable : le bouton
+    // doit dire ce qu'il encaisse.
+    expect(await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Encaisser 2 000 FCFA' })).toBeTruthy();
+  });
+
   it('envoie l’identifiant de la carte touchée, pas celui de sa voisine', async () => {
     chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
     const onEncaisser = vi.fn();
@@ -254,7 +284,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
     // précède kA (5 mises) parmi les boutons rendus. Vérifié plutôt que
     // supposé — c'est cet ordre-là qui rend la confusion possible si le tri
     // venait à changer, et un index nu la cliquerait en silence.
-    const boutons = await screen.findAllByRole('button', { name: 'Encaisser une mise' });
+    const boutons = await screen.findAllByRole('button', { name: /^Encaisser / });
     expect(boutons).toHaveLength(2);
     expect(boutons[0].parentElement?.textContent).toMatch(/6\s*000/);
     expect(boutons[1].parentElement?.textContent).toMatch(/2\s*000/);

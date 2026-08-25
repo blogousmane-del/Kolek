@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -49,16 +49,55 @@ vi.mock('./cache', () => ({ viderCache: vi.fn() }));
 // Les dix écrans sont remplacés par des témoins : ce test porte sur la
 // coquille, pas sur ce qu'elle affiche.
 const temoin = (nom: string) => ({ [nom]: () => <div>écran {nom}</div> });
-vi.mock('./ecrans/Accueil', () => temoin('Accueil'));
 vi.mock('./ecrans/Alertes', () => temoin('Alertes'));
 vi.mock('./ecrans/Avis', () => temoin('Avis'));
 vi.mock('./ecrans/Bilan', () => temoin('Bilan'));
-vi.mock('./ecrans/Clients', () => temoin('Clients'));
 vi.mock('./ecrans/Encaisser', () => temoin('Encaisser'));
 vi.mock('./ecrans/Plus', () => temoin('Plus'));
 vi.mock('./ecrans/Rapprochement', () => temoin('Rapprochement'));
 vi.mock('./ecrans/Recus', () => temoin('Recus'));
-vi.mock('./ecrans/Retrait', () => temoin('Retrait'));
+
+// Trois témoins bavards : le chemin qui pose le filtre de retrait, celui qui
+// devrait le lever, et l'écran qui en subit l'état. Les autres restent muets.
+vi.mock('./ecrans/Accueil', () => ({
+  Accueil: ({ onNaviguer }: { onNaviguer: (cle: string) => void }) => (
+    <>
+      <div>écran Accueil</div>
+      <button type="button" onClick={() => onNaviguer('retrait')}>
+        tuile Retrait
+      </button>
+    </>
+  ),
+}));
+
+vi.mock('./ecrans/Clients', () => ({
+  Clients: ({ onRetrait }: { onRetrait: (c: { id: string; nom: string }) => void }) => (
+    <>
+      <div>écran Clients</div>
+      <button type="button" onClick={() => onRetrait({ id: 'cli9', nom: 'Sy' })}>
+        retirer pour Sy
+      </button>
+    </>
+  ),
+}));
+
+vi.mock('./ecrans/Retrait', () => ({
+  Retrait: ({
+    client,
+    onRetour,
+  }: {
+    client: { id: string; nom: string } | null;
+    onRetour: () => void;
+  }) => (
+    <>
+      <div>écran Retrait</div>
+      <div>filtre : {client ? client.id : 'aucun'}</div>
+      <button type="button" onClick={onRetour}>
+        retour accueil
+      </button>
+    </>
+  ),
+}));
 
 const { Coquille } = await import('./Coquille');
 
@@ -121,5 +160,29 @@ describe('coquille du collecteur', () => {
     // Sur bureau la barre n'existe pas : la marge non plus, sinon l'écran
     // porte 84 px de vide en bas sans raison.
     expect(colonne?.className).toContain('lg:pb-0');
+  });
+});
+
+describe('le filtre de l’écran de retrait', () => {
+  it('emporte le client désigné quand on part d’une de ses cartes', () => {
+    render(<Coquille onDeconnexion={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'retirer pour Sy' }));
+
+    expect(screen.getByText('filtre : cli9')).toBeTruthy();
+  });
+
+  it('rend la liste entière à toute autre navigation', () => {
+    render(<Coquille onDeconnexion={vi.fn()} />);
+
+    // Le filtre appartient au geste qui l'a posé. La tuile « Retrait » de
+    // l'accueil demande la liste complète : sans remise à zéro, elle rouvrait
+    // l'écran encore réduit au client de la visite précédente — qui n'a
+    // parfois plus aucune carte, donc un écran vide et sans explication.
+    fireEvent.click(screen.getByRole('button', { name: 'retirer pour Sy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'retour accueil' }));
+    fireEvent.click(screen.getByRole('button', { name: 'tuile Retrait' }));
+
+    expect(screen.getByText('filtre : aucun')).toBeTruthy();
   });
 });

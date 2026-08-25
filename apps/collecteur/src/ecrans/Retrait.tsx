@@ -2,6 +2,7 @@ import { MISES_PAR_CYCLE, formatMontant } from '@kolek/core';
 import { Bouton, Carte, Icone } from '@kolek/ui';
 import { useState } from 'react';
 
+import type { ClientCible } from '../Coquille';
 import { useDonnees } from '../cache';
 import { cloturerCarte } from '../ecritures-ecrans';
 import { chargerCartesCloturables, type CarteCloturable } from '../lectures-ecrans';
@@ -28,7 +29,7 @@ export function Retrait({
   onRetour,
   onCloture,
   revision,
-  clientId = null,
+  client = null,
   onToutesLesCartes,
 }: {
   onRetour: () => void;
@@ -44,8 +45,13 @@ export function Retrait({
    * main — par nom, montant et nombre de jours — avant un geste qui ne se
    * défait pas. Debout dans un marché, c'est fabriquer l'erreur qu'on veut
    * éviter, d'autant qu'un même client peut avoir deux cartes dans cette liste.
+   *
+   * Le nom arrive avec l'identifiant, et n'est plus déduit des cartes lues :
+   * quand la liste réduite est vide — juste après le dernier retrait de ce
+   * client — il n'y avait plus de nom, donc plus de bandeau, donc plus aucune
+   * sortie du filtre.
    */
-  clientId?: string | null;
+  client?: ClientCible | null;
   /** Retire le filtre. Absent quand aucun filtre n'est posé. */
   onToutesLesCartes?: () => void;
 }) {
@@ -74,10 +80,7 @@ export function Retrait({
   // `cartes` reste la liste entière : le filtre ne change que ce qu'on montre,
   // jamais ce qu'on a lu. Une seule lecture sert les deux vues, et revenir à
   // toutes les cartes ne coûte pas un aller-retour réseau.
-  const visibles = clientId ? (cartes ?? []).filter((c) => c.clientId === clientId) : cartes;
-  const nomFiltre = clientId
-    ? ((cartes ?? []).find((c) => c.clientId === clientId)?.clientNom ?? null)
-    : null;
+  const visibles = client ? (cartes ?? []).filter((c) => c.clientId === client.id) : cartes;
 
   async function confirmer() {
     if (!aConfirmer || envoi) return;
@@ -149,9 +152,9 @@ export function Retrait({
                 disparues. Le bandeau dit sur qui on est, et rend la sortie
                 visible — sinon le seul moyen de revoir les autres est de
                 repartir de l'accueil. */}
-            {nomFiltre && (
+            {client && (
               <div className="flex items-center justify-between gap-3 bg-info-tint rounded-md px-3 py-2">
-                <p className="font-body text-sm text-ink m-0">Cartes de {nomFiltre}</p>
+                <p className="font-body text-sm text-ink m-0">Cartes de {client.nom}</p>
                 {onToutesLesCartes && (
                   <Bouton variante="contour" onClick={onToutesLesCartes}>
                     Voir toutes les cartes
@@ -167,9 +170,9 @@ export function Retrait({
             {visibles?.length === 0 && (
               <RienAMontrer
                 icone="coins"
-                titre={clientId ? 'Aucune carte active pour ce client' : 'Aucune carte active'}
+                titre={client ? 'Aucune carte active pour ce client' : 'Aucune carte active'}
                 detail={
-                  clientId
+                  client
                     ? 'Ses cartes ont toutes été clôturées. Ouvre-lui-en une depuis sa fiche.'
                     : "Une carte apparaît ici dès qu'un client en ouvre une."
                 }
