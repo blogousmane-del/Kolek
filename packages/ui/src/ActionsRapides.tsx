@@ -53,18 +53,29 @@ export function ActionsRapides({ actions, compact = false, anime = false }: Prop
           title={action.onActiver ? undefined : 'À venir'}
           onClick={action.onActiver}
           style={anime ? ({ '--rang': rang } as CSSProperties) : undefined}
-          className={`anim-pression flex flex-col items-center ${compact ? 'gap-1.5' : 'gap-2'} ${
+          className={`anim-pression flex flex-col items-center ${compact ? 'gap-1.5 p-2' : 'gap-2.5 p-3'} rounded-2xl bg-secondary/50 border border-hairline/80 hover:bg-secondary/90 transition-all ${
             anime ? 'anim-cascade' : ''
           } ${action.onActiver ? 'cursor-pointer' : 'opacity-60 cursor-default'}`}
         >
+          {/* La bordure reste `border-primary` pleine, et non une teinte à 20 %.
+              La tuile qui vient d'apparaître autour ne peut pas la remplacer
+              comme limite : `secondary/50` sur le canevas rend 1,05:1 — un fond
+              qu'on devine, pas un contour qu'on voit. La tuile groupe, la
+              pastille désigne la commande.
+
+              Pas d'inversion de couleur au survol non plus : le produit est
+              tactile, et WebKit garde l'état `:hover` après le relâchement du
+              doigt. Le collecteur verrait un bouton plein qu'il n'a pas laissé
+              enfoncé. C'est `anim-pression`, sur le bouton entier, qui accuse
+              réception du geste. */}
           <div
             className={`${
-              compact ? 'w-12 h-12' : 'w-14 h-14 shadow-sm'
-            } rounded-pill bg-surface border border-primary flex items-center justify-center`}
+              compact ? 'w-10 h-10' : 'w-12 h-12'
+            } rounded-pill bg-surface text-primary border border-primary flex items-center justify-center shadow-xs`}
           >
-            <Icone nom={action.icone} taille={compact ? 20 : 22} className="text-primary" />
+            <Icone nom={action.icone} taille={compact ? 18 : 20} />
           </div>
-          <span className="text-xs font-body font-medium text-ink text-center leading-tight">
+          <span className="text-xs font-body font-semibold text-ink text-center leading-tight">
             {action.libelle}
           </span>
         </button>
