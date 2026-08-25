@@ -151,4 +151,26 @@ describe('activer une carte de plus', () => {
 
     expect(screen.queryByRole('alert')).toBeNull();
   });
+
+  it('ne verrouille pas le bloc quand le réseau coupe en pleine écriture', async () => {
+    // Un rejet — le réseau tombe en pleine écriture, ce qui arrive debout dans
+    // un marché en 3G — laissait `envoi` à vrai pour toujours. Les deux boutons
+    // du bloc en dépendent, donc les deux se verrouillaient, et il fallait
+    // recharger l'application pour en sortir.
+    ouvrirCarte.mockRejectedValue(new Error('Failed to fetch'));
+    const onOuverte = vi.fn();
+
+    render(
+      <ActiverCarte clientId={CLIENT} misePreremplie={5000} identifiant="essai" onOuverte={onOuverte} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+    fireEvent.click(await screen.findByRole('button', { name: /Ouvrir la carte/ }));
+
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Annuler' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    expect(onOuverte).not.toHaveBeenCalled();
+  });
 });

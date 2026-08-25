@@ -56,7 +56,19 @@ export function ActiverCarte({
     if (!collecteurId || envoi) return;
     setEnvoi(true);
     setErreur(null);
-    const resultat = await ouvrirCarte(collecteurId, clientId, mise);
+
+    let resultat;
+    try {
+      resultat = await ouvrirCarte(collecteurId, clientId, mise);
+    } catch {
+      // Un rejet plutôt qu'un `{ ok: false }` : le réseau est tombé pendant
+      // l'écriture. Sans ce filet, `envoi` resterait vrai et verrouillerait les
+      // deux boutons du bloc — il faudrait recharger l'application pour en
+      // sortir, debout dans un marché.
+      setEnvoi(false);
+      setErreur("Le réseau a coupé pendant l'ouverture. Vérifie la carte du client avant de réessayer.");
+      return;
+    }
     setEnvoi(false);
     if (!resultat.ok) {
       // Le bloc reste ouvert : le refermer effacerait le montant choisi et
