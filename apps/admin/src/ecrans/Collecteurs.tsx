@@ -277,7 +277,9 @@ export function Collecteurs({
                   <div className="w-28 text-right text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground">
                     Statut
                   </div>
-                  <div className="w-10" />
+                  {/* Réservé au chevron d'ouverture, qui fait 44 px depuis
+                      qu'il est une vraie cible tactile. */}
+                  <div className="w-11" />
                 </div>
 
                 {listeFiltree.map((c, i) => (

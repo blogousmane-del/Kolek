@@ -92,7 +92,7 @@ Deux conséquences pratiques.
 | Token | Hex | Usage |
 |---|---|---|
 | `--color-ink` / `--color-foreground` | `#171A17` | Texte principal, titres. |
-| `--color-muted-foreground` | `#6C716A` | Texte secondaire, étiquettes. |
+| `--color-muted-foreground` | `#666B64` | Texte secondaire, étiquettes. Assombri le 2026-08-25 : `#6C716A` ne tenait que 4,33:1 sur `--color-muted`. |
 | `--color-muted` | `#EFEFEA` | **Surface** muette : piste de jauge, en-tête de tableau. |
 | `--color-hairline` / `--color-border` | `#E6E3DA` | Bordures, séparateurs (1 px). |
 | `--color-canvas` / `--color-background` | `#F4F5F2` | Fond de la zone de contenu. |
@@ -109,7 +109,7 @@ Deux conséquences pratiques.
 | Token | Hex | Fond (tint) | Usage |
 |---|---|---|---|
 | `--color-positive` | `#1C7A4B` | `--color-positive-tint` `#E6F3EC` | Dépôt, à jour, montant reçu (+). |
-| `--color-negative` | `#C1553E` | `--color-negative-tint` `#F6E4DF` | Retard, sortie, alerte, échéance (−). |
+| `--color-negative` | `#A8452F` | `--color-negative-tint` `#F6E4DF` | Retard, sortie, alerte, échéance (−). Assombri le 2026-08-25 : `#C1553E` ne tenait que 3,68:1 sur sa propre teinte. |
 | `--color-info` | `#3D6E8E` | `--color-info-tint` `#E6EEF4` | Neutre informatif, bandeau hors-ligne. |
 
 **Data-viz (dégradés pastel, comme le modèle)**

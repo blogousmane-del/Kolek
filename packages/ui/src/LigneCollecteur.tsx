@@ -43,11 +43,16 @@ export function LigneCollecteur({
       <div className="w-28 flex justify-end">
         <BadgeStatut statut={statut} className="px-3 py-1" />
       </div>
+      {/* 44 px de côté, et non la taille de l'icône : ouvrir la fiche passe
+          uniquement par ce chevron — la ligne n'est pas cliquable — et la
+          console s'ouvre sur tablette, où la barre latérale devient un tiroir.
+          L'écart avec la colonne précédente vient du `gap-4` du parent ; un
+          `ml-2` en plus décalerait la colonne de l'en-tête. */}
       <button
         type="button"
         onClick={onOuvrir}
         aria-label={`Ouvrir la fiche de ${nom}`}
-        className="ml-2 cursor-pointer"
+        className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-md cursor-pointer"
       >
         <Icone nom="chevron-right" className="text-muted-foreground" />
       </button>

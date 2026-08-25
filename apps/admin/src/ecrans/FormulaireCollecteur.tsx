@@ -181,7 +181,7 @@ export function FormulaireCollecteur({
             type="text"
             value={motDePasse}
             onChange={(e) => setMotDePasse(e.target.value)}
-            className="flex-1 min-w-0 bg-surface border border-hairline rounded-md px-3 py-2.5 font-mono text-sm text-ink outline-none focus:border-primary"
+            className="flex-1 min-w-0 bg-surface border border-hairline rounded-md px-3 py-2.5 font-mono text-sm text-ink focus:border-primary"
           />
           <Bouton
             variante="contour"
@@ -241,7 +241,7 @@ function Champ({
         value={valeur}
         maxLength={maxLength}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-base font-body text-ink outline-none focus:border-primary"
+        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-base font-body text-ink focus:border-primary"
       />
     </div>
   );

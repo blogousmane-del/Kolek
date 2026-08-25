@@ -33,7 +33,9 @@ export const couleurs = {
   // `muted` est une surface (piste de jauge, en-tête de tableau) et
   // `mutedForeground` un texte. Les confondre donne du gris sur gris.
   muted: '#EFEFEA',
-  mutedForeground: '#6C716A',
+  // Assombri le 2026-08-25 : `#6C716A` ne donnait que 4,33:1 sur `muted`, sous
+  // le seuil AA. C'est la paire du badge « Inactif », écrit en 12 px.
+  mutedForeground: '#666B64',
   hairline: '#E6E3DA',
   border: '#E6E3DA',
   canvas: '#F4F5F2',
@@ -45,7 +47,11 @@ export const couleurs = {
   // Sémantique
   positive: '#1C7A4B',
   positiveTint: '#E6F3EC',
-  negative: '#C1553E',
+  // Assombri le 2026-08-25. `#C1553E` sur `negativeTint` ne donnait que
+  // 3,68:1 : le message d'erreur était le texte le moins lisible du produit,
+  // dans les trois applications. Éclaircir la teinte ne suffisait pas — même
+  // presque blanche, elle plafonnait à 4,24:1. C'est l'encre qui devait foncer.
+  negative: '#A8452F',
   negativeTint: '#F6E4DF',
   info: '#3D6E8E',
   infoTint: '#E6EEF4',

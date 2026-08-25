@@ -47,7 +47,7 @@ export function Champ({
         required={requis}
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full min-h-11 px-3.5 border-[1.5px] rounded-md text-base font-body outline-none ${
+        className={`w-full min-h-11 px-3.5 border-[1.5px] rounded-md text-base font-body ${
           sombre
             ? 'bg-white/5 border-white/15 text-white focus:border-or'
             : 'bg-input border-hairline text-ink focus:border-primary'

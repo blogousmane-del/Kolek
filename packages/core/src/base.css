@@ -46,6 +46,39 @@
   }
 }
 
+/* ------------------------------ Le focus -------------------------------- */
+
+/* L'anneau de focus vit ici, et nulle part ailleurs.
+
+   Les champs le supprimaient chacun de leur côté — `outline-none` — pour le
+   remplacer par une bordure de 1,5 px qui change de couleur. Au clavier, c'est
+   trop peu : rien ne dit franchement où l'on est. Et supprimer l'anneau sans le
+   remplacer est un défaut d'accessibilité à part entière, pas une préférence.
+
+   **Deux couches, parce que le produit a deux fonds.** La couche blanche colle
+   à l'élément et porte sur les fonds sombres — 14,7:1 sur la barre latérale,
+   18,9:1 sur le canevas sombre. La couche verte se pose 2 px plus loin et porte
+   sur les fonds clairs — 10,7:1 sur le canevas, 11,7:1 sur blanc. Un seul
+   anneau sert les deux, sans que personne ait à savoir sur quelle page il est.
+
+   **Hors de toute couche**, volontairement : une règle non calquée l'emporte
+   sur `@layer utilities`, donc sur les classes `shadow-*` de Tailwind. Sans
+   cela, le bouton d'action de `NavBureau` — qui porte `shadow-action` et vit
+   sur la barre latérale sombre — écrasait la couche blanche et se retrouvait
+   sans anneau visible du tout.
+
+   `:focus-visible` et non `:focus` : le navigateur ne le pose qu'à la
+   navigation au clavier. Un bouton touché au doigt ne garde pas un anneau dont
+   personne n'a besoin.
+
+   L'or est écarté : il appartient à la marque, et le Design System §1 le
+   réserve à la pièce du logo. */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px var(--color-surface);
+}
+
 /* --------------------------- Téléphone réel ----------------------------- */
 
 /* Les encoches et la barre de geste.

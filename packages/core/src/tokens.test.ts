@@ -8,7 +8,7 @@ describe('tokens du Design System', () => {
 
   it('porte les couleurs sémantiques du Design System §3.1', () => {
     expect(couleurs.positive).toBe('#1C7A4B');
-    expect(couleurs.negative).toBe('#C1553E');
+    expect(couleurs.negative).toBe('#A8452F');
     expect(couleurs.info).toBe('#3D6E8E');
   });
 
@@ -58,7 +58,7 @@ describe('genererCssTheme', () => {
   it('convertit chaque clé en variable CSS kebab-case', () => {
     const css = genererCssTheme();
     expect(css).toContain('--color-chart-blue: #9FC2DA;');
-    expect(css).toContain('--color-muted-foreground: #6C716A;');
+    expect(css).toContain('--color-muted-foreground: #666B64;');
     expect(css).toContain('--text-2xl: 24px;');
     expect(css).toContain('--font-headings:');
   });
@@ -72,5 +72,67 @@ describe('genererCssTheme', () => {
       if (!ligne.trim().startsWith('--')) continue;
       expect(ligne).toMatch(/^ {2}--[a-z0-9-]+: \S.*;$/);
     }
+  });
+});
+
+/**
+ * Le contraste des paires que le produit emploie réellement.
+ *
+ * Une valeur de jeton ne se lit pas seule : `negative` n'existe qu'écrit sur
+ * `negativeTint`, et `mutedForeground` sur `muted` ou sur `canvas`. C'est la
+ * paire qui passe ou ne passe pas, et c'est elle qu'on garde ici.
+ *
+ * Le seuil est 4,5:1 — WCAG AA pour du texte courant. Les badges et les
+ * en-têtes de colonne sont en 12 px : aucune de ces paires ne relève de
+ * l'exception « grand texte », qui commence à 18,66 px gras ou 24 px.
+ *
+ * Constaté le 2026-08-25 : `negative` sur `negativeTint` donnait 3,68:1. Le
+ * message d'erreur était le texte le moins lisible du produit, dans les trois
+ * applications à la fois.
+ */
+function luminance(hex: string): number {
+  const canal = (v: number) => {
+    const c = v / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const n = hex.replace('#', '');
+  const [r, v, b] = [0, 2, 4].map((i) => Number.parseInt(n.slice(i, i + 2), 16));
+  return 0.2126 * canal(r!) + 0.7152 * canal(v!) + 0.0722 * canal(b!);
+}
+
+/** Rapport de contraste WCAG entre deux couleurs opaques. */
+function contraste(a: string, b: string): number {
+  const [la, lb] = [luminance(a), luminance(b)];
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+describe('contraste des paires employées', () => {
+  const PAIRES: Array<[string, string, string]> = [
+    ['erreur sur sa teinte', couleurs.negative, couleurs.negativeTint],
+    ['erreur sur surface', couleurs.negative, couleurs.surface],
+    ['succès sur sa teinte', couleurs.positive, couleurs.positiveTint],
+    ['succès sur surface', couleurs.positive, couleurs.surface],
+    ['information sur sa teinte', couleurs.info, couleurs.infoTint],
+    // `muted` est la piste de jauge et l'en-tête de tableau ; le badge
+    // « Inactif » y écrit son libellé.
+    ['texte muet sur surface muette', couleurs.mutedForeground, couleurs.muted],
+    ['texte muet sur canevas', couleurs.mutedForeground, couleurs.canvas],
+    ['texte muet sur surface', couleurs.mutedForeground, couleurs.surface],
+    ['encre sur canevas', couleurs.ink, couleurs.canvas],
+    ['action sur surface', couleurs.primary, couleurs.surface],
+    ['blanc sur barre latérale', couleurs.primaryForeground, couleurs.sidebar],
+  ];
+
+  for (const [nom, texte, fond] of PAIRES) {
+    it(`tient 4,5:1 — ${nom}`, () => {
+      expect(contraste(texte, fond)).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+
+  it('vérifie la mesure elle-même sur deux extrêmes connus', () => {
+    // Sans ce contrôle, une erreur de formule rendrait les onze tests
+    // ci-dessus verts sur n'importe quelle couleur.
+    expect(contraste('#000000', '#FFFFFF')).toBeCloseTo(21, 1);
+    expect(contraste('#777777', '#777777')).toBeCloseTo(1, 5);
   });
 });
