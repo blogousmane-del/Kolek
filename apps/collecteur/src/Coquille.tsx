@@ -207,16 +207,36 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
         />
       </div>
 
-      <div className="mx-auto flex min-h-dvh w-full max-w-mobile flex-col overflow-x-clip lg:min-h-0 lg:max-w-none lg:py-8">
+      {/* `pb-nav` réserve la hauteur de la barre, qui ne défile plus et ne
+          pousse donc plus rien. Sans cette marge, la dernière ligne d'une liste
+          — le dernier client de la tournée, son bouton « Encaisser » — passe
+          sous la barre et devient injoignable. */}
+      <div className="mx-auto flex min-h-dvh w-full max-w-mobile flex-col overflow-x-clip pb-nav lg:min-h-0 lg:max-w-none lg:pb-0 lg:py-8">
         {contenu}
       </div>
 
       {/* La barre du bas ne connaît que ses cinq clés. Sur un écran secondaire,
           aucun onglet n'est actif — d'où le repli sur 'accueil', qui est bien
-          l'endroit d'où l'on vient et où la flèche ramène. */}
-      <div className="lg:hidden">
-        <NavMobile actif={estOnglet(page) ? page : 'accueil'} onNaviguer={setPage} />
-      </div>
+          l'endroit d'où l'on vient et où la flèche ramène.
+
+          Elle est sortie de la colonne le 2026-08-25, en même temps qu'elle est
+          passée de `sticky` à `fixed`. Le 24, elle y était entrée pour une
+          raison qui ne vaut que pour `sticky` : un élément collant est confiné à
+          sa boîte englobante, et il lui fallait une boîte plus haute que lui
+          pour avoir de la course. Un élément fixe, lui, se positionne sur le
+          champ de vision — il n'a besoin d'aucune course, et il gagne à ne pas
+          descendre d'une boîte en `overflow-x: clip`, qui peut rogner un
+          descendant fixe.
+
+          Ce qui reste vrai de la leçon du 24 : **aucune enveloppe**. Le
+          masquage bureau est porté par la barre elle-même, via `className`.
+          Remettre un `<div className="lg:hidden">` ici, c'est rouvrir la porte
+          par laquelle la panne est entrée. */}
+      <NavMobile
+        className="lg:hidden"
+        actif={estOnglet(page) ? page : 'accueil'}
+        onNaviguer={setPage}
+      />
     </div>
   );
 }

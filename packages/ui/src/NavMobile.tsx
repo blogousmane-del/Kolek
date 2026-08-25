@@ -32,17 +32,50 @@ const ONGLETS: Onglet[] = [
 interface Props {
   actif: CleNavCollecteur;
   onNaviguer: (cle: CleNavCollecteur) => void;
+  /** Posé sur la barre elle-même, jamais sur une boîte autour.
+      Voir le commentaire de rendu ci-dessous : c'est un correctif de panne, pas
+      une commodité de style. */
+  className?: string;
 }
 
-export function NavMobile({ actif, onNaviguer }: Props) {
+export function NavMobile({ actif, onNaviguer, className = '' }: Props) {
   return (
-    // `sticky` : la maquette posait la barre en fin de colonne. Sur un écran
-    // réel la liste des clients dépasse la hauteur du téléphone, et une barre
-    // qui part au défilement oblige à remonter avant chaque encaissement.
-    // `pb-barre` ajoute la marge de la barre de geste iOS sous les onglets.
+    // `fixed` et non `sticky`, depuis le 2026-08-25.
+    //
+    // `sticky bottom-0` ne colle que tant que la boîte englobante déborde du
+    // champ de vision. Sur un écran court — l'accueil d'un collecteur qui a
+    // trois clients — la barre n'a pas de course : elle se pose là où le
+    // contenu s'arrête, au milieu de l'écran, puis remonte avec le document dès
+    // qu'on fait défiler. C'est ce qu'on voyait, et ce n'est pas ce qu'une
+    // application mobile fait.
+    //
+    // `fixed` la sort du flux : elle est posée sur le champ de vision, elle ne
+    // bouge plus, quelle que soit la longueur de la page. Le prix est que le
+    // document ne réserve plus sa place — d'où `pb-nav` sur la colonne, sans
+    // quoi la dernière ligne d'une liste passe dessous.
+    //
+    // La largeur ne s'hérite plus non plus. `left-1/2 -translate-x-1/2` avec
+    // `max-w-mobile` reproduit le centrage de la colonne : entre 640 et 1023 px
+    // celle-ci est plafonnée à 520 px, et une barre pleine fenêtre sous un
+    // contenu de 520 px se lit comme deux mises en page superposées.
+    //
+    // `pb-barre` ajoute le repos de la barre de geste iOS sous les onglets.
     // Sans elle, en mode installé, le trait du bas recouvre les libellés et
     // mange le tiers inférieur de la zone cliquable des cinq onglets.
-    <div className="sticky bottom-0 z-10 bg-surface border-t border-hairline flex items-center justify-around px-2 pt-3 pb-barre">
+    //
+    // `className` entre ici plutôt que sur un `<div>` enveloppant, et cette
+    // règle survit au changement de positionnement : une enveloppe autour d'un
+    // élément `fixed` ne le casse pas, mais elle réintroduit une boîte dont le
+    // `overflow` ou le `transform` peut le rogner ou le recadrer. La propriété
+    // existe pour qu'il n'y ait rien entre la barre et son parent.
+    //
+    // `<nav>` plutôt que `<div>` : cinq onglets qui mènent aux cinq écrans du
+    // métier sont un repère de navigation. C'est aussi ce qui rend la barre
+    // nommable — donc vérifiable, ce que `Coquille.test.tsx` fait.
+    <nav
+      aria-label="Navigation principale"
+      className={`fixed bottom-0 left-1/2 -translate-x-1/2 z-30 w-full max-w-mobile bg-surface border-t border-hairline flex items-center justify-around px-2 pt-3 pb-barre ${className}`}
+    >
       {ONGLETS.map((onglet) => {
         const estActif = onglet.cle === actif;
 
@@ -86,6 +119,6 @@ export function NavMobile({ actif, onNaviguer }: Props) {
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }

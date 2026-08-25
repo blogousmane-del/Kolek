@@ -69,6 +69,24 @@
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
 }
 
+/* La place que la barre du bas occupe une fois qu'elle ne défile plus.
+ *
+ * `position: fixed` sort la barre du flux : le document ne sait plus qu'elle
+ * existe, et les dernières lignes d'une liste se retrouvent dessous. C'est
+ * exactement là que se trouve le bouton d'encaissement du dernier client de la
+ * tournée — le seul endroit où l'on ne peut pas se permettre de cacher une
+ * commande.
+ *
+ * 5.25rem = la hauteur mesurée de la barre (≈ 77 px : marge haute, cible
+ * tactile de 44 px minimum, libellé) plus le repos de la barre de geste iOS.
+ * Un chiffre écrit ici plutôt qu'une mesure au rendu : lire la hauteur en
+ * JavaScript pour la reporter en marge ferait sauter la page à chaque
+ * changement d'orientation.
+ */
+@utility pb-nav {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.25rem);
+}
+
 @utility px-marge {
   padding-left: max(env(safe-area-inset-left, 0px), 1.25rem);
   padding-right: max(env(safe-area-inset-right, 0px), 1.25rem);
