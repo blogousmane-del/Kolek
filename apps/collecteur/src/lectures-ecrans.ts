@@ -256,7 +256,14 @@ export async function chargerAlertes(): Promise<Alerte[]> {
         cle: `complete-${carte.id}`,
         gravite: 'action',
         titre: `${nom} — cycle terminé`,
-        detail: `Les ${MISES_PAR_CYCLE} mises sont encaissées. La carte doit être clôturée et ${formatMontant(du)} FCFA restitués.`,
+        // « La carte doit être clôturée » : c'était vrai tant qu'un client ne
+        // pouvait tenir qu'une carte à la fois — il fallait fermer l'ancienne
+        // pour en ouvrir une neuve, donc rendre l'argent. La contrainte est
+        // tombée le 2026-08-25, et l'obligation avec elle. Une alerte qui
+        // présente un choix comme un devoir pousse le collecteur à réclamer une
+        // clôture que personne ne demande, et à rendre un argent que le client
+        // voulait garder.
+        detail: `Les ${MISES_PAR_CYCLE} mises sont encaissées. Tu peux lui restituer ${formatMontant(du)} FCFA, ou lui activer une carte de plus : son solde lui reste dû tant qu'il n'y a pas eu de retrait.`,
       });
       continue;
     }
