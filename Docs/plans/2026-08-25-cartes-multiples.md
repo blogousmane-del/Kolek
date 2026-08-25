@@ -791,9 +791,10 @@ export function ActiverCarte({
 cd apps/collecteur && npx vitest run src/ecrans/ActiverCarte.test.tsx
 ```
 
-Attendu : **3 tests au vert.** Si `toBeChecked` échoue, vérifier que `ChoixMise`
-rend bien des `input type="radio"` étiquetés ; ajuster le sélecteur du test à ce
-que le composant rend réellement, jamais l'inverse.
+Attendu : **3 tests au vert.** Si la recherche du `radio` échoue, ouvrir
+`ChoixMise.tsx` et voir ce qu'il rend réellement : s'il n'emploie pas
+`input type="radio"` avec une étiquette, ajuster le sélecteur du test à ce qui
+existe — jamais le composant à ce que le test espérait.
 
 - [ ] **Étape 5 : commit**
 
