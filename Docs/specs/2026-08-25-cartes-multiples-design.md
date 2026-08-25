@@ -78,8 +78,8 @@ const existante = parClient.get(carte.client_id);
 if (!existante || carte.statut === 'active') parClient.set(carte.client_id, carte);
 ```
 
-C'est **le seul endroit du dépôt** qui replie plusieurs cartes sur un client. La
-`Map` disparaît.
+C'est l'un des deux endroits du dépôt qui replient plusieurs cartes sur un client
+— l'autre est `FicheClient.tsx`, voir §5. La `Map` disparaît.
 
 | | Avant | Après |
 |---|---|---|
@@ -135,17 +135,65 @@ prendre. On y met le choix :
 | État | Badge | Actions |
 |---|---|---|
 | active, moins de 31 | À jour | **Encaisser** |
-| active, **31/31** | **Cycle complet** | **Retirer** · **Nouvelle carte** |
+| active, **31/31** | **Cycle complet** | **Retirer** · **Activer une carte** |
 | clôturée | Clôturée | — |
 
 **Retirer** mène à `Retrait`, positionné sur cette carte. Aucun tri à écrire :
 `chargerCartesCloturables` marque déjà `cycleComplet` et trie par avancement
 décroissant — les cartes pleines sont en tête.
 
-**Nouvelle carte** appelle `ouvrirCarte`, montant **prérempli à celui de la carte
+**Activer une carte** appelle `ouvrirCarte`, montant **prérempli à celui de la carte
 pleine et modifiable**. La raison est déjà écrite dans le dépôt : « 500 FCFA en
 saison creuse, 2 000 quand le commerce marche ». Le montant se reconduit par
 défaut parce que c'est le cas courant, il se change parce que c'est le cas utile.
+
+### Le carrefour existe aux trois endroits où le moment se présente
+
+Un choix offert à un endroit et pas aux deux autres se lit comme un défaut. Le
+cycle complet apparaît dans trois écrans, et les trois portent les deux mêmes
+portes.
+
+| Écran | Aujourd'hui | Après |
+|---|---|---|
+| Liste des clients | bouton *Encaisser* éteint, sans un mot | **Retirer** · **Activer une carte** |
+| Fiche client | *Aller au retrait*, seul | **Aller au retrait** · **Activer une carte** |
+| Retrait | *Clôturer cette carte*, seul | **Faire le retrait** · **Activer une carte** |
+
+### Le vocabulaire visible : retrait, pas clôture
+
+`Retrait.tsx` s'appelle Retrait, écrit dans `retraits`, et propose un bouton
+« Clôturer cette carte ». Deux mots pour un geste, dans le même écran. Le mot qui
+reste est **retrait** : c'est l'acte, et c'est le fait du point de vue du client
+— on lui rend son argent. La clôture en est la conséquence.
+
+Le code et la base ne bougent pas : `cloturerCarte`, `statut = 'cloturee'`,
+`cloturee_le`. Renommer à moitié — le domaine d'un côté, l'écran de l'autre —
+coûterait plus cher que les deux vocabulaires actuels.
+
+La confirmation porte les deux vérités, parce que les deux comptent :
+
+> Confirmer le retrait de **30 000 FCFA** pour Hj ? La carte se clôture, c'est
+> définitif.
+
+### Le texte de la fiche client devient faux
+
+```
+Rends-lui 30 000 FCFA depuis « Retrait ». La nouvelle carte s'ouvre ensuite.
+```
+
+« Ensuite » était la règle d'une seule carte active : il fallait clôturer avant
+d'ouvrir. Cette règle tombe au §1, et la phrase avec elle. Le bloc dit désormais
+le vrai choix — rendre l'argent, ou en ouvrir une de plus pendant que celle-ci
+reste pleine et que son solde reste dû.
+
+### Deux conséquences techniques
+
+`CarteCloturable` porte `clientNom` mais pas `clientId`, et `ouvrirCarte` a
+besoin du second. Le champ est ajouté à `chargerCartesCloturables` — une colonne
+de plus dans un `select` qui lit déjà `client_id` pour résoudre le nom.
+
+`FicheClient.tsx` collapse les cartes (voir §5) : `active` devient `actives`, et
+le bloc « Carte en cours » devient une liste. « Cartes précédentes » ne bouge pas.
 
 ### Garder ses mises chez le collecteur — ce que la base fait déjà
 
@@ -181,12 +229,32 @@ mise antidatée rendrait faux, rétroactivement, le rapprochement de caisse
 
 ---
 
-## 5. Ce qui ne bouge pas — vérifié fichier par fichier
+## 5. Ce qui replie les cartes sur un client — les deux endroits
 
-C'est ce qui rend le chantier court. Le dépôt indexe déjà par `carte.id` presque
-partout :
+Une première version de cette spec affirmait qu'il n'y en avait qu'un. C'était
+faux, et l'erreur venait d'avoir vérifié la couche de lecture sans vérifier les
+écrans qui la consomment. Il y en a **deux**, et tous deux dans l'interface :
 
-- `chargerFicheClient` rend **déjà** une liste de cartes triée par date d'ouverture
+```ts
+// Clients.tsx — une entrée par client, l'active écrase la clôturée
+const existante = parClient.get(carte.client_id);
+if (!existante || carte.statut === 'active') parClient.set(carte.client_id, carte);
+
+// FicheClient.tsx:84 — la première active, et rien d'autre
+const active = fiche?.cartes.find((k) => k.statut === 'active') ?? null;
+```
+
+La couche de lecture, elle, est saine : `chargerFicheClient` rend bien une liste
+complète, triée par date d'ouverture. C'est l'écran qui n'en garde qu'une — d'où
+le titre « Carte **en cours** », au singulier.
+
+### Ce qui ne bouge pas — vérifié fichier par fichier
+
+C'est ce qui rend le chantier court. Sous les deux écrans ci-dessus, le dépôt
+indexe déjà par `carte.id` presque partout :
+
+- `chargerFicheClient` — le **chargeur** rend déjà la liste complète ; seul
+  l'écran qui le consomme la réduit
 - `Retrait` liste **déjà** des cartes, via `chargerCartesCloturables`
 - `chargerTableauCollecteur` prend **déjà** « la carte active la plus avancée »
   parmi plusieurs, et somme l'encours sur toutes
@@ -237,8 +305,15 @@ sera voulu ; il ne s'invente pas ici.
   clôturée existe
 - une carte à 31/31 affiche « Cycle complet » et deux actions, jamais un bouton
   éteint
-- « Nouvelle carte » préremplit le montant de la carte pleine et le laisse
+- « Activer une carte » préremplit le montant de la carte pleine et le laisse
   modifiable
+- les trois écrans — liste, fiche, retrait — offrent les deux mêmes portes sur
+  une carte à 31/31 ; aucun n'en offre une seule
+- `Retrait` ne dit plus « clôturer » à l'écran, et sa confirmation nomme les deux
+  faits : le montant rendu, et la carte qui se clôture définitivement
+- une fiche client à deux cartes actives rend deux blocs « en cours », pas un
+- après « Activer une carte » depuis l'écran Retrait, la carte pleine est
+  toujours là, toujours dans l'encours, et la neuve est à 0/31
 
 ---
 
@@ -247,7 +322,16 @@ sera voulu ; il ne s'invente pas ici.
 1. Migration : suppression de l'index, réécriture des deux commentaires
 2. Tests de base — ils échouent avant la migration, ils passent après
 3. `ecritures.ts` : retrait de la branche `CARTE_ACTIVE_EXISTANTE`
-4. `Clients.tsx` : suppression de la `Map`, une ligne par carte, filtre `Sans
+4. `lectures-ecrans.ts` : `clientId` ajouté à `CarteCloturable`
+5. `Clients.tsx` : suppression de la `Map`, une ligne par carte, filtre `Sans
    carte` redéfini
-5. `Clients.tsx` : le carrefour à 31/31
-6. Vérification du libellé « dormante »
+6. `FicheClient.tsx` : `active` devient `actives`, « Carte en cours » devient une
+   liste
+7. Le carrefour à 31/31, dans les trois écrans — liste, fiche, retrait — et le
+   passage de « clôturer » à « retrait » dans le texte visible de `Retrait.tsx`
+8. Vérification du libellé « dormante »
+
+Les étapes 5 à 7 se tiennent : chacune touche un écran, et aucune ne dépend du
+rendu d'une autre. Elles peuvent être menées dans l'ordre qui arrange, à
+condition que 4 précède 7 — le bouton « Activer une carte » de l'écran Retrait a
+besoin du `clientId`.
