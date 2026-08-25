@@ -419,6 +419,11 @@ export async function chargerProfil(): Promise<Profil> {
 
 export interface CarteCloturable {
   carteId: string;
+  /** Nécessaire pour ouvrir une carte de plus depuis l'écran Retrait, quand le
+      client préfère laisser son argent plutôt que le reprendre. Le `select`
+      lisait déjà `client_id` pour résoudre le nom : c'est une propriété de plus
+      dans l'objet, pas une requête de plus. */
+  clientId: string;
   clientNom: string;
   mise: number;
   misesEncaissees: number;
@@ -450,6 +455,7 @@ export async function chargerCartesCloturables(): Promise<CarteCloturable[]> {
     .filter((c) => c.statut === 'active')
     .map((c) => ({
       carteId: c.id,
+      clientId: c.client_id,
       clientNom: noms.get(c.client_id) ?? 'Client',
       mise: c.mise,
       misesEncaissees: c.mises_encaissees,
