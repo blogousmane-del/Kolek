@@ -1,0 +1,25 @@
+-- Kolek — un client peut détenir plusieurs cartes actives
+--
+-- Le cadrage de Phase 1 posait l'inverse, et le défendait ainsi : « deux carnets
+-- ouverts en même temps sur le même client, c'est deux soldes à retenir, et la
+-- première dispute au moment de rendre l'argent ».
+--
+-- L'objection valait pour le carnet papier. Une application ne retient pas, elle
+-- affiche. Chaque carte porte son solde ; `retraits.carte_id` est unique, donc on
+-- rend l'argent d'une carte et jamais d'un client ; et l'écran de retrait liste
+-- des cartes, pas des personnes. Ce que le papier ne pouvait pas tenir, la base
+-- le tient depuis le premier jour.
+--
+-- Le besoin est double, et les deux sont réels : un client épargne pour deux
+-- choses à deux rythmes, et un client qui a rempli sa carte veut souvent
+-- continuer plutôt que reprendre son argent. Ce second cas ne demandait rien de
+-- plus que cette suppression : une carte à 31/31 reste `active` et refuse les
+-- mises suivantes sans se clôturer, donc son solde reste dû. Seul l'index
+-- empêchait d'en ouvrir une à côté.
+--
+-- Rien d'autre ne bouge. `mises_avant_insert` refuse toujours au-delà de 31,
+-- impose toujours le montant de la carte, et décide toujours seul
+-- `est_commission` — donc chaque carte porte sa propre commission à sa première
+-- mise. `cartes_client_du_meme_collecteur` tient. Les politiques RLS portent sur
+-- le collecteur, jamais sur le nombre de cartes.
+drop index if exists public.cartes_une_active_par_client;

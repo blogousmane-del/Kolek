@@ -22,27 +22,35 @@ describe('création automatique du collecteur à l’inscription', () => {
 });
 
 describe('contraintes du schéma cartes', () => {
-  it('refuse une deuxième carte active pour le même client', async () => {
+  it('accepte une deuxième carte active pour le même client', async () => {
+    // Jusqu'au 2026-08-25, l'index `cartes_une_active_par_client` refusait cette
+    // deuxième écriture avec 23505. Il est levé par
+    // `20260825090000_cartes_multiples.sql` — voir `cartes-multiples.test.ts`
+    // pour la couverture complète du nouveau comportement. Ici, on ne garde que
+    // la vérification schéma minimale : les deux cartes, nommées, restent actives.
     const a = await creerCollecteur('Bintou Traoré', `+225071${Date.now() % 10000000}`);
     const clientId = crypto.randomUUID();
 
     await admin.from('clients').insert({ id: clientId, collecteur_id: a.id, nom: 'Mariam' });
+    const premiere = crypto.randomUUID();
     await admin.from('cartes').insert({
-      id: crypto.randomUUID(),
+      id: premiere,
       collecteur_id: a.id,
       client_id: clientId,
       mise: 1000,
     });
 
+    const seconde = crypto.randomUUID();
     const { error } = await admin.from('cartes').insert({
-      id: crypto.randomUUID(),
+      id: seconde,
       collecteur_id: a.id,
       client_id: clientId,
       mise: 2000,
     });
+    expect(error).toBeNull();
 
-    expect(error).not.toBeNull();
-    expect(error!.code).toBe('23505');
+    const { data } = await admin.from('cartes').select('id, statut').in('id', [premiere, seconde]);
+    expect((data ?? []).every((c) => c.statut === 'active')).toBe(true);
   });
 
   it('refuse une mise journalière hors des bornes 500 – 10 000', async () => {
@@ -64,9 +72,7 @@ describe('contraintes du schéma cartes', () => {
   it('laisse rouvrir une carte une fois la précédente clôturée', async () => {
     // La promesse du produit : quand un client retire son argent, la carte se
     // ferme mais le client reste — il peut reprendre, au même montant ou à un
-    // autre. Le test complète celui du dessus : l'un vérifie qu'on ne peut pas
-    // tenir deux carnets à la fois, celui-ci qu'on n'est pas enfermé pour
-    // autant.
+    // autre.
     const a = await creerCollecteur('Aya Konan', `+225074${Date.now() % 10000000}`);
     const clientId = crypto.randomUUID();
     await admin.from('clients').insert({ id: clientId, collecteur_id: a.id, nom: 'Aminata' });
@@ -111,12 +117,6 @@ describe('contraintes du schéma cartes', () => {
         .from('cartes')
         .insert({ id: carteId, collecteur_id: a.id, client_id: clientId, mise });
       expect(error, `mise de ${mise} refusée`).toBeNull();
-
-      // Clôturée aussitôt : une seule carte active par client à la fois.
-      await admin
-        .from('cartes')
-        .update({ statut: 'cloturee', cloturee_le: new Date().toISOString() })
-        .eq('id', carteId);
     }
   });
 
