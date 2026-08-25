@@ -23,6 +23,11 @@ interface Props {
   /** Lien de retour vers la vitrine. Absent sur l'administration, qui ne se
       présente à personne. */
   retourAccueil?: string;
+  /** Un motif déjà connu à l'ouverture de l'écran.
+      Une connexion fédérée qui échoue ne lève rien côté client : le fournisseur
+      **redirige**, et le motif arrive accroché à l'adresse. L'écran doit donc
+      pouvoir démarrer sur une erreur, pas seulement en produire une. */
+  erreurInitiale?: string | null;
 }
 
 /** Le « G » de Google, tracé. Un fichier d'image serait bloqué par la CSP des
@@ -66,10 +71,11 @@ export function EcranConnexion({
   onSoumettre,
   federee,
   retourAccueil,
+  erreurInitiale = null,
 }: Props) {
   const [email, setEmail] = useState('');
   const [motDePasse, setMotDePasse] = useState('');
-  const [erreur, setErreur] = useState<string | null>(null);
+  const [erreur, setErreur] = useState<string | null>(erreurInitiale);
   const [enCours, setEnCours] = useState(false);
   const [redirection, setRedirection] = useState(false);
 

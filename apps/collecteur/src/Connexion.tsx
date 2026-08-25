@@ -1,5 +1,11 @@
 import { EcranConnexion } from '@kolek/ui';
+import { useEffect, useState } from 'react';
 
+import {
+  MESSAGE_COMPTE_NON_RATTACHE,
+  lireErreurOAuthCourante,
+  nettoyerUrlOAuth,
+} from './erreurOAuth';
 import { supabase } from './supabase';
 
 /** La vitrine, pour le lien de retour. En dur plutôt qu'en variable
@@ -38,11 +44,25 @@ const VITRINE = 'https://kolek-site.netlify.app';
  * clics.
  */
 export function Connexion() {
+  // Une connexion Google qui échoue ne lève rien ici : GoTrue **redirige**, et
+  // le motif revient accroché à l'adresse. Sans cette lecture, le collecteur
+  // repartait chez Google, revenait, et retrouvait cet écran sans un mot — voir
+  // l'en-tête de `erreurOAuth.ts` pour la panne du 2026-08-24.
+  const [erreurRetour] = useState(lireErreurOAuthCourante);
+
+  // Le nettoyage vit dans un effet, pas dans l'initialiseur au-dessus : celui-ci
+  // est rejoué en mode strict, et un initialiseur qui a des effets rend un
+  // résultat différent au second passage.
+  useEffect(() => {
+    nettoyerUrlOAuth();
+  }, []);
+
   return (
     <EcranConnexion
       titre="Kolek"
       sousTitre="Chaque mise compte"
       retourAccueil={VITRINE}
+      erreurInitiale={erreurRetour}
       federee={{
         libelle: 'Continuer avec Google',
         onActiver: async () => {
@@ -64,7 +84,10 @@ export function Connexion() {
           // réellement rencontrer sont nommés ; le reste passe tel quel, parce
           // qu'un message générique fait recommencer la même chose.
           if (/signups? not allowed|signup is disabled/i.test(message)) {
-            return "Cette adresse Google n'est rattachée à aucun compte Kolek. Demande à GTCS d'ouvrir ton compte.";
+            // La même phrase que le retour par l'adresse, et une seule source :
+            // deux chemins mènent à ce refus, deux formulations se liraient
+            // comme deux problèmes différents.
+            return MESSAGE_COMPTE_NON_RATTACHE;
           }
           if (/provider is not enabled|unsupported provider/i.test(message)) {
             return 'La connexion Google n’est pas encore activée sur ce projet.';
