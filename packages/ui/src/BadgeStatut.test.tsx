@@ -11,6 +11,7 @@ const TOUS: Statut[] = [
   'En synchro',
   'Versé aujourd’hui',
   'Clôturée',
+  'Cycle terminé',
 ];
 
 describe('BadgeStatut', () => {

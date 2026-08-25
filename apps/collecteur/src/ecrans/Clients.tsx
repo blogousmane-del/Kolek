@@ -130,7 +130,13 @@ export function Clients({
 
         if (reponseClients.error || reponseCartes.error) {
           setErreur('Impossible de charger tes clients.');
+          // `toutesCartes` doit vider en même temps que `lignes` : le filtre
+          // « Clôturées » lit `toutesCartes` et non `lignes`, et la liste
+          // rendue n'est pas conditionnée par l'absence d'erreur — sans ça,
+          // il continuerait d'afficher les cartes du chargement précédent
+          // sous la bannière d'erreur.
           setLignes([]);
+          setToutesCartes([]);
           return;
         }
 
@@ -167,7 +173,10 @@ export function Clients({
       } catch {
         if (!vivant) return;
         setErreur('Impossible de charger tes clients.');
+        // Même raison qu'au-dessus : `toutesCartes` suit `lignes` sur tout
+        // chemin d'erreur, pas seulement celui-ci.
         setLignes([]);
+        setToutesCartes([]);
       }
     })();
 
@@ -206,6 +215,10 @@ export function Clients({
     });
   }, [lignes, toutesCartes, recherche, filtre]);
 
+  // `lignes` porte une ligne par carte active, plus une par client sans carte
+  // active : `lignes.length` compte des lignes, pas des clients, dès qu'un
+  // client tient deux cartes — exactement ce que cette refonte permet.
+  const clientsDistincts = new Set(lignes?.map((l) => l.client.id)).size;
   // `lignes` ne porte déjà que les cartes actives : compter ses lignes « carte »
   // compte les cartes, pas les clients — un même client peut en apporter deux.
   const cartesActives = lignes?.filter((l) => l.genre === 'carte').length ?? 0;
@@ -242,7 +255,7 @@ export function Clients({
         <div className="text-center flex-1 min-w-0">
           <p className="text-xs text-muted-foreground font-body">Clients</p>
           <p className="font-headings font-bold text-xl text-ink tabular-nums">
-            {lignes?.length ?? '—'}
+            {lignes ? clientsDistincts : '—'}
           </p>
         </div>
         <div className="w-px h-8 bg-hairline" />

@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { MISES_PAR_CYCLE } from '@kolek/core';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -27,9 +28,10 @@ const { Clients } = await import('./Clients');
 const CLIENTS = [
   { id: 'cli1', nom: 'Hj', marche: 'Sokourani', telephone: null, avis_actifs: false },
   { id: 'cli2', nom: 'Ka', marche: null, telephone: null, avis_actifs: false },
+  { id: 'cli3', nom: 'Sy', marche: null, telephone: null, avis_actifs: false },
 ];
 
-/** Deux cartes actives pour Hj, aucune active pour Ka. */
+/** Deux cartes actives pour Hj, aucune active pour Ka, une carte pleine pour Sy. */
 const CARTES = [
   {
     id: 'k1',
@@ -54,6 +56,16 @@ const CARTES = [
     statut: 'cloturee',
     mises_encaissees: 31,
     ouverte_le: '2026-06-03T08:00:00.000Z',
+  },
+  // Reste `active` à 31/31 : la base ne clôture qu'au retrait. C'est la seule
+  // des trois branches du badge de statut qu'aucune carte ci-dessus n'atteint.
+  {
+    id: 'k4',
+    client_id: 'cli3',
+    mise: 3000,
+    statut: 'active',
+    mises_encaissees: MISES_PAR_CYCLE,
+    ouverte_le: '2026-05-01T08:00:00.000Z',
   },
 ];
 
@@ -128,5 +140,60 @@ describe('liste des clients devenue liste de cartes', () => {
 
     // Un client fidèle depuis un an occuperait douze lignes d'historique.
     expect(screen.queryByText(/2 000 FCFA/)).toBeNull();
+  });
+
+  it('envoie l’identifiant de la carte touchée, pas celui de sa voisine', async () => {
+    brancherSupabase();
+    const onEncaisser = vi.fn();
+    render(
+      <Clients
+        collecteurId="col1"
+        revision={0}
+        ouvrirFormulaire={false}
+        onFormulaireVu={vi.fn()}
+        onDeconnexion={vi.fn()}
+        onEncaisser={onEncaisser}
+        onEcriture={vi.fn()}
+        onNaviguer={vi.fn()}
+      />,
+    );
+
+    // Le tri range la carte la plus avancée en premier : k2 (17 mises) doit
+    // précéder k1 (2 mises) parmi les boutons rendus. Vérifié plutôt que
+    // supposé — c'est cet ordre-là qui rend la confusion possible.
+    const boutons = await screen.findAllByRole('button', { name: 'Encaisser' });
+    expect(boutons).toHaveLength(2);
+    expect(boutons[0].closest('.bg-surface')?.textContent).toMatch(/1 000 FCFA/);
+    expect(boutons[1].closest('.bg-surface')?.textContent).toMatch(/5 000 FCFA/);
+
+    // boutons[1] porte la ligne de k1 : c'est celui-là qu'on touche, et non son
+    // voisin — les mises sont immuables, encaisser sur la mauvaise carte ne se
+    // rattrape pas.
+    fireEvent.click(boutons[1]);
+
+    expect(onEncaisser).toHaveBeenCalledTimes(1);
+    expect(onEncaisser).toHaveBeenCalledWith({
+      carteId: 'k1',
+      clientNom: 'Hj',
+      mise: 5000,
+      misesEncaissees: 2,
+    });
+  });
+
+  it('ouvre les deux portes sur une carte au bout de son cycle', async () => {
+    brancherSupabase();
+    rendre();
+
+    // Seule des trois branches du badge encore sans couverture : aucune carte
+    // ci-dessus n'atteignait 31/31 en restant `active`.
+    await screen.findByText('Sy');
+    const ligne = screen.getByText('Sy').closest('.bg-surface') as HTMLElement;
+
+    expect(within(ligne).getByText('Cycle terminé')).toBeTruthy();
+    expect(within(ligne).getByRole('button', { name: 'Retirer' })).toBeTruthy();
+    expect(within(ligne).getByRole('button', { name: 'Activer une carte' })).toBeTruthy();
+    // Encaisser ici serait refusé par la base (déclencheur CYCLE_COMPLET) :
+    // c'est justement ce que la refonte en cartes doit empêcher de proposer.
+    expect(within(ligne).queryByRole('button', { name: 'Encaisser' })).toBeNull();
   });
 });
