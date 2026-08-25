@@ -279,8 +279,15 @@ export async function definirConsentementAvis(
  * `20260825090000_cartes_multiples.sql`, qui porte le raisonnement complet.
  *
  * Conséquence sur ce geste : il ne peut plus échouer pour cause de carte déjà
- * ouverte. Le refus `23505` qui était traduit ici est devenu inatteignable, et la
- * branche a été retirée plutôt que laissée en veille.
+ * ouverte, et la branche qui traduisait ce refus a été retirée plutôt que laissée
+ * en veille.
+ *
+ * `23505` n'a pas disparu pour autant, et il ne faut pas le croire : c'est le
+ * code de toute violation d'unicité, et `cartes.id` reste une clé primaire dont
+ * l'identifiant vient du téléphone. Une collision y tomberait encore, et serait
+ * nommée « doublon » par le traitement générique — un mot qui parle de mise, pas
+ * de carte. C'est assumé : un UUID v4 n'entre pas en collision, et lui écrire une
+ * phrase dédiée serait du texte que personne ne lira jamais.
  */
 export async function ouvrirCarte(
   collecteurId: string,
