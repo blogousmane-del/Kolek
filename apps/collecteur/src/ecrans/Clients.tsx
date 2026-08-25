@@ -67,6 +67,8 @@ export function Clients({
   revision,
   ouvrirFormulaire,
   onFormulaireVu,
+  ficheAOuvrir,
+  onFicheVue,
   onDeconnexion,
   onEncaisser,
   onEcriture,
@@ -77,6 +79,10 @@ export function Clients({
   /** Posé par le bouton « Souscrire » de l'accueil. */
   ouvrirFormulaire: boolean;
   onFormulaireVu: () => void;
+  /** Posé par la commande « Fiche » de l'accueil : le client dont la fiche
+      s'ouvre dès l'arrivée sur cet écran. `null` = aucune. */
+  ficheAOuvrir: string | null;
+  onFicheVue: () => void;
   onDeconnexion: () => void;
   onEncaisser: (carte: CarteChoisie) => void;
   onEcriture: () => void;
@@ -97,6 +103,14 @@ export function Clients({
     // puis revenir sur cet écran le rouvrirait tout seul.
     onFormulaireVu();
   }, [ouvrirFormulaire, onFormulaireVu]);
+
+  useEffect(() => {
+    if (!ficheAOuvrir) return;
+    setFiche(ficheAOuvrir);
+    // Consommée tout de suite, pour la même raison que le formulaire : sans
+    // ça, refermer la fiche puis revenir sur cet écran la rouvrirait seule.
+    onFicheVue();
+  }, [ficheAOuvrir, onFicheVue]);
   const [lignes, setLignes] = useState<Ligne[] | null>(null);
   /** Les cartes brutes, actives et clôturées confondues. Le dépliage de
       `lignes` ne garde que les actives ; le filtre `Clôturées` a besoin des

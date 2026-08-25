@@ -1,5 +1,6 @@
 import { formatMontant } from '@kolek/core';
 import {
+  ActionsCarte,
   ActionsRapides,
   Avatar,
   BandeauHorsLigne,
@@ -14,7 +15,7 @@ import {
 } from '@kolek/ui';
 
 import { useDonnees } from '../cache';
-import type { Page } from '../Coquille';
+import type { CarteChoisie, Page } from '../Coquille';
 import { chargerTableauCollecteur } from '../lectures';
 import { usePremierRendu } from '../premier-rendu';
 
@@ -39,12 +40,18 @@ export function Accueil({
   revision,
   onNaviguer,
   onSouscrire,
+  onEncaisser,
+  onOuvrirFiche,
   onDeconnexion,
 }: {
   nomCollecteur: string | null;
   revision: number;
   onNaviguer: (cle: Page) => void;
   onSouscrire: () => void;
+  /** Encaisser sur la carte affichée, sans passer par la liste. */
+  onEncaisser: (carte: CarteChoisie) => void;
+  /** Ouvrir la fiche du client de la carte affichée. */
+  onOuvrirFiche: (clientId: string) => void;
   onDeconnexion: () => void;
 }) {
   const enLigne = useEnLigne();
@@ -52,6 +59,11 @@ export function Accueil({
     revision,
     messageErreur: 'Chiffres indisponibles. Vérifie le réseau.',
   });
+
+  /** Extraite une fois : les commandes posées sous la carte s'y réfèrent
+      quatre fois, et `tableau?.carteDuJour!` à chaque ligne se lirait comme
+      une supposition, alors que c'est la condition d'affichage du bloc. */
+  const carteDuJour = tableau?.carteDuJour ?? null;
 
   // Les huit mènent quelque part depuis le 2026-08-20. Six étaient grises,
   // faute d'écran derrière : `ActionsRapides` désactive toute action sans
@@ -181,14 +193,50 @@ export function Accueil({
             {tableau.cartesActives > 1 ? 's' : ''}.
           </p>
         )}
-        {tableau?.carteDuJour ? (
-          <CarteCollecte
-            nomClient={tableau.carteDuJour.nom}
-            misePar={formatMontant(tableau.carteDuJour.mise)}
-            jourCourant={tableau.carteDuJour.misesEncaissees}
-            solde={formatMontant(tableau.carteDuJour.solde)}
-            cycle="1"
-          />
+        {carteDuJour ? (
+          <>
+            <CarteCollecte
+              nomClient={carteDuJour.nom}
+              misePar={formatMontant(carteDuJour.mise)}
+              jourCourant={carteDuJour.misesEncaissees}
+              solde={formatMontant(carteDuJour.solde)}
+              cycle="1"
+            />
+            {/* Deux commandes, et elles portent sur la carte au-dessus.
+                Renvoyer vers un écran — « Encaisser » vers la liste des clients
+                — obligeait à y retrouver à la main le client qu'on venait de
+                lire, dans une liste triée autrement. Un bouton posé sous une
+                carte agit sur cette carte, ou n'a rien à y faire.
+
+                Pas de « Retrait » ici, malgré la maquette : rendre son argent à
+                un client est rare, définitif, et se décide devant sa fiche —
+                ses cartes, ses versements, son cycle. L'accueil montre la carte
+                la plus avancée, pas le dossier. */}
+            <div className="mt-3">
+              <ActionsCarte
+                actions={[
+                  {
+                    icone: 'circle-dollar-sign',
+                    libelle: 'Encaisser',
+                    description: `Encaisser sur la carte de ${carteDuJour.nom}`,
+                    onActiver: () =>
+                      onEncaisser({
+                        carteId: carteDuJour.carteId,
+                        clientNom: carteDuJour.nom,
+                        mise: carteDuJour.mise,
+                        misesEncaissees: carteDuJour.misesEncaissees,
+                      }),
+                  },
+                  {
+                    icone: 'user',
+                    libelle: 'Fiche',
+                    description: `Ouvrir la fiche de ${carteDuJour.nom}`,
+                    onActiver: () => onOuvrirFiche(carteDuJour.clientId),
+                  },
+                ]}
+              />
+            </div>
+          </>
         ) : (
           <Carte className="p-4">
             <p className="text-base font-body text-ink m-0">

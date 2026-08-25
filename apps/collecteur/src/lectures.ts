@@ -39,8 +39,23 @@ export interface TableauCollecteur {
   encaisseAujourdhui: number;
   /** Ce que le collecteur doit encore à ses clients, toutes cartes actives. */
   encoursTotal: number;
-  /** La carte active la plus avancée : celle qu'on finit avant les autres. */
-  carteDuJour: { nom: string; mise: number; misesEncaissees: number; solde: number } | null;
+  /**
+   * La carte active la plus avancée : celle qu'on finit avant les autres.
+   *
+   * `carteId` et `clientId` l'accompagnent depuis le 2026-08-25 : sans eux, les
+   * commandes posées sous la carte de l'accueil ne pouvaient que renvoyer vers
+   * un écran — « Encaisser » ouvrait la liste des clients, à charge pour le
+   * collecteur d'y retrouver celui qu'il venait de voir. Un bouton posé sous
+   * une carte doit agir sur cette carte.
+   */
+  carteDuJour: {
+    carteId: string;
+    clientId: string;
+    nom: string;
+    mise: number;
+    misesEncaissees: number;
+    solde: number;
+  } | null;
   dernieres: Array<{ nom: string; montant: number; estCommission: boolean; quand: string }>;
 }
 
@@ -98,6 +113,8 @@ export async function chargerTableauCollecteur(): Promise<TableauCollecteur> {
     encoursTotal,
     carteDuJour: plusAvancee
       ? {
+          carteId: plusAvancee.id,
+          clientId: plusAvancee.client_id,
           nom: nomParClient.get(plusAvancee.client_id) ?? 'Client',
           mise: plusAvancee.mise,
           misesEncaissees: plusAvancee.mises_encaissees,

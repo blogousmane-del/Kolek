@@ -120,6 +120,25 @@
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.25rem);
 }
 
+/* La barre de défilement d'un carrousel.
+ *
+ * Elle ne se voit pas sur téléphone — iOS et Android ne la peignent que pendant
+ * le geste — mais elle se voit sur le bureau collecteur, où elle barre le bas
+ * de la carte d'un trait gris qui ressemble à une jauge. Une carte de collecte
+ * porte déjà une jauge, celle des 31 cases : deux barres l'une sous l'autre,
+ * dont une qui ne veut rien dire, c'est une lecture de trop dans un écran qui
+ * parle d'argent.
+ *
+ * Ce qui reste pour dire qu'on peut défiler : les points sous le carrousel, qui
+ * comptent les cartes — une information que la barre, elle, ne donnait pas. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @utility px-marge {
   padding-left: max(env(safe-area-inset-left, 0px), 1.25rem);
   padding-right: max(env(safe-area-inset-right, 0px), 1.25rem);

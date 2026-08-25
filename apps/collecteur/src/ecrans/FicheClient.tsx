@@ -1,5 +1,5 @@
 import { MISES_PAR_CYCLE, formatMontant, soldeRestituable } from '@kolek/core';
-import { Bouton, CarteCollecte, Feuille, Icone, LigneTransaction } from '@kolek/ui';
+import { Bouton, CarrouselCartes, Feuille, Icone, LigneTransaction } from '@kolek/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { CarteChoisie } from '../Coquille';
@@ -124,24 +124,15 @@ export function FicheClient({
           <Coordonnees fiche={fiche} onChange={onEcriture} onRelire={relire} />
 
           {actives.length > 0 ? (
-            <section>
-              <p className="font-headings font-bold text-base text-ink mb-2">
-                {actives.length > 1 ? 'Cartes en cours' : 'Carte en cours'}
-              </p>
-              {actives.map(({ carte, cycle }) => (
-                <CarteEnCours
-                  key={carte.id}
-                  carte={carte}
-                  nomClient={fiche.nom}
-                  cycle={cycle}
-                  clientId={fiche.id}
-                  collecteurId={collecteurId}
-                  onEncaisser={onEncaisser}
-                  onRetrait={onRetrait}
-                  onEcriture={onEcriture}
-                />
-              ))}
-            </section>
+            <CartesEnCours
+              actives={actives}
+              nomClient={fiche.nom}
+              clientId={fiche.id}
+              collecteurId={collecteurId}
+              onEncaisser={onEncaisser}
+              onRetrait={onRetrait}
+              onEcriture={onEcriture}
+            />
           ) : (
             <NouvelleCarte
               clientId={fiche.id}
@@ -280,26 +271,48 @@ function Coordonnees({
 }
 
 /**
- * Une carte en cours, et ce qu'on peut en faire.
+ * Les cartes en cours d'un client, et ce qu'on peut faire de celle qu'on regarde.
  *
- * Sous 31 mises, un seul geste : encaisser. À 31, le cycle est fini et la
- * décision appartient au client — reprendre son argent, ou le laisser et repartir
- * sur une carte de plus. Les deux portes se valent, donc les deux boutons se
- * valent.
+ * ## Ce que le carrousel a remplacé, et ce qu'il n'a pas perdu
+ *
+ * Les cartes étaient empilées, chacune avec son bouton pleine largeur. À trois
+ * carnets, la fiche mesurait trois écrans avant d'arriver aux derniers
+ * versements, et le collecteur devait comparer deux cartes séparées par un
+ * bouton. En rangée, la fiche garde sa hauteur quel que soit le nombre de
+ * cartes.
+ *
+ * Rien de ce qui existait n'a disparu. Le carrousel change la façon d'atteindre
+ * une carte, pas ce qu'on peut en faire :
+ *
+ * - **le montant reste sur le bouton** — « Encaisser 5 000 FCFA ». Il y était
+ *   parce que deux cartes faisaient deux boutons l'un sous l'autre ; cette
+ *   raison-là tombe avec l'empilement, mais pas la bonne : une mise est
+ *   immuable, et le bouton qui la déclenche doit dire ce qu'il encaisse. Il
+ *   désigne désormais la carte en face, et change quand on fait défiler ;
+ * - **les deux portes de fin de cycle** — rendre l'argent, ou repartir sur une
+ *   carte de plus — restent côte à côte dans leur bloc, sur la carte pleine ;
+ * - **chaque carte reste atteignable**, par le doigt, par les points, ou par
+ *   les flèches du clavier.
+ *
+ * ## La carte visible
+ *
+ * Elle est tenue ici, et non dans le carrousel : la rangée d'actions et le bloc
+ * de fin de cycle en dépendent tous les deux. Le repli sur la première carte
+ * n'est pas une précaution de style — après un encaissement, la relecture
+ * réordonne les cartes par avancement, et celle qu'on regardait peut avoir
+ * changé de rang ou avoir été clôturée.
  */
-function CarteEnCours({
-  carte,
+function CartesEnCours({
+  actives,
   nomClient,
-  cycle,
   clientId,
   collecteurId,
   onEncaisser,
   onRetrait,
   onEcriture,
 }: {
-  carte: CarteFiche;
+  actives: Array<{ carte: CarteFiche; cycle: number }>;
   nomClient: string;
-  cycle: number;
   clientId: string;
   collecteurId: string | null;
   onEncaisser: (carte: CarteChoisie) => void;
@@ -308,16 +321,30 @@ function CarteEnCours({
   onRetrait: (clientNom: string) => void;
   onEcriture: () => void;
 }) {
+  const [visibleId, setVisibleId] = useState(actives[0].carte.id);
+
+  const courant = actives.find(({ carte }) => carte.id === visibleId) ?? actives[0];
+  const { carte } = courant;
   const complete = carte.misesEncaissees >= MISES_PAR_CYCLE;
+  const solde = formatMontant(soldeRestituable(carte.misesEncaissees, carte.mise));
 
   return (
-    <div className="mb-4">
-      <CarteCollecte
-        nomClient={nomClient}
-        misePar={formatMontant(carte.mise)}
-        jourCourant={carte.misesEncaissees}
-        solde={formatMontant(soldeRestituable(carte.misesEncaissees, carte.mise))}
-        cycle={String(cycle)}
+    <section>
+      <p className="font-headings font-bold text-base text-ink mb-2">
+        {actives.length > 1 ? 'Cartes en cours' : 'Carte en cours'}
+      </p>
+
+      <CarrouselCartes
+        cartes={actives.map(({ carte: c, cycle: rang }) => ({
+          id: c.id,
+          nomClient,
+          misePar: formatMontant(c.mise),
+          jourCourant: c.misesEncaissees,
+          solde: formatMontant(soldeRestituable(c.misesEncaissees, c.mise)),
+          cycle: String(rang),
+        }))}
+        visibleId={courant.carte.id}
+        onVisible={setVisibleId}
       />
 
       {complete ? (
@@ -327,10 +354,8 @@ function CarteEnCours({
               Cycle terminé — {MISES_PAR_CYCLE} mises sur {MISES_PAR_CYCLE}.
             </p>
             <p className="font-body text-xs text-muted-foreground mt-1">
-              Tu peux lui rendre ses{' '}
-              {formatMontant(soldeRestituable(carte.misesEncaissees, carte.mise))} FCFA, ou lui
-              activer une carte de plus. Tant qu'il n'y a pas de retrait, cette carte reste
-              ouverte et son solde lui est dû.
+              Tu peux lui rendre ses {solde} FCFA, ou lui activer une carte de plus. Tant qu'il n'y
+              a pas de retrait, cette carte reste ouverte et son solde lui est dû.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -347,9 +372,11 @@ function CarteEnCours({
           </div>
         </div>
       ) : (
-        // Le montant est sur le bouton, pas seulement dans le bloc au-dessus :
-        // deux cartes actives font deux boutons pleine largeur l'un sous
-        // l'autre, dans un panneau qui défile. Une mise est immuable.
+        // Le montant reste sur le bouton. Il y était parce que deux cartes
+        // faisaient deux boutons l'un sous l'autre ; le carrousel a supprimé
+        // cette raison-là, mais pas la bonne : une mise est immuable, et le
+        // bouton qui la déclenche doit dire ce qu'il encaisse. Il désigne
+        // maintenant la carte en face, et change avec elle.
         <Bouton
           pleineLargeur
           className="mt-3"
@@ -366,7 +393,7 @@ function CarteEnCours({
           Encaisser {formatMontant(carte.mise)} FCFA
         </Bouton>
       )}
-    </div>
+    </section>
   );
 }
 

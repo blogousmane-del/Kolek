@@ -64,6 +64,9 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       cartes. Porté ici et non dans l'écran : c'est la navigation qui le décide,
       et un état local se perdrait au premier aller-retour. */
   const [clientPourRetrait, setClientPourRetrait] = useState<ClientCible | null>(null);
+  /** Le client dont la fiche s'ouvre à l'arrivée sur la liste. Posé par la
+      commande « Fiche » de l'accueil, consommé par l'écran `Clients`. */
+  const [clientPourFiche, setClientPourFiche] = useState<string | null>(null);
   /** Incrémenté après chaque écriture : la liste des clients s'y abonne pour
       se relire. Sans ça, un client tout juste inscrit n'apparaît qu'au
       rechargement de la page. */
@@ -141,6 +144,19 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
     naviguer('encaisser');
   }
 
+  /**
+   * Ouvrir la fiche d'un client depuis un autre écran.
+   *
+   * La fiche est un panneau flottant de la liste des clients, pas un écran :
+   * on ne peut donc pas y « naviguer ». On va sur la liste en portant
+   * l'identifiant, qu'elle consomme à l'arrivée — le même mécanisme que le
+   * formulaire de souscription, et pour la même raison.
+   */
+  function ouvrirFiche(clientId: string) {
+    setClientPourFiche(clientId);
+    naviguer('clients');
+  }
+
   const contenu = (
     <>
       {erreurSortie && (
@@ -161,6 +177,8 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
             setSouscrire(true);
             naviguer('clients');
           }}
+          onEncaisser={encaisserSur}
+          onOuvrirFiche={ouvrirFiche}
           onDeconnexion={deconnecter}
         />
       )}
@@ -170,6 +188,8 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
           revision={revision}
           ouvrirFormulaire={souscrire}
           onFormulaireVu={() => setSouscrire(false)}
+          ficheAOuvrir={clientPourFiche}
+          onFicheVue={() => setClientPourFiche(null)}
           onDeconnexion={deconnecter}
           onEncaisser={encaisserSur}
           onEcriture={() => setRevision((r) => r + 1)}

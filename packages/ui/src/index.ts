@@ -1,3 +1,4 @@
+export { ActionsCarte, type ActionCarte } from './ActionsCarte';
 export { ActionsRapides, type ActionRapide } from './ActionsRapides';
 export { Avatar, fondPour, initiales } from './Avatar';
 export { BadgeStatut, type Statut } from './BadgeStatut';
@@ -8,6 +9,7 @@ export { BarreLaterale, type CleNavAdmin } from './BarreLaterale';
 export { Bouton } from './Bouton';
 export { Carte, EnteteCarte, EnteteSection, LienBloc } from './Carte';
 export { CarteCollecte } from './CarteCollecte';
+export { CarrouselCartes, type CarteItem } from './CarrouselCartes';
 export { CarteStat } from './CarteStat';
 export { CarteZone } from './CarteZone';
 export { Champ } from './Champ';

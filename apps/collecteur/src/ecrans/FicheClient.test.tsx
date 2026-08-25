@@ -261,12 +261,18 @@ describe('fiche d’un client à plusieurs cartes', () => {
       />,
     );
 
-    // Deux cartes actives, deux boutons pleine largeur l'un sous l'autre. Un
-    // libellé commun — « Encaisser une mise » — laisse le montant au seul bloc
-    // du dessus, dans un panneau qui défile. La mise est immuable : le bouton
-    // doit dire ce qu'il encaisse.
+    // Depuis le carrousel, une seule carte est en face, donc un seul bouton.
+    // La propriété que gardait ce test tient toujours, et c'est elle qui
+    // compte : la mise est immuable, le bouton doit dire ce qu'il encaisse.
+    // Il porte le montant de la carte regardée, et de celle-là seulement.
     expect(await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Encaisser 2 000 FCFA' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Encaisser 2 000 FCFA' })).toBeNull();
+
+    // Et il change avec elle : le point de la seconde carte l'amène en face.
+    fireEvent.click(screen.getByRole('button', { name: 'Carte 2 sur 2' }));
+
+    expect(await screen.findByRole('button', { name: 'Encaisser 2 000 FCFA' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Encaisser 6 000 FCFA' })).toBeNull();
   });
 
   it('envoie l’identifiant de la carte touchée, pas celui de sa voisine', async () => {
@@ -285,19 +291,18 @@ describe('fiche d’un client à plusieurs cartes', () => {
       />,
     );
 
-    // Le tri affiche la carte la plus avancée en premier : kB (20 mises)
-    // précède kA (5 mises) parmi les boutons rendus. Vérifié plutôt que
-    // supposé — c'est cet ordre-là qui rend la confusion possible si le tri
-    // venait à changer, et un index nu la cliquerait en silence.
-    const boutons = await screen.findAllByRole('button', { name: /^Encaisser / });
-    expect(boutons).toHaveLength(2);
-    expect(boutons[0].parentElement?.textContent).toMatch(/6\s*000/);
-    expect(boutons[1].parentElement?.textContent).toMatch(/2\s*000/);
+    // Le tri met la carte la plus avancée en premier : kB (20 mises) s'ouvre en
+    // face, kA (5 mises) est sa voisine. Vérifié plutôt que supposé — c'est cet
+    // ordre-là qui rend la confusion possible si le tri venait à changer.
+    expect(await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' })).toBeTruthy();
 
-    // boutons[1] porte le bloc de kA : c'est celui-là qu'on touche, et non son
-    // voisin — une mise est immuable, encaisser sur la mauvaise carte ne se
-    // rattrape pas.
-    fireEvent.click(boutons[1]);
+    // On amène la voisine en face, et c'est elle qu'on touche. Le carrousel
+    // déplace le risque sans le supprimer : le bouton est unique, donc il ne
+    // peut plus être confondu avec celui d'à côté, mais il doit suivre la
+    // carte visible sans retard. Une mise est immuable — encaisser sur la
+    // mauvaise carte ne se rattrape pas.
+    fireEvent.click(screen.getByRole('button', { name: 'Carte 2 sur 2' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Encaisser 2 000 FCFA' }));
 
     expect(onEncaisser).toHaveBeenCalledTimes(1);
     expect(onEncaisser).toHaveBeenCalledWith({
