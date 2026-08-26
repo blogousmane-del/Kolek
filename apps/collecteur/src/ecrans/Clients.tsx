@@ -15,7 +15,6 @@ import type { CarteChoisie, ClientCible } from '../Coquille';
 import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { supabase } from '../supabase';
-import { ActiverCarte } from './ActiverCarte';
 import { ChoixMise } from './ChoixMise';
 import { FicheClient } from './FicheClient';
 
@@ -43,15 +42,29 @@ interface CarteClient {
 }
 
 /**
- * Une ligne de la liste.
+ * Une ligne de la liste : un client, et les carnets qu'il tient.
  *
- * Le type est une union parce que la liste porte deux choses différentes, et
- * qu'un champ `carte: CarteClient | null` obligeait chaque lecteur à retester la
- * nullité — ce qui est exactement l'erreur que l'ancienne `Map` fabriquait.
+ * ## Pourquoi ce n'est plus une ligne par carte
+ *
+ * Ça l'a été du 2026-08-25 au 26, et pour une raison qui tenait : le geste du
+ * métier porte sur une carte, pas sur une personne. Mais la liste était alors
+ * le seul endroit d'où choisir une carte — la fiche n'en montrait qu'une, et le
+ * carrousel n'existait pas.
+ *
+ * Depuis, la fiche montre tous les carnets et laisse en désigner un. La liste
+ * qui les déplie n'ajoute plus un choix : elle répète un nom. Un client à
+ * quatre carnets occupait quatre lignes identiques, portant quatre boutons
+ * « Encaisser » que rien ne distinguait au premier coup d'œil — sur un écran
+ * où une mise engagée ne se reprend pas.
+ *
+ * La liste redit donc qui, et la fiche dit quoi.
  */
-type Ligne =
-  | { genre: 'carte'; cle: string; client: Client; carte: CarteClient }
-  | { genre: 'client'; cle: string; client: Client };
+interface Ligne {
+  cle: string;
+  client: Client;
+  /** Ses carnets, le plus avancé d'abord. Vide = aucun carnet en cours. */
+  cartes: CarteClient[];
+}
 
 const FILTRES = ['Tous', 'Avec carte', 'Clôturées', 'Sans carte'] as const;
 type Filtre = (typeof FILTRES)[number];
@@ -170,21 +183,15 @@ export function Clients({
 
         // Les clients arrivent déjà triés par nom. Les cartes d'un même client
         // sont rangées par avancement décroissant : celle qui se termine en
-        // premier est celle qu'il ne faut pas oublier.
-        const construites: Ligne[] = [];
-        for (const client of clients) {
-          const siennes = (parClient.get(client.id) ?? [])
+        // premier est celle qu'il ne faut pas oublier, et c'est elle que la
+        // ligne résume.
+        const construites: Ligne[] = clients.map((client) => ({
+          cle: client.id,
+          client,
+          cartes: (parClient.get(client.id) ?? [])
             .filter((k) => k.statut === 'active')
-            .sort((a, b) => b.mises_encaissees - a.mises_encaissees);
-
-          if (siennes.length === 0) {
-            construites.push({ genre: 'client', cle: client.id, client });
-            continue;
-          }
-          for (const carte of siennes) {
-            construites.push({ genre: 'carte', cle: carte.id, client, carte });
-          }
-        }
+            .sort((a, b) => b.mises_encaissees - a.mises_encaissees),
+        }));
 
         setToutesCartes(cartes);
         setLignes(construites);
@@ -209,40 +216,44 @@ export function Clients({
     if (!lignes) return [];
     const terme = recherche.trim().toLowerCase();
 
-    // `Clôturées` ne lit pas `lignes` : le dépliage n'y met que les cartes
-    // actives. Il repart des cartes brutes, et se construit ses propres lignes.
+    // `Clôturées` ne lit pas les carnets de `lignes` : ceux-là sont les actifs.
+    // Il repart des cartes brutes et recompose chaque ligne avec les carnets
+    // clos du client, puis écarte ceux qui n'en ont aucun.
     if (filtre === 'Clôturées') {
-      const nomParClient = new Map(lignes.map((l) => [l.client.id, l.client]));
-      return toutesCartes
-        .filter((k) => k.statut === 'cloturee')
-        .flatMap<Ligne>((carte) => {
-          const client = nomParClient.get(carte.client_id);
-          if (!client) return [];
-          if (terme && !client.nom.toLowerCase().includes(terme)) return [];
-          return [{ genre: 'carte', cle: carte.id, client, carte }];
+      return lignes
+        .map((l) => ({
+          ...l,
+          cartes: toutesCartes
+            .filter((k) => k.client_id === l.client.id && k.statut === 'cloturee')
+            .sort((a, b) => b.mises_encaissees - a.mises_encaissees),
+        }))
+        .filter((l) => {
+          if (l.cartes.length === 0) return false;
+          return !terme || l.client.nom.toLowerCase().includes(terme);
         });
     }
 
     return lignes.filter((l) => {
       if (terme && !l.client.nom.toLowerCase().includes(terme)) return false;
-      if (filtre === 'Avec carte') return l.genre === 'carte';
+      if (filtre === 'Avec carte') return l.cartes.length > 0;
       // `Sans carte` valait « aucune carte, jamais ». Il vaut désormais « aucune
       // carte active » : c'est le filtre du geste à faire, ouvrir une carte.
-      if (filtre === 'Sans carte') return l.genre === 'client';
+      if (filtre === 'Sans carte') return l.cartes.length === 0;
       return true;
     });
   }, [lignes, toutesCartes, recherche, filtre]);
 
-  // `lignes` porte une ligne par carte active, plus une par client sans carte
-  // active : `lignes.length` compte des lignes, pas des clients, dès qu'un
-  // client tient deux cartes — exactement ce que cette refonte permet.
-  const clientsDistincts = new Set(lignes?.map((l) => l.client.id)).size;
-  // `lignes` ne porte déjà que les cartes actives : compter ses lignes « carte »
-  // compte les cartes, pas les clients — un même client peut en apporter deux.
-  const cartesActives = lignes?.filter((l) => l.genre === 'carte').length ?? 0;
+  // Une ligne par client depuis le 2026-08-26, donc `lignes.length` compte bien
+  // des personnes. Les carnets, eux, se comptent en les additionnant : c'est la
+  // distinction qu'un compteur de lignes avait perdue le 25.
+  const clientsDistincts = lignes?.length ?? 0;
+  const cartesActives = lignes?.reduce((somme, l) => somme + l.cartes.length, 0) ?? 0;
   const cyclesComplets =
-    lignes?.filter((l) => l.genre === 'carte' && l.carte.mises_encaissees >= MISES_PAR_CYCLE)
-      .length ?? 0;
+    lignes?.reduce(
+      (somme, l) =>
+        somme + l.cartes.filter((k) => k.mises_encaissees >= MISES_PAR_CYCLE).length,
+      0,
+    ) ?? 0;
   // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit — et
   // cette liste-ci se relit après chaque inscription et chaque encaissement.
   const premier = usePremierRendu();
@@ -400,8 +411,6 @@ export function Clients({
           >
           <LigneClient
             ligne={ligne}
-            collecteurId={collecteurId}
-            onEncaisser={onEncaisser}
             onEcriture={onEcriture}
             onOuvrirFiche={() => setFiche(ligne.client.id)}
             onRetrait={() => onRetrait({ id: ligne.client.id, nom: ligne.client.nom })}
@@ -440,19 +449,15 @@ export function Clients({
 
 function LigneClient({
   ligne,
-  collecteurId,
-  onEncaisser,
   onEcriture,
   onOuvrirFiche,
   onRetrait,
 }: {
   ligne: Ligne;
-  collecteurId: string | null;
-  onEncaisser: (carte: CarteChoisie) => void;
-  /** Une écriture a eu lieu sur cette ligne — un consentement posé, une carte
-      ouverte — et la liste doit se relire. La propriété s'appelait
-      `onConsentementChange` quand le consentement était la seule écriture
-      possible ici ; elle en porte deux depuis. */
+  /** Une écriture a eu lieu sur cette ligne — le consentement aux avis — et la
+      liste doit se relire. La propriété s'appelait `onConsentementChange` quand
+      c'était la seule écriture possible ici ; elle en a porté deux tant que la
+      ligne ouvrait aussi des cartes, et elle n'en porte de nouveau qu'une. */
   onEcriture: () => void;
   onOuvrirFiche: () => void;
   onRetrait: () => void;
@@ -460,8 +465,10 @@ function LigneClient({
   const [demandeEnCours, setDemandeEnCours] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const [erreurAvis, setErreurAvis] = useState<string | null>(null);
-  const carte = ligne.genre === 'carte' ? ligne.carte : null;
   const client = ligne.client;
+  /** Le carnet que la ligne résume : le plus avancé, celui qui finit en premier. */
+  const carte = ligne.cartes[0] ?? null;
+  const nombre = ligne.cartes.length;
   const encaissees = carte?.mises_encaissees ?? 0;
   const avancement = Math.round((encaissees / MISES_PAR_CYCLE) * 100);
 
@@ -477,16 +484,20 @@ function LigneClient({
           ? 'Cycle terminé'
           : 'À jour';
 
+  // Un seul carnet : on le décrit entièrement, c'est le cas courant et le
+  // montant compte. Plusieurs : on dit combien, et où en est le plus avancé —
+  // détailler quatre carnets sur une ligne les rendrait tous illisibles, et
+  // c'est la fiche qui les montre un par un.
   const sousTitre =
     carte === null
       ? (client.marche ?? 'Pas encore de carte')
-      : `Mise ${formatMontant(carte.mise)} FCFA · ${encaissees}/${MISES_PAR_CYCLE} · ouverte le ${dateCourte(carte.ouverte_le)}`;
+      : nombre === 1
+        ? `Mise ${formatMontant(carte.mise)} FCFA · ${encaissees}/${MISES_PAR_CYCLE} · ouverte le ${dateCourte(carte.ouverte_le)}`
+        : `${nombre} carnets · le plus avancé ${encaissees}/${MISES_PAR_CYCLE}`;
 
-  // Le cycle est fini mais la carte reste ouverte : la décision (retirer ou
-  // ouvrir la suivante) appartient au client, pas à un bouton d'encaissement
-  // qui de toute façon serait refusé par le déclencheur CYCLE_COMPLET.
+  // Le cycle est fini mais la carte reste ouverte : la décision — rendre
+  // l'argent ou repartir sur un carnet de plus — appartient au client.
   const complete = carte !== null && carte.statut === 'active' && encaissees >= MISES_PAR_CYCLE;
-  const encaissable = carte !== null && carte.statut === 'active' && !complete;
 
   async function poser(accepte: boolean) {
     setEnvoi(true);
@@ -537,37 +548,22 @@ function LigneClient({
       )}
       </div>
 
-      {complete ? (
-        // Le cycle est fini : la décision appartient au client. Un bouton
-        // d'encaissement éteint ne la lui poserait pas.
-        <div className="flex flex-wrap gap-2 mt-3">
+      {/* Aucun bouton d'encaissement ici, et c'est le sujet de la refonte du
+          2026-08-26. Une ligne qui résume plusieurs carnets ne peut pas en
+          désigner un ; en proposer un quand même reviendrait à choisir à la
+          place du collecteur, sur un geste qui ne se reprend pas. Le choix se
+          fait dans la fiche, devant le carrousel.
+
+          « Retirer » reste, parce qu'il porte sur le client et non sur un
+          carnet : l'écran de retrait s'ouvre sur ses cartes à lui et lui laisse
+          désigner celle qu'il rend. */}
+      {complete && (
+        <div className="mt-3">
           <Bouton variante="contour" icone="arrow-up-right" onClick={onRetrait}>
             Retirer
           </Bouton>
-          <ActiverCarte
-            collecteurId={collecteurId}
-            clientId={client.id}
-            misePreremplie={carte.mise}
-            identifiant={`ligne-${carte.id}`}
-            onOuverte={onEcriture}
-          />
         </div>
-      ) : encaissable ? (
-        <Bouton
-          className="mt-3"
-          icone="circle-dollar-sign"
-          onClick={() =>
-            onEncaisser({
-              carteId: carte.id,
-              clientNom: client.nom,
-              mise: carte.mise,
-              misesEncaissees: encaissees,
-            })
-          }
-        >
-          Encaisser
-        </Bouton>
-      ) : null}
+      )}
 
       <BasculeAvis
         client={client}

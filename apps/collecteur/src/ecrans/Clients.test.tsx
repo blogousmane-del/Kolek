@@ -101,32 +101,50 @@ afterEach(() => {
   from.mockReset();
 });
 
-describe('liste des clients devenue liste de cartes', () => {
-  it('rend une ligne par carte active', async () => {
+describe('liste des clients redevenue liste de personnes', () => {
+  it('rend une ligne par client, quel que soit le nombre de carnets', async () => {
     brancherSupabase();
     rendre();
 
-    // Hj tient deux carnets : deux lignes, pas une.
-    expect(await screen.findAllByText('Hj')).toHaveLength(2);
+    // Hj tient deux carnets, et n'existe qu'une fois. Signalé le 2026-08-26,
+    // capture à l'appui : quatre lignes au même nom, quatre boutons
+    // « Encaisser », un seul client. La liste des cartes avait été écrite le 25
+    // à 06 h 34, avant que la fiche sache montrer tous les carnets ; le
+    // carrousel du 25 au soir a rendu ce choix caduc.
+    expect(await screen.findAllByText('Hj')).toHaveLength(1);
   });
 
-  it('donne à chaque ligne son propre bouton d’encaissement', async () => {
+  it('dit combien de carnets le client tient, et où en est le plus avancé', async () => {
     brancherSupabase();
     rendre();
 
-    const boutons = await screen.findAllByRole('button', { name: 'Encaisser' });
-    expect(boutons).toHaveLength(2);
+    const ligne = (await screen.findByText('Hj')).closest('.bg-surface') as HTMLElement;
+    // Le nombre est l'information qui manquait : sans lui, une ligne unique
+    // cacherait les carnets au lieu de les résumer.
+    expect(ligne.textContent).toMatch(/2 carnets/);
+    // Et c'est l'avancement du plus avancé qui compte — k2, 17 mises : celui
+    // dont le cycle se termine en premier, donc celui qu'on n'oublie pas.
+    expect(ligne.textContent).toMatch(new RegExp(`17/${MISES_PAR_CYCLE}`));
   });
 
-  it('distingue deux cartes par leur date d’ouverture', async () => {
+  it('ne propose plus d’encaisser depuis la liste', async () => {
     brancherSupabase();
     rendre();
 
-    // Les mises sont immuables : encaisser sur la mauvaise carte n'est pas
-    // rattrapable. La date d'ouverture est ce qui sépare deux lignes de même
-    // montant.
-    expect(await screen.findByText(/1 août/)).toBeTruthy();
-    expect(await screen.findByText(/2 juil/)).toBeTruthy();
+    await screen.findByText('Hj');
+    // Une mise est immuable. Depuis une ligne qui résume plusieurs carnets,
+    // aucun bouton ne peut désigner le bon sans que le collecteur l'ait choisi :
+    // le choix se fait dans la fiche, devant le carrousel.
+    expect(screen.queryByRole('button', { name: 'Encaisser' })).toBeNull();
+  });
+
+  it('mène à la fiche, où les carnets se voient', async () => {
+    brancherSupabase();
+    rendre();
+
+    expect(
+      await screen.findByRole('button', { name: 'Ouvrir la fiche de Hj' }),
+    ).toBeTruthy();
   });
 
   it('garde une ligne pour le client sans carte active', async () => {
@@ -145,48 +163,21 @@ describe('liste des clients devenue liste de cartes', () => {
     expect(screen.queryByText(/2 000 FCFA/)).toBeNull();
   });
 
-  it('envoie l’identifiant de la carte touchée, pas celui de sa voisine', async () => {
-    brancherSupabase();
-    const onEncaisser = vi.fn();
-    rendre({ onEncaisser });
-
-    // Le tri range la carte la plus avancée en premier : k2 (17 mises) doit
-    // précéder k1 (2 mises) parmi les boutons rendus. Vérifié plutôt que
-    // supposé — c'est cet ordre-là qui rend la confusion possible.
-    const boutons = await screen.findAllByRole('button', { name: 'Encaisser' });
-    expect(boutons).toHaveLength(2);
-    expect(boutons[0].closest('.bg-surface')?.textContent).toMatch(/1 000 FCFA/);
-    expect(boutons[1].closest('.bg-surface')?.textContent).toMatch(/5 000 FCFA/);
-
-    // boutons[1] porte la ligne de k1 : c'est celui-là qu'on touche, et non son
-    // voisin — les mises sont immuables, encaisser sur la mauvaise carte ne se
-    // rattrape pas.
-    fireEvent.click(boutons[1]);
-
-    expect(onEncaisser).toHaveBeenCalledTimes(1);
-    expect(onEncaisser).toHaveBeenCalledWith({
-      carteId: 'k1',
-      clientNom: 'Hj',
-      mise: 5000,
-      misesEncaissees: 2,
-    });
-  });
-
-  it('ouvre les deux portes sur une carte au bout de son cycle', async () => {
+  it('signale le cycle terminé sans proposer d’encaisser', async () => {
     brancherSupabase();
     rendre();
 
-    // Seule des trois branches du badge encore sans couverture : aucune carte
-    // ci-dessus n'atteignait 31/31 en restant `active`.
     await screen.findByText('Sy');
     const ligne = screen.getByText('Sy').closest('.bg-surface') as HTMLElement;
 
     expect(within(ligne).getByText('Cycle terminé')).toBeTruthy();
+    // « Retirer » reste : il porte sur le client, pas sur une carte, et
+    // l'écran de retrait montre lui-même les carnets concernés.
     expect(within(ligne).getByRole('button', { name: 'Retirer' })).toBeTruthy();
-    expect(within(ligne).getByRole('button', { name: 'Activer une carte' })).toBeTruthy();
-    // Encaisser ici serait refusé par la base (déclencheur CYCLE_COMPLET) :
-    // c'est justement ce que la refonte en cartes doit empêcher de proposer.
     expect(within(ligne).queryByRole('button', { name: 'Encaisser' })).toBeNull();
+    // « Activer une carte » demande un montant à préremplir, donc une carte
+    // précise. Il vit dans la fiche, avec les autres gestes de carnet.
+    expect(within(ligne).queryByRole('button', { name: 'Activer une carte' })).toBeNull();
   });
 
   it('mène au retrait du bon client depuis la carte terminée', async () => {
