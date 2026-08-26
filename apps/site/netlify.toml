@@ -61,6 +61,22 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), geolocation=(), microphone=()"
 
+# Le formulaire d'ouverture de compte reste hors de l'index.
+#
+# Il est servi par la même réécriture que la vitrine, donc par le même
+# `index.html` : Google verrait deux adresses au contenu initial identique. La
+# balise canonique le dit déjà, mais un en-tête est plus sûr qu'une balise — le
+# routage de `App.tsx` est lu au chargement, et un `noindex` injecté après coup
+# par JavaScript arrive après le passage du robot.
+#
+# Rien à cacher ici : la page est publique et le restera. Ce qu'on évite, c'est
+# qu'une recherche « Kolek » tombe sur un formulaire vide au lieu de la page qui
+# explique le produit.
+[[headers]]
+  for = "/inscription"
+  [headers.values]
+    X-Robots-Tag = "noindex"
+
 [[headers]]
   for = "/assets/*"
   [headers.values]

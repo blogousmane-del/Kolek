@@ -4,3 +4,8 @@
 # `/robots.txt` par du HTML, et l'intention ne se lit nulle part.
 User-agent: *
 Allow: /
+
+# Le sitemap se déclare ici en plus d'être soumis dans Search Console : un robot
+# qui n'est pas Google ne lit que ce fichier, et l'adresse doit être absolue —
+# un chemin relatif est ignoré par la spécification.
+Sitemap: https://kolek-site.netlify.app/sitemap.xml

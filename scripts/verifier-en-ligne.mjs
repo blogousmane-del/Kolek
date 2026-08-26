@@ -94,6 +94,68 @@ export function cleAnonyme(texte) {
   return trouve ? trouve[0] : null;
 }
 
+/**
+ * Ce qui manque à un document pour être trouvable — et partageable.
+ *
+ * Fonction pure, parce que ces balises sont exactement le genre de chose qu'une
+ * refonte de `index.html` emporte sans que personne ne s'en aperçoive. Leur
+ * disparition ne casse rien : le site continue de s'afficher, les liens
+ * partagés redeviennent des adresses nues, et on l'apprend des semaines plus
+ * tard en constatant que la page a quitté les résultats.
+ *
+ * `origine` est passée plutôt que codée en dur : le jour où un domaine propre
+ * remplace `kolek-site.netlify.app`, ce contrôle doit échouer tant que les
+ * balises n'ont pas suivi. C'est précisément à ce moment-là qu'on les oublie.
+ */
+export function manquesSeo(html, origine) {
+  const manques = [];
+  const contenuDe = (attribut, nom) => {
+    const motif = new RegExp(
+      `<meta[^>]+${attribut}="${nom}"[^>]+content="([^"]*)"|` +
+        `<meta[^>]+content="([^"]*)"[^>]+${attribut}="${nom}"`,
+      'i',
+    );
+    const trouve = motif.exec(html);
+    return trouve ? (trouve[1] ?? trouve[2]) : null;
+  };
+
+  const canonique = /<link[^>]+rel="canonical"[^>]+href="([^"]*)"/i.exec(html);
+  if (!canonique) manques.push('aucune balise canonique');
+  else if (canonique[1] !== `${origine}/`) {
+    manques.push(`canonique = ${canonique[1]} (attendu : ${origine}/)`);
+  }
+
+  const attendus = {
+    'og:url': `${origine}/`,
+    'og:image': `${origine}/og.png`,
+    'og:type': 'website',
+    'twitter:card': 'summary_large_image',
+  };
+  for (const [nom, valeur] of Object.entries(attendus)) {
+    const recu = contenuDe(nom.startsWith('og:') ? 'property' : 'name', nom);
+    if (recu !== valeur) manques.push(`${nom} = ${recu ?? 'absent'} (attendu : ${valeur})`);
+  }
+
+  // Le titre et la description ne sont pas comparés à une constante : ce sont
+  // des textes de vente, ils bougeront. Ce qui doit tenir, c'est qu'ils
+  // existent et qu'ils disent la même chose que la page.
+  const titrePage = /<title>([^<]*)<\/title>/i.exec(html);
+  const ogTitre = contenuDe('property', 'og:title');
+  if (!ogTitre) manques.push('og:title absent');
+  else if (titrePage && ogTitre !== titrePage[1]) {
+    manques.push(`og:title diverge du <title> : « ${ogTitre} » contre « ${titrePage[1]} »`);
+  }
+
+  const description = /<meta[^>]+name="description"[^>]+content="([^"]*)"/i.exec(html);
+  const ogDescription = contenuDe('property', 'og:description');
+  if (!ogDescription) manques.push('og:description absente');
+  else if (description && ogDescription !== description[1]) {
+    manques.push('og:description diverge de la <meta description>');
+  }
+
+  return manques;
+}
+
 export const CIBLES = [
   {
     nom: 'collecteur',
@@ -135,6 +197,10 @@ export const CIBLES = [
     // d'autorisation écrite noir sur blanc plutôt que déduite d'une absence.
     robots: null,
     robotsRegle: 'Allow: /',
+    // Et le seul, donc, à qui les contrôles d'indexation s'appliquent. Les
+    // poser sur les deux applications reviendrait à exiger un sitemap de pages
+    // qu'on interdit aux moteurs.
+    seo: true,
   },
 ];
 
@@ -301,6 +367,53 @@ async function verifier(cible) {
     (inconnue.headers.get('content-type') ?? '').includes('text/html'),
     `route inconnue sert ${inconnue.headers.get('content-type')}`,
   );
+
+  // L'indexation, pour le seul site qui la cherche.
+  //
+  // Aucun de ces contrôles ne porte sur la sécurité, et c'est voulu : ils
+  // gardent la surface commerciale. Une balise perdue ne casse rien et ne se
+  // voit nulle part — c'est exactement le profil de défaut que ce fichier
+  // existe pour attraper.
+  if (cible.seo) {
+    for (const manque of manquesSeo(html, cible.url)) echecs.push(`SEO — ${manque}`);
+
+    const sitemap = await fetch(`${cible.url}/sitemap.xml`);
+    constat(sitemap.ok, `/sitemap.xml renvoie ${sitemap.status}`);
+    const typeSitemap = sitemap.headers.get('content-type') ?? '';
+    constat(
+      typeSitemap.includes('xml'),
+      `/sitemap.xml sert ${typeSitemap} — la réécriture SPA l'a probablement avalé`,
+    );
+    if (sitemap.ok) {
+      const corps = await sitemap.text();
+      constat(
+        corps.includes(`<loc>${cible.url}/</loc>`),
+        `/sitemap.xml ne déclare pas ${cible.url}/`,
+      );
+    }
+    constat(
+      regleRobots.includes(`Sitemap: ${cible.url}/sitemap.xml`),
+      '/robots.txt ne déclare pas le sitemap',
+    );
+
+    // L'image de partage. Une balise `og:image` qui pointe un 404 fait pire que
+    // rien : la plateforme affiche un cadre vide au lieu du lien nu.
+    const og = await fetch(`${cible.url}/og.png`);
+    constat(og.ok, `/og.png renvoie ${og.status}`);
+    constat(
+      (og.headers.get('content-type') ?? '').includes('image/png'),
+      `/og.png sert ${og.headers.get('content-type') ?? 'rien'}`,
+    );
+
+    // Le formulaire hors index. En-tête et non balise : la réécriture sert le
+    // même `index.html` aux deux chemins, donc seule la réponse HTTP peut les
+    // distinguer avant que le robot n'exécute quoi que ce soit.
+    const inscription = await fetch(`${cible.url}/inscription`);
+    constat(
+      inscription.headers.get('x-robots-tag') === 'noindex',
+      `/inscription x-robots-tag = ${inscription.headers.get('x-robots-tag') ?? 'absent'}`,
+    );
+  }
 
   // La PWA. Un service worker mis en cache fige la version installée sur le
   // téléphone du collecteur : c'est l'en-tête qu'on vérifie, pas le fichier.

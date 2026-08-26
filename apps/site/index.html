@@ -10,6 +10,45 @@
       content="Kolek remplace le carnet du banquier ambulant par un téléphone : chaque mise comptée, chaque caisse rapprochée, chaque franc tracé. Abonnement fixe en FCFA — jamais de commission sur l’épargne."
     />
     <meta name="theme-color" content="#06140E" />
+
+    <!--
+      L'adresse canonique.
+
+      Le site répond sur deux chemins — `/` et `/inscription`, voir `App.tsx` —
+      et `index.html` les sert tous les deux par la réécriture du `netlify.toml`.
+      Sans cette ligne, Google verrait deux pages au même contenu HTML initial et
+      choisirait lui-même laquelle garder. La désigner ici lève le doute ; le
+      formulaire est en outre marqué `noindex` par un en-tête, côté serveur.
+    -->
+    <link rel="canonical" href="https://kolek-site.netlify.app/" />
+
+    <!--
+      Open Graph — ce que Facebook, LinkedIn ou WhatsApp affichent quand on colle
+      l'adresse. Sans ces balises, le lien voyage nu : un titre deviné dans le
+      HTML, aucune vignette. Sur un produit vendu de bouche à oreille dans un
+      marché, c'est le lien partagé qui fait la première impression.
+
+      Les textes reprennent mot pour mot le `<title>` et la `<meta description>`
+      ci-dessus. Deux formulations divergentes se sépareraient à la première
+      retouche, et personne ne verrait laquelle est servie.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Kolek" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:url" content="https://kolek-site.netlify.app/" />
+    <meta property="og:title" content="Kolek — L’épargne du marché, enfin sécurisée" />
+    <meta
+      property="og:description"
+      content="Kolek remplace le carnet du banquier ambulant par un téléphone : chaque mise comptée, chaque caisse rapprochée, chaque franc tracé. Abonnement fixe en FCFA — jamais de commission sur l’épargne."
+    />
+    <!-- Engendrée par `scripts/generer-marque.mjs` depuis `tokens.ts`, comme le
+         favicon : une image de marque peinte à la main diverge de la palette au
+         premier changement de couleur. -->
+    <meta property="og:image" content="https://kolek-site.netlify.app/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="La marque Kolek : un « k » sombre sur une pièce d’or." />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <!--

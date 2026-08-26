@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Une seule adresse, et c'est voulu.
+
+  Le site n'a que deux chemins — voir `apps/site/src/App.tsx`. Le second,
+  `/inscription`, est un formulaire : rien à y chercher, et l'indexer diviserait
+  le signal entre deux pages qui disent la même chose. Il porte d'ailleurs un
+  `X-Robots-Tag: noindex` posé par le `netlify.toml`.
+
+  Pas de `lastmod` : il faudrait le tenir à jour à chaque déploiement, et un
+  `lastmod` faux est pire qu'absent — Google apprend à ne plus le croire, sur ce
+  site comme sur les autres. Le sitemap sert ici à déclarer l'existence de la
+  page, ce qu'il fait avec une ligne.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://kolek-site.netlify.app/</loc>
+  </url>
+</urlset>

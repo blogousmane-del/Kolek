@@ -6,6 +6,7 @@ import {
   cleAnonyme,
   comparerAssets,
   hstsSuffisant,
+  manquesSeo,
 } from './verifier-en-ligne.mjs';
 
 // Le script parle au réseau : ce qui est testable ici, ce sont les deux
@@ -61,6 +62,74 @@ describe('les attentes déclarées par cible', () => {
       'admin',
       'site',
     ]);
+  });
+});
+
+describe('manquesSeo', () => {
+  const ORIGINE = 'https://kolek-site.netlify.app';
+  const TITRE = 'Kolek — L’épargne du marché';
+  const DESCRIPTION = 'Le carnet du banquier ambulant, sur un téléphone.';
+
+  function page(remplacements = {}) {
+    const champs = {
+      canonical: `${ORIGINE}/`,
+      ogUrl: `${ORIGINE}/`,
+      ogImage: `${ORIGINE}/og.png`,
+      ogTitre: TITRE,
+      ogDescription: DESCRIPTION,
+      ...remplacements,
+    };
+    return (
+      `<title>${TITRE}</title>` +
+      `<meta name="description" content="${DESCRIPTION}" />` +
+      `<link rel="canonical" href="${champs.canonical}" />` +
+      `<meta property="og:type" content="website" />` +
+      `<meta property="og:url" content="${champs.ogUrl}" />` +
+      `<meta property="og:title" content="${champs.ogTitre}" />` +
+      `<meta property="og:description" content="${champs.ogDescription}" />` +
+      `<meta property="og:image" content="${champs.ogImage}" />` +
+      `<meta name="twitter:card" content="summary_large_image" />`
+    );
+  }
+
+  it('ne trouve rien à redire à une page complète', () => {
+    expect(manquesSeo(page(), ORIGINE)).toEqual([]);
+  });
+
+  it('signale une balise canonique absente', () => {
+    const html = page().replace(/<link[^>]+canonical[^>]+>/, '');
+    expect(manquesSeo(html, ORIGINE)).toContain('aucune balise canonique');
+  });
+
+  it('signale une canonique restée sur l’ancien domaine', () => {
+    // Le cas qui arrivera vraiment : un domaine propre est acheté, les balises
+    // ne suivent pas, et Google continue d'indexer l'adresse Netlify.
+    const manques = manquesSeo(page(), 'https://kolek.ci');
+    expect(manques.some((m) => m.startsWith('canonique ='))).toBe(true);
+  });
+
+  it('signale une image de partage qui ne mène nulle part', () => {
+    const manques = manquesSeo(page({ ogImage: `${ORIGINE}/image-supprimee.png` }), ORIGINE);
+    expect(manques.some((m) => m.startsWith('og:image ='))).toBe(true);
+  });
+
+  it('refuse un og:title qui a cessé de dire ce que dit le titre', () => {
+    // Deux formulations divergentes ne cassent rien et ne se voient pas : le
+    // visiteur lit l'une, celui à qui on partage le lien lit l'autre.
+    const manques = manquesSeo(page({ ogTitre: 'Kolek' }), ORIGINE);
+    expect(manques.some((m) => m.startsWith('og:title diverge'))).toBe(true);
+  });
+
+  it('refuse une description de partage divergente', () => {
+    const manques = manquesSeo(page({ ogDescription: 'Autre chose.' }), ORIGINE);
+    expect(manques).toContain('og:description diverge de la <meta description>');
+  });
+
+  it('lit un attribut content placé avant le nom de la balise', () => {
+    // L'ordre des attributs n'est pas garanti : un formateur peut les
+    // réarranger, et un contrôle qui n'en lit qu'un sens crierait au loup.
+    const html = `<meta content="website" property="og:type" />`;
+    expect(manquesSeo(html, ORIGINE).some((m) => m.startsWith('og:type ='))).toBe(false);
   });
 });
 

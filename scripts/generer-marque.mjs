@@ -79,10 +79,47 @@ export function iconeSvg() {
   );
 }
 
+/**
+ * L'image de partage — celle que Facebook, LinkedIn ou WhatsApp affichent
+ * quand quelqu'un colle l'adresse du site.
+ *
+ * 1200 × 630, le format que ces trois-là attendent. En dessous, ils rognent ou
+ * refusent la vignette et n'affichent qu'un lien nu.
+ *
+ * ## Pourquoi aucun texte
+ *
+ * `resvg` ne dessine du texte qu'avec les polices du système où il tourne. Deux
+ * machines aux polices différentes rendraient deux PNG différents, et
+ * `--verifier` — qui compare les octets — crierait au loup sans qu'aucune
+ * couleur n'ait bougé. Un garde-fou qui se déclenche à tort finit par être
+ * ignoré, et c'est celui-là qui protège la palette.
+ *
+ * Le titre et la description voyagent de toute façon dans les balises Open
+ * Graph, que ces plateformes rendent en texte à côté de la vignette. L'image
+ * n'a donc à porter que la marque.
+ */
+export function ogSvg() {
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">` +
+    `<rect width="1200" height="630" fill="${couleurs.sidebar}"/>` +
+    // Un filet d'or en retrait du bord : la vignette est souvent posée sur un
+    // fond sombre, et sans lui elle se fond dans le fil de discussion.
+    `<rect x="24" y="24" width="1152" height="582" rx="16" fill="none" ` +
+    `stroke="${couleurs.or}" stroke-width="2" opacity="0.35"/>` +
+    `<g transform="translate(600 315) scale(2.6) translate(-50 -50)">` +
+    `<circle cx="50" cy="50" r="50" fill="${couleurs.or}"/>${k(couleurs.sidebar)}</g>` +
+    `</svg>`
+  );
+}
+
 function pngIcone(taille) {
   return new Resvg(iconeSvg(), { fitTo: { mode: 'width', value: taille } })
     .render()
     .asPng();
+}
+
+function pngOg() {
+  return new Resvg(ogSvg(), { fitTo: { mode: 'width', value: 1200 } }).render().asPng();
 }
 
 /** Ce que chaque fichier doit contenir. Les SVG en texte, les PNG en octets. */
@@ -94,6 +131,7 @@ export function artefacts() {
     { chemin: 'apps/site/public/favicon.svg', contenu: favicon },
     { chemin: 'apps/collecteur/public/icone-192.png', contenu: pngIcone(192) },
     { chemin: 'apps/collecteur/public/icone-512.png', contenu: pngIcone(512) },
+    { chemin: 'apps/site/public/og.png', contenu: pngOg() },
   ];
 }
 
@@ -127,7 +165,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   if (process.argv.includes('--verifier')) {
     const perimes = fichiersPerimes();
     if (perimes.length === 0) {
-      console.log('Le favicon et les icônes sont à jour.');
+      console.log('Le favicon, les icônes et l’image de partage sont à jour.');
       process.exit(0);
     }
     console.error(

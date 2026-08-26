@@ -5,25 +5,35 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { couleurs } from '../packages/core/src/tokens.ts';
-import { faviconSvg, fichiersPerimes, iconeSvg } from './generer-marque.mjs';
+import { artefacts, faviconSvg, fichiersPerimes, iconeSvg, ogSvg } from './generer-marque.mjs';
 
 const RACINE = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('fraîcheur des artefacts de marque', () => {
-  it('le favicon et les icônes versionnés correspondent à tokens.ts', () => {
-    // Si ce test tombe, quelqu'un a changé une couleur de marque sans relancer
-    // la génération. L'écart ne se verrait ni au build ni à la revue : il se
-    // verrait dans un onglet de navigateur et sur l'écran d'accueil d'un
-    // téléphone, c'est-à-dire nulle part où on regarde.
-    expect(fichiersPerimes()).toEqual([]);
-  });
+  it(
+    'le favicon et les icônes versionnés correspondent à tokens.ts',
+    () => {
+      // Si ce test tombe, quelqu'un a changé une couleur de marque sans relancer
+      // la génération. L'écart ne se verrait ni au build ni à la revue : il se
+      // verrait dans un onglet de navigateur et sur l'écran d'accueil d'un
+      // téléphone, c'est-à-dire nulle part où on regarde.
+      expect(fichiersPerimes()).toEqual([]);
+    },
+    // Le délai par défaut de 5 s suppose une machine au repos. Ce test rend
+    // trois PNG avec `resvg` — 192, 512, et l'image de partage en 1200 × 630,
+    // de loin la plus lourde — et les cinq fichiers de `test:scripts` tournent
+    // ensemble. Il a expiré à l'ajout de la troisième, sans qu'aucun octet
+    // n'ait divergé : l'échec ne désignait pas sa cause. Même raison, même
+    // remède que dans `packages/ui/vitest.config.ts`.
+    20000,
+  );
 });
 
 describe('les couleurs viennent des jetons', () => {
   it('n’écrit aucun hexadécimal qui ne soit dans tokens.ts', () => {
     const connus = new Set(Object.values(couleurs).map((c) => c.toUpperCase()));
 
-    for (const svg of [faviconSvg(), iconeSvg()]) {
+    for (const svg of [faviconSvg(), iconeSvg(), ogSvg()]) {
       for (const hex of svg.match(/#[0-9A-Fa-f]{3,8}/g) ?? []) {
         expect(connus).toContain(hex.toUpperCase());
       }
@@ -50,7 +60,30 @@ describe('le « k » ne peut pas diverger entre le composant et les icônes', ()
       expect(composant).toContain(trace);
       expect(faviconSvg()).toContain(trace);
       expect(iconeSvg()).toContain(trace);
+      expect(ogSvg()).toContain(trace);
     }
+  });
+});
+
+describe('l’image de partage', () => {
+  it('mesure 1200 × 630 — sous ce format, les plateformes rognent ou refusent', () => {
+    expect(ogSvg()).toContain('viewBox="0 0 1200 630"');
+  });
+
+  it('ne contient aucun texte', () => {
+    // `resvg` ne dessine du texte qu'avec les polices de la machine où il
+    // tourne. Une seule balise `<text>` rendrait le PNG dépendant du poste, et
+    // `--verifier`, qui compare les octets, signalerait un écart que personne
+    // n'a introduit. Un garde-fou qui crie à tort finit par être ignoré.
+    expect(ogSvg()).not.toMatch(/<text|font-family/);
+  });
+
+  it('est produite dans le dossier public du site, sous le nom que les balises citent', () => {
+    const chemins = artefacts().map((a) => a.chemin);
+    expect(chemins).toContain('apps/site/public/og.png');
+
+    const html = readFileSync(join(RACINE, 'apps/site/index.html'), 'utf8');
+    expect(html).toContain('/og.png');
   });
 });
 
