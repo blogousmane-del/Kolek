@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -57,6 +57,35 @@ vi.mock('./ecrans/Plus', () => temoin('Plus'));
 vi.mock('./ecrans/Rapprochement', () => temoin('Rapprochement'));
 vi.mock('./ecrans/Recus', () => temoin('Recus'));
 
+// L'écran d'encaissement, bavard : il dit ce que la coquille lui donne. C'est
+// exactement ce que le vrai fait — tout son corps est sous `{!carte ? … : …}`.
+vi.mock('./ecrans/Encaisser', () => ({
+  Encaisser: ({
+    carte,
+    onEncaisse,
+    onNaviguer,
+  }: {
+    carte: { carteId: string; misesEncaissees: number } | null;
+    onEncaisse: () => void;
+    onNaviguer: (cle: string) => void;
+  }) => (
+    <>
+      <div>écran Encaisser</div>
+      {carte ? (
+        <div>carte {carte.carteId} · jour {carte.misesEncaissees}</div>
+      ) : (
+        <div>Aucune carte choisie.</div>
+      )}
+      <button type="button" onClick={onEncaisse}>
+        confirmer
+      </button>
+      <button type="button" onClick={() => onNaviguer('clients')}>
+        revenir aux clients
+      </button>
+    </>
+  ),
+}));
+
 // Trois témoins bavards : le chemin qui pose le filtre de retrait, celui qui
 // devrait le lever, et l'écran qui en subit l'état. Les autres restent muets.
 vi.mock('./ecrans/Accueil', () => ({
@@ -71,11 +100,30 @@ vi.mock('./ecrans/Accueil', () => ({
 }));
 
 vi.mock('./ecrans/Clients', () => ({
-  Clients: ({ onRetrait }: { onRetrait: (c: { id: string; nom: string }) => void }) => (
+  Clients: ({
+    onRetrait,
+    onEncaisser,
+  }: {
+    onRetrait: (c: { id: string; nom: string }) => void;
+    onEncaisser: (carte: {
+      carteId: string;
+      clientNom: string;
+      mise: number;
+      misesEncaissees: number;
+    }) => void;
+  }) => (
     <>
       <div>écran Clients</div>
       <button type="button" onClick={() => onRetrait({ id: 'cli9', nom: 'Sy' })}>
         retirer pour Sy
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onEncaisser({ carteId: 'k7', clientNom: 'Sy', mise: 5000, misesEncaissees: 17 })
+        }
+      >
+        encaisser k7
       </button>
     </>
   ),
@@ -117,6 +165,50 @@ afterEach(() => {
   getUser.mockReset();
   maybeSingle.mockReset();
   signOut.mockReset();
+});
+
+describe('ce que la coquille fait de la carte encaissée', () => {
+  it('garde la carte sous les yeux après la mise, et compte le jour de plus', async () => {
+    // Le défaut signalé le 2026-08-26 : « lorsqu'on encaisse, la carte se
+    // ferme ». Elle ne se ferme pas — la coquille remettait `carteChoisie` à
+    // `null` dans le même rendu que le message de réussite, et tout le corps de
+    // l'écran d'encaissement vit sous `{!carte ? … : …}`. La confirmation, la
+    // carte et le bouton disparaissaient à la seconde où la mise partait.
+    //
+    // Le geste est répété trente fois par jour, debout, devant une cliente.
+    // L'écran doit dire « c'est fait », pas « va chercher un client ».
+    render(<Coquille onDeconnexion={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'encaisser k7' }));
+    // `findBy` et non `getBy` : sous quatre espaces de travail qui tournent
+    // ensemble, le rendu qui suit le clic n'est pas toujours retombé quand
+    // l'assertion s'exécute. Attendre n'affaiblit rien — ce qui doit paraître
+    // paraît, ou le test échoue quand même — et un échec qui dépend de la
+    // charge de la machine finit par être lu comme du bruit.
+    expect(await screen.findByText('carte k7 · jour 17')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'confirmer' }));
+
+    // La case fraîchement remplie se voit : c'est le moment signature du
+    // produit, jusqu'ici démonté avant d'avoir pu se montrer.
+    expect(await screen.findByText('carte k7 · jour 18')).toBeTruthy();
+    expect(screen.queryByText('Aucune carte choisie.')).toBeNull();
+  });
+
+  it('oublie la carte en quittant l’écran, pour ne pas la rouvrir par l’onglet', async () => {
+    // Le `null` qu'on retire du succès doit reparaître ailleurs : sans lui,
+    // l'onglet « Encaisser » de la barre du bas rouvrirait la carte du client
+    // précédent, et un appui de trop écrirait une seconde mise sur elle.
+    render(<Coquille onDeconnexion={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'encaisser k7' }));
+    fireEvent.click(screen.getByRole('button', { name: 'revenir aux clients' }));
+
+    const barre = screen.getByRole('navigation', { name: 'Navigation principale' });
+    fireEvent.click(within(barre).getByRole('button', { name: 'Encaisser' }));
+
+    expect(await screen.findByText('Aucune carte choisie.')).toBeTruthy();
+  });
 });
 
 describe('coquille du collecteur', () => {

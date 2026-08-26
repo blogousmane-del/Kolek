@@ -172,7 +172,20 @@ export function Encaisser({
             <button
               type="button"
               onClick={confirmer}
-              disabled={envoi || collecteurId === null || carte.misesEncaissees >= MISES_PAR_CYCLE}
+              // `succes` désarme le bouton, et c'est lui qui remplace le
+              // `null` que la coquille posait autrefois sur la carte. Le
+              // serveur **accepte** deux mises le même jour sur la même carte —
+              // `mises_avant_insert` refuse un doublon d'identifiant, une carte
+              // clôturée, un cycle complet, un montant faux, pas celle-là. Le
+              // seul garde-fou est ici, et il doit rester : une mise est
+              // immuable, et un doigt qui insiste sur un écran qui n'a pas
+              // bougé est le geste le plus naturel du monde.
+              disabled={
+                envoi ||
+                succes !== null ||
+                collecteurId === null ||
+                carte.misesEncaissees >= MISES_PAR_CYCLE
+              }
               className="w-full rounded-pill bg-primary text-primary-foreground font-body font-bold text-lg py-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-default"
             >
               <Icone nom="check-circle" taille={20} />

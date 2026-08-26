@@ -131,6 +131,21 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
    */
   function naviguer(cle: Page) {
     setClientPourRetrait(null);
+    // La carte choisie s'oublie ici, et non après l'encaissement.
+    //
+    // Elle s'oubliait au succès, ce qui interdisait à l'écran de montrer sa
+    // propre confirmation : tout son corps vit sous `{!carte ? … : …}`, donc
+    // la carte, le message et le bouton disparaissaient dans le rendu même où
+    // la mise partait. Le collecteur encaissait devant sa cliente et lisait
+    // « Aucune carte choisie ».
+    //
+    // Le `null` protégeait tout de même quelque chose de réel — le serveur
+    // accepte deux mises le même jour sur la même carte, `mises_avant_insert`
+    // ne s'y oppose pas. Cette garde-là est reprise par l'écran, qui désarme
+    // son bouton une fois la mise écrite. Ici, on se contente de ne pas
+    // rouvrir une carte oubliée : sans cette ligne, l'onglet « Encaisser » de
+    // la barre du bas rouvrirait celle du client précédent.
+    setCarteChoisie(null);
     setPage(cle);
   }
 
@@ -140,8 +155,11 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
   }
 
   function encaisserSur(carte: CarteChoisie) {
-    setCarteChoisie(carte);
+    // Naviguer d'abord, choisir ensuite : `naviguer` remet la carte à `null`,
+    // et l'ordre inverse effacerait celle qu'on vient de désigner. Deux
+    // écritures du même état dans le même gestionnaire, la dernière l'emporte.
     naviguer('encaisser');
+    setCarteChoisie(carte);
   }
 
   /**
@@ -203,7 +221,12 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
           onNaviguer={naviguer}
           onEncaisse={() => {
             setRevision((r) => r + 1);
-            setCarteChoisie(null);
+            // La carte reste, et gagne son jour. C'est la case fraîchement
+            // remplie que la conception voulait animer et qu'on démontait
+            // avant qu'elle ait pu se montrer.
+            setCarteChoisie((c) =>
+              c ? { ...c, misesEncaissees: c.misesEncaissees + 1 } : c,
+            );
           }}
         />
       )}
