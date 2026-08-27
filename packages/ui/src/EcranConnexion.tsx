@@ -23,6 +23,11 @@ interface Props {
   /** Lien de retour vers la vitrine. Absent sur l'administration, qui ne se
       présente à personne. */
   retourAccueil?: string;
+  /** L'adresse de l'écran « mot de passe oublié ». Facultative pour la même
+      raison que `federee` : les trois applications partagent ce formulaire, et
+      l'administration n'a pas ce besoin — un compte d'administration se
+      récupère auprès de GTCS, pas par un formulaire public. */
+  motDePasseOublie?: string;
   /** Un motif déjà connu à l'ouverture de l'écran.
       Une connexion fédérée qui échoue ne lève rien côté client : le fournisseur
       **redirige**, et le motif arrive accroché à l'adresse. L'écran doit donc
@@ -71,6 +76,7 @@ export function EcranConnexion({
   onSoumettre,
   federee,
   retourAccueil,
+  motDePasseOublie,
   erreurInitiale = null,
 }: Props) {
   const [email, setEmail] = useState('');
@@ -181,6 +187,15 @@ export function EcranConnexion({
         <Bouton type="submit" pleineLargeur disabled={enCours}>
           {enCours ? 'Connexion…' : 'Se connecter'}
         </Bouton>
+
+        {motDePasseOublie && (
+          <a
+            href={motDePasseOublie}
+            className="mt-4 block text-center font-body text-sm text-or/70 underline underline-offset-2 transition-colors hover:text-or"
+          >
+            Mot de passe oublié ?
+          </a>
+        )}
 
         {retourAccueil && (
           <a

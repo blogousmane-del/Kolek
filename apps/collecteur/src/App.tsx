@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { viderCache } from './cache';
 import { Connexion } from './Connexion';
 import { Coquille } from './Coquille';
+import { MotDePasseOublie } from './ecrans/MotDePasseOublie';
+import { NouveauMotDePasse } from './ecrans/NouveauMotDePasse';
 import { supabase } from './supabase';
 
 /**
@@ -70,6 +72,19 @@ export default function App() {
   }, [session]);
 
   if (!pret) return null;
+
+  // Deux chemins traités **avant** la session, et l'ordre compte. Le lien
+  // d'invitation ouvre une session en atterrissant : sans ce branchement,
+  // l'application afficherait sa coquille et le prospect n'aurait jamais
+  // l'écran où choisir son mot de passe.
+  //
+  // Le chemin est lu une fois, comme le fait `apps/site/src/App.tsx` : deux
+  // destinations ne justifient pas une bibliothèque de routage, et on n'y passe
+  // qu'une fois.
+  const chemin = window.location.pathname.replace(/\/+$/, '');
+  if (chemin === '/nouveau-mot-de-passe') return <NouveauMotDePasse />;
+  if (chemin === '/mot-de-passe-oublie') return <MotDePasseOublie />;
+
   if (!session) return <Connexion />;
 
   if (compte === 'orphelin') {

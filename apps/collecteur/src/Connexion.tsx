@@ -11,7 +11,7 @@ import { supabase } from './supabase';
 /** La vitrine, pour le lien de retour. En dur plutôt qu'en variable
     d'environnement : c'est une adresse publique et stable, et une variable
     manquante au build donnerait un lien mort — pire qu'une constante. */
-const VITRINE = 'https://kolek-site.netlify.app';
+const VITRINE = 'https://kolek.cash';
 
 /**
  * La connexion du collecteur.
@@ -62,6 +62,7 @@ export function Connexion() {
       titre="Kolek"
       sousTitre="Chaque mise compte"
       retourAccueil={VITRINE}
+      motDePasseOublie="/mot-de-passe-oublie"
       erreurInitiale={erreurRetour}
       federee={{
         libelle: 'Continuer avec Google',
