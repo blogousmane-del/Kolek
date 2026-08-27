@@ -177,3 +177,158 @@ describe('ce que rend admin_demandes', () => {
     expect((data ?? []).length).toBe(1);
   });
 });
+
+describe('le verrou d’admin_demande', () => {
+  it('refuse la lecture d’une demande à un collecteur authentifié', async () => {
+    // Une seule ligne suffit à livrer un prospect : nom, numéro, adresse.
+    const { error } = await collecteur.client.rpc('admin_demande', {
+      demande_id: crypto.randomUUID(),
+    });
+    expect(error).not.toBeNull();
+  });
+
+  it('refuse admin_demande à un anonyme', async () => {
+    const { error } = await anonyme.rpc('admin_demande', {
+      demande_id: crypto.randomUUID(),
+    });
+    expect(error).not.toBeNull();
+  });
+});
+
+describe('l’adresse électronique', () => {
+  it('accepte une demande sans adresse — les anciennes n’en ont pas', async () => {
+    // La colonne est nullable exprès. Ce test garde cette décision : un
+    // `not null` ajouté plus tard casserait la reprise des demandes déposées
+    // avant le 2026-08-27.
+    const { error } = await admin.from('demandes_ouverture').insert({
+      nom: `Sonde ${MARQUE} sans adresse`,
+      telephone: `+2250700${MARQUE}1`,
+    });
+    expect(error).toBeNull();
+  });
+
+  it('refuse une seconde demande en attente sur la même adresse', async () => {
+    const adresse = `sonde-${MARQUE}@example.ci`;
+    const premiere = await admin.from('demandes_ouverture').insert({
+      nom: `Sonde ${MARQUE} A`,
+      telephone: `+2250700${MARQUE}2`,
+      email: adresse,
+    });
+    expect(premiere.error).toBeNull();
+
+    const seconde = await admin.from('demandes_ouverture').insert({
+      nom: `Sonde ${MARQUE} B`,
+      telephone: `+2250700${MARQUE}3`,
+      email: adresse,
+    });
+    expect(seconde.error?.code).toBe('23505');
+  });
+
+  it('refuse la même adresse écrite en majuscules', async () => {
+    // L'index porte sur `lower(email)`. Sans cela, une majuscule suffirait à
+    // redéposer, et le garde-spam ne garderait rien.
+    const adresse = `casse-${MARQUE}@example.ci`;
+    await admin.from('demandes_ouverture').insert({
+      nom: `Sonde ${MARQUE} C`,
+      telephone: `+2250700${MARQUE}4`,
+      email: adresse,
+    });
+
+    const { error } = await admin.from('demandes_ouverture').insert({
+      nom: `Sonde ${MARQUE} D`,
+      telephone: `+2250700${MARQUE}5`,
+      email: adresse.toUpperCase(),
+    });
+    expect(error?.code).toBe('23505');
+  });
+
+  it('laisse redéposer une fois la demande traitée', async () => {
+    const adresse = `reprise-${MARQUE}@example.ci`;
+    const { data } = await admin
+      .from('demandes_ouverture')
+      .insert({
+        nom: `Sonde ${MARQUE} E`,
+        telephone: `+2250700${MARQUE}6`,
+        email: adresse,
+      })
+      .select('id')
+      .single();
+
+    await admin
+      .from('demandes_ouverture')
+      .update({ statut: 'refusee', traite_le: new Date().toISOString() })
+      .eq('id', data!.id);
+
+    // Un collecteur refusé en août peut revenir en décembre.
+    const { error } = await admin.from('demandes_ouverture').insert({
+      nom: `Sonde ${MARQUE} F`,
+      telephone: `+2250700${MARQUE}7`,
+      email: adresse,
+    });
+    expect(error).toBeNull();
+  });
+
+  it('refuse une adresse trop longue, même sous clé de service', async () => {
+    const { error } = await admin.from('demandes_ouverture').insert({
+      nom: `Sonde ${MARQUE} G`,
+      telephone: `+2250700${MARQUE}8`,
+      email: `${'x'.repeat(200)}@example.ci`,
+    });
+    expect(error?.code).toBe('23514');
+  });
+
+  it('rend l’adresse dans admin_demandes', async () => {
+    const adresse = `liste-${MARQUE}@example.ci`;
+    await admin.from('demandes_ouverture').insert({
+      nom: `Sonde ${MARQUE} H`,
+      telephone: `+2250700${MARQUE}9`,
+      email: adresse,
+    });
+
+    const { data } = await admin.rpc('admin_demandes');
+    const ligne = (data as Array<{ nom: string; email: string | null }>).find(
+      (d) => d.nom === `Sonde ${MARQUE} H`,
+    );
+    expect(ligne?.email).toBe(adresse);
+  });
+
+  it('rend la demande entière par admin_demande, sans la modifier', async () => {
+    const adresse = `unique-${MARQUE}@example.ci`;
+    const { data: creee } = await admin
+      .from('demandes_ouverture')
+      .insert({
+        nom: `Sonde ${MARQUE} I`,
+        telephone: `+2250701${MARQUE}0`,
+        email: adresse,
+        palier: 'pro',
+        zone: 'Adjamé',
+      })
+      .select('id')
+      .single();
+
+    const { data } = await admin.rpc('admin_demande', { demande_id: creee!.id });
+    expect(data).toMatchObject({
+      email: adresse,
+      nom: `Sonde ${MARQUE} I`,
+      palier: 'pro',
+      zone: 'Adjamé',
+      statut: 'nouvelle',
+    });
+
+    // « Sans la modifier » est la moitié de sa raison d'être.
+    const { data: apres } = await admin
+      .from('demandes_ouverture')
+      .select('statut, traite_le')
+      .eq('id', creee!.id)
+      .single();
+    expect(apres).toEqual({ statut: 'nouvelle', traite_le: null });
+  });
+
+  it('rend null pour une demande inexistante', async () => {
+    const { data, error } = await admin.rpc('admin_demande', {
+      demande_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    expect(data).toBeNull();
+  });
+});
