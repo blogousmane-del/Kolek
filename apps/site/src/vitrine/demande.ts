@@ -23,6 +23,10 @@ const CLE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 export interface Demande {
   nom: string;
   telephone: string;
+  /** Obligatoire depuis le 2026-08-27 : c'est par elle que l'accès arrive une
+      fois la demande accordée. Sans elle, la demande n'a pas de suite possible
+      autre qu'un appel. */
+  email: string;
   zone: string;
   palier: Palier;
   message: string;
@@ -42,11 +46,16 @@ const MESSAGES: Record<string, string> = {
   NOM_TROP_LONG: 'Ce nom est trop long.',
   TELEPHONE_TROP_COURT: 'Ce numéro semble incomplet.',
   TELEPHONE_TROP_LONG: 'Ce numéro est trop long.',
+  EMAIL_MANQUANT: 'Indique ton adresse e-mail — c’est par là que ton accès arrivera.',
+  EMAIL_INVALIDE: 'Cette adresse n’a pas la bonne forme. Vérifie l’arobase et le domaine.',
+  EMAIL_TROP_LONG: 'Cette adresse est trop longue.',
   ZONE_TROP_LONGUE: 'Le nom de la zone est trop long.',
   MESSAGE_TROP_LONG: 'Ton message dépasse 500 caractères.',
   PALIER_INCONNU: 'Cette offre n’existe pas. Choisis-en une dans la liste.',
   DEMANDE_DEJA_EN_ATTENTE:
     'Une demande est déjà enregistrée pour ce numéro. GTCS te rappelle très vite — inutile de renvoyer.',
+  TROP_DE_DEMANDES:
+    'Une demande vient de partir depuis cette connexion. Patiente une minute avant de réessayer.',
   CORPS_ILLISIBLE: 'La demande n’a pas pu être lue. Réessaie.',
   SAISIE_REFUSEE: 'Une des informations n’a pas été acceptée. Vérifie ta saisie.',
   ENREGISTREMENT_IMPOSSIBLE: 'Enregistrement impossible pour le moment. Réessaie dans un instant.',

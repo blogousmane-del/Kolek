@@ -43,6 +43,7 @@ function Etiquette({ pour, children }: { pour: string; children: React.ReactNode
 export function Inscription() {
   const [nom, setNom] = useState('');
   const [telephone, setTelephone] = useState('');
+  const [email, setEmail] = useState('');
   const [zone, setZone] = useState('');
   const [message, setMessage] = useState('');
   const [palier, setPalier] = useState<Palier>(() =>
@@ -64,7 +65,7 @@ export function Inscription() {
     setEnvoi(true);
     setErreur(null);
 
-    const resultat = await envoyerDemande({ nom, telephone, zone, palier, message });
+    const resultat = await envoyerDemande({ nom, telephone, email, zone, palier, message });
 
     setEnvoi(false);
     if (resultat.ok) {
@@ -109,7 +110,9 @@ export function Inscription() {
             <h1 className="mb-3 font-headings text-3xl font-bold text-white">Demande enregistrée</h1>
             <p className="mb-6 font-body text-base leading-relaxed text-white/60">
               GTCS te rappelle sur le <strong className="text-white">{telephone}</strong> pour
-              ouvrir ton compte et te montrer l’application. Garde ton téléphone à portée.
+              ouvrir ton compte et te montrer l’application. Ton accès partira ensuite sur{' '}
+              <strong className="text-white">{email}</strong> — garde ton téléphone à portée et
+              surveille tes courriels.
             </p>
             <p className="font-body text-sm text-white/40">
               Tu as déjà un compte ?{' '}
@@ -175,6 +178,27 @@ export function Inscription() {
                 />
                 <p className="mt-1.5 font-body text-xs text-white/30">
                   C’est le numéro sur lequel GTCS te rappelle.
+                </p>
+              </div>
+
+              <div className="mb-4">
+                <Etiquette pour="email">Ton adresse e-mail</Etiquette>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  maxLength={160}
+                  autoComplete="email"
+                  placeholder="mariam@exemple.ci"
+                  className={CHAMP_SOMBRE}
+                />
+                {/* Dire à quoi elle sert au moment où on la demande. Un
+                    formulaire qui réclame une adresse sans expliquer pourquoi
+                    fait hésiter, et l'hésitation coûte des demandes. */}
+                <p className="mt-1.5 font-body text-xs text-white/30">
+                  C’est là que tu recevras ton accès quand GTCS aura ouvert ton compte.
                 </p>
               </div>
 
@@ -255,10 +279,16 @@ export function Inscription() {
               </button>
 
               {/* La seule donnée qui part est celle de ce formulaire. Le dire
-                  sur une page qui demande un numéro de téléphone n'est pas du
-                  décor : c'est ce que le visiteur a le droit de savoir. */}
+                  sur une page qui demande un numéro et une adresse n'est pas du
+                  décor : c'est ce que le visiteur a le droit de savoir.
+
+                  La phrase a été corrigée le 2026-08-27, quand le champ e-mail
+                  est apparu. Elle disait « Nom, numéro et zone uniquement » —
+                  une promesse devenue fausse est pire qu'une promesse absente,
+                  surtout sur une page qui collecte des données personnelles. */}
               <p className="mt-4 text-center font-body text-xs text-white/30">
-                Nom, numéro et zone uniquement. Aucun mot de passe, aucun paiement à cette étape.
+                Nom, numéro, adresse e-mail et zone. Aucun mot de passe, aucun paiement à cette
+                étape.
               </p>
 
               {/* Le repli, toujours visible. Un formulaire est un point unique
