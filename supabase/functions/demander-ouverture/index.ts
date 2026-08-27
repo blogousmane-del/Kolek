@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import { ORIGINES_SITE, entetesCors, listerOrigines } from '../_shared/cors.ts';
+import { empreinteRequete } from '../_shared/debit.ts';
 import { validerDemande } from '../_shared/valider-demande.ts';
 
 /**
@@ -21,6 +22,12 @@ import { validerDemande } from '../_shared/valider-demande.ts';
  *   ligne. Un formulaire public qui renverrait ce qu'il vient d'enregistrer
  *   devient un moyen de vérifier ce que la table contient déjà.
  * * **Elle borne avant d'écrire**, par `validerDemande`, qui est testé.
+ * * **Elle compte les appels par IP** depuis le 2026-08-27, par
+ *   `consommer_debit`. Une demande par minute. Ce n'est pas un CAPTCHA — un
+ *   réseau d'adresses passe encore — mais c'est ce qui ferme le cas réel : un
+ *   script sur une machine qui fait varier le numéro. L'audit du 2026-08-25
+ *   chiffrait ce manque : `grep -cin "ratelimit\|captcha\|turnstile"` rendait 0
+ *   sur ce fichier.
  * * **Elle refuse le doublon** — l'index unique partiel sur le téléphone en
  *   attente lève `23505`, traduit ici en 409. Sans lui, un formulaire public se
  *   soumet mille fois.
@@ -34,6 +41,17 @@ import { validerDemande } from '../_shared/valider-demande.ts';
  */
 
 const ORIGINES_AUTORISEES = listerOrigines(Deno.env.get('ORIGINES_SITE'), ORIGINES_SITE);
+
+/**
+ * Une demande par minute et par adresse IP.
+ *
+ * Le chiffre est volontairement bas : personne n'ouvre deux comptes dans la
+ * même minute, et un visiteur qui a cliqué deux fois lit le refus comme une
+ * confirmation que sa demande est bien passée. Ce que la borne ferme, c'est le
+ * script qui fait varier le numéro.
+ */
+const PLAFOND = 1;
+const FENETRE_SECONDES = 60;
 
 function entetesPour(requete: Request): Record<string, string> {
   return entetesCors({
@@ -77,6 +95,27 @@ Deno.serve(async (requete) => {
   const client = createClient(url, cleService, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // La borne vient **après** la validation : une saisie malformée n'atteint pas
+  // la base et ne coûte que du calcul, et un visiteur qui se trompe de format ne
+  // doit pas se retrouver enfermé dehors pour une minute.
+  const { data: dansLePlafond, error: erreurDebit } = await client.rpc('consommer_debit', {
+    cle: empreinteRequete('demander-ouverture', requete.headers),
+    plafond: PLAFOND,
+    fenetre_secondes: FENETRE_SECONDES,
+  });
+
+  if (erreurDebit) {
+    // Le compteur est en panne. On refuse plutôt que d'ouvrir : c'est la seule
+    // écriture publique du produit, et une borne qui se désactive toute seule
+    // sous la panne ne borne rien le jour où on en a besoin.
+    console.error('consommer_debit a échoué :', erreurDebit.message);
+    return reponse({ erreur: 'ENREGISTREMENT_IMPOSSIBLE' }, 500, requete);
+  }
+
+  if (dansLePlafond !== true) {
+    return reponse({ erreur: 'TROP_DE_DEMANDES' }, 429, requete);
+  }
 
   const { error } = await client.from('demandes_ouverture').insert(verdict.demande);
 
