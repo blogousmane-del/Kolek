@@ -55,7 +55,40 @@ Les modifications du dépôt sont **déjà faites et non commitées** — douze 
 dans l'arbre de travail, `npm test` et `npm run test:scripts` au vert. Elles
 attendent la tâche 7. Ne pas les refaire ; ne pas les pousser avant.
 
-### Ce qui est déjà acquis, mesuré le 2026-08-27
+### ✅ Bascule terminée le 2026-08-27 au soir
+
+`npm run build && npm run verifier:en-ligne` :
+
+```
+collecteur  conforme — https://app.kolek.cash
+admin       conforme — https://admin.kolek.cash
+site        conforme — https://kolek.cash
+Les trois cibles servent ce que le dépôt déclare — artefacts comparés.
+```
+
+Et les trois contrôles que la sonde ne couvre pas, vérifiés à la main :
+
+| Contrôle | Résultat |
+|---|---|
+| Redirections des anciennes adresses | `301` vers les trois nouveaux domaines |
+| Origines CORS | `kolek.cash` acceptée ; `kolek-site.netlify.app` et une intruse **refusées** |
+| Adresse de retour d'authentification | liste rejetant l'inconnu, Site URL = `https://app.kolek.cash` |
+| Migrations en production | `20260827090000` et `20260827100000` appliquées |
+| Passerelle courriel | les trois secrets `COURRIEL_*` lus — plus de `CONFIGURATION` |
+
+**Ce qui reste, et qui n'est pas de la bascule :**
+
+- Retirer de Supabase → Auth → Redirect URLs les deux entrées transitoires
+  `https://kolek-collecteur.netlify.app` — le filet n'a plus d'objet depuis que
+  l'ancienne adresse redirige.
+- Google Search Console — tâche 8.
+- **L'essai de bout en bout du courriel** : déposer une demande, l'accorder,
+  recevoir l'invitation. La sonde prouve que les secrets sont lus, **pas que
+  Resend accepte la clé** — seul un envoi réel le dira.
+- **La clé `service_role` publiée le 2026-08-24 n'est toujours pas révoquée.**
+- Passer le DMARC de `p=none` à `p=quarantine`, après quelques semaines d'envois.
+
+### Ce qui était acquis à la reprise, mesuré le 2026-08-27
 
 **La tâche 3 est faite.** Les quatre enregistrements résolvent, un seul par nom —
 aucun reliquat de parking :
