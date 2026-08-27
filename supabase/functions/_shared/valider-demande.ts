@@ -17,10 +17,13 @@
  * transaction pour une saisie vide.
  */
 
+import { EMAIL_MAX, validerEmail } from './valider-email.ts';
+
 /** Reprises des contraintes `CHECK` de `public.demandes_ouverture`. */
 export const BORNES = {
   nom: { min: 2, max: 120 },
   telephone: { min: 8, max: 64 },
+  email: { max: EMAIL_MAX },
   zone: { max: 80 },
   message: { max: 500 },
 } as const;
@@ -31,6 +34,7 @@ export type PalierDemande = (typeof PALIERS_VALIDES)[number];
 export interface DemandeBrute {
   nom?: unknown;
   telephone?: unknown;
+  email?: unknown;
   zone?: unknown;
   palier?: unknown;
   message?: unknown;
@@ -39,6 +43,7 @@ export interface DemandeBrute {
 export interface DemandeValide {
   nom: string;
   telephone: string;
+  email: string;
   zone: string | null;
   palier: PalierDemande;
   message: string | null;
@@ -90,6 +95,19 @@ export function validerDemande(brut: DemandeBrute): Resultat {
     return { ok: false, erreur: 'TELEPHONE_TROP_LONG', champ: 'telephone' };
   }
 
+  // L'adresse est obligatoire depuis le 2026-08-27, et c'est un revirement
+  // assumé : `admin-creer-collecteur` explique qu'« attendre une confirmation
+  // par courriel bloquerait un collecteur qui n'a pas d'adresse à lui — cas
+  // courant sur ce marché ». C'est vrai du collecteur qu'on équipe au comptoir,
+  // et cette fonction-là n'a pas changé. Ce n'est pas vrai de celui qui remplit
+  // le formulaire de la vitrine : il choisit une offre, il paiera, et sans
+  // adresse aucun des trois services demandés ne peut exister. Une adresse
+  // créée pour l'occasion suffit.
+  const verdictEmail = validerEmail(brut.email);
+  if (!verdictEmail.ok) {
+    return { ok: false, erreur: verdictEmail.erreur, champ: 'email' };
+  }
+
   const zone = texte(brut.zone);
   if (zone.length > BORNES.zone.max) {
     return { ok: false, erreur: 'ZONE_TROP_LONGUE', champ: 'zone' };
@@ -113,6 +131,7 @@ export function validerDemande(brut: DemandeBrute): Resultat {
     demande: {
       nom,
       telephone,
+      email: verdictEmail.email,
       zone: zone || null,
       palier: palierBrut as PalierDemande,
       message: message || null,
