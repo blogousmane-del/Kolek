@@ -24,6 +24,32 @@
 [build.environment]
   NODE_VERSION = "26"
 
+# L'ancienne adresse cesse de servir.
+#
+# **Poser le domaine principal chez Netlify ne suffit pas** — constaté le
+# 2026-08-27, une heure après la bascule. Un *alias* de domaine, lui, redirige
+# tout seul : `www.kolek.cash` a rendu un 301 dès l'émission du certificat. Mais
+# `kolek-site.netlify.app` a continué de servir la page en 200, indéfiniment.
+#
+# Ce n'est pas cosmétique. Deux adresses qui servent la même application, ce
+# sont **deux origines** — et les listes CORS des Edge Functions n'en nomment
+# qu'une. Le formulaire d'ouverture de compte marcherait depuis l'une et pas
+# depuis l'autre, selon le lien par lequel le visiteur est arrivé. Côté
+# référencement, c'est aussi la page dédoublée que la balise canonique existe
+# pour éviter.
+#
+# `force = true` est indispensable : sans lui, la règle s'efface devant un
+# fichier réellement présent à ce chemin, et la racine en est un.
+#
+# **Cette règle précède la réécriture SPA**, et l'ordre fait la décision :
+# Netlify applique la première correspondance. Placée après, elle ne serait
+# jamais atteinte — `/*` avale tout.
+[[redirects]]
+  from = "https://kolek-site.netlify.app/*"
+  to = "https://kolek.cash/:splat"
+  status = 301
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

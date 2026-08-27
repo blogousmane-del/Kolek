@@ -31,6 +31,19 @@
 [build.environment]
   NODE_VERSION = "26"
 
+# L'ancienne adresse cesse de servir. Voir la note longue dans le netlify.toml
+# du site public : poser le domaine principal chez Netlify ne suffit pas, seuls
+# les alias de domaine redirigent d'eux-mêmes. Deux adresses qui servent la même
+# application, ce sont deux origines — et les listes CORS n'en nomment qu'une.
+#
+# Elle précède la réécriture SPA : Netlify applique la première correspondance,
+# et `/*` avalerait tout.
+[[redirects]]
+  from = "https://kolek-collecteur.netlify.app/*"
+  to = "https://app.kolek.cash/:splat"
+  status = 301
+  force = true
+
 # Application à page unique : toute route inconnue rend l'index.
 # Le code 200 et non 301 — c'est une réécriture, pas une redirection.
 [[redirects]]
