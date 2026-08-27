@@ -19,6 +19,10 @@ export interface Demande {
   zone: string | null;
   palier: string;
   message: string | null;
+  /** Nulle sur les demandes déposées avant le 2026-08-27, où le formulaire de
+      la vitrine ne la demandait pas. Accorder l'une d'elles rend
+      `EMAIL_ABSENT` : il faut rappeler pour l'obtenir. */
+  email: string | null;
   statut: StatutDemande;
   cree_le: string;
   traite_le: string | null;
@@ -33,6 +37,20 @@ const MESSAGES: Record<string, string> = {
   STATUT_INVALIDE: 'Ce statut n’est pas reconnu.',
   JETON_ABSENT: 'Session expirée. Reconnecte-toi.',
   CONFIGURATION: 'Le serveur est mal configuré.',
+
+  // L'accord d'une demande ouvre le compte et envoie l'invitation depuis le
+  // 2026-08-27. Ces cinq refus disent tous la même chose au fond : **où en est
+  // la demande**. C'est ce que l'administrateur doit savoir pour décider s'il
+  // relance ou s'il appelle.
+  COURRIEL_NON_CONFIGURE:
+    'Le service de courriel n’est pas configuré. Rien n’a été créé — préviens GTCS.',
+  EMAIL_ABSENT:
+    'Cette demande a été déposée sans adresse e-mail. Rappelle le prospect pour l’obtenir.',
+  COMPTE_NON_CREE: 'Le compte n’a pas pu être créé. Réessaie dans un instant.',
+  COURRIEL_NON_PARTI:
+    'Le compte est créé, mais le courriel n’est pas parti. La demande reste ouverte : réessaie.',
+  MARQUAGE_INCOMPLET:
+    'Le prospect a reçu son courriel, mais la demande n’a pas pu être classée. Ne recommence pas : préviens GTCS.',
 };
 
 /** Extrait le code d'erreur du corps, quand `functions.invoke` a signalé un
