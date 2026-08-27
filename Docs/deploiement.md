@@ -145,6 +145,104 @@ de connexion Google, et n'ont rien à déclarer.
 refusée, et le code répond en français au lieu de laisser passer le message
 anglais de GoTrue. C'est voulu — le compte se crée par GTCS, pas par Google.
 
+### La panne du 2026-08-24 au 2026-08-27 — trois murs, l'un derrière l'autre
+
+Trois jours de « Continuer avec Google » qui échoue. La leçon n'est pas dans les
+correctifs, qui tiennent en deux champs de formulaire ; elle est dans la manière
+de savoir **lequel des trois murs** on a devant soi, sans jamais voir le secret.
+
+Chaque mur affiche un message différent dans l'application, et c'est ce message
+qui désigne l'étape. Ils viennent tous de `apps/collecteur/src/erreurOAuth.ts` :
+
+| Ce que lit le collecteur | Où ça casse | Ce qu'il faut corriger |
+|---|---|---|
+| « La configuration du projet, pas ton compte » | L'échange du code contre un jeton | Le *Client Secret* dans Supabase |
+| Écran Google « Accès bloqué — Erreur 400 » | Avant même de partir | L'URI de redirection, côté Google |
+| « Cette adresse n'est rattachée à aucun compte Kolek » | Après l'échange, réussi | Rien : c'est `disable_signup` qui fait son travail |
+
+**Le troisième message est une bonne nouvelle.** GoTrue ne connaît l'adresse de
+l'utilisateur qu'après avoir échangé le code et lu le profil chez Google : le
+voir apparaître prouve que le secret et l'URI sont bons.
+
+#### Les trois sondes, qui n'ont demandé aucun accès
+
+Elles se relancent telles quelles, et suffisent à trancher entre les deux
+premiers murs :
+
+```bash
+# 1. Quel client le projet emploie-t-il, et vers quelle adresse de retour ?
+curl -sS -o /dev/null -D - \
+  "https://yfnwmokxkznejotgpfgf.supabase.co/auth/v1/authorize?provider=google" \
+  | grep -i '^location'
+
+# 2. Google accepte-t-il ce couple client + adresse de retour ?
+#    Coller l'adresse rendue ci-dessus. Une page « Sign in - Google Accounts »
+#    veut dire oui ; une redirection vers /signin/oauth/error veut dire non, et
+#    le paramètre `authError` se décode en base64 pour lire le motif exact.
+curl -sS -L -o /tmp/g.html "<adresse rendue par la sonde 1>"
+grep -oiE "redirect_uri_mismatch|invalid_client|Error 40[0-9]" /tmp/g.html
+
+# 3. Que répond Google quand le secret est faux ? (sonde sur notre propre
+#    client, avec un secret volontairement invalide)
+curl -sS -X POST https://oauth2.googleapis.com/token \
+  -d "client_id=<le client_id de la sonde 1>" \
+  -d "client_secret=SONDE-INVALIDE" -d "code=BIDON" \
+  -d "grant_type=authorization_code" \
+  -d "redirect_uri=https://yfnwmokxkznejotgpfgf.supabase.co/auth/v1/callback"
+```
+
+La troisième sonde rend `invalid_client — The provided client secret is invalid`
+**alors même que le code est bidon** : Google valide le secret avant le code. Un
+secret correct sur un code invalide rendrait `invalid_grant`. C'est ce qui
+permet de distinguer un secret fautif d'un code périmé sans posséder ni l'un ni
+l'autre.
+
+#### Ce que le journal ajoute, et lui seul
+
+*Logs → Auth Logs*. Une connexion Google qui aboutit écrit **quatre** lignes :
+
+```
+GET  /auth/v1/authorize  302
+GET  /auth/v1/callback   302
+POST /auth/v1/token      200   ← grant_type=pkce
+GET  /auth/v1/user       200
+```
+
+Les deux dernières manquaient pendant toute la panne. Ce sont elles la preuve du
+rétablissement — pas l'écran qui s'ouvre, qui peut s'ouvrir pour de mauvaises
+raisons. L'écart de temps entre `authorize` et `callback` a aussi son usage :
+quatre secondes et un seul passage éliminent le code expiré et le code rejoué,
+donc `invalid_grant`.
+
+#### Le piège qui a coûté le plus
+
+Le remède retenu a été de créer un **client OAuth entièrement neuf**, dans un
+nouveau projet Google Cloud. Voie légitime, mais **un client neuf ne connaît
+aucune URI de redirection** : la panne s'est déplacée de l'échange du code vers
+le tout premier pas, avec un message qui ne ressemblait plus au précédent. Après
+tout changement de client, redéclarer :
+
+| Champ, côté Google Cloud | Valeur |
+|---|---|
+| Authorized redirect URIs | `https://yfnwmokxkznejotgpfgf.supabase.co/auth/v1/callback` |
+| Authorized JavaScript origins | `https://yfnwmokxkznejotgpfgf.supabase.co` |
+
+Et vérifier que l'écran de consentement du projet neuf n'est pas resté en mode
+*Testing* : seules les adresses inscrites en *Test users* y passent, et le refus
+ressemble trait pour trait au précédent.
+
+#### Ce qu'on n'automatise pas
+
+`verifier:en-ligne` pourrait contrôler que le fournisseur est allumé et que
+l'`authorize` pointe au bon endroit — c'est-à-dire, pendant cette panne, **les
+deux choses qui allaient bien**. Le secret ne s'éprouve qu'avec un vrai code
+d'autorisation, donc avec un humain devant l'écran.
+
+Un contrôle qui passerait au vert pendant que la connexion est cassée vaut moins
+que rien. Le garde-fou qui a fonctionné ici, c'est le message affiché au
+collecteur : il a envoyé chercher au bon endroit au lieu de faire désinstaller
+l'application.
+
 **Sauvegardes.** Vérifier que les sauvegardes automatiques sont actives. C'est
 l'épargne réelle de commerçants ; l'exigence de sauvegarde du cahier §7 ne se
 satisfait pas d'un défaut supposé.
@@ -482,10 +580,21 @@ sur l'apex au lieu d'un `A` — ne vaut pas ce risque-là.
 **Propagation.** De quelques minutes à quelques heures.
 
 ```bash
-nslookup kolek.cash
-nslookup app.kolek.cash
-nslookup admin.kolek.cash
+npm run verifier:dns               # via un résolveur public
+npm run verifier:dns -- --systeme  # via celui du poste
 ```
+
+**Le résolveur public d'abord, et ce n'est pas un détail.** Celui du poste garde
+en mémoire la réponse négative obtenue *avant* la création des enregistrements,
+aussi longtemps qu'une réponse positive : il fait croire à un échec sur une zone
+déjà juste. Constaté le 2026-08-27 — `1.1.1.1` déclarait les quatre
+enregistrements en place pendant que la machine les disait tous introuvables. Si
+le public est vert et le poste rouge, il n'y a rien à corriger, il faut attendre.
+
+Le script compte aussi les réponses au lieu de se contenter de la première :
+c'est ce qui attrape l'enregistrement de parking d'Hostinger laissé en place,
+lequel donne deux `A` sur l'apex et fait tomber un visiteur sur deux sur la page
+« domaine réservé ».
 
 ### 4.3 Netlify — trois fois le même geste
 
