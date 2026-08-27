@@ -18,6 +18,7 @@
     "test:db": "npm run db:env && vitest run --config supabase/tests/vitest.config.ts",
     "test:scripts": "vitest run scripts",
     "verifier:bundles": "node scripts/verifier-bundles.mjs",
+    "verifier:dns": "node scripts/verifier-dns.mjs",
     "verifier:en-ligne": "node scripts/verifier-en-ligne.mjs",
     "generer:theme": "node scripts/generer-theme.mjs",
     "verifier:theme": "node scripts/generer-theme.mjs --verifier",
