@@ -6,6 +6,7 @@ import {
   cleAnonyme,
   comparerAssets,
   hstsSuffisant,
+  manqueRedirection,
   manquesSeo,
 } from './verifier-en-ligne.mjs';
 
@@ -63,10 +64,20 @@ describe('les attentes déclarées par cible', () => {
       'site',
     ]);
   });
+
+  it('déclare pour chaque cible l’adresse Netlify qu’elle remplace', () => {
+    // Sans ce champ, le contrôle de redirection se sauterait en silence — et un
+    // contrôle qui s'efface tout seul ne vaut rien.
+    for (const cible of CIBLES) {
+      expect(cible.ancienne, `${cible.nom} : ancienne adresse non déclarée`).toMatch(
+        /^https:\/\/kolek-[a-z]+\.netlify\.app$/,
+      );
+    }
+  });
 });
 
 describe('manquesSeo', () => {
-  const ORIGINE = 'https://kolek-site.netlify.app';
+  const ORIGINE = 'https://kolek.cash';
   const TITRE = 'Kolek — L’épargne du marché';
   const DESCRIPTION = 'Le carnet du banquier ambulant, sur un téléphone.';
 
@@ -102,9 +113,12 @@ describe('manquesSeo', () => {
   });
 
   it('signale une canonique restée sur l’ancien domaine', () => {
-    // Le cas qui arrivera vraiment : un domaine propre est acheté, les balises
-    // ne suivent pas, et Google continue d'indexer l'adresse Netlify.
-    const manques = manquesSeo(page(), 'https://kolek.ci');
+    // Le cas qui est arrivé, le 2026-08-26 : `kolek.cash` remplace l'adresse
+    // Netlify, et les balises restent en arrière. Rien ne casse — le site
+    // s'affiche —, mais Google continue d'indexer l'adresse morte. L'origine
+    // ci-dessous est fictive, et le reste : le test doit continuer de valoir
+    // le jour où `kolek.cash` cédera à son tour.
+    const manques = manquesSeo(page(), 'https://kolek.example');
     expect(manques.some((m) => m.startsWith('canonique ='))).toBe(true);
   });
 
@@ -242,5 +256,37 @@ describe('cleAnonyme', () => {
     // amputé en jeton plausible — et c'est exactement ce qu'on cherche à voir.
     const amputee = ENTIERE.slice(1);
     expect(cleAnonyme('vl=`' + amputee + '`')).toBeNull();
+  });
+});
+
+describe('manqueRedirection', () => {
+  const NOUVELLE = 'https://kolek.cash';
+
+  it('ne trouve rien à redire à une 301 vers la bonne adresse', () => {
+    expect(manqueRedirection(301, 'https://kolek.cash/', NOUVELLE)).toBeNull();
+  });
+
+  it('tolère la barre oblique finale, des deux côtés', () => {
+    expect(manqueRedirection(301, 'https://kolek.cash', NOUVELLE)).toBeNull();
+    expect(manqueRedirection(308, 'https://kolek.cash/', NOUVELLE)).toBeNull();
+  });
+
+  it('signale une ancienne adresse qui sert encore l’application', () => {
+    // Le défaut qu'on cherche : le domaine principal n'a pas été posé sur
+    // Netlify. Rien n'a l'air cassé — les deux adresses répondent — mais deux
+    // origines servent la même application, et les listes CORS n'en nomment
+    // qu'une. La moitié des visiteurs ne peut pas envoyer le formulaire.
+    expect(manqueRedirection(200, null, NOUVELLE)).toContain('domaine principal');
+  });
+
+  it('signale une redirection qui mène ailleurs', () => {
+    const manque = manqueRedirection(301, 'https://kolek-site.netlify.app/', NOUVELLE);
+    expect(manque).toContain('attendu https://kolek.cash');
+  });
+
+  it('signale une ancienne adresse qui ne répond plus du tout', () => {
+    // Un 404 n'est pas une réussite : le lien partagé hier mène au vide au lieu
+    // de mener au nouveau domaine.
+    expect(manqueRedirection(404, null, NOUVELLE)).toContain('404');
   });
 });

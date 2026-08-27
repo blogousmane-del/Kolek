@@ -121,8 +121,11 @@ Une seule adresse de redirection. Rien d'autre.
 
 | Champ | Valeur |
 |---|---|
-| Site URL | `https://kolek-collecteur.netlify.app` |
-| Redirect URLs | `https://kolek-collecteur.netlify.app`<br>`https://kolek-collecteur.netlify.app/**` |
+| Site URL | `https://app.kolek.cash` |
+| Redirect URLs | `https://app.kolek.cash`<br>`https://app.kolek.cash/**` |
+
+Ces deux valeurs portaient `https://kolek-collecteur.netlify.app` jusqu'au
+2026-08-26 — voir §4, qui décrit le passage au domaine propre.
 
 **Supabase — Authentication → Providers → Google** : activer, coller le *Client
 ID* et le *Client Secret*.
@@ -162,11 +165,15 @@ Trois sites distincts sur le même dépôt, conformément au dossier stratégiqu
 En ligne depuis le 2026-08-18, équipe `blog-ousmane`, publiés à la main depuis
 les artefacts locaux :
 
-| Site | URL | Identifiant |
-|---|---|---|
-| `kolek-collecteur` | https://kolek-collecteur.netlify.app | `56d28aa0-de05-4a92-b384-4a576685fe47` |
-| `kolek-admin` | https://kolek-admin.netlify.app | `401e55b2-0aaa-4f02-a21a-18e777bf9369` |
-| `kolek-site` | https://kolek-site.netlify.app | `eae737cb-2247-49d6-a190-2a662f9af5e2` |
+| Site | Adresse publique | Adresse Netlify | Identifiant |
+|---|---|---|---|
+| `kolek-collecteur` | https://app.kolek.cash | `kolek-collecteur.netlify.app` | `56d28aa0-de05-4a92-b384-4a576685fe47` |
+| `kolek-admin` | https://admin.kolek.cash | `kolek-admin.netlify.app` | `401e55b2-0aaa-4f02-a21a-18e777bf9369` |
+| `kolek-site` | https://kolek.cash | `kolek-site.netlify.app` | `eae737cb-2247-49d6-a190-2a662f9af5e2` |
+
+Le domaine propre date du 2026-08-26 — voir §4. Les adresses `.netlify.app`
+restent le nom permanent de chaque site chez Netlify : elles servent aux
+enregistrements `CNAME`, et redirigent en 301 vers la colonne de gauche.
 
 Le dossier stratégique n'en prévoyait que deux : les deux applications. Le site
 public est venu après, avec les maquettes de tarifs. Il ne partage avec elles que
@@ -399,7 +406,270 @@ de la vérification.
 
 ---
 
-## 4. Vérification après déploiement
+## 4. Le domaine — `kolek.cash`
+
+Acheté chez Hostinger le 2026-08-26. Il remplace les trois adresses
+`*.netlify.app`, qui restent l'identité Netlify des sites — elles ne
+disparaissent pas, elles cessent d'être ce qu'on donne à lire.
+
+| Adresse | Site Netlify | Public |
+|---|---|---|
+| `kolek.cash` | `kolek-site` | Public — grille tarifaire, **indexée** |
+| `www.kolek.cash` | `kolek-site` | Redirection 301 vers l'apex, posée par Netlify |
+| `app.kolek.cash` | `kolek-collecteur` | Collecteurs, sur le terrain — `noindex` |
+| `admin.kolek.cash` | `kolek-admin` | GTCS et gérants — `noindex` |
+
+**L'apex nu pour la vitrine, pas `www`.** C'est l'adresse qu'on prononce à voix
+haute sur un marché, et celle qu'on écrit sur un flyer. `www` existe et redirige,
+parce qu'une part des gens le tape encore.
+
+### 4.1 L'ordre, qui n'est pas indifférent
+
+**DNS d'abord, dépôt en dernier.** Les quatre étapes ne commutent pas.
+
+1. **DNS chez Hostinger** — §4.2
+2. **Domaine ajouté sur les trois sites Netlify**, certificat HTTPS émis — §4.3
+3. **Supabase** : Site URL, Redirect URLs, secrets d'origines — §4.4
+4. **`git push`** du dépôt — §4.5
+5. `npm run verifier:en-ligne` — §4.7
+6. Search Console — §4.6
+
+Inverser 4 et 1 casse le produit pendant toute la propagation DNS. Le dépôt
+porte deux choses qui ne tolèrent pas l'avance : les liens de la vitrine vers
+`app.kolek.cash`, qui mèneraient nulle part, et les listes d'origines CORS, qui
+refuseraient le formulaire d'ouverture de compte encore servi depuis
+`kolek-site.netlify.app`. Le symptôme serait un bouton mort et un formulaire
+muet, c'est-à-dire exactement ce qu'on ne remarque pas depuis un poste de
+développement.
+
+Faire le DNS en premier ne coûte rien en revanche : pendant toute l'opération,
+Netlify continue de servir les anciennes adresses. Rien ne tombe.
+
+### 4.2 DNS chez Hostinger
+
+hPanel → **Domaines** → `kolek.cash` → **DNS / Serveurs de noms** → *Gérer les
+enregistrements DNS*.
+
+**Supprimer d'abord les enregistrements de parking.** Hostinger pose de son
+propre chef un `A` sur `@` vers son IP de page d'attente, et un `CNAME www` qui
+la suit. Les laisser en place donnerait deux `A` sur l'apex : le visiteur
+tomberait une fois sur deux sur la page « domaine réservé », sans qu'aucun
+message n'explique pourquoi.
+
+| Type | Nom | Valeur | TTL |
+|---|---|---|---|
+| `A` | `@` | `75.2.60.5` | 3600 |
+| `CNAME` | `www` | `kolek-site.netlify.app` | 3600 |
+| `CNAME` | `app` | `kolek-collecteur.netlify.app` | 3600 |
+| `CNAME` | `admin` | `kolek-admin.netlify.app` | 3600 |
+
+> **Lire l'IP de l'apex dans Netlify, pas ici.** `75.2.60.5` est l'adresse du
+> répartiteur Netlify au 2026-08-26, et Netlify l'affiche lui-même à l'écran
+> quand on ajoute un domaine apex (§4.3). C'est cette valeur-là qui fait foi :
+> une IP recopiée d'une documentation vieillit sans prévenir, et l'échec qu'elle
+> produit ressemble à une propagation lente.
+
+Les trois `CNAME` visent bien les adresses `.netlify.app`. Ce ne sont pas des
+reliquats : c'est le nom permanent de chaque site chez Netlify, et il ne change
+pas quand on lui ajoute un domaine.
+
+**Pourquoi garder le DNS chez Hostinger** plutôt que de basculer les serveurs de
+noms sur Netlify. Déplacer les serveurs de noms déplace **tout**, `MX` compris.
+Le jour où une adresse `@kolek.cash` sera ouverte chez Hostinger, elle cessera
+de fonctionner sans que rien ne le relie à ce changement-ci. Le gain — un `ALIAS`
+sur l'apex au lieu d'un `A` — ne vaut pas ce risque-là.
+
+**Propagation.** De quelques minutes à quelques heures.
+
+```bash
+nslookup kolek.cash
+nslookup app.kolek.cash
+nslookup admin.kolek.cash
+```
+
+### 4.3 Netlify — trois fois le même geste
+
+Pour chaque site : **Site configuration → Domain management → Add a domain**.
+
+| Site | Domaine à ajouter | Domaine principal |
+|---|---|---|
+| `kolek-site` | `kolek.cash` puis `www.kolek.cash` | `kolek.cash` |
+| `kolek-collecteur` | `app.kolek.cash` | `app.kolek.cash` |
+| `kolek-admin` | `admin.kolek.cash` | `admin.kolek.cash` |
+
+**Le champ *primary domain* n'est pas cosmétique.** C'est lui qui fait rediriger
+l'adresse `.netlify.app` en 301 vers le nouveau domaine. Sans lui, les deux
+adresses servent le même contenu : **deux origines pour une seule application**,
+alors que les listes CORS n'en nomment qu'une. Le formulaire marcherait depuis
+l'une et pas depuis l'autre, selon le lien par lequel le visiteur est arrivé.
+
+**HTTPS.** Netlify émet un certificat Let's Encrypt dès que le DNS résout.
+Attendre *Your site has HTTPS enabled* avant de passer à la suite ; un certificat
+en cours d'émission donne un avertissement de navigateur qui ressemble à une
+panne.
+
+> **`includeSubDomains` change de portée.** L'en-tête HSTS des trois
+> `netlify.toml` porte `max-age=31536000; includeSubDomains`. Sur
+> `kolek-site.netlify.app`, il ne couvrait qu'un sous-domaine de Netlify. Sur
+> `kolek.cash`, il couvre **tout `*.kolek.cash`**, pendant un an, pour tout
+> navigateur ayant visité la vitrine une fois. Les trois sites sont en HTTPS
+> chez Netlify : rien ne casse aujourd'hui. Mais tout sous-domaine ajouté plus
+> tard et consulté dans un navigateur devra être en HTTPS, sans exception
+> possible.
+
+### 4.4 Supabase — deux endroits, et un piège
+
+**Authentication → URL Configuration**
+
+| Champ | Valeur |
+|---|---|
+| Site URL | `https://app.kolek.cash` |
+| Redirect URLs | `https://app.kolek.cash`<br>`https://app.kolek.cash/**` |
+
+**Google Cloud Console : rien à changer.** Google ne redirige jamais vers
+Netlify, il redirige vers Supabase — voir §2. Le changement de domaine ne
+l'atteint pas.
+
+**Edge Functions → Secrets**
+
+| Secret | Valeur |
+|---|---|
+| `ORIGINES_SITE` | `https://kolek.cash,http://localhost:5173` |
+| `ORIGINES_COLLECTEUR` | `https://app.kolek.cash,http://localhost:5173` |
+| `ORIGINES_ADMIN` | `https://admin.kolek.cash,http://localhost:5173` |
+
+```bash
+npx supabase secrets set \
+  ORIGINES_SITE='https://kolek.cash,http://localhost:5173' \
+  ORIGINES_COLLECTEUR='https://app.kolek.cash,http://localhost:5173' \
+  ORIGINES_ADMIN='https://admin.kolek.cash,http://localhost:5173'
+npx supabase functions deploy
+```
+
+> **Le piège.** Ces secrets **priment** sur les constantes de
+> `supabase/functions/_shared/cors.ts`, qui ne sont que des replis. Corriger le
+> dépôt sans corriger les secrets ne change **rien** en ligne, tout en donnant
+> l'impression rassurante d'un travail fait. Le symptôme est celui du
+> 2026-08-20 : « Failed to send a request to the Edge Function », `fetch` qui
+> rejette, et **des journaux Supabase vides** — la requête n'atteint jamais le
+> serveur, c'est le navigateur qui la retient.
+
+Le `functions deploy` n'est pas facultatif : `Deno.env.get` est lu à
+l'initialisation du module, donc une fois par démarrage d'isolat. Un isolat
+encore chaud continuerait de servir l'ancienne liste.
+
+### 4.5 Le dépôt
+
+Onze fichiers portaient une adresse en dur. Aucun n'aurait échoué au build en
+gardant l'ancienne.
+
+| Fichier | Ce qui change |
+|---|---|
+| `apps/site/index.html` | `canonical`, `og:url`, `og:image` |
+| `apps/site/public/robots.txt` | ligne `Sitemap:` |
+| `apps/site/public/sitemap.xml` | le `<loc>` |
+| `apps/site/src/vitrine/liens.ts` | `APP_COLLECTEUR`, `APP_ADMIN` |
+| `apps/collecteur/src/Connexion.tsx` | `VITRINE`, le lien de retour |
+| `supabase/functions/_shared/cors.ts` | les trois listes de repli |
+| `scripts/verifier-en-ligne.mjs` | les trois `CIBLES` |
+| `supabase/config.toml` | le commentaire nommant la Site URL distante |
+| trois fichiers de tests | les origines de référence |
+
+Les trois premiers sont les plus silencieux : une balise `canonical` restée sur
+`kolek-site.netlify.app` ne casse rien, ne se voit nulle part, et fait indexer
+par Google une adresse qui redirige. `manquesSeo()` existe pour ça — il compare
+les balises à l'origine **réellement interrogée**, et échoue tant qu'une seule
+est en arrière.
+
+### 4.6 Google Search Console
+
+Ajouter une propriété pour `kolek.cash`, et y soumettre
+`https://kolek.cash/sitemap.xml`.
+
+**Ne pas supprimer l'ancienne propriété.** La redirection 301 posée par Netlify
+transfère le signal d'indexation, et c'est dans l'ancienne propriété qu'on voit
+le transfert se faire. Elle s'éteindra d'elle-même.
+
+### 4.7 Vérification
+
+```bash
+npm run build && npm run verifier:en-ligne
+```
+
+Les `CIBLES` visent désormais `kolek.cash`. Le script contrôle sur les nouvelles
+adresses tout ce qu'il contrôlait sur les anciennes — CSP, HSTS, fuites de clés,
+fraîcheur du build, clé anonyme acceptée — plus les balises d'indexation, le
+sitemap, `og.png` et le `noindex` de `/inscription`.
+
+Et le contrôle que le script ne fait pas, parce qu'il porte sur ce qui doit
+**cesser** de servir :
+
+```bash
+curl -sI https://kolek-site.netlify.app | head -3
+```
+
+Attendu : `301`, et un `location:` vers `https://kolek.cash/`. Une réponse `200`
+signifie que le *primary domain* n'a pas été posé, et que deux origines servent
+la même application.
+
+---
+
+## 4 bis. Le courriel d'accès
+
+Deux fonctions envoient des courriels depuis le 2026-08-27 : `admin-demandes`
+quand elle accorde une demande d'ouverture, et `mot-de-passe-oublie`. Toutes
+deux passent par `_shared/passerelle-courriel.ts`, jamais par le mailer intégré
+de Supabase — celui-ci plafonne à deux messages par heure (`email_sent = 2`) et
+le troisième prospect de la journée ne recevrait rien **sans qu'aucune erreur ne
+le dise**.
+
+### a. Chez le fournisseur (Resend)
+
+1. Créer un compte, ajouter le domaine `kolek.cash`.
+2. Poser les enregistrements DNS qu'il indique — SPF, DKIM, et l'enregistrement
+   de retour. Tant qu'ils ne sont pas vérifiés, tout envoi est refusé en 403,
+   que `lireIssue` traduit en `IDENTIFIANTS_REFUSES`.
+3. Créer une clé d'API en écriture seule.
+
+### b. Secrets d'Edge Function
+
+Sur le projet Supabase, *Edge Functions → Secrets* :
+
+| Secret | Valeur |
+|---|---|
+| `COURRIEL_FOURNISSEUR` | `resend` |
+| `COURRIEL_CLE` | la clé d'API |
+| `COURRIEL_EXPEDITEUR` | `Kolek <acces@kolek.cash>` |
+| `REDIRECTION_MOT_DE_PASSE` | `https://app.kolek.cash/nouveau-mot-de-passe` |
+
+Sans les trois premiers, `passerelleDepuis` rend `null` : `admin-demandes` refuse
+d'accorder avec `COURRIEL_NON_CONFIGURE` et **ne crée rien**, et
+`mot-de-passe-oublie` rend `CONFIGURATION`. C'est délibéré — rien ne prétend
+avoir envoyé.
+
+`REDIRECTION_MOT_DE_PASSE` a une valeur par défaut dans le code. Le secret n'est
+utile que pour une pré-production.
+
+### c. Tableau de bord Auth
+
+*Authentication → URL Configuration → Redirect URLs* : ajouter
+`https://app.kolek.cash/nouveau-mot-de-passe`.
+
+**C'est le réglage qui ne prévient pas.** Absent, GoTrue renvoie silencieusement
+sur la Site URL : le prospect arrive sur l'écran de connexion, sans mot de passe,
+et croit que son compte n'existe pas. Aucune erreur nulle part.
+
+### d. Déployer les fonctions
+
+```bash
+npx supabase functions deploy demander-ouverture
+npx supabase functions deploy admin-demandes
+npx supabase functions deploy mot-de-passe-oublie
+```
+
+---
+
+## 5. Vérification après déploiement
 
 Le déploiement n'est pas terminé tant que ces points ne sont pas constatés sur
 l'environnement distant, pas sur le local.

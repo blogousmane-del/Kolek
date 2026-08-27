@@ -14,12 +14,12 @@
 
 /** L'application du collecteur. Site Netlify distinct — la vitrine y renvoie
     par une navigation ordinaire, ce qu'aucune directive CSP n'entrave. */
-export const APP_COLLECTEUR = 'https://kolek-collecteur.netlify.app';
+export const APP_COLLECTEUR = 'https://app.kolek.cash';
 
 /** L'administration GTCS. Non annoncée dans la navigation : elle ne s'adresse
     pas aux visiteurs, et la lister reviendrait à publier une cible. Elle
     figure dans la section Accès, nommée pour ce qu'elle est. */
-export const APP_ADMIN = 'https://kolek-admin.netlify.app';
+export const APP_ADMIN = 'https://admin.kolek.cash';
 
 /**
  * Le formulaire d'ouverture de compte.

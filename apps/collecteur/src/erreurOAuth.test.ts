@@ -20,7 +20,7 @@ import { lireErreurOAuth } from './erreurOAuth';
  * rencontrées, sans truquer l'objet `location` de jsdom.
  */
 
-const ORIGINE = 'https://kolek-collecteur.netlify.app';
+const ORIGINE = 'https://app.kolek.cash';
 
 describe('lecture d’une erreur OAuth au retour', () => {
   it('ne dit rien quand l’adresse ne porte aucune erreur', () => {

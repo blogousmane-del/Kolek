@@ -168,10 +168,11 @@ enabled = true
 # le vide sans message.
 #
 # **Cette valeur diverge légitimement du distant.** En production, la Site URL
-# vaut `https://kolek-collecteur.netlify.app`, et elle se pose dans le tableau
-# de bord Supabase — voir `Docs/deploiement.md` §2. C'est le seul réglage du
-# fichier dont la bonne valeur locale n'est pas la bonne valeur distante, et il
-# est nommé ici pour que la divergence soit une décision plutôt qu'un oubli.
+# vaut `https://app.kolek.cash` depuis le 2026-08-26 — `kolek-collecteur.netlify.app`
+# auparavant —, et elle se pose dans le tableau de bord Supabase, voir
+# `Docs/deploiement.md` §2. C'est le seul réglage du fichier dont la bonne valeur
+# locale n'est pas la bonne valeur distante, et il est nommé ici pour que la
+# divergence soit une décision plutôt qu'un oubli.
 site_url = "http://localhost:5173"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
@@ -188,6 +189,16 @@ additional_redirect_urls = [
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:5175",
+  # Où atterrissent le lien d'invitation et celui de réinitialisation, depuis le
+  # 2026-08-27. Le paragraphe ci-dessus vaut mot pour mot pour ces deux
+  # adresses : absentes de cette liste, elles ne provoquent aucune erreur — le
+  # prospect arrive sur l'écran de connexion, sans mot de passe, et conclut que
+  # son compte n'existe pas.
+  #
+  # **À poser aussi dans le tableau de bord du projet distant**, où la seconde
+  # ligne est la seule qui compte. Ce fichier ne pilote que la pile locale.
+  "http://localhost:5173/nouveau-mot-de-passe",
+  "https://app.kolek.cash/nouveau-mot-de-passe",
 ]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600

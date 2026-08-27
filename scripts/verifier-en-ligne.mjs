@@ -69,11 +69,17 @@ const EN_TETES_ATTENDUS = {
 };
 
 /**
- * HSTS ne se compare pas à l'identique : Netlify ajoute `preload` de son propre
- * chef sur les domaines `.netlify.app`. Refuser cette valeur reviendrait à
- * signaler comme un défaut une politique plus stricte que la nôtre. On vérifie
- * donc le plancher — un an, sous-domaines compris — et on laisse passer le
- * reste.
+ * HSTS ne se compare pas à l'identique : Netlify ajoutait `preload` de son
+ * propre chef sur les adresses `.netlify.app`. Refuser cette valeur reviendrait
+ * à signaler comme un défaut une politique plus stricte que la nôtre. On
+ * vérifie donc le plancher — un an, sous-domaines compris — et on laisse passer
+ * le reste.
+ *
+ * Depuis le passage à `kolek.cash` le 2026-08-26, `preload` n'est plus ajouté :
+ * il ne l'est que sur les domaines dont Netlify est propriétaire. Le plancher
+ * reste le bon contrôle, et il l'était déjà pour la mauvaise raison — c'est
+ * `includeSubDomains` qui compte désormais, puisqu'il couvre maintenant
+ * `app.` et `admin.`, servis par deux autres sites.
  */
 export function hstsSuffisant(valeur) {
   if (!valeur) return false;
@@ -103,9 +109,11 @@ export function cleAnonyme(texte) {
  * partagés redeviennent des adresses nues, et on l'apprend des semaines plus
  * tard en constatant que la page a quitté les résultats.
  *
- * `origine` est passée plutôt que codée en dur : le jour où un domaine propre
- * remplace `kolek-site.netlify.app`, ce contrôle doit échouer tant que les
- * balises n'ont pas suivi. C'est précisément à ce moment-là qu'on les oublie.
+ * `origine` est passée plutôt que codée en dur, et le 2026-08-26 a donné raison
+ * à ce choix : `kolek-site.netlify.app` a cédé la place à `kolek.cash`, et ces
+ * balises étaient les seules du dépôt à porter l'ancienne adresse **sans que
+ * rien ne casse** si on les oubliait. Le contrôle compare à l'origine réellement
+ * interrogée ; il échoue donc tant qu'une balise est restée en arrière.
  */
 export function manquesSeo(html, origine) {
   const manques = [];
@@ -156,10 +164,49 @@ export function manquesSeo(html, origine) {
   return manques;
 }
 
+/**
+ * Ce qui cloche dans la redirection de l'adresse qu'on a quittée.
+ *
+ * Le défaut visé est muet : si le *primary domain* n'est pas posé sur Netlify,
+ * l'ancienne adresse continue de **servir** l'application au lieu de rediriger.
+ * Rien n'a l'air cassé — les deux adresses répondent 200 — mais deux origines
+ * servent la même page, et les listes CORS des Edge Functions n'en nomment
+ * qu'une. Le formulaire marche depuis l'une, échoue depuis l'autre, selon le
+ * lien par lequel le visiteur est arrivé.
+ *
+ * Un 404 n'est pas davantage une réussite : le lien partagé la semaine dernière
+ * mène alors au vide plutôt qu'au nouveau domaine.
+ *
+ * Rend `null` quand il n'y a rien à redire — la redirection est le cas normal,
+ * et c'est le manquement qui doit porter un texte.
+ */
+export function manqueRedirection(statut, destination, attendue) {
+  if (statut === 200) {
+    return (
+      "sert encore l'application (200) — le domaine principal n'est pas posé sur " +
+      'Netlify, et deux origines servent la même page'
+    );
+  }
+  if (statut < 300 || statut >= 400) {
+    return `répond ${statut}, attendu une redirection vers ${attendue}`;
+  }
+
+  const sansBarre = (adresse) => String(adresse ?? '').replace(/\/+$/, '');
+  if (sansBarre(destination) !== sansBarre(attendue)) {
+    return `redirige vers ${destination ?? 'nulle part'}, attendu ${attendue}`;
+  }
+
+  return null;
+}
+
 export const CIBLES = [
   {
     nom: 'collecteur',
-    url: 'https://kolek-collecteur.netlify.app',
+    url: 'https://app.kolek.cash',
+    // L'adresse d'avant le 2026-08-26. Elle reste le nom permanent du site chez
+    // Netlify — c'est elle que visent les `CNAME` — et doit désormais rediriger
+    // plutôt que servir.
+    ancienne: 'https://kolek-collecteur.netlify.app',
     dist: 'apps/collecteur/dist',
     supabase: true,
     pwa: true,
@@ -169,7 +216,8 @@ export const CIBLES = [
   },
   {
     nom: 'admin',
-    url: 'https://kolek-admin.netlify.app',
+    url: 'https://admin.kolek.cash',
+    ancienne: 'https://kolek-admin.netlify.app',
     dist: 'apps/admin/dist',
     supabase: true,
     pwa: false,
@@ -179,7 +227,8 @@ export const CIBLES = [
   },
   {
     nom: 'site',
-    url: 'https://kolek-site.netlify.app',
+    url: 'https://kolek.cash',
+    ancienne: 'https://kolek-site.netlify.app',
     dist: 'apps/site/dist',
     // Passé à `true` le 2026-08-23. La vitrine était une brochure : elle ne
     // parlait à personne, et le contrôle exigeait `connect-src 'self'` seul.
@@ -413,6 +462,20 @@ async function verifier(cible) {
       inscription.headers.get('x-robots-tag') === 'noindex',
       `/inscription x-robots-tag = ${inscription.headers.get('x-robots-tag') ?? 'absent'}`,
     );
+  }
+
+  // L'adresse qu'on a quittée. Elle doit avoir cessé de servir — voir la note
+  // sur `manqueRedirection`. `redirect: 'manual'` est indispensable : sans lui,
+  // `fetch` suivrait la 301 et rendrait le 200 de la destination, ce qui ferait
+  // passer le contrôle quoi qu'il arrive.
+  if (cible.ancienne) {
+    const ancienne = await fetch(cible.ancienne, { redirect: 'manual' });
+    const manque = manqueRedirection(
+      ancienne.status,
+      ancienne.headers.get('location'),
+      cible.url,
+    );
+    constat(manque === null, `${cible.ancienne} — ${manque}`);
   }
 
   // La PWA. Un service worker mis en cache fige la version installée sur le

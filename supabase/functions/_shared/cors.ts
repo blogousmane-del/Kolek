@@ -84,9 +84,22 @@ export function entetesCors({
  * Déclarés **avant** `listerOrigines` : ils servent de valeur par défaut à son
  * paramètre, et une constante lue avant son initialisation lèverait une erreur
  * de zone morte temporelle si l'ordre venait à compter un jour.
+ *
+ * ## Ce sont des replis, pas la production
+ *
+ * Si les secrets `ORIGINES_ADMIN`, `ORIGINES_COLLECTEUR` et `ORIGINES_SITE`
+ * sont posés sur le projet Supabase, **ces trois lignes ne sont jamais lues**.
+ * Les corriger sans corriger les secrets ne change donc rien en ligne, et le
+ * dépôt donne alors l'impression rassurante d'un travail fait.
+ *
+ * C'est le piège du 2026-08-26, jour du passage à `kolek.cash` : les origines
+ * ont changé ici et dans le tableau de bord, dans le même mouvement. Le
+ * symptôme d'un oubli est un formulaire qui échoue avec « Failed to send a
+ * request to the Edge Function » — le navigateur refuse d'envoyer, la fonction
+ * ne voit rien passer, et les journaux Supabase sont vides.
  */
-export const ORIGINES_ADMIN = 'https://kolek-admin.netlify.app,http://localhost:5173';
-export const ORIGINES_COLLECTEUR = 'https://kolek-collecteur.netlify.app,http://localhost:5173';
+export const ORIGINES_ADMIN = 'https://admin.kolek.cash,http://localhost:5173';
+export const ORIGINES_COLLECTEUR = 'https://app.kolek.cash,http://localhost:5173';
 
 /**
  * La vitrine. Ajoutée le 2026-08-23 avec `demander-ouverture`, la seule
@@ -97,7 +110,7 @@ export const ORIGINES_COLLECTEUR = 'https://kolek-collecteur.netlify.app,http://
  * refuser par `est_admin()` — reviendrait à ouvrir une porte pour la refermer
  * derrière.
  */
-export const ORIGINES_SITE = 'https://kolek-site.netlify.app,http://localhost:5173';
+export const ORIGINES_SITE = 'https://kolek.cash,http://localhost:5173';
 
 export function listerOrigines(
   brut: string | undefined | null,

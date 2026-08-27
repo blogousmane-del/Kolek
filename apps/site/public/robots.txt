@@ -8,4 +8,4 @@ Allow: /
 # Le sitemap se déclare ici en plus d'être soumis dans Search Console : un robot
 # qui n'est pas Google ne lit que ce fichier, et l'adresse doit être absolue —
 # un chemin relatif est ignoré par la spécification.
-Sitemap: https://kolek-site.netlify.app/sitemap.xml
+Sitemap: https://kolek.cash/sitemap.xml

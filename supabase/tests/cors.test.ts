@@ -17,8 +17,8 @@ import { ENTETES_MINIMAUX, entetesCors, listerOrigines } from '../functions/_sha
  * Le premier test ci-dessous demande ce que le navigateur demande vraiment.
  */
 
-const ORIGINES = listerOrigines('https://kolek-admin.netlify.app,http://localhost:5173');
-const ADMIN = 'https://kolek-admin.netlify.app';
+const ORIGINES = listerOrigines('https://admin.kolek.cash,http://localhost:5173');
+const ADMIN = 'https://admin.kolek.cash';
 
 describe('en-têtes CORS', () => {
   it('accorde les quatre en-têtes que supabase-js envoie', () => {
@@ -55,9 +55,9 @@ describe('en-têtes CORS', () => {
     // même navigateur que la session de l'administrateur pourrait appeler la
     // fonction et lire la plateforme entière.
     for (const intruse of [
-      'https://kolek-admin.netlify.app.exemple.test',
+      'https://admin.kolek.cash.exemple.test',
       'https://exemple.test',
-      'http://kolek-admin.netlify.app',
+      'http://admin.kolek.cash',
       null,
     ]) {
       const entetes = entetesCors({
@@ -89,7 +89,7 @@ describe('en-têtes CORS', () => {
 
 describe('liste des origines', () => {
   it('retient le tableau de bord en ligne par défaut', () => {
-    expect(listerOrigines(undefined).has('https://kolek-admin.netlify.app')).toBe(true);
+    expect(listerOrigines(undefined).has('https://admin.kolek.cash')).toBe(true);
   });
 
   it('ignore les espaces et les entrées vides', () => {
