@@ -696,7 +696,17 @@ Si c'est un `200`, le domaine principal de l'étape 2 n'a pas pris. Y retourner.
 
 ---
 
-## Task 5 : Le contrôle qui refuse les deux origines
+## Task 5 : Le contrôle qui refuse les deux origines — ✅ TERMINÉE le 2026-08-27
+
+`manqueRedirection` est écrite, les trois cibles déclarent leur `ancienne`
+adresse, et `verifier()` interroge celle-ci avec `redirect: 'manual'`.
+`npm run test:scripts` : 6 fichiers, **71 tests**, tout au vert.
+
+Le contrôle **échouera** tant que la tâche 4 n'est pas faite — c'est son travail :
+aujourd'hui les trois adresses `.netlify.app` répondent encore 200 au lieu de
+rediriger.
+
+Les étapes ci-dessous sont conservées pour mémoire.
 
 L'anomalie de la tâche 4 étape 2 — domaine principal non posé — est silencieuse :
 les deux adresses répondent 200, tout a l'air de marcher, et seule la moitié des
@@ -976,8 +986,25 @@ tient toute la posture CORS, et il se vérifie en une ligne.
 
 ## Task 7 : Pousser le dépôt
 
-Les modifications sont déjà dans l'arbre de travail depuis le 2026-08-26. C'est
-ici, et pas avant, qu'elles partent.
+> **Le commit est fait — `b9982e7`, le 2026-08-27.** Ce qui reste est le **push**,
+> et lui seul était l'étape dangereuse : commiter ne déploie rien.
+>
+> **Mais le dépôt n'est plus sur `main`.** Le travail s'est poursuivi sur la
+> branche `invitation-et-mot-de-passe-oublie`, qui porte cinq commits d'une
+> autre fonctionnalité, et c'est là que la bascule de domaine a atterri — le
+> fichier `Connexion.tsx` ayant même été absorbé par le commit `11667e5` de cette
+> branche.
+>
+> Le déploiement continu de Netlify écoute `main`. Rien de ce qui est sur cette
+> branche n'est en ligne, et rien ne le sera tant qu'elle n'aura pas été fusionnée.
+> **À trancher avant d'aller plus loin** : fusionner la branche entière une fois
+> les deux chantiers terminés, ou détacher les trois commits de domaine vers
+> `main` séparément.
+>
+> Les étapes 1 à 4 ci-dessous sont faites. Reprendre à l'étape 5.
+
+Les modifications étaient dans l'arbre de travail depuis le 2026-08-26. C'est
+ici, et pas avant, qu'elles partent en ligne.
 
 **Fichiers :** les douze déjà modifiés, plus la documentation.
 
