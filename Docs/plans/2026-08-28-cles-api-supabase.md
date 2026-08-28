@@ -56,6 +56,37 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
 Mesuré le 2026-08-28 à 00 h 30 : **`200`**. Charge utile inchangée depuis le
 2026-08-16 — `iat = 1786918110`, signature `DZOkT8cl…`.
 
+## Résultat de la tâche 1, mesuré le 2026-08-28 — il supprime deux tâches
+
+La sonde a été déployée, interrogée, puis supprimée (404 confirmé). Voici ce
+qu'elle a rendu, et ce n'était pas ce qu'on attendait :
+
+| Variable injectée | Présente | Longueur | Préfixe |
+|---|---|---|---|
+| `SUPABASE_URL` | oui | 40 | `https://` |
+| `SUPABASE_ANON_KEY` | oui | 46 | **`sb_publi`** |
+| `SUPABASE_SERVICE_ROLE_KEY` | oui | 41 | **`sb_secre`** |
+| `SUPABASE_PUBLISHABLE_KEY` | non | — | — |
+| `SUPABASE_PUBLISHABLE_KEYS` | oui | 60 | `{"defaul` |
+| `SUPABASE_SECRET_KEY` | non | — | — |
+| `SUPABASE_SECRET_KEYS` | oui | 107 | `{"defaul` |
+
+**Supabase a déjà remplacé les valeurs derrière les anciens noms.** Les onze
+Edge Functions reçoivent déjà les clés du nouveau format — `sb_publishable_` et
+`sb_secret_` — sous les noms `SUPABASE_ANON_KEY` et `SUPABASE_SERVICE_ROLE_KEY`.
+
+Conséquence directe : **les tâches 2 et 3 sont sans objet.** Le résolveur
+`_shared/cles.ts` et la réécriture des onze fonctions ne servent à rien — le
+code lit déjà les bonnes clés sans le savoir. Écrire ce résolveur aurait été du
+travail parfaitement inutile, découvert seulement à la fermeture.
+
+Les variantes au pluriel sont des **objets JSON** (`{"default":…`), pas des
+listes séparées par des virgules : elles ne sont pas destinées à être lues
+directement, et rien n'a besoin d'y toucher.
+
+Ce qui reste à faire est donc uniquement là où le **format hérité** est encore
+en place : les paquets servis par les trois sites, et le secret du Vault.
+
 ## État de départ
 
 - Le projet a **déjà migré** vers les JWT Signing Keys. Le secret hérité ne sert
@@ -88,7 +119,15 @@ Mesuré le 2026-08-28 à 00 h 30 : **`200`**. Charge utile inchangée depuis le
 
 ---
 
-## Task 1 : Savoir ce que la plateforme injecte vraiment
+## Task 1 : Savoir ce que la plateforme injecte vraiment — ✅ TERMINÉE le 2026-08-28
+
+Voir le tableau en tête de plan. La sonde a été déployée, interrogée, puis
+supprimée — `404` confirmé, aucune trace dans le dépôt, jamais commitée.
+
+Elle a rendu l'inverse de ce qu'on attendait, et supprimé deux tâches. Les
+étapes ci-dessous restent, parce que la méthode resservira : la prochaine fois
+qu'une plateforme changera un contrat sous nos pieds, c'est ainsi qu'on le
+saura avant d'écrire du code pour rien.
 
 Aucune ligne de code ne peut être écrite correctement sans cette réponse : les
 noms sont au pluriel, et une valeur au pluriel est probablement une liste. Une
@@ -190,7 +229,16 @@ ligne. Une mesure non écrite est une mesure à refaire.
 
 ---
 
-## Task 2 : Un résolveur de clés qui accepte les deux noms
+## Task 2 : ~~Un résolveur de clés qui accepte les deux noms~~ — SANS OBJET
+
+**La tâche 1 l'a rendue inutile** : `SUPABASE_SERVICE_ROLE_KEY` porte déjà une
+clé `sb_secret_`, et `SUPABASE_ANON_KEY` une clé `sb_publishable_`. Le code lit
+déjà les bonnes clés sans le savoir.
+
+Les étapes ci-dessous sont conservées pour mémoire — **elles ne doivent pas être
+exécutées**. Écrire ce résolveur aurait coûté une demi-journée, et le travail
+n'aurait été reconnu inutile qu'à la fermeture : plus rien n'aurait cassé, et on
+aurait cru que c'était grâce à lui.
 
 C'est la pièce qui rend la bascule réversible. Le code cesse de nommer une clé
 précise et demande « la clé secrète », que la plateforme la fournisse sous
@@ -402,7 +450,11 @@ FIN
 
 ---
 
-## Task 3 : Les onze fonctions passent par le résolveur
+## Task 3 : ~~Les onze fonctions passent par le résolveur~~ — SANS OBJET
+
+Même motif que la tâche 2 : les onze fonctions reçoivent déjà les clés du
+nouveau format. Aucune n'a besoin d'être touchée, et aucune ne cassera à la
+fermeture. **À ne pas exécuter.**
 
 Purement mécanique, et c'est voulu : la décision a été prise en tâche 2. Ici on
 ne fait que remplacer un `Deno.env.get` par un appel.
