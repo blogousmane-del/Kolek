@@ -56,11 +56,16 @@
 -- collecteur ni client réels — `alter table … disable trigger all` ne passe
 -- pas, le rôle `postgres` de Supabase n'étant pas superutilisateur.
 
+-- `pg_temp` quitte le `search_path`, présent depuis l'origine. Dans une
+-- `security definer`, il laisse un rôle capable de créer des objets temporaires
+-- masquer une référence non qualifiée du corps. Rien n'est exploitable
+-- aujourd'hui — tout est qualifié, et `pg_catalog` passe d'office avant — mais
+-- c'est une mine posée sous la prochaine ligne qu'on écrira ici sans y penser.
 create or replace function public.avis_declencher_drainage()
 returns text
 language plpgsql
 security definer
-set search_path = public, extensions, pg_temp
+set search_path = public, extensions
 as $fn$
 declare
   adresse text;
@@ -115,6 +120,40 @@ $fn$;
 revoke all on function public.avis_declencher_drainage() from public;
 revoke all on function public.avis_declencher_drainage() from anon;
 revoke all on function public.avis_declencher_drainage() from authenticated;
+
+-- `service_role` manquait à la liste depuis l'origine, et l'audit du
+-- 2026-08-28 l'a trouvé : `select proacl` rendait `service_role=X/postgres`.
+-- Supabase accorde d'office l'exécution des fonctions neuves aux trois rôles de
+-- l'API de données ; en révoquer deux sur trois laisse la porte entrouverte.
+--
+-- Ce n'est pas une brèche : la clé secrète qui porte ce rôle ouvre déjà toute
+-- la base, et cette fonction ne rend rien qu'elle ne sache déjà. C'est une
+-- déviation de l'intention écrite juste au-dessus — « les révocations ne sont
+-- pas optionnelles » — et un chemin d'exécution que personne n'emprunte. Seul
+-- pg_cron appelle cette fonction, sous `postgres`, qui en est le propriétaire.
+revoke all on function public.avis_declencher_drainage() from service_role;
+
+/* ------------------------------ Garde-fou -------------------------------- */
+
+-- Celui de `20260823170000` interrogeait `anon` et `authenticated`. Il aurait
+-- laissé passer ce que l'audit vient de trouver, parce qu'il ne demandait pas.
+-- Un garde-fou qui ne couvre pas tous les rôles de l'API de données donne la
+-- tranquillité sans la garantie — c'est pire que pas de garde-fou du tout.
+do $garde$
+declare
+  role_ouvert text;
+begin
+  select r into role_ouvert
+    from unnest(array['anon', 'authenticated', 'service_role']) as r
+   where has_function_privilege(r, 'public.avis_declencher_drainage()', 'execute')
+   limit 1;
+
+  if role_ouvert is not null then
+    raise exception
+      'GARDE_FOU : la fonction qui lit la clé de service est appelable par « % ».', role_ouvert;
+  end if;
+end;
+$garde$;
 
 comment on function public.avis_declencher_drainage() is
   'Réveille envoyer-avis quand la file n''est pas vide. Lit l''adresse et la clé de service dans Vault ; rend un état nommé si elles sont absentes, si l''adresse n''est pas une origine https, ou si la clé n''a pas la forme sb_secret_ ni eyJ.';
