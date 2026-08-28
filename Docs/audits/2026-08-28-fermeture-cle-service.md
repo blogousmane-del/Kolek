@@ -201,23 +201,21 @@ s'y trompe pas : son motif exige `sb_secret_[A-Za-z0-9_-]{8,}`. Une sonde écrit
 
 ## Ce qui reste ouvert
 
-- **`JWT_KEY`, 88 caractères, posée sur les trois sites Netlify et référencée
-  nulle part dans le dépôt.** Du matériel de clé sans usage. Elle n'atteint pas
-  le navigateur — seules les variables préfixées `VITE_` y vont — mais une
-  valeur secrète que personne ne lit est une valeur que personne ne surveille.
+- ~~**`JWT_KEY`, 88 caractères, posée sur les trois sites Netlify.**~~
+  **Retirée des trois le 2026-08-28**, vérifié par l'API : il ne reste que
+  `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`.
 
-  Son horodatage la date : posée le **2026-08-25 vers 14h48**, une demi-heure
-  après la modification des clés anon des trois sites le même jour. C'est-à-dire
-  pendant la tentative de suivre l'audit du 25, qui prescrivait *Generate new
-  secret*. L'hypothèse la plus simple est qu'il s'agit du secret JWT du projet,
-  collé dans trois environnements de construction au lieu du tableau de bord
-  Supabase.
+  Elle était référencée nulle part dans le dépôt, et son horodatage la datait —
+  posée le 2026-08-25 vers 14h48, une demi-heure après la modification des clés
+  anon des trois sites le même jour, c'est-à-dire pendant la tentative de suivre
+  l'audit du 25 qui prescrivait *Generate new secret*. Du matériel de clé rangé
+  au mauvais endroit, que personne ne lisait, donc que personne ne surveillait.
 
-  Deux gestes, dans cet ordre : **la retirer des trois sites Netlify**, puis
-  **vérifier dans Supabase → JWT Keys si la clé héritée est encore acceptée en
-  vérification**. Si elle l'est, un porteur de cette valeur peut forger un jeton
-  de session pour n'importe quel collecteur — ce que la désactivation des clés
-  d'API du 2026-08-28 ne ferme pas, les deux mécanismes étant distincts.
+  **Le second geste reste à faire :** vérifier dans **Supabase → JWT Keys** si la
+  clé héritée est encore acceptée en vérification. Si elle l'est, un porteur de
+  cette valeur pourrait forger un jeton de session pour n'importe quel
+  collecteur — ce que la désactivation des clés d'API du 2026-08-28 ne ferme
+  pas, les deux mécanismes étant distincts.
 - ~~**`avis_declencher_drainage` accepte n'importe quelle valeur non nulle.**~~
   **Corrigé** par `20260828100000_avis_drainage_secret_plausible.sql` : deux
   états nommés de plus, `SECRET_INVALIDE` et `ADRESSE_INVALIDE`. Les cinq
