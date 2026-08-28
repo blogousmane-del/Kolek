@@ -52,13 +52,20 @@ const temoin = (nom: string) => ({ [nom]: () => <div>écran {nom}</div> });
 vi.mock('./ecrans/Alertes', () => temoin('Alertes'));
 vi.mock('./ecrans/Avis', () => temoin('Avis'));
 vi.mock('./ecrans/Bilan', () => temoin('Bilan'));
-vi.mock('./ecrans/Encaisser', () => temoin('Encaisser'));
 vi.mock('./ecrans/Plus', () => temoin('Plus'));
 vi.mock('./ecrans/Rapprochement', () => temoin('Rapprochement'));
 vi.mock('./ecrans/Recus', () => temoin('Recus'));
 
 // L'écran d'encaissement, bavard : il dit ce que la coquille lui donne. C'est
 // exactement ce que le vrai fait — tout son corps est sous `{!carte ? … : …}`.
+//
+// **`Encaisser` est délibérément absent de la liste des témoins muets
+// ci-dessus.** Il y figurait, et ce doublon a tenu la suite en échec :
+// `vi.mock` garde la **première** inscription pour un chemin donné, si bien que
+// le témoin muet écrasait celui-ci. Le symptôme est trompeur — deux tests
+// échouent sur un texte introuvable, `carte k7 · jour 17`, comme si la coquille
+// ne transmettait plus la carte, alors que c'est le témoin qui ne l'affiche
+// pas. Rien dans la sortie de Vitest ne signale la simulation en double.
 vi.mock('./ecrans/Encaisser', () => ({
   Encaisser: ({
     carte,
