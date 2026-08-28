@@ -90,12 +90,26 @@ export function hstsSuffisant(valeur) {
 /**
  * Extrait la clé anonyme d'un artefact servi.
  *
- * L'expression part de `eyJ` — l'en-tête JWT encodé — et **pas** du segment de
- * charge utile, qui commence lui aussi par `eyJ`. C'est la nuance qui rendait
- * une clé amputée indiscernable d'une clé entière : une correspondance qui
- * démarre au milieu du jeton en rend un fragment plausible.
+ * **Deux formats, et c'est voulu.** Depuis le 2026-08-28, le projet migre des
+ * clés héritées `anon` vers les clés `publishable`, et la bascule se fait site
+ * par site : pendant un temps, deux des trois paquets portent l'ancien format
+ * et le troisième le neuf. Un contrôle qui n'en lirait qu'un crierait sur un
+ * déploiement sain — et un garde-fou qui crie à tort finit par être ignoré.
+ *
+ * Pour le format hérité, l'expression part de `eyJ` — l'en-tête JWT encodé — et
+ * **pas** du segment de charge utile, qui commence lui aussi par `eyJ`. C'est
+ * la nuance qui rendait une clé amputée indiscernable d'une clé entière : une
+ * correspondance qui démarre au milieu du jeton en rend un fragment plausible.
  */
 export function cleAnonyme(texte) {
+  // Le format neuf d'abord. `sb_publishable_` est sans ambiguïté, et surtout
+  // `sb_secret_` **ne correspond pas** : la confondre avec la clé publique
+  // ferait passer une fuite pour un déploiement normal — le contrôle dirait
+  // « clé servie, et acceptée par le projet », ce qui serait vrai et
+  // catastrophique. C'est `verifier-bundles.mjs` qui traque celle-là.
+  const publiable = texte.match(/sb_publishable_[A-Za-z0-9_-]{8,}/);
+  if (publiable) return publiable[0];
+
   const trouve = texte.match(/eyJhbGciOi[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/);
   return trouve ? trouve[0] : null;
 }
@@ -395,7 +409,8 @@ async function verifier(cible) {
     if (cleServie === null) {
       echecs.push(
         'aucune clé anonyme reconnaissable dans les artefacts servis — ' +
-          "variable d'environnement absente au build, ou clé tronquée (elle doit commencer par « eyJhbGciOi »)",
+          "variable d'environnement absente au build, ou clé tronquée — elle doit " +
+          'commencer par « sb_publishable_ », ou par « eyJhbGciOi » tant que le format hérité sert',
       );
     } else {
       const essai = await fetch(`https://${PROJET}.supabase.co/auth/v1/settings`, {

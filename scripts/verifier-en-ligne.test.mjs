@@ -257,6 +257,30 @@ describe('cleAnonyme', () => {
     const amputee = ENTIERE.slice(1);
     expect(cleAnonyme('vl=`' + amputee + '`')).toBeNull();
   });
+
+  it('reconnaît une clé publiable du nouveau format', () => {
+    // Ajouté le 2026-08-28, avant la bascule vers les clés `publishable`. Sans
+    // ce cas, le contrôle rendrait « aucune clé anonyme reconnaissable » sur un
+    // déploiement parfaitement sain — et un garde-fou qui crie à tort finit par
+    // être ignoré. C'est celui-là qui a attrapé la clé amputée du 2026-08-23.
+    const paquet = 'var _l=`https://x.supabase.co`,vl=`sb_publishable_ACJWlzQHlZjBrEguHvfOxg`;';
+    expect(cleAnonyme(paquet)).toBe('sb_publishable_ACJWlzQHlZjBrEguHvfOxg');
+  });
+
+  it('reconnaît encore un JWT, tant que les deux formats coexistent', () => {
+    // La bascule se fait site par site : pendant un temps, deux des trois
+    // paquets portent l'ancien format et le troisième le neuf.
+    expect(cleAnonyme('vl=`' + ENTIERE + '`')).toBe(ENTIERE);
+  });
+
+  it('ne prend pas une clé secrète pour une clé publiable', () => {
+    // Une `sb_secret_` ne doit jamais atteindre un paquet, et
+    // `verifier-bundles.mjs` la refuse déjà. Mais si elle y était, la confondre
+    // avec la clé publique ferait passer la fuite pour un déploiement normal —
+    // le contrôle dirait « clé servie, et acceptée par le projet », ce qui
+    // serait vrai et catastrophique.
+    expect(cleAnonyme('const k="sb_secret_AbCdEf123456789";')).toBeNull();
+  });
 });
 
 describe('manqueRedirection', () => {
