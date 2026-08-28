@@ -462,17 +462,50 @@ leçon. D'où, dans chacun des trois fichiers :
   publish = "apps/site/dist"
 ```
 
-**Variables d'environnement.** Uniquement sur les deux applications :
+**Variables d'environnement.** Sur les **trois** sites :
 
 ```
 VITE_SUPABASE_URL      = https://<ref>.supabase.co
-VITE_SUPABASE_ANON_KEY = <clé anonyme du projet>
+VITE_SUPABASE_ANON_KEY = sb_publishable_<…>
 ```
 
-`kolek-site` n'en prend aucune. Il ne parle à aucune API — sa page de tarifs est
-statique et son formulaire de paiement est délibérément inerte, faute de
-partenaire agréé (cahier §11). Lui donner une clé, même anonyme, serait exposer
-un secret sans usage.
+Ce paragraphe disait « uniquement sur les deux applications », au motif que
+`kolek-site` ne parlait à aucune API. Ce n'est plus vrai depuis le 2026-08-23 :
+la vitrine dépose une demande d'ouverture par `demander-ouverture`, et il lui
+faut la clé publique comme aux deux autres. Corrigé le 2026-08-28 — une phrase
+juste à l'écriture qui cesse de l'être en silence est plus coûteuse qu'une
+phrase absente.
+
+**Le nom de la variable ment depuis le 2026-08-28, et il faut le savoir.** Elle
+s'appelle toujours `VITE_SUPABASE_ANON_KEY`, mais elle ne porte plus un jeton
+`anon` : elle porte une clé **publiable**, `sb_publishable_…`, 46 caractères. Le
+nom est conservé parce que c'est celui que le code lit ; le renommer imposerait
+de toucher les trois applications pour un gain nul.
+
+Le contrat des clés, depuis la fermeture de l'incident du 2026-08-24 (voir
+`Docs/audits/2026-08-28-fermeture-cle-service.md`) :
+
+| Clé | Forme | Où elle vit | Qui la voit |
+|---|---|---|---|
+| Publiable | `sb_publishable_…`, 46 car | Les trois sites Netlify, les six `.env` locaux | Tout le monde — elle est dans le JavaScript servi |
+| Secrète | `sb_secret_…`, 41 car | Secret Supabase des Edge Functions, Vault `kolek_cle_service` | Personne hors du serveur |
+| `anon` héritée | JWT, 208 car | Nulle part | **Désactivée le 2026-08-28** |
+| `service_role` héritée | JWT, 219 car | Nulle part | **Désactivée le 2026-08-28** |
+
+Les deux dernières lignes rendent `401` sur l'authentification comme sur la
+lecture de table. C'est la mesure qui a clos l'incident, et celle à reprendre si
+un doute revient :
+
+```bash
+# Attendu : 401. Un 200 signifierait que les clés héritées ont été réactivées.
+curl -s -o /dev/null -w "%{http_code}\n" \
+  "https://<ref>.supabase.co/auth/v1/settings" -H "apikey: <ancienne clé anon>"
+```
+
+Les Edge Functions, elles, n'ont demandé aucune modification : la plateforme
+injecte `sb_secret_` dans `SUPABASE_SERVICE_ROLE_KEY` et `sb_publishable_` dans
+`SUPABASE_ANON_KEY` — mêmes noms, contenu neuf. C'est une sonde qui l'a établi,
+et elle a supprimé deux tâches sur huit du plan de fermeture.
 
 **Content-Security-Policy — resserrée le 2026-08-17.** Les `netlify.toml` des
 deux applications nommaient `connect-src https://*.supabase.co`, faute de

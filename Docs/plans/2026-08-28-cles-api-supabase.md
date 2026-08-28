@@ -1,5 +1,11 @@
 # Fermer la clé `service_role` publiée le 2026-08-24 — plan d'implémentation
 
+> **✅ PLAN TERMINÉ le 2026-08-28.** Les clés héritées sont désactivées.
+> L'ancienne clé `anon` et le jeton `service_role` diffusé le 2026-08-24 rendent
+> `401` sur l'authentification comme sur la lecture de table. Quatre jours
+> d'exposition. Compte rendu, incidents de parcours et points restés ouverts :
+> `Docs/audits/2026-08-28-fermeture-cle-service.md`.
+
 > **Pour un agent d'exécution :** SOUS-COMPÉTENCE REQUISE — utiliser
 > `superpowers:executing-plans` ou `superpowers:subagent-driven-development`
 > pour dérouler ce plan tâche par tâche. Les étapes portent des cases à cocher
@@ -559,7 +565,7 @@ FIN
 
 ---
 
-## Task 4 : `cleAnonyme` reconnaît une clé publiable
+## Task 4 : `cleAnonyme` reconnaît une clé publiable — ✅ TERMINÉE le 2026-08-28
 
 Sans cette tâche, la tâche 5 casse le contrôle d'après-déploiement — et un
 contrôle qui crie à tort finit par être ignoré, c'est écrit en toutes lettres en
@@ -678,7 +684,7 @@ FIN
 
 ---
 
-## Task 5 : Les trois sites servent la clé publiable
+## Task 5 : Les trois sites servent la clé publiable — ✅ TERMINÉE le 2026-08-28
 
 **Fichiers :** aucun dans le dépôt. Variables d'environnement Netlify.
 
@@ -733,7 +739,7 @@ en une minute.
 
 ---
 
-## Task 6 : Le secret du Vault
+## Task 6 : Le secret du Vault — ✅ TERMINÉE le 2026-08-28
 
 Celui qu'on oublie, et dont l'oubli ne casse **rien de visible**.
 `avis_declencher_drainage` lit `kolek_cle_service` pour réveiller `envoyer-avis`.
@@ -789,7 +795,7 @@ application.
 
 ---
 
-## Task 7 : Fermer les clés héritées
+## Task 7 : Fermer les clés héritées — ✅ TERMINÉE le 2026-08-28
 
 Le geste qui referme le 24 août. Toutes les surfaces portent désormais les clés
 neuves, et les tâches 3 à 6 l'ont prouvé une par une.
@@ -838,7 +844,7 @@ ainsi qu'on est resté quatre jours avec une clé publiée.
 
 ---
 
-## Task 8 : Consigner
+## Task 8 : Consigner — ✅ TERMINÉE le 2026-08-28
 
 **Fichiers :**
 - Modifier : `Docs/deploiement.md`
