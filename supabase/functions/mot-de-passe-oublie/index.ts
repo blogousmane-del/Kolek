@@ -4,6 +4,7 @@ import { ORIGINES_COLLECTEUR, entetesCors, listerOrigines } from '../_shared/cor
 import { empreinteRequete } from '../_shared/debit.ts';
 import { composer } from '../_shared/message-acces.ts';
 import { envoyer, passerelleDepuis } from '../_shared/passerelle-courriel.ts';
+import { plancherDepuis, tenirPlancher } from '../_shared/plancher.ts';
 import { validerEmail } from '../_shared/valider-email.ts';
 
 /**
@@ -42,6 +43,22 @@ import { validerEmail } from '../_shared/valider-email.ts';
  * forme est visible du client, elle ne renseigne sur aucun compte, et le
  * silence ferait chercher longtemps quelqu'un qui a fait une faute de frappe.
  *
+ * ## La quatrième conséquence, ajoutée le 2026-08-29
+ *
+ * Les trois précédentes regardent toutes le **contenu** de la réponse. Aucune
+ * ne regardait sa **durée** — et les trois chemins ne coûtent pas la même
+ * chose. Le chemin nominal appelle la passerelle de courriel ; les deux autres
+ * non. Plusieurs centaines de millisecondes séparaient donc « adresse connue »
+ * de « adresse inconnue », et cet écart se chronomètre en boucle depuis
+ * n'importe quel navigateur.
+ *
+ * Un corps de réponse identique livré à des instants distincts n'est pas une
+ * réponse identique. `_shared/plancher.ts` retient chaque réponse **du domaine
+ * où les chemins divergent** jusqu'à un instant fixe compté depuis l'entrée.
+ * Toutes les sorties situées après la validation d'adresse passent par
+ * `repondreTenu` — en manquer une seule rouvrirait la fuite, puisqu'il suffit
+ * d'un chemin distinguable pour distinguer.
+ *
  * ## Aucun appel ne liste les comptes
  *
  * `generateLink` refuse de lui-même une adresse inconnue : il sert donc à la
@@ -79,7 +96,27 @@ function reponse(corps: unknown, statut: number, requete: Request): Response {
   return new Response(JSON.stringify(corps), { status: statut, headers: entetesPour(requete) });
 }
 
+/** Lu une fois au chargement du module, comme les origines et la redirection.
+    Le relire à chaque requête coûterait un accès environnement par appel sans
+    rien apporter : une variable ne change pas sans redéploiement. */
+const PLANCHER_MS = plancherDepuis(Deno.env.toObject());
+
 Deno.serve(async (requete) => {
+  const debut = Date.now();
+
+  /**
+   * Toute sortie postérieure à la validation d'adresse passe par ici.
+   *
+   * Les sorties antérieures — méthode refusée, corps illisible, adresse mal
+   * formée — répondent sans attendre : elles sont volontairement
+   * distinguables, ne dépendent d'aucun compte, et les retenir n'ajouterait
+   * qu'une seconde d'attente à une faute de frappe.
+   */
+  const repondreTenu = async (corps: unknown, statut: number): Promise<Response> => {
+    await tenirPlancher(debut, PLANCHER_MS);
+    return reponse(corps, statut, requete);
+  };
+
   if (requete.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: entetesPour(requete) });
   }
@@ -101,7 +138,7 @@ Deno.serve(async (requete) => {
   const cleService = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!url || !cleService) {
     console.error('Configuration incomplète.');
-    return reponse({ erreur: 'CONFIGURATION' }, 500, requete);
+    return await repondreTenu({ erreur: 'CONFIGURATION' }, 500);
   }
 
   // Avant la borne : voir l'en-tête. Une configuration absente doit produire la
@@ -109,7 +146,7 @@ Deno.serve(async (requete) => {
   const passerelle = passerelleDepuis(Deno.env.toObject());
   if (!passerelle) {
     console.error('COURRIEL_FOURNISSEUR / COURRIEL_CLE / COURRIEL_EXPEDITEUR absents.');
-    return reponse({ erreur: 'CONFIGURATION' }, 500, requete);
+    return await repondreTenu({ erreur: 'CONFIGURATION' }, 500);
   }
 
   const client = createClient(url, cleService, {
@@ -123,7 +160,7 @@ Deno.serve(async (requete) => {
   });
 
   // Au-delà : la réponse nominale, sans rien envoyer.
-  if (dansLePlafond !== true) return reponse(NOMINALE, 200, requete);
+  if (dansLePlafond !== true) return await repondreTenu(NOMINALE, 200);
 
   const { data, error } = await client.auth.admin.generateLink({
     type: 'recovery',
@@ -135,7 +172,7 @@ Deno.serve(async (requete) => {
     // Adresse inconnue, le plus souvent. Journalisé en `info` : ce n'est pas un
     // incident, et le noter en erreur ferait du bruit à chaque faute de frappe.
     console.info('lien de réinitialisation non engendré :', error?.message ?? 'sans propriétés');
-    return reponse(NOMINALE, 200, requete);
+    return await repondreTenu(NOMINALE, 200);
   }
 
   const { sujet, corps } = composer({
@@ -150,5 +187,5 @@ Deno.serve(async (requete) => {
     console.error('courriel de réinitialisation non parti :', issue.raison);
   }
 
-  return reponse(NOMINALE, 200, requete);
+  return await repondreTenu(NOMINALE, 200);
 });
