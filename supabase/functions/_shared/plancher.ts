@@ -43,16 +43,40 @@
  *
  * ## Calibrer
  *
- * `PLANCHER_REPONSE_MS` sur le projet Supabase. Pour choisir la valeur, lire
- * dans les journaux de la fonction la durée du chemin le plus lent — celui qui
- * a réellement appelé la passerelle — et prendre confortablement au-dessus. Le
- * défaut ci-dessous est posé pour la latence observée depuis Abidjan vers
- * Resend ; une passerelle plus lente demande de le relever.
+ * `PLANCHER_REPONSE_MS` sur le projet Supabase, pour corriger sans redéployer
+ * le code. Le défaut ci-dessous porte la mesure et la méthode pour la refaire.
+ * Une passerelle plus lente, ou un changement d'hébergement, demandent de le
+ * reprendre — un plancher calibré une fois et jamais revérifié redevient une
+ * supposition.
  */
 
-/** Le défaut. Au-dessus du chemin lent observé, sous le seuil où un formulaire
-    paraît figé. */
-export const PLANCHER_DEFAUT_MS = 1200;
+/**
+ * Le défaut, **mesuré** en production le 2026-08-29, pas supposé.
+ *
+ * Premier jet à 1200 ms, choisi au jugé. La mesure l'a démenti le jour même :
+ *
+ * | Chemin | Durée observée depuis Abidjan |
+ * |---|---|
+ * | Adresse mal formée (sort avant le plancher) | 426 ms |
+ * | Borné — travail quasi nul, retenu par le plancher | 1525 ms |
+ * | Dans le plafond — `consommer_debit` + `generateLink` | 2280 ms |
+ *
+ * Les 1525 ms prouvent que le plancher retient : sans lui ce chemin sortirait
+ * vers 430 ms, comme le témoin. Mais 2280 ms le dépassent de 700 ms — le
+ * chemin nominal n'était donc pas couvert, et l'écart subsistait, atténué. Un
+ * plancher sous le pire cas ne mesure que la confiance qu'on lui accorde.
+ *
+ * 3000 ms couvre le chemin observé le plus lent — auquel s'ajoute encore
+ * l'appel à la passerelle sur une adresse connue — avec de la marge. C'est
+ * long pour un formulaire ; c'est un geste rare, et la seule alternative
+ * honnête serait de rendre `generateLink` plus rapide, ce qui n'est pas à
+ * notre main.
+ *
+ * Le mesurer à nouveau : trois appels sur une adresse bien formée et
+ * inexistante suffisent à épuiser le plafond, et l'écart entre le troisième et
+ * le quatrième donne directement ce que le plancher doit couvrir.
+ */
+export const PLANCHER_DEFAUT_MS = 3000;
 
 /** Le plafond. Un zéro de trop dans le tableau de bord tiendrait la requête
     ouverte jusqu'au délai de la plateforme, et le formulaire paraîtrait cassé —
