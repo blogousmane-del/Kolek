@@ -31,3 +31,12 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Kits de référence déposés pour consultation
+#
+# `Docs/izikit-main/` est un starter tiers, lu le 2026-08-29 pour en extraire
+# des invariants de sécurité. Il n'est pas du code de Kolek : le verser ici
+# ajouterait ses dépendances, sa licence et son historique à un dépôt public,
+# pour un contenu qu'on ne maintient pas. Ses enseignements vivent dans
+# `Docs/audits/`, pas dans l'arborescence.
+Docs/izikit-main/
