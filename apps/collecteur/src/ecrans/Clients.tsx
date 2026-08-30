@@ -6,6 +6,9 @@ import {
   Bouton,
   Carte,
   Icone,
+  Rosace,
+  SqueletteKPI,
+  SqueletteLigne,
   useEnLigne,
   type Statut,
 } from '@kolek/ui';
@@ -260,56 +263,75 @@ export function Clients({
 
   return (
     <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-large">
-      {/* En-tête sombre */}
-      <div className="bg-sidebar px-marge pt-entete pb-5 lg:rounded-2xl lg:pt-6">
-        <div className="flex items-center justify-between mb-5">
+      {/* En-tête sombre immersif */}
+      <div className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pt-entete pb-7 shadow-lg lg:rounded-3xl lg:pt-6">
+        <Rosace
+          petales={18}
+          excentricite={0.35}
+          animee
+          className="pointer-events-none absolute -right-[15%] -top-[20%] w-[65vmin] text-or/10 lg:w-96"
+        />
+
+        <div className="relative z-10 flex items-center justify-between mb-2">
           <div>
-            <p className="text-white/60 text-sm font-body">Bonjour,</p>
-            <p className="text-white font-headings font-bold text-2xl">Mes clients</p>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-white/10 text-white/70 text-xs font-body font-medium mb-1 backdrop-blur-xs">
+              <span className="w-1.5 h-1.5 rounded-pill bg-chart-mint" />
+              Portefeuille
+            </span>
+            <p className="text-white font-headings font-bold text-2xl tracking-tight">Mes clients</p>
           </div>
           <button
             type="button"
             onClick={onDeconnexion}
             aria-label="Se déconnecter"
-            className="w-9 h-9 rounded-pill bg-white/10 flex items-center justify-center cursor-pointer"
+            className="anim-pression w-10 h-10 rounded-pill bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-md flex items-center justify-center cursor-pointer transition-colors shadow-xs"
           >
-            <Icone nom="log-out" className="text-white" />
+            <Icone nom="log-out" className="text-white" taille={18} />
           </button>
         </div>
-        {!enLigne && <BandeauHorsLigne className="mb-1" />}
+        {!enLigne && <BandeauHorsLigne className="mt-3 relative z-10" />}
       </div>
 
-      {/* Résumé — trois nombres que la base sait vraiment donner. */}
-      <div className="mx-4 -mt-4 bg-surface rounded-xl border border-hairline p-4 flex items-center justify-between shadow-md">
+      {/* Résumé — trois nombres clés */}
+      <div className="mx-4 -mt-5 relative z-20 bg-surface rounded-2xl border border-hairline/80 p-3.5 xs:p-4 flex items-center justify-between shadow-md backdrop-blur-xs">
         <div className="text-center flex-1 min-w-0">
-          <p className="text-xs text-muted-foreground font-body">Clients</p>
-          <p className="font-headings font-bold text-xl text-ink tabular-nums">
-            {lignes ? clientsDistincts : '—'}
-          </p>
+          <p className="text-[11px] text-muted-foreground font-body font-medium mb-0.5">Clients</p>
+          {lignes ? (
+            <p className="font-headings font-bold text-xl text-ink tabular-nums tracking-tight">
+              {clientsDistincts}
+            </p>
+          ) : (
+            <SqueletteKPI />
+          )}
         </div>
         <div className="w-px h-8 bg-hairline" />
         <div className="text-center flex-1 min-w-0">
-          <p className="text-xs text-muted-foreground font-body">Cartes actives</p>
-          <p className="font-headings font-bold text-xl text-ink tabular-nums">
-            {lignes ? cartesActives : '—'}
-          </p>
+          <p className="text-[11px] text-muted-foreground font-body font-medium mb-0.5">Cartes actives</p>
+          {lignes ? (
+            <p className="font-headings font-bold text-xl text-ink tabular-nums tracking-tight">
+              {cartesActives}
+            </p>
+          ) : (
+            <SqueletteKPI />
+          )}
         </div>
         <div className="w-px h-8 bg-hairline" />
         <div className="text-center flex-1 min-w-0">
-          <p className="text-xs text-muted-foreground font-body">Cycles complets</p>
-          <p className="font-headings font-bold text-xl text-ink tabular-nums">
-            {lignes ? cyclesComplets : '—'}
-          </p>
+          <p className="text-[11px] text-muted-foreground font-body font-medium mb-0.5">Cycles finis</p>
+          {lignes ? (
+            <p className="font-headings font-bold text-xl text-ink tabular-nums tracking-tight">
+              {cyclesComplets}
+            </p>
+          ) : (
+            <SqueletteKPI />
+          )}
         </div>
       </div>
 
       {/* Recherche */}
-      {/* Le bouton « Filtrer » de la maquette a été retiré : il n'ouvrait rien, et
-          les pastilles juste en dessous font déjà ce filtrage. Deux commandes pour
-          un même geste, dont une inerte, valent moins qu'une seule qui marche. */}
       <div className="px-4 mt-5 flex gap-2">
-        <div className="flex-1 flex items-center gap-2 bg-surface border border-hairline rounded-md px-3 py-2.5 focus-within:border-primary">
-          <Icone nom="search" taille={15} className="text-muted-foreground" />
+        <div className="flex-1 flex items-center gap-2.5 bg-surface border border-hairline/80 rounded-2xl px-3.5 py-2.5 shadow-xs focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+          <Icone nom="search" taille={16} className="text-muted-foreground" />
           <input
             type="search"
             value={recherche}
@@ -318,8 +340,17 @@ export function Clients({
             aria-label="Rechercher un client"
             className="flex-1 min-w-0 bg-transparent text-base font-body text-ink outline-none placeholder:text-muted-foreground"
           />
+          {recherche && (
+            <button
+              type="button"
+              onClick={() => setRecherche('')}
+              aria-label="Effacer la recherche"
+              className="w-5 h-5 rounded-pill bg-muted flex items-center justify-center text-muted-foreground hover:text-ink cursor-pointer"
+            >
+              <Icone nom="x" taille={12} />
+            </button>
+          )}
         </div>
-
       </div>
 
       {/* Inscrire un client */}
@@ -347,16 +378,16 @@ export function Clients({
       </div>
 
       {/* Filtres */}
-      <div className="px-4 mt-3 flex gap-2 overflow-x-auto">
+      <div className="px-4 mt-3 flex gap-2 overflow-x-auto scrollbar-none pb-1">
         {FILTRES.map((f) => (
           <button
             key={f}
             type="button"
             onClick={() => setFiltre(f)}
-            className={`px-3 py-1.5 rounded-pill text-sm font-body font-medium border whitespace-nowrap cursor-pointer ${
+            className={`px-4 py-1.5 rounded-pill text-xs xs:text-sm font-body font-semibold border whitespace-nowrap cursor-pointer transition-all shadow-xs ${
               f === filtre
                 ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-surface text-ink border-hairline'
+                : 'bg-surface text-ink border-hairline/80 hover:bg-muted/50'
             }`}
           >
             {f}
@@ -382,7 +413,14 @@ export function Clients({
         )}
 
         {lignes === null && !erreur && (
-          <p className="text-base font-body text-muted-foreground">Chargement…</p>
+          <div className="col-span-full space-y-3">
+            <Carte className="p-0 overflow-hidden divide-y divide-hairline">
+              <SqueletteLigne />
+              <SqueletteLigne />
+              <SqueletteLigne />
+              <SqueletteLigne />
+            </Carte>
+          </div>
         )}
 
         {!erreur && lignes?.length === 0 && (
@@ -513,7 +551,7 @@ function LigneClient({
   }
 
   return (
-    <div className="bg-surface rounded-lg border border-hairline p-4 shadow-sm">
+    <div className="bg-surface rounded-2xl border border-hairline/80 p-4 shadow-xs hover:shadow-sm transition-all">
       <div className="flex items-center gap-3">
       {/* Un `button` et non la carte entière : « Encaisser » et la bascule des
           avis sont déjà des commandes, et un bouton dans un bouton n'est pas du
@@ -523,16 +561,16 @@ function LigneClient({
         type="button"
         onClick={onOuvrirFiche}
         aria-label={`Ouvrir la fiche de ${client.nom}`}
-        className="anim-pression flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
+        className="anim-pression flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer group"
       >
-      <Avatar nom={client.nom} className="w-11 h-11 flex-shrink-0" />
+      <Avatar nom={client.nom} className="w-11 h-11 flex-shrink-0 ring-2 ring-hairline/60 shadow-xs" />
       <div className="flex-1 min-w-0">
-        <p className="font-body font-semibold text-base text-ink truncate">{client.nom}</p>
-        <p className="text-sm text-muted-foreground font-body truncate">{sousTitre}</p>
+        <p className="font-body font-semibold text-base text-ink truncate group-hover:text-primary transition-colors">{client.nom}</p>
+        <p className="text-xs xs:text-sm text-muted-foreground font-body truncate">{sousTitre}</p>
         {carte && (
-          <div className="w-full h-1 bg-muted rounded-pill mt-1.5 overflow-hidden">
+          <div className="w-full h-1.5 bg-muted rounded-pill mt-2 overflow-hidden">
             <div
-              className="h-full bg-chart-mint rounded-pill"
+              className="h-full bg-gradient-to-r from-accent to-chart-mint rounded-pill transition-all"
               style={{ width: `${avancement}%` }}
             />
           </div>
@@ -540,7 +578,7 @@ function LigneClient({
       </div>
       </button>
       {statut ? (
-        <BadgeStatut statut={statut} className="px-2.5 py-1 flex-shrink-0" />
+        <BadgeStatut statut={statut} className="px-2.5 py-1 flex-shrink-0 shadow-xs" />
       ) : (
         <span className="px-2.5 py-1 rounded-pill text-xs font-body font-semibold bg-muted text-muted-foreground flex-shrink-0">
           Sans carte

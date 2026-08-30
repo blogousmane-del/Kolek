@@ -1,5 +1,5 @@
 import { formatMontant } from '@kolek/core';
-import { Carte, Icone } from '@kolek/ui';
+import { Carte, Icone, SqueletteLigne } from '@kolek/ui';
 import { useState } from 'react';
 
 import { useDonnees } from '../cache';
@@ -55,7 +55,12 @@ export function Recus({ onRetour, revision }: { onRetour: () => void; revision: 
             )}
 
             {!recus && !erreur && (
-              <p className="font-body text-sm text-muted-foreground text-center py-8">Lecture…</p>
+              <Carte className="p-0 overflow-hidden divide-y divide-hairline">
+                <SqueletteLigne />
+                <SqueletteLigne />
+                <SqueletteLigne />
+                <SqueletteLigne />
+              </Carte>
             )}
 
             {recus?.length === 0 && (
@@ -73,7 +78,7 @@ export function Recus({ onRetour, revision }: { onRetour: () => void; revision: 
               return (
                 <Carte
                   key={recu.id}
-                  className={`p-0 overflow-hidden ${premier ? 'anim-cascade' : ''}`}
+                  className={`p-0 rounded-2xl border border-hairline/80 shadow-xs hover:shadow-sm overflow-hidden transition-all ${premier ? 'anim-cascade' : ''}`}
                   style={rangCascade(rang, premier)}
                 >
                   <button

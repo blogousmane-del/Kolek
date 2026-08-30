@@ -27,57 +27,59 @@ export function CarteCollecte({
   const pourcentage = Math.round((jourCourant / totalJours) * 100);
 
   return (
-    <div className="rounded-xl overflow-hidden relative shadow-md min-h-50 bg-[image:var(--degrade-carte)]">
-      {/* Cercles décoratifs */}
-      <div className="absolute top-0 right-0 w-40 h-40 rounded-pill opacity-20 translate-x-[20%] -translate-y-[30%] bg-[radial-gradient(circle,#ffffff_0%,transparent_70%)]" />
-      <div className="absolute bottom-0 left-0 w-32 h-32 rounded-pill opacity-15 -translate-x-[20%] translate-y-[30%] bg-[radial-gradient(circle,var(--color-primary)_0%,transparent_70%)]" />
+    <div className="rounded-xl overflow-hidden relative shadow-lg min-h-50 bg-[image:var(--degrade-carte)] border border-white/30 backdrop-blur-xs">
+      {/* Cercles et reflets décoratifs */}
+      <div className="pointer-events-none absolute top-0 right-0 w-48 h-48 rounded-pill opacity-25 translate-x-[20%] -translate-y-[30%] bg-[radial-gradient(circle,#ffffff_0%,transparent_70%)]" />
+      <div className="pointer-events-none absolute bottom-0 left-0 w-36 h-36 rounded-pill opacity-20 -translate-x-[20%] translate-y-[30%] bg-[radial-gradient(circle,var(--color-primary)_0%,transparent_70%)]" />
 
       <div className="relative p-5">
         {/* En-tête */}
         <div className="flex items-start justify-between mb-4">
           <div>
-            <p className="text-xs font-body font-semibold uppercase tracking-widest text-ink/60 mb-0.5">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-white/25 backdrop-blur-md border border-white/40 text-[10px] font-body font-bold uppercase tracking-widest text-ink/80 mb-1.5 shadow-xs">
               Cycle {cycle}
-            </p>
-            <p className="font-headings font-bold text-xl text-ink">{nomClient}</p>
+            </span>
+            <p className="font-headings font-bold text-xl text-ink leading-snug">{nomClient}</p>
           </div>
-          <div className="bg-ink/10 rounded-md px-3 py-1.5 text-right">
-            <p className="text-xs font-body text-ink/70">Mise / jour</p>
+          <div className="bg-white/30 backdrop-blur-md rounded-xl border border-white/40 px-3 py-1.5 text-right shadow-xs">
+            <p className="text-[11px] font-body font-medium text-ink/75">Mise / jour</p>
             <p className="font-body font-bold text-base text-ink tabular-nums">
-              {misePar} <span className="text-xs">FCFA</span>
+              {misePar} <span className="text-xs font-normal">FCFA</span>
             </p>
           </div>
         </div>
 
         {/* Les 31 cases du cycle */}
-        <div className="grid grid-cols-16 gap-1 mb-4">
+        <div className="grid grid-cols-16 gap-1 mb-4 p-1.5 rounded-lg bg-black/5 backdrop-blur-xs border border-white/10">
           {cases.map((numero) => (
             <div
               key={numero}
-              className={`h-5 rounded-sm flex items-center justify-center ${
+              className={`h-5 rounded-xs flex items-center justify-center transition-all ${
                 numero < jourCourant
-                  ? 'bg-ink/60'
+                  ? 'bg-ink/75 text-white'
                   : numero === jourCourant
-                    ? 'bg-sidebar'
-                    : 'bg-white/40'
+                    ? 'bg-sidebar shadow-xs ring-1 ring-white/60'
+                    : 'bg-white/45'
               }`}
             >
-              {numero === jourCourant && <div className="w-1.5 h-1.5 rounded-pill bg-chart-mint" />}
+              {numero === jourCourant && (
+                <div className="w-1.5 h-1.5 rounded-pill bg-chart-mint animate-pulse" />
+              )}
             </div>
           ))}
         </div>
 
         {/* Pied */}
-        <div className="flex items-end justify-between">
+        <div className="flex items-end justify-between pt-1">
           <div>
-            <p className="text-xs font-body text-ink/60 mb-0.5">Solde restituable</p>
-            <p className="font-headings font-bold text-2xl text-ink tabular-nums">
-              {solde} <span className="text-sm font-body font-medium">FCFA</span>
+            <p className="text-xs font-body font-medium text-ink/70 mb-0.5">Solde restituable</p>
+            <p className="font-headings font-bold text-2xl text-ink tabular-nums leading-none">
+              {solde} <span className="text-sm font-body font-medium text-ink/80">FCFA</span>
             </p>
           </div>
           <div className="text-right">
-            <span className="text-xs font-body font-medium text-ink/70">
-              {jourCourant}/{totalJours} jours · {pourcentage} %
+            <span className="inline-flex items-center px-2 py-0.5 rounded-pill bg-white/20 backdrop-blur-xs text-xs font-body font-semibold text-ink/80 border border-white/20">
+              {jourCourant}/{totalJours} j · {pourcentage} %
             </span>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { Carte, Icone } from '@kolek/ui';
+import { Carte, Icone, Squelette } from '@kolek/ui';
 
 import { useDonnees } from '../cache';
 import { chargerAlertes, type GraviteAlerte } from '../lectures-ecrans';
@@ -68,7 +68,18 @@ export function Alertes({ onRetour, revision }: { onRetour: () => void; revision
             )}
 
             {!alertes && !erreur && (
-              <p className="font-body text-sm text-muted-foreground text-center py-8">Lecture…</p>
+              <div className="space-y-3">
+                <Carte className="p-4 space-y-2.5">
+                  <Squelette hauteur="h-4" largeur="w-20" />
+                  <Squelette hauteur="h-5" largeur="w-48" />
+                  <Squelette hauteur="h-4" largeur="w-3/4" />
+                </Carte>
+                <Carte className="p-4 space-y-2.5">
+                  <Squelette hauteur="h-4" largeur="w-20" />
+                  <Squelette hauteur="h-5" largeur="w-48" />
+                  <Squelette hauteur="h-4" largeur="w-3/4" />
+                </Carte>
+              </div>
             )}
 
             {alertes?.length === 0 && (
@@ -84,7 +95,7 @@ export function Alertes({ onRetour, revision }: { onRetour: () => void; revision
               return (
                 <Carte
                   key={alerte.cle}
-                  className={`p-4 ${style.bordure} ${premier ? 'anim-cascade' : ''}`}
+                  className={`p-4 rounded-2xl border border-hairline/80 shadow-xs hover:shadow-sm transition-all ${style.bordure} ${premier ? 'anim-cascade' : ''}`}
                   style={rangCascade(rang, premier)}
                 >
                   <div className="flex items-start gap-3">

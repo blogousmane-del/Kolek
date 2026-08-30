@@ -1,11 +1,18 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { CleNavSuper } from '@kolek/ui';
+
 import type { VueGlobale } from '../donnees';
 import type { EtatSuperAdmin } from '../superadmin';
 
 /**
- * L'écran Super Admin.
+ * La console de plateforme, découpée en cinq écrans.
+ *
+ * Chaque groupe de tests rend directement l'entrée concernée : la navigation a
+ * quitté cet écran pour la barre latérale de la coquille. L'entrée par défaut —
+ * « Abonnements » — montre les KPI financiers, les paliers et le tableau des
+ * collecteurs ; les quatre autres reprennent le contenu existant.
  *
  * ## Ce que cet écran ne décide pas
  *
@@ -13,18 +20,6 @@ import type { EtatSuperAdmin } from '../superadmin';
  * super admin : tout cela vit en SQL, sous verrou, et les deux Edge Functions
  * redemandent `est_super_admin()` avec le jeton de l'appelant. L'écran envoie
  * des demandes et affiche des verdicts.
- *
- * Ce qu'il fait quand même : ne pas proposer un geste que le serveur refusera à
- * coup sûr. Sa propre ligne ne porte donc pas de bouton — non pour protéger
- * quoi que ce soit, mais pour ne pas offrir un clic dont la seule issue est un
- * message d'erreur.
- *
- * ## Le journal ne se charge pas tout seul
- *
- * Chaque lecture du journal s'inscrit dans le journal. La déclencher à
- * l'ouverture de l'écran remplirait la table de la preuve qu'on la regarde. Le
- * premier test de cette série est ce qui empêche un `useEffect` bien intentionné
- * de la rendre bavarde.
  */
 
 const agirSuperAdmin = vi.fn();
@@ -94,13 +89,77 @@ const ETAT: EtatSuperAdmin = {
 
 const VUE = {
   collecteurs: [
-    { id: AUTRE, nom: 'Bakary Touré', palier: 'pro' },
-    { id: 'ccc', nom: 'Chantal Yao', palier: 'starter' },
+    {
+      id: AUTRE,
+      nom: 'Bakary Touré',
+      telephone: '+2250700000002',
+      zone: 'Cocody',
+      palier: 'pro',
+      abonnement_statut: 'actif',
+      abonnement_echeance: '2027-06-12T00:00:00Z',
+      cree_le: '2026-06-12T09:00:00Z',
+      clients: 10,
+      cartes_actives: 5,
+      encaisse: 50000,
+      commissions: 5000,
+      restitutions: 0,
+      encours: 45000,
+    },
+    {
+      id: 'ccc',
+      nom: 'Chantal Yao',
+      telephone: '+2250700000003',
+      zone: 'Plateau',
+      palier: 'standard',
+      abonnement_statut: 'actif',
+      abonnement_echeance: '2027-03-01T00:00:00Z',
+      cree_le: '2026-03-01T09:00:00Z',
+      clients: 5,
+      cartes_actives: 3,
+      encaisse: 20000,
+      commissions: 2000,
+      restitutions: 0,
+      encours: 18000,
+    },
   ],
+  abonnements: {
+    collecteurs_total: 2,
+    collecteurs_actifs: 2,
+    suspendus: 0,
+    expires: 0,
+    expirations_ce_mois: 0,
+    expirations_a_venir_30j: 0,
+    mrr: 7500,
+    parPalier: [
+      { palier: 'pro', nom: 'Pro', prix: 5000, limiteClients: 150, total: 1, actifs: 1, mrr: 5000 },
+      { palier: 'standard', nom: 'Standard', prix: 2500, limiteClients: 50, total: 1, actifs: 1, mrr: 2500 },
+    ],
+  },
+  totaux: {
+    clients: 15, cartes_actives: 8, cartes_total: 10, mises: 70000,
+    total_encaisse: 70000, commissions: 7000, restitutions: 0, encours_clients: 63000,
+  },
+  zones: [],
+  mouvements: [],
+  cartes: [],
+  cartes_total_lignes: 0,
+  genereLe: '2026-08-30T08:00:00Z',
 } as unknown as VueGlobale;
 
 function poser(etat: Record<string, unknown>) {
   utiliserEtat.mockReturnValue({ ...etat, recharger });
+}
+
+/**
+ * Rend la console de plateforme sur une de ses entrées.
+ *
+ * L'écran n'a plus de barre d'onglets à cliquer : depuis le 2026-08-30, sa
+ * navigation est celle de la coquille — la barre latérale — et il reçoit
+ * l'entrée courante en propriété. Où mène chaque entrée est donc vérifié dans
+ * `Coquille.test.tsx` ; ici, on vérifie ce que chacune affiche.
+ */
+function rendre(onglet: CleNavSuper) {
+  return render(<SuperAdmin vue={VUE} onglet={onglet} />);
 }
 
 afterEach(() => {
@@ -115,7 +174,7 @@ describe('les états de chargement', () => {
   it('annonce le chargement plutôt qu’un écran vide', () => {
     poser({ statut: 'chargement' });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('abonnements');
 
     expect(screen.getByRole('status')).toBeDefined();
   });
@@ -123,7 +182,7 @@ describe('les états de chargement', () => {
   it('dit pourquoi rien ne s’affiche, et propose de réessayer', () => {
     poser({ statut: 'erreur', message: 'Cet écran est réservé aux super administrateurs.' });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('abonnements');
 
     expect(screen.getByRole('alert').textContent).toMatch(/réservé/i);
     screen.getByRole('button', { name: /réessayer/i }).click();
@@ -135,10 +194,8 @@ describe('les administrateurs', () => {
   it('liste les comptes avec leur niveau', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('administrateurs');
 
-    // Cherché dans sa ligne : le même collecteur figure aussi dans les remises
-    // en cours, et un `getByText` global y trouverait deux fois son nom.
     expect(within(screen.getByTestId(`admin-${MOI}`)).getByText(/Aya Konan/)).toBeDefined();
     const autre = within(screen.getByTestId(`admin-${AUTRE}`));
     expect(autre.getByText(/Bakary Touré/)).toBeDefined();
@@ -148,10 +205,10 @@ describe('les administrateurs', () => {
   it('marque sa propre ligne et n’y propose aucun geste', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('administrateurs');
 
     const maLigne = screen.getByTestId(`admin-${MOI}`);
-    expect(within(maLigne).getByText(/c’est toi/i)).toBeDefined();
+    expect(within(maLigne).getByText(/c'est toi/i)).toBeDefined();
     expect(within(maLigne).queryByRole('button')).toBeNull();
   });
 
@@ -159,7 +216,8 @@ describe('les administrateurs', () => {
     poser({ statut: 'ok', etat: ETAT });
     agirSuperAdmin.mockResolvedValue({ ok: true, corps: { fait: true } });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('administrateurs');
+
     within(screen.getByTestId(`admin-${AUTRE}`))
       .getByRole('button', { name: /promouvoir/i })
       .click();
@@ -176,14 +234,15 @@ describe('les administrateurs', () => {
 
   it('affiche le refus du serveur sans le maquiller en succès', async () => {
     poser({ statut: 'ok', etat: ETAT });
-    agirSuperAdmin.mockResolvedValue({ ok: false, message: 'Ton compte n’est plus super.' });
+    agirSuperAdmin.mockResolvedValue({ ok: false, message: 'Ton compte n\u2019est plus super.' });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('administrateurs');
+
     within(screen.getByTestId(`admin-${AUTRE}`))
       .getByRole('button', { name: /révoquer/i })
       .click();
 
-    expect(await screen.findByText('Ton compte n’est plus super.')).toBeDefined();
+    expect(await screen.findByText('Ton compte n\u2019est plus super.')).toBeDefined();
     expect(recharger).not.toHaveBeenCalled();
   });
 });
@@ -192,7 +251,7 @@ describe('les codes promo', () => {
   it('liste les codes avec leur consommation', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('promos');
 
     const ligne = screen.getByTestId('code-RENTREE');
     expect(within(ligne).getByText('12 / 50')).toBeDefined();
@@ -202,7 +261,7 @@ describe('les codes promo', () => {
     poser({ statut: 'ok', etat: ETAT });
     agirSuperAdmin.mockResolvedValue({ ok: true, corps: { fait: true } });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('promos');
 
     fireEvent.change(screen.getByLabelText(/^code$/i), { target: { value: 'noel' } });
     fireEvent.change(screen.getByLabelText(/remise/i), { target: { value: '25' } });
@@ -214,9 +273,6 @@ describe('les codes promo', () => {
     await waitFor(() =>
       expect(agirSuperAdmin).toHaveBeenCalledWith({
         action: 'creer_code',
-        // Saisi en minuscules, envoyé en majuscules : la contrainte de table
-        // n'admet que `[A-Z0-9]`, et refuser la frappe de l'utilisateur pour
-        // une casse serait lui faire deviner une règle de stockage.
         code: 'NOEL',
         remise_pct: 25,
         valide_du: '2026-12-01',
@@ -227,13 +283,10 @@ describe('les codes promo', () => {
   });
 
   it('envoie un quota nul quand la case est vide, pas zéro', async () => {
-    // `quota: 0` serait un code épuisé d'avance ; `null` veut dire « sans
-    // limite ». Les deux se ressemblent dans un formulaire vide et n'ont rien à
-    // voir dans la base.
     poser({ statut: 'ok', etat: ETAT });
     agirSuperAdmin.mockResolvedValue({ ok: true, corps: { fait: true } });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('promos');
 
     fireEvent.change(screen.getByLabelText(/^code$/i), { target: { value: 'LIBRE' } });
     fireEvent.change(screen.getByLabelText(/remise/i), { target: { value: '10' } });
@@ -250,7 +303,7 @@ describe('les codes promo', () => {
     poser({ statut: 'ok', etat: ETAT });
     agirSuperAdmin.mockResolvedValue({ ok: true, corps: { fait: true, remise_pct: 30 } });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('promos');
 
     fireEvent.change(screen.getByLabelText(/collecteur/i), { target: { value: 'ccc' } });
     fireEvent.change(screen.getByLabelText(/code à appliquer/i), { target: { value: 'RENTREE' } });
@@ -270,10 +323,8 @@ describe('la plateforme', () => {
   it('traduit les noms de tables en libellés lisibles', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('plateforme');
 
-    // Cherché dans sa carte : « Lignes de journal » figure aussi parmi les
-    // indicateurs du haut, et un `getByText` global le trouverait deux fois.
     const carte = within(screen.getByTestId('plateforme'));
     expect(carte.getByText('Collecteurs')).toBeDefined();
     expect(carte.getByText('Lignes de journal')).toBeDefined();
@@ -282,7 +333,7 @@ describe('la plateforme', () => {
   it('nomme les tables journalisées', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('plateforme');
 
     const carte = within(screen.getByTestId('plateforme'));
     expect(carte.getByText('collecteurs')).toBeDefined();
@@ -290,14 +341,12 @@ describe('la plateforme', () => {
   });
 
   it('alerte quand des rejets de synchronisation attendent un arbitrage', () => {
-    // L'argent a changé de main dans le monde réel : ces lignes ne doivent pas
-    // dormir. Un compteur parmi douze autres ne se remarque pas.
     poser({
       statut: 'ok',
       etat: { ...ETAT, volumes: { ...ETAT.volumes, rejets_non_traites: 3 } },
     });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('plateforme');
 
     expect(screen.getByRole('alert').textContent).toMatch(/arbitrage/i);
   });
@@ -307,7 +356,7 @@ describe('les remises en cours', () => {
   it('nomme le collecteur, son code et la fin de la remise', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('promos');
 
     const ligne = screen.getByTestId(`remise-${AUTRE}`);
     expect(within(ligne).getByText(/RENTREE/)).toBeDefined();
@@ -328,12 +377,9 @@ describe('le journal de sécurité', () => {
   };
 
   it('ne lit rien tant qu’on ne le demande pas', () => {
-    // Chaque lecture du journal s'enregistre dans le journal. La déclencher à
-    // l'ouverture de l'écran remplirait la table de la preuve qu'on la regarde,
-    // et enterrerait dessous ce qu'elle protège.
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('securite');
 
     expect(chargerJournal).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /afficher le journal/i })).toBeDefined();
@@ -343,7 +389,8 @@ describe('le journal de sécurité', () => {
     poser({ statut: 'ok', etat: ETAT });
     chargerJournal.mockResolvedValue({ lignes: [LIGNE], a_suivre: false, page: 1, taille: 50 });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('securite');
+
     fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
 
     expect(await screen.findByTestId(`journal-${LIGNE.id}`)).toBeDefined();
@@ -354,7 +401,8 @@ describe('le journal de sécurité', () => {
     poser({ statut: 'ok', etat: ETAT });
     chargerJournal.mockResolvedValue({ lignes: [LIGNE], a_suivre: true, page: 1, taille: 50 });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('securite');
+
     fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
 
     fireEvent.click(await screen.findByRole('button', { name: /page suivante/i }));
@@ -368,7 +416,8 @@ describe('le journal de sécurité', () => {
     poser({ statut: 'ok', etat: ETAT });
     chargerJournal.mockResolvedValue({ lignes: [LIGNE], a_suivre: false, page: 1, taille: 50 });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('securite');
+
     fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
     await screen.findByTestId(`journal-${LIGNE.id}`);
 
@@ -381,11 +430,12 @@ describe('le journal de sécurité', () => {
 
   it('dit pourquoi la page n’est pas venue', async () => {
     poser({ statut: 'ok', etat: ETAT });
-    chargerJournal.mockRejectedValue(new Error('La base n’a pas pu produire cette page.'));
+    chargerJournal.mockRejectedValue(new Error('La base n\u2019a pas pu produire cette page.'));
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('securite');
+
     fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
 
-    expect(await screen.findByText(/n’a pas pu produire/)).toBeDefined();
+    expect(await screen.findByText(/n\u2019a pas pu produire/)).toBeDefined();
   });
 });

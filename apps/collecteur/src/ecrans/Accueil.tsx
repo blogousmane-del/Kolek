@@ -10,6 +10,10 @@ import {
   Icone,
   LienBloc,
   LigneTransaction,
+  Rosace,
+  Squelette,
+  SqueletteKPI,
+  SqueletteLigne,
   useEnLigne,
   type ActionRapide,
 } from '@kolek/ui';
@@ -93,70 +97,101 @@ export function Accueil({
 
   return (
     <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-large">
-      {/* En-tête sombre */}
-      <div className="bg-sidebar px-marge pt-entete pb-6 lg:rounded-2xl lg:pt-6">
-        <div className="flex items-center justify-between mb-6">
+      {/* En-tête sombre immersif */}
+      <div className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pt-entete pb-7 shadow-lg lg:rounded-3xl lg:pt-6">
+        {/* Rosace décorative en filigrane */}
+        <Rosace
+          petales={18}
+          excentricite={0.35}
+          animee
+          className="pointer-events-none absolute -right-[15%] -top-[20%] w-[65vmin] text-or/10 lg:w-96"
+        />
+
+        <div className="relative z-10 flex items-center justify-between mb-5">
           <div className="min-w-0">
-            <p className="text-white/60 text-sm font-body">Bonjour,</p>
-            <p className="text-white font-headings font-bold text-2xl truncate">{nom}</p>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-white/10 text-white/70 text-xs font-body font-medium mb-1 backdrop-blur-xs">
+              <span className="w-1.5 h-1.5 rounded-pill bg-chart-mint" />
+              Collecteur actif
+            </span>
+            <p className="text-white font-headings font-bold text-2xl truncate tracking-tight">{nom}</p>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
-            {/* La maquette posait un portrait décoratif. Il devient la sortie de
-                session : sans elle, un téléphone prêté reste connecté. */}
+          <div className="flex items-center gap-2.5 shrink-0">
             <button
               type="button"
               onClick={onDeconnexion}
               aria-label="Se déconnecter"
-              className="w-9 h-9 rounded-pill bg-white/10 flex items-center justify-center cursor-pointer"
+              className="anim-pression w-10 h-10 rounded-pill bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-md flex items-center justify-center cursor-pointer transition-colors shadow-xs"
             >
-              <Icone nom="log-out" className="text-white" />
+              <Icone nom="log-out" className="text-white" taille={18} />
             </button>
-            <Avatar nom={nom} className="w-10 h-10" />
+            <Avatar nom={nom} className="w-10 h-10 ring-2 ring-white/25 shadow-xs" />
           </div>
         </div>
 
-        <div className="mb-2">
-          <p className="text-white/60 text-sm font-body mb-1">Encaissé aujourd’hui</p>
-          {/* `text-3xl` sous 390 px : « 1 250 000 » en 36 px déborde de la
-              largeur utile d'un Galaxy A03 et se coupe en deux lignes au
-              milieu du nombre. */}
-          <p className="anim-montant font-headings font-bold text-white text-3xl xs:text-4xl leading-[1.1] tabular-nums">
+        <div className="relative z-10 mb-2">
+          <p className="text-white/70 text-xs font-body font-medium uppercase tracking-wider mb-1">
+            Encaissé aujourd’hui
+          </p>
+          <p className="anim-montant font-headings font-bold text-white text-3xl xs:text-4xl leading-[1.1] tabular-nums tracking-tight">
             {chiffre(tableau?.encaisseAujourdhui)}{' '}
-            <span className="text-lg font-body font-medium text-white/60">FCFA</span>
+            <span className="text-sm xs:text-base font-body font-semibold px-2 py-0.5 rounded-md bg-white/15 text-white/90 backdrop-blur-xs ml-1 border border-white/15 align-middle">
+              FCFA
+            </span>
           </p>
         </div>
-        {/* Pas de « +8 % vs hier » : comparer à hier suppose de retenir le total
-            d'hier, et rien ne l'enregistre. */}
-        <p className="text-white/50 text-xs font-body">
-          {tableau ? `${tableau.cartesActives} carte${tableau.cartesActives > 1 ? 's' : ''} active${tableau.cartesActives > 1 ? 's' : ''}` : ' '}
-        </p>
 
-        {!enLigne && <BandeauHorsLigne className="mt-4" />}
+        <div className="relative z-10 flex items-center gap-2 text-white/60 text-xs font-body">
+          <span className="inline-flex items-center gap-1">
+            <Icone nom="check-circle" taille={14} className="text-chart-mint" />
+            {tableau ? `${tableau.cartesActives} carte${tableau.cartesActives > 1 ? 's' : ''} active${tableau.cartesActives > 1 ? 's' : ''}` : 'Chargement…'}
+          </span>
+        </div>
+
+        {!enLigne && <BandeauHorsLigne className="mt-4 relative z-10" />}
       </div>
 
-      {/* Résumé du jour — trois nombres que la base sait vraiment donner. */}
-      {/* `min-w-0` sur chaque piste : par défaut une colonne de grille refuse
-          de descendre sous la largeur de son contenu. « Encours » à sept
-          chiffres élargissait donc la carte au-delà de la largeur du téléphone,
-          et avec elle tout le document. */}
-      <div className="mx-4 -mt-4 bg-surface rounded-xl border border-hairline p-4 grid grid-cols-3 gap-2 xs:gap-3 shadow-md">
+      {/* Résumé du jour — trois indicateurs avec badges d'icônes */}
+      <div className="mx-4 -mt-5 relative z-20 bg-surface rounded-2xl border border-hairline/80 p-3.5 xs:p-4 grid grid-cols-3 gap-2 xs:gap-3 shadow-md backdrop-blur-xs">
         <div className="text-center min-w-0">
-          <p className="text-xs text-muted-foreground font-body mb-0.5">Clients</p>
-          <p className="font-headings font-bold text-xl text-ink tabular-nums">
-            {tableau?.clients ?? '—'}
-          </p>
+          <div className="flex items-center justify-center gap-1 mb-1 text-muted-foreground">
+            <Icone nom="users" taille={13} />
+            <span className="text-[11px] font-body font-medium">Clients</span>
+          </div>
+          {tableau ? (
+            <p className="font-headings font-bold text-xl text-ink tabular-nums tracking-tight">
+              {tableau.clients}
+            </p>
+          ) : (
+            <SqueletteKPI />
+          )}
         </div>
+
         <div className="text-center border-x border-hairline min-w-0">
-          <p className="text-xs text-muted-foreground font-body mb-0.5">Cartes actives</p>
-          <p className="font-headings font-bold text-xl text-ink tabular-nums">
-            {tableau?.cartesActives ?? '—'}
-          </p>
+          <div className="flex items-center justify-center gap-1 mb-1 text-muted-foreground">
+            <Icone nom="circle-dollar-sign" taille={13} className="text-accent" />
+            <span className="text-[11px] font-body font-medium">Actives</span>
+          </div>
+          {tableau ? (
+            <p className="font-headings font-bold text-xl text-ink tabular-nums tracking-tight">
+              {tableau.cartesActives}
+            </p>
+          ) : (
+            <SqueletteKPI />
+          )}
         </div>
+
         <div className="text-center min-w-0">
-          <p className="text-xs text-muted-foreground font-body mb-0.5">Encours</p>
-          <p className="font-headings font-bold text-lg xs:text-xl text-ink tabular-nums">
-            {chiffre(tableau?.encoursTotal)}
-          </p>
+          <div className="flex items-center justify-center gap-1 mb-1 text-muted-foreground">
+            <Icone nom="bar-chart-2" taille={13} className="text-info" />
+            <span className="text-[11px] font-body font-medium">Encours</span>
+          </div>
+          {tableau ? (
+            <p className="font-headings font-bold text-base xs:text-lg text-ink tabular-nums tracking-tight truncate">
+              {chiffre(tableau.encoursTotal)}
+            </p>
+          ) : (
+            <SqueletteKPI />
+          )}
         </div>
       </div>
 
@@ -237,16 +272,26 @@ export function Accueil({
               />
             </div>
           </>
+        ) : !tableau ? (
+          <Carte className="p-5 space-y-3">
+            <div className="flex justify-between">
+              <Squelette hauteur="h-5" largeur="w-24" />
+              <Squelette hauteur="h-5" largeur="w-20" />
+            </div>
+            <Squelette hauteur="h-10" largeur="w-full" />
+            <div className="flex justify-between pt-2">
+              <Squelette hauteur="h-6" largeur="w-32" />
+              <Squelette hauteur="h-4" largeur="w-16" />
+            </div>
+          </Carte>
         ) : (
           <Carte className="p-4">
             <p className="text-base font-body text-ink m-0">
-              {tableau ? 'Aucune carte active.' : 'Chargement…'}
+              Aucune carte active.
             </p>
-            {tableau && (
-              <p className="text-sm font-body text-muted-foreground mt-1">
-                Inscris un client pour ouvrir sa première carte.
-              </p>
-            )}
+            <p className="text-sm font-body text-muted-foreground mt-1">
+              Inscris un client pour ouvrir sa première carte.
+            </p>
           </Carte>
         )}
       </div>
@@ -259,7 +304,11 @@ export function Accueil({
         />
         <Carte className="overflow-hidden">
           {!tableau ? (
-            <p className="px-4 py-5 text-base font-body text-muted-foreground m-0">Chargement…</p>
+            <div className="divide-y divide-hairline">
+              <SqueletteLigne />
+              <SqueletteLigne />
+              <SqueletteLigne />
+            </div>
           ) : tableau.dernieres.length === 0 ? (
             <p className="px-4 py-5 text-base font-body text-muted-foreground m-0">
               Aucune mise encaissée pour l’instant.

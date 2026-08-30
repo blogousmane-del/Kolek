@@ -40,46 +40,55 @@ interface Props {
   anime?: boolean;
 }
 
+const COULEURS_ICONES: Record<string, { fond: string; icone: string; bordure: string }> = {
+  'circle-dollar-sign': { fond: 'bg-positive-tint', icone: 'text-positive', bordure: 'border-positive/20' },
+  'user-plus': { fond: 'bg-[#EBF5EE]', icone: 'text-accent', bordure: 'border-accent/20' },
+  'arrow-up-right': { fond: 'bg-info-tint', icone: 'text-info', bordure: 'border-info/20' },
+  'bar-chart-2': { fond: 'bg-[#EBF2F7]', icone: 'text-[#2B6082]', bordure: 'border-[#2B6082]/20' },
+  'refresh-cw': { fond: 'bg-[#FBF6E9]', icone: 'text-[#96741F]', bordure: 'border-[#96741F]/20' },
+  receipt: { fond: 'bg-[#F8F5EC]', icone: 'text-[#7D6B35]', bordure: 'border-[#7D6B35]/20' },
+  bell: { fond: 'bg-negative-tint', icone: 'text-negative', bordure: 'border-negative/20' },
+  'message-square': { fond: 'bg-[#EFF2F9]', icone: 'text-[#475569]', bordure: 'border-[#475569]/20' },
+  'more-horizontal': { fond: 'bg-muted', icone: 'text-muted-foreground', bordure: 'border-hairline' },
+};
+
 export function ActionsRapides({ actions, compact = false, anime = false }: Props) {
   return (
-    // Deux colonnes sur téléphone : à quatre, le libellé sous la pastille
-    // passait sur trois lignes et coupait les mots.
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      {actions.map((action, rang) => (
-        <button
-          key={action.libelle}
-          type="button"
-          disabled={!action.onActiver}
-          title={action.onActiver ? undefined : 'À venir'}
-          onClick={action.onActiver}
-          style={anime ? ({ '--rang': rang } as CSSProperties) : undefined}
-          className={`anim-pression flex flex-col items-center ${compact ? 'gap-1.5 p-2' : 'gap-2.5 p-3'} rounded-2xl bg-secondary/50 border border-hairline/80 hover:bg-secondary/90 transition-all ${
-            anime ? 'anim-cascade' : ''
-          } ${action.onActiver ? 'cursor-pointer' : 'opacity-60 cursor-default'}`}
-        >
-          {/* La bordure reste `border-primary` pleine, et non une teinte à 20 %.
-              La tuile qui vient d'apparaître autour ne peut pas la remplacer
-              comme limite : `secondary/50` sur le canevas rend 1,05:1 — un fond
-              qu'on devine, pas un contour qu'on voit. La tuile groupe, la
-              pastille désigne la commande.
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 xs:gap-3">
+      {actions.map((action, rang) => {
+        const styleIcone = COULEURS_ICONES[action.icone] ?? {
+          fond: 'bg-surface',
+          icone: 'text-primary',
+          bordure: 'border-primary/20',
+        };
 
-              Pas d'inversion de couleur au survol non plus : le produit est
-              tactile, et WebKit garde l'état `:hover` après le relâchement du
-              doigt. Le collecteur verrait un bouton plein qu'il n'a pas laissé
-              enfoncé. C'est `anim-pression`, sur le bouton entier, qui accuse
-              réception du geste. */}
-          <div
-            className={`${
-              compact ? 'w-10 h-10' : 'w-12 h-12'
-            } rounded-pill bg-surface text-primary border border-primary flex items-center justify-center shadow-xs`}
+        return (
+          <button
+            key={action.libelle}
+            type="button"
+            disabled={!action.onActiver}
+            title={action.onActiver ? undefined : 'À venir'}
+            onClick={action.onActiver}
+            style={anime ? ({ '--rang': rang } as CSSProperties) : undefined}
+            className={`anim-pression group flex flex-col items-center justify-center ${
+              compact ? 'gap-1.5 p-2.5' : 'gap-2 p-3 sm:p-3.5'
+            } rounded-2xl bg-surface border border-hairline/80 shadow-xs hover:shadow-sm hover:border-hairline transition-all cursor-pointer ${
+              anime ? 'anim-cascade' : ''
+            } ${action.onActiver ? 'cursor-pointer' : 'opacity-60 cursor-default'}`}
           >
-            <Icone nom={action.icone} taille={compact ? 18 : 20} />
-          </div>
-          <span className="text-xs font-body font-semibold text-ink text-center leading-tight">
-            {action.libelle}
-          </span>
-        </button>
-      ))}
+            <div
+              className={`${
+                compact ? 'w-10 h-10' : 'w-12 h-12'
+              } rounded-2xl ${styleIcone.fond} ${styleIcone.icone} border ${styleIcone.bordure} flex items-center justify-center transition-transform duration-200 group-hover:scale-105`}
+            >
+              <Icone nom={action.icone} taille={compact ? 18 : 22} />
+            </div>
+            <span className="text-xs font-body font-semibold text-ink text-center leading-tight">
+              {action.libelle}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

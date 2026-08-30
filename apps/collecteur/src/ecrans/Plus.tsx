@@ -1,5 +1,5 @@
 import { PALIERS, formatMontant } from '@kolek/core';
-import { Bouton, Carte, Icone, useEnLigne } from '@kolek/ui';
+import { Bouton, Carte, Icone, Squelette, useEnLigne } from '@kolek/ui';
 
 import { useDonnees } from '../cache';
 import { chargerProfil } from '../lectures-ecrans';
@@ -49,7 +49,19 @@ export function Plus({ onRetour, onDeconnexion }: {
             )}
 
             {!profil && !erreur && (
-              <p className="font-body text-sm text-muted-foreground text-center py-8">Lecture…</p>
+              <div className="space-y-4">
+                <Carte className="p-5 space-y-3">
+                  <Squelette hauteur="h-5" largeur="w-24" />
+                  <Squelette hauteur="h-4" largeur="w-full" />
+                  <Squelette hauteur="h-4" largeur="w-3/4" />
+                  <Squelette hauteur="h-4" largeur="w-1/2" />
+                </Carte>
+                <Carte className="p-5 space-y-3">
+                  <Squelette hauteur="h-5" largeur="w-32" />
+                  <Squelette hauteur="h-4" largeur="w-full" />
+                  <Squelette hauteur="h-4" largeur="w-2/3" />
+                </Carte>
+              </div>
             )}
 
             {profil && (

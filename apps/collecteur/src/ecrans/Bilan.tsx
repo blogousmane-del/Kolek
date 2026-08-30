@@ -1,5 +1,5 @@
 import { formatMontant } from '@kolek/core';
-import { Carte } from '@kolek/ui';
+import { Carte, Icone, Squelette } from '@kolek/ui';
 
 import { useDonnees } from '../cache';
 import { chargerBilan } from '../lectures-ecrans';
@@ -34,24 +34,26 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
         onRetour={onRetour}
         enfants={
           donnees && (
-            <div className="grid grid-cols-2 gap-3">
-              {/* `min-w-0` : une piste de grille ne descend pas sous la largeur
-                  de son contenu tant qu'on ne l'y autorise pas. Un encours à
-                  sept chiffres élargissait donc la tuile, puis l'en-tête, puis
-                  le document. */}
-              <div className="bg-white/10 rounded-lg p-3 min-w-0">
-                <p className="text-white/60 text-xs font-body mb-0.5">Encours client</p>
-                <p className="anim-montant text-white font-headings font-bold text-lg xs:text-xl tabular-nums">
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 p-3.5 min-w-0 shadow-xs">
+                <div className="flex items-center gap-1 text-white/70 mb-0.5">
+                  <Icone nom="bar-chart-2" taille={13} />
+                  <p className="text-xs font-body">Encours client</p>
+                </div>
+                <p className="anim-montant text-white font-headings font-bold text-lg xs:text-xl tabular-nums tracking-tight">
                   {formatMontant(donnees.encoursTotal)}
                 </p>
-                <p className="text-white/50 text-xs font-body">FCFA à rendre</p>
+                <p className="text-white/50 text-[11px] font-body mt-0.5">FCFA à rendre</p>
               </div>
-              <div className="bg-white/10 rounded-lg p-3 min-w-0">
-                <p className="text-white/60 text-xs font-body mb-0.5">Cartes actives</p>
-                <p className="text-white font-headings font-bold text-xl tabular-nums">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 p-3.5 min-w-0 shadow-xs">
+                <div className="flex items-center gap-1 text-white/70 mb-0.5">
+                  <Icone nom="users" taille={13} />
+                  <p className="text-xs font-body">Cartes actives</p>
+                </div>
+                <p className="text-white font-headings font-bold text-xl tabular-nums tracking-tight">
                   {donnees.cartesActives}
                 </p>
-                <p className="text-white/50 text-xs font-body">
+                <p className="text-white/50 text-[11px] font-body mt-0.5">
                   {donnees.clients} client{donnees.clients > 1 ? 's' : ''}
                 </p>
               </div>
@@ -71,7 +73,26 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
             )}
 
             {!donnees && !erreur && (
-              <p className="font-body text-sm text-muted-foreground text-center py-8">Lecture…</p>
+              <div className="space-y-4 lg:grid lg:grid-cols-3 lg:gap-4 lg:space-y-0">
+                <Carte className="p-5 space-y-3">
+                  <Squelette hauteur="h-5" largeur="w-24" />
+                  <Squelette hauteur="h-8" largeur="w-3/4" />
+                  <Squelette hauteur="h-4" largeur="w-1/2" />
+                  <Squelette hauteur="h-12" largeur="w-full" />
+                </Carte>
+                <Carte className="p-5 space-y-3">
+                  <Squelette hauteur="h-5" largeur="w-24" />
+                  <Squelette hauteur="h-8" largeur="w-3/4" />
+                  <Squelette hauteur="h-4" largeur="w-1/2" />
+                  <Squelette hauteur="h-12" largeur="w-full" />
+                </Carte>
+                <Carte className="p-5 space-y-3">
+                  <Squelette hauteur="h-5" largeur="w-24" />
+                  <Squelette hauteur="h-8" largeur="w-3/4" />
+                  <Squelette hauteur="h-4" largeur="w-1/2" />
+                  <Squelette hauteur="h-12" largeur="w-full" />
+                </Carte>
+              </div>
             )}
 
             {donnees?.tranches.every((t) => t.nombreMises === 0) && (
@@ -82,64 +103,65 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
               />
             )}
 
-            {/* Les trois tranches côte à côte sur bureau. Empilées, elles
-                obligeaient à faire défiler pour comparer aujourd'hui à trente
-                jours — or la comparaison est tout l’intérêt de cet écran. */}
+            {/* Les trois tranches côte à côte sur bureau */}
             <div className="space-y-4 lg:grid lg:grid-cols-3 lg:gap-4 lg:space-y-0 lg:items-start">
               {donnees?.tranches.map((tranche, rang) => (
                 <Carte
                   key={tranche.libelle}
-                  className={`p-4 ${premier ? 'anim-cascade' : ''}`}
+                  className={`p-5 rounded-2xl border border-hairline/80 shadow-xs hover:shadow-sm transition-all ${
+                    premier ? 'anim-cascade' : ''
+                  }`}
                   style={rangCascade(rang, premier)}
                 >
-                <p className="font-headings font-bold text-base text-ink mb-3">{tranche.libelle}</p>
-
-                <div className="flex items-baseline justify-between gap-2 mb-1">
-                  <span className="font-body text-sm text-muted-foreground shrink-0">Encaissé</span>
-                  <span className="font-headings font-bold text-xl text-ink tabular-nums text-right min-w-0">
-                    {formatMontant(tranche.encaisse)}{' '}
-                    <span className="text-xs font-body font-medium text-muted-foreground">FCFA</span>
-                  </span>
-                </div>
-
-                {/* La ligne qui compte : ce qui reste au collecteur. */}
-                <div className="flex items-baseline justify-between gap-2 mb-3 pb-3 border-b border-hairline">
-                  <span className="font-body text-sm text-positive font-medium shrink-0">
-                    Ta commission
-                  </span>
-                  <span className="font-headings font-bold text-lg text-positive tabular-nums text-right min-w-0">
-                    {formatMontant(tranche.commissions)}{' '}
-                    <span className="text-xs font-body font-medium">FCFA</span>
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="min-w-0">
-                    <p className="font-headings font-bold text-base text-ink tabular-nums">
-                      {tranche.nombreMises}
-                    </p>
-                    <p className="text-xs font-body text-muted-foreground">mises</p>
+                  <div className="flex items-center justify-between mb-3.5">
+                    <p className="font-headings font-bold text-base text-ink">{tranche.libelle}</p>
+                    <span className="text-[11px] font-body font-semibold px-2 py-0.5 rounded-pill bg-muted text-muted-foreground">
+                      {tranche.nombreMises} mise{tranche.nombreMises > 1 ? 's' : ''}
+                    </span>
                   </div>
-                  <div>
-                    <p className="font-headings font-bold text-base text-ink tabular-nums">
-                      {tranche.cartesOuvertes}
-                    </p>
-                    <p className="text-xs font-body text-muted-foreground">cartes ouvertes</p>
-                  </div>
-                  <div>
-                    <p className="font-headings font-bold text-base text-ink tabular-nums">
-                      {tranche.cartesCloturees}
-                    </p>
-                    <p className="text-xs font-body text-muted-foreground">clôturées</p>
-                  </div>
-                </div>
 
-                {tranche.restitue > 0 && (
-                  <p className="font-body text-xs text-muted-foreground mt-3 pt-3 border-t border-hairline">
-                    Restitué aux clients :{' '}
-                    <strong className="text-ink">{formatMontant(tranche.restitue)} FCFA</strong>
-                  </p>
-                )}
+                  <div className="flex items-baseline justify-between gap-2 mb-1.5">
+                    <span className="font-body text-xs text-muted-foreground shrink-0 uppercase tracking-wider">
+                      Encaissé
+                    </span>
+                    <span className="font-headings font-bold text-xl text-ink tabular-nums text-right min-w-0">
+                      {formatMontant(tranche.encaisse)}{' '}
+                      <span className="text-xs font-body font-medium text-muted-foreground">FCFA</span>
+                    </span>
+                  </div>
+
+                  {/* La ligne qui compte : ce qui reste au collecteur. */}
+                  <div className="flex items-baseline justify-between gap-2 mb-4 p-2.5 rounded-xl bg-positive-tint/80 border border-positive/20">
+                    <span className="font-body text-xs text-positive font-bold shrink-0">
+                      Ta commission
+                    </span>
+                    <span className="font-headings font-bold text-base xs:text-lg text-positive tabular-nums text-right min-w-0">
+                      +{formatMontant(tranche.commissions)}{' '}
+                      <span className="text-xs font-body font-semibold">FCFA</span>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-center p-2 rounded-xl bg-muted/40 border border-hairline/60">
+                    <div>
+                      <p className="font-headings font-bold text-base text-ink tabular-nums">
+                        {tranche.cartesOuvertes}
+                      </p>
+                      <p className="text-[11px] font-body text-muted-foreground">cartes ouvertes</p>
+                    </div>
+                    <div>
+                      <p className="font-headings font-bold text-base text-ink tabular-nums">
+                        {tranche.cartesCloturees}
+                      </p>
+                      <p className="text-[11px] font-body text-muted-foreground">clôturées</p>
+                    </div>
+                  </div>
+
+                  {tranche.restitue > 0 && (
+                    <p className="font-body text-xs text-muted-foreground mt-3 pt-3 border-t border-hairline/70 flex justify-between">
+                      <span>Restitué :</span>
+                      <strong className="text-ink font-semibold">{formatMontant(tranche.restitue)} FCFA</strong>
+                    </p>
+                  )}
                 </Carte>
               ))}
             </div>
