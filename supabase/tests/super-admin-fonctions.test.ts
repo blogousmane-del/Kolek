@@ -187,6 +187,22 @@ describe('les actions', () => {
     expect((await reponse.json()).raison).toBe('action_sur_soi');
   });
 
+  it('rend 400 sur une date malformée, et non 500', async () => {
+    // Constat d'audit de kolek-00. Une date invalide lève 22007, que ni la
+    // branche 23505 ni la 23514 n'attrapent : elle sortait en 500, alors que
+    // l'en-tête du fichier promet 400 pour une requête mal formée. Une faute
+    // de frappe n'est pas une panne du serveur.
+    const reponse = await agir(jetonPatron, {
+      action: 'creer_code',
+      code: `DATE${MARQUE}`,
+      remise_pct: 10,
+      valide_du: 'pas-une-date',
+      valide_au: '2099-12-31',
+    });
+    expect(reponse.status).toBe(400);
+    expect((await reponse.json()).erreur).toBe('CHAMPS_INVALIDES');
+  });
+
   it('crée un code promo', async () => {
     const reponse = await agir(jetonPatron, {
       action: 'creer_code',

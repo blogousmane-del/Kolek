@@ -109,3 +109,21 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function estUuid(valeur: unknown): valeur is string {
   return typeof valeur === 'string' && UUID.test(valeur);
 }
+
+const DATE_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Même raison que pour `estUuid`, et un vrai constat d'audit derrière.
+ *
+ * Une date invalide passée telle quelle à la base lève un `22007`, qu'aucune
+ * branche d'erreur métier n'attrape : elle ressortait en 500. Une faute de
+ * frappe dans un formulaire n'est pas une panne du serveur.
+ *
+ * Le motif ne suffit pas — `2026-02-31` a la bonne forme et n'existe pas —
+ * d'où le second contrôle sur la valeur elle-même.
+ */
+export function estDateIso(valeur: unknown): valeur is string {
+  if (typeof valeur !== 'string' || !DATE_ISO.test(valeur)) return false;
+  const date = new Date(`${valeur}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(valeur);
+}

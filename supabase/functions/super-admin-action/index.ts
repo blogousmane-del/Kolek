@@ -1,4 +1,10 @@
-import { entetesPour, estUuid, ouvrir, reponse } from '../_shared/portillon-super-admin.ts';
+import {
+  entetesPour,
+  estDateIso,
+  estUuid,
+  ouvrir,
+  reponse,
+} from '../_shared/portillon-super-admin.ts';
 
 /**
  * Les écritures du Super Admin : privilèges et remises.
@@ -96,8 +102,11 @@ Deno.serve(async (requete) => {
       if (
         typeof code !== 'string' ||
         typeof remise_pct !== 'number' ||
-        typeof valide_du !== 'string' ||
-        typeof valide_au !== 'string' ||
+        // Les dates sont vérifiées ici et pas seulement par la base : une date
+        // invalide lève un 22007, qu'aucune branche métier n'attrape, et
+        // ressortait en 500. Une faute de frappe n'est pas une panne.
+        !estDateIso(valide_du) ||
+        !estDateIso(valide_au) ||
         (quota !== undefined && quota !== null && typeof quota !== 'number')
       ) {
         return reponse({ erreur: 'CHAMPS_INVALIDES' }, 400, requete);
