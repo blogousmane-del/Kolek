@@ -36,14 +36,25 @@ import {
  * n'enverra rien, et il vaut mieux le lire ici que le déduire d'un silence.
  */
 
+/**
+ * WhatsApp a été retiré de cette liste le 2026-08-30.
+ *
+ * Il y figurait avec la note « Moins cher, mais suppose que le client a WhatsApp
+ * et le relève ». La note était fausse et la case était un piège : aucune
+ * passerelle WhatsApp n'existe, et `envoyer-avis` ne filtre pas par canal — le
+ * choisir faisait partir un SMS, facturé 20 FCFA le segment, sous une étiquette
+ * promettant une économie.
+ *
+ * Le cahier des charges désigne pourtant WhatsApp comme le canal prioritaire.
+ * L'administrateur qui suivait la spécification tombait donc exactement dessus.
+ *
+ * La base refuse désormais ce canal — `CANAL_SANS_PASSERELLE`. Le retirer d'ici
+ * évite de proposer un choix que le serveur rejettera : un formulaire qui offre
+ * ce qu'il refuse ensuite est une façon lente de dire non.
+ */
 const CANAUX: { cle: Canal; libelle: string; note: string }[] = [
   { cle: 'aucun', libelle: 'Aucun', note: 'Rien ne part. État par défaut.' },
   { cle: 'sms', libelle: 'SMS', note: 'Environ 20 FCFA par message.' },
-  {
-    cle: 'whatsapp',
-    libelle: 'WhatsApp',
-    note: 'Moins cher, mais suppose que le client a WhatsApp et le relève.',
-  },
 ];
 
 function prixAbonnement(cle: string): number | null {

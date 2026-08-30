@@ -9,7 +9,9 @@ import { supabase } from './supabase';
  * une table dont une colonne fixe un budget mensuel.
  */
 
-export type Canal = 'aucun' | 'sms' | 'whatsapp';
+/** `whatsapp` retiré le 2026-08-30 : reconnu par le schéma d'origine, servi par
+    aucune passerelle. Voir la migration `20260830170000_avis_canal_servable`. */
+export type Canal = 'aucun' | 'sms';
 
 export interface LigneAvis {
   id: string;
@@ -53,6 +55,10 @@ const MESSAGES: Record<string, string> = {
   MISE_A_JOUR_IMPOSSIBLE: 'La politique n’a pas pu être enregistrée.',
   COLLECTEUR_INTROUVABLE: 'Ce collecteur n’existe plus.',
   CANAL_INVALIDE: 'Ce canal n’est pas reconnu.',
+  // Distinct du précédent, et volontairement : « pas reconnu » envoie chercher
+  // une faute de frappe, celui-ci envoie chercher une passerelle.
+  CANAL_SANS_PASSERELLE:
+    'WhatsApp n’est pas encore desservi. Aucune passerelle ne l’envoie — choisir SMS, ou attendre.',
   QUOTA_INVALIDE: 'Le quota doit être un entier entre 0 et 50 000 segments.',
   JETON_ABSENT: 'Session expirée. Reconnecte-toi.',
   CONFIGURATION: 'Le serveur est mal configuré.',

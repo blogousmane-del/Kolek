@@ -122,11 +122,20 @@ Deno.serve(async (requete) => {
   });
 
   if (error) {
-    for (const code of ['COLLECTEUR_INTROUVABLE', 'CANAL_INVALIDE', 'QUOTA_INVALIDE']) {
-      if (error.message.includes(code)) {
-        return reponse({ erreur: code }, code === 'COLLECTEUR_INTROUVABLE' ? 404 : 400, requete);
-      }
+    // 409 pour `CANAL_SANS_PASSERELLE` : la demande est comprise et bien
+    // formée, elle est refusée. Un 400 dirait « tu as mal écrit », et
+    // enverrait chercher la faute de frappe d'un mot qui n'en a pas.
+    const STATUTS: Record<string, number> = {
+      COLLECTEUR_INTROUVABLE: 404,
+      CANAL_INVALIDE: 400,
+      QUOTA_INVALIDE: 400,
+      CANAL_SANS_PASSERELLE: 409,
+    };
+
+    for (const [code, statut] of Object.entries(STATUTS)) {
+      if (error.message.includes(code)) return reponse({ erreur: code }, statut, requete);
     }
+
     console.error('admin_avis_definir a échoué :', error.message);
     return reponse({ erreur: 'MISE_A_JOUR_IMPOSSIBLE' }, 500, requete);
   }
