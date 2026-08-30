@@ -218,7 +218,21 @@ const AT_REESSAYABLES = new Set([405, 500, 501, 502]);
  */
 export function lireIssueAfricastalking(statut: number, texte: string): Issue {
   const parStatut = lireIssue(statut);
-  if (!parStatut.ok) return parStatut;
+
+  // Le refus explique pourquoi, et on jetait l'explication.
+  //
+  // Le 2026-08-30, le premier envoi réel a rendu `IDENTIFIANTS_REFUSES` — et
+  // rien de plus. Compte inconnu ? clé d'un autre projet ? clé du bac à sable ?
+  // Africa's Talking répond ces trois choses différemment, dans le corps, et
+  // `derniere_erreur` n'en gardait aucune. On cherchait à l'aveugle.
+  //
+  // L'extrait est court et nettoyé : il finit dans une colonne de base lue par
+  // un écran, pas dans un journal. Le corps d'un refus ne porte jamais la clé —
+  // c'est la requête qui la porte, pas la réponse.
+  if (!parStatut.ok) {
+    const extrait = texte.replace(/\s+/g, ' ').trim().slice(0, 120);
+    return extrait ? { ...parStatut, raison: `${parStatut.raison} — ${extrait}` } : parStatut;
+  }
 
   let destinataires: unknown;
   try {

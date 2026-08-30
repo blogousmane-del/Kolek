@@ -334,3 +334,43 @@ describe("l'expéditeur facultatif", () => {
     expect(sans, 'Twilio refuse un envoi sans From').toBeNull();
   });
 });
+
+/**
+ * Le refus doit dire pourquoi.
+ *
+ * Le 2026-08-30, le premier envoi réel de GTCS a rendu `IDENTIFIANTS_REFUSES`
+ * et rien d'autre. Compte inconnu, clé d'un autre projet, clé du bac à sable :
+ * Africa's Talking distingue ces cas dans le corps de la réponse, et le code
+ * jetait ce corps. On cherchait à l'aveugle une cause que la passerelle avait
+ * déjà nommée.
+ */
+describe('ce que dit un refus', () => {
+  it("garde l'explication de la passerelle dans la raison", async () => {
+    const faux = (async () =>
+      new Response('Invalid API key or username\n', { status: 401 })) as unknown as typeof fetch;
+
+    const issue = await envoyer(AT, '0701020304', 'texte', faux);
+    expect(issue.ok).toBe(false);
+    if (issue.ok) return;
+
+    expect(issue.raison).toContain('IDENTIFIANTS_REFUSES');
+    expect(issue.raison, "l'explication de la passerelle doit survivre").toContain(
+      'Invalid API key or username',
+    );
+    expect(issue.reessayable, 'des identifiants refusés ne se rejouent pas').toBe(false);
+  });
+
+  it('reste lisible quand le refus est muet', async () => {
+    const faux = (async () => new Response('', { status: 403 })) as unknown as typeof fetch;
+    const issue = await envoyer(AT, '0701020304', 'texte', faux);
+    expect(issue).toMatchObject({ ok: false, raison: 'IDENTIFIANTS_REFUSES' });
+  });
+
+  it('borne l’extrait : la colonne est lue par un écran, pas par un journal', async () => {
+    const faux = (async () =>
+      new Response('x'.repeat(500), { status: 400 })) as unknown as typeof fetch;
+    const issue = await envoyer(AT, '0701020304', 'texte', faux);
+    if (issue.ok) throw new Error('devait échouer');
+    expect(issue.raison.length).toBeLessThan(160);
+  });
+});
