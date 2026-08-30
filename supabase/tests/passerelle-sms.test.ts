@@ -437,3 +437,36 @@ describe('la sonde des identifiants', () => {
     expect(appele, 'aucun appel ne doit partir vers Africa’s Talking').toBe(false);
   });
 });
+
+/**
+ * L'espace qu'on ne voit pas.
+ *
+ * Sélectionner une clé d'API à la souris attrape souvent un espace ou un
+ * retour à la ligne. Le champ du tableau de bord paraît correct, la passerelle
+ * répond 401, et on régénère une clé qui n'était pas en cause — ce qui a été
+ * fait deux fois le 2026-08-30 avant que la sonde ne tranche.
+ */
+describe('les valeurs rognées', () => {
+  it('accepte une clé collée avec des espaces autour', () => {
+    const p = passerelleDepuis({
+      SMS_FOURNISSEUR: ' africastalking ',
+      SMS_COMPTE: '  gtcs\n',
+      SMS_SECRET: '\tcle-api ',
+    });
+
+    expect(p, 'un espace parasite ne doit pas invalider la passerelle').not.toBeNull();
+    expect(p?.fournisseur).toBe('africastalking');
+    expect(p?.compte).toBe('gtcs');
+    expect(p?.secret).toBe('cle-api');
+  });
+
+  it('traite une valeur faite d’espaces comme absente', () => {
+    expect(
+      passerelleDepuis({
+        SMS_FOURNISSEUR: 'africastalking',
+        SMS_COMPTE: '   ',
+        SMS_SECRET: 'cle-api',
+      }),
+    ).toBeNull();
+  });
+});

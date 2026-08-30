@@ -87,10 +87,20 @@ export function normaliserNumero(brut: string, defaut = '225'): string | null {
 export function passerelleDepuis(
   env: Record<string, string | undefined>,
 ): Identifiants | null {
-  const fournisseur = env.SMS_FOURNISSEUR;
-  const compte = env.SMS_COMPTE;
-  const secret = env.SMS_SECRET;
-  const expediteur = env.SMS_EXPEDITEUR;
+  // `trim()` sur les quatre, et ce n'est pas de la coquetterie.
+  //
+  // Ces valeurs arrivent d'un copier-coller dans un champ de tableau de bord.
+  // Un espace ou un retour à la ligne attrapé en sélectionnant une clé à la
+  // souris rend un identifiant faux que rien ne distingue à l'œil : le champ
+  // paraît correct, la passerelle répond 401, et on régénère une clé qui
+  // n'était pas en cause. C'est exactement l'impasse du 2026-08-30.
+  //
+  // Rogner ici plutôt qu'à l'usage : `passerelleDepuis` est le seul point
+  // d'entrée de ces quatre valeurs dans le code.
+  const fournisseur = env.SMS_FOURNISSEUR?.trim();
+  const compte = env.SMS_COMPTE?.trim();
+  const secret = env.SMS_SECRET?.trim();
+  const expediteur = env.SMS_EXPEDITEUR?.trim();
 
   if (fournisseur !== 'twilio' && fournisseur !== 'africastalking') return null;
   if (!compte || !secret) return null;
@@ -299,9 +309,15 @@ export async function verifierIdentifiants(
     });
     const extrait = (await reponse.text()).replace(/\s+/g, ' ').trim().slice(0, 100);
 
+    // Les longueurs, et pas les valeurs. Une clé Africa's Talking a une taille
+    // stable ; un caractère de trop trahit un copier-coller qui a mordu, et
+    // c'est invisible dans un champ de tableau de bord. Sans ce chiffre on
+    // régénère une clé parfaitement valide — ce qui a déjà été fait deux fois.
+    const formes = `compte ${identifiants.compte.length} car., clé ${identifiants.secret.length} car.`;
+
     return reponse.ok
       ? `COMPTE_RECONNU — la passerelle accepte ces identifiants (${extrait})`
-      : `COMPTE_REFUSE ${reponse.status} — ${extrait}`;
+      : `COMPTE_REFUSE ${reponse.status} — ${extrait} [${formes}]`;
   } catch (cause) {
     return `SONDE_IMPOSSIBLE ${cause instanceof Error ? cause.name : ''}`.trim();
   }
