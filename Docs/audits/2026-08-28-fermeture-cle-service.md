@@ -3,12 +3,20 @@
 **Date :** 2026-08-28 · **Objet :** clore l'incident ouvert par
 `2026-08-25-verification-audit.md`, seul constat bloquant du dépôt.
 
-**Verdict : fermée.** Quatre jours d'exposition, du 2026-08-24 au 2026-08-28.
+> **Correction du 2026-08-30 — ce document a conclu trop tôt.** Le verdict
+> ci-dessous porte sur la désactivation des clés d'API, faite le 2026-08-28.
+> Elle était nécessaire et elle n'était pas suffisante : le secret partagé qui
+> avait signé la clé fuitée **continuait de vérifier les jetons**, et cette
+> seconde barrière n'a été fermée que le 2026-08-30. Voir
+> « La fermeture n'était pas complète » plus bas. Exposition réelle : **six
+> jours**, non quatre.
+
+**Verdict : fermée.** Six jours d'exposition, du 2026-08-24 au 2026-08-30.
 La clé n'ouvre plus rien — mesuré, pas supposé.
 
 | | |
 |---|---|
-| Exposition | 4 jours |
+| Exposition | 6 jours (4 annoncés le 2026-08-28, corrigé le 2026-08-30) |
 | Cause de la fuite | Clé de service collée dans `VITE_SUPABASE_ANON_KEY`, servie dans un paquet public |
 | Cause du délai | Le projet avait migré vers les JWT Signing Keys : le bouton qui aurait clos l'incident en une minute n'existait plus |
 | Geste qui a clos | Désactivation des clés d'API héritées, après bascule complète vers le format `sb_publishable_` / `sb_secret_` |
@@ -117,6 +125,79 @@ endpoint`, et l'a toujours fait.
 
 ---
 
+## La fermeture n'était pas complète — 2026-08-30
+
+Le 2026-08-28, la mesure disait `401` sur les deux clés héritées et ce document
+concluait. **Le `401` venait du portillon des clés d'API, pas de la signature.**
+Deux barrières distinctes ; une seule était tombée.
+
+L'écran *JWT Keys → Legacy JWT Secret* le disait pourtant en clair :
+
+> *Legacy JWT secret … is used to **only verify** JSON Web Tokens by Supabase
+> products.*
+
+« Ne signe plus, vérifie encore ». Un secret qui vérifie est un secret qui
+authentifie : quiconque le détenait pouvait **fabriquer** un jeton portant
+`role: service_role` et le faire accepter, sans jamais toucher à la clé fuitée.
+Et cette valeur avait séjourné trois jours dans `JWT_KEY`, sur les trois sites
+Netlify.
+
+### Le test qui a tranché, et les deux qui n'y sont pas parvenus
+
+**Première tentative, non concluante.** Présenter le jeton hérité comme jeton
+d'utilisateur rendait `403 invalid claim: missing sub claim`, tandis qu'un jeton
+à signature inventée rendait `403 signature is invalid`. Tentant d'en conclure
+que la signature du premier avait été vérifiée — mais les deux résultats sont
+tout aussi compatibles avec « les revendications sont contrôlées avant la
+signature ». Le jeton hérité n'a pas de `sub` ; mon témoin en avait un. Ils
+échouaient à des endroits différents pour la mauvaise raison.
+
+**Le test décisif** interroge un consommateur qui se moque du `sub` : PostgREST,
+qui ne regarde que `role`. Deux requêtes rigoureusement identiques, jusqu'aux
+revendications, ne différant que par la signature :
+
+```
+A. vrai jeton hérité, signé par le secret partagé
+   → 404 PGRST205 « Could not find the table 'public.profils' »
+
+B. mêmes revendications, signature inventée
+   → 401 PGRST301 « None of the keys was able to decode the JWT »
+```
+
+En A, PostgREST **avait authentifié le jeton** et appliqué son rôle : il ne se
+plaignait plus que d'un nom de table inventé pour l'occasion. La signature était
+donc acceptée.
+
+Après révocation, les deux réponses sont devenues identiques :
+
+```
+A → 401 PGRST301 « No suitable key was found to decode the JWT »
+B → 401 PGRST301 « No suitable key was found to decode the JWT »
+```
+
+C'est la fermeture, et elle se lit en une ligne.
+
+### Ce que ça coûte de savoir mesurer la bonne chose
+
+Trois mesures ont été prises avant celle-ci, et toutes disaient `401` sans rien
+prouver de la signature. La leçon n'est pas « il fallait mieux chercher » : c'est
+qu'**une barrière ne se vérifie qu'en interrogeant le composant qui l'applique.**
+Le portillon des clés d'API répond avant GoTrue, GoTrue contrôle les
+revendications avant la signature, et seul PostgREST rend la signature
+observable.
+
+### Impact utilisateur : nul, et établi avant le geste
+
+| Ce qui aurait pu casser | Pourquoi ça n'a pas cassé |
+|---|---|
+| Sessions ouvertes | Jetons d'accès valides 1 h ; la clé ne signait plus depuis 13 jours |
+| Reconnexion automatique | Les jetons de rafraîchissement sont opaques, pas des JWT : ils ne dépendent d'aucune clé de signature |
+| Connexion par mot de passe | Vérifié après coup : `400 invalid_credentials`, donc la clé passe |
+
+L'interface a été le vrai obstacle — la colonne `ACTIONS` du tableau
+*Previously used keys* tombait hors de l'écran, et la révocation demande de
+recopier l'identifiant de 36 caractères pour confirmer.
+
 ## Ce qui a mal tourné pendant la fermeture
 
 Quatre incidents, tous rattrapés, tous instructifs.
@@ -211,11 +292,20 @@ s'y trompe pas : son motif exige `sb_secret_[A-Za-z0-9_-]{8,}`. Une sonde écrit
   l'audit du 25 qui prescrivait *Generate new secret*. Du matériel de clé rangé
   au mauvais endroit, que personne ne lisait, donc que personne ne surveillait.
 
-  **Le second geste reste à faire :** vérifier dans **Supabase → JWT Keys** si la
-  clé héritée est encore acceptée en vérification. Si elle l'est, un porteur de
-  cette valeur pourrait forger un jeton de session pour n'importe quel
-  collecteur — ce que la désactivation des clés d'API du 2026-08-28 ne ferme
-  pas, les deux mécanismes étant distincts.
+  ~~**Le second geste reste à faire :** vérifier si la clé héritée est encore
+  acceptée en vérification.~~ **Fait le 2026-08-30, et elle l'était.** Le
+  `Legacy HS256 (Shared Secret)` a été révoqué. Voir « La fermeture n'était pas
+  complète » plus haut.
+
+- ~~**A-t-on pu s'ajouter comme administrateur pendant la fenêtre ?**~~
+  **Vérifié le 2026-08-30 : non.** `public.admins` ne contient qu'une ligne,
+  celle du compte de GTCS, créée le 2026-08-19 — cinq jours avant l'incident.
+
+  Réserve à consigner : cela prouve l'absence de porte dérobée **persistante**,
+  pas l'absence de passage. Une ligne ajoutée puis retirée pendant la fenêtre
+  n'aurait rien laissé, le journal sur cette table n'existant pas encore. Ce cas
+  supposerait toutefois un intrus renonçant à son propre accès en partant.
+  Depuis le 2026-08-29, l'octroi **et** le retrait laissent tous deux une trace.
 - ~~**`avis_declencher_drainage` accepte n'importe quelle valeur non nulle.**~~
   **Corrigé** par `20260828100000_avis_drainage_secret_plausible.sql` : deux
   états nommés de plus, `SECRET_INVALIDE` et `ADRESSE_INVALIDE`. Les cinq
