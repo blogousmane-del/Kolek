@@ -6,6 +6,7 @@ import {
   lireIssue,
   normaliserNumero,
   passerelleDepuis,
+  verifierIdentifiants,
   type Identifiants,
 } from '../functions/_shared/passerelle-sms.ts';
 
@@ -372,5 +373,67 @@ describe('ce que dit un refus', () => {
     const issue = await envoyer(AT, '0701020304', 'texte', faux);
     if (issue.ok) throw new Error('devait échouer');
     expect(issue.raison.length).toBeLessThan(160);
+  });
+});
+
+/**
+ * La sonde qui tranche.
+ *
+ * GTCS a régénéré sa clé, puis corrigé son nom d'utilisateur. Africa's Talking
+ * a répondu « The supplied authentication is invalid » aux deux essais
+ * suivants. Deux corrections plausibles, aucun changement — à ce stade on ne
+ * sait plus si le refus vient des identifiants ou de notre requête, et les deux
+ * se corrigent à des endroits opposés.
+ *
+ * `/version1/user` répond au même couple username + apiKey, ne coûte rien et
+ * n'envoie aucun message.
+ */
+describe('la sonde des identifiants', () => {
+  it('interroge le compte sans envoyer de message', async () => {
+    let vue = '';
+    let entetes: Record<string, string> = {};
+    const faux = (async (url: string, init: RequestInit) => {
+      vue = url;
+      entetes = init.headers as Record<string, string>;
+      return new Response('{"UserData":{"balance":"KES 1.00"}}', { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const verdict = await verifierIdentifiants(AT, faux);
+
+    expect(vue).toBe('https://api.africastalking.com/version1/user?username=gtcs');
+    expect(entetes.apiKey, 'la sonde s’authentifie comme l’envoi').toBe('cle-api');
+    expect(verdict).toContain('COMPTE_RECONNU');
+  });
+
+  it('nomme le refus quand la passerelle dit non', async () => {
+    const faux = (async () =>
+      new Response('The supplied authentication is invalid', {
+        status: 401,
+      })) as unknown as typeof fetch;
+
+    const verdict = await verifierIdentifiants(AT, faux);
+    expect(verdict).toContain('COMPTE_REFUSE 401');
+    expect(verdict).toContain('The supplied authentication is invalid');
+  });
+
+  it('ne prétend rien quand elle-même échoue', async () => {
+    // Une sonde muette qui rendrait « compte refusé » ferait chercher une clé
+    // parfaitement valide.
+    const faux = (async () => {
+      throw new TypeError('Failed to fetch');
+    }) as unknown as typeof fetch;
+
+    expect(await verifierIdentifiants(AT, faux)).toContain('SONDE_IMPOSSIBLE');
+  });
+
+  it('ne s’applique pas à Twilio', async () => {
+    let appele = false;
+    const faux = (async () => {
+      appele = true;
+      return new Response('', { status: 200 });
+    }) as unknown as typeof fetch;
+
+    expect(await verifierIdentifiants(TWILIO, faux)).toBe('SONDE_NON_APPLICABLE');
+    expect(appele, 'aucun appel ne doit partir vers Africa’s Talking').toBe(false);
   });
 });

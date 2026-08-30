@@ -1,6 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-import { envoyer, passerelleDepuis } from '../_shared/passerelle-sms.ts';
+import { envoyer, passerelleDepuis, verifierIdentifiants } from '../_shared/passerelle-sms.ts';
 
 /**
  * Le drainage de la file des avis.
@@ -89,6 +89,14 @@ Deno.serve(async (requete) => {
   let envoyes = 0;
   let echecs = 0;
 
+  // La sonde d'identifiants, au plus une fois par drainage.
+  //
+  // Elle ne part que si la passerelle a refusé l'authentification, et son
+  // résultat est collé à la raison du premier avis concerné. Une fois suffit :
+  // cinquante avis refusés pour la même clé donneraient cinquante fois la même
+  // réponse, et cinquante appels à une passerelle qui vient de dire non.
+  let diagnostic: string | null = null;
+
   for (const avis of file) {
     const issue = await envoyer(passerelle, avis.destinataire, avis.corps);
 
@@ -114,6 +122,14 @@ Deno.serve(async (requete) => {
       continue;
     }
 
+    // « Pourquoi » plutôt que « encore ». Voir `verifierIdentifiants` : un refus
+    // d'authentification ne dit pas si la faute est dans les identifiants ou
+    // dans notre requête, et les deux se corrigent à des endroits opposés.
+    if (issue.raison.startsWith('IDENTIFIANTS_REFUSES') && diagnostic === null) {
+      diagnostic = await verifierIdentifiants(passerelle);
+      console.error('Sonde des identifiants :', diagnostic);
+    }
+
     const tentatives = avis.tentatives + 1;
     // `abandonne` est définitif : ni un refus d'identifiants ni un numéro
     // invalide ne passeront au quatrième essai, et les rejouer indéfiniment
@@ -123,7 +139,13 @@ Deno.serve(async (requete) => {
 
     await client
       .from('avis_clients')
-      .update({ statut, tentatives, derniere_erreur: issue.raison })
+      .update({
+        statut,
+        tentatives,
+        derniere_erreur: diagnostic
+          ? `${issue.raison} | SONDE: ${diagnostic}`.slice(0, 400)
+          : issue.raison,
+      })
       .eq('id', avis.id);
 
     echecs += 1;

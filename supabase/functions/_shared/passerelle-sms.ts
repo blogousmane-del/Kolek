@@ -257,6 +257,56 @@ export function lireIssueAfricastalking(statut: number, texte: string): Issue {
   return { ok: false, reessayable: AT_REESSAYABLES.has(code), raison: `REFUS_${code}` };
 }
 
+/**
+ * Demande à la passerelle si elle reconnaît le compte, sans rien envoyer.
+ *
+ * ## Pourquoi cette sonde existe
+ *
+ * Le 2026-08-30, GTCS a régénéré sa clé d'API puis corrigé son nom
+ * d'utilisateur. Africa's Talking a répondu « The supplied authentication is
+ * invalid » aux deux essais suivants, exactement comme avant. Deux corrections
+ * plausibles, aucun changement : à ce stade, on ne sait plus si le refus vient
+ * des identifiants ou de **notre requête**.
+ *
+ * `/version1/user` répond au même couple `username` + `apiKey`, ne coûte rien
+ * et n'envoie aucun message. Il tranche donc la question que l'envoi ne peut
+ * pas trancher :
+ *
+ * | Réponse de la sonde | Ce qu'on cherche ensuite |
+ * |---|---|
+ * | compte joignable | les identifiants sont bons — le défaut est dans notre appel d'envoi |
+ * | compte refusé | les identifiants sont mauvais — inutile de toucher au code |
+ *
+ * Sans elle, les deux hypothèses se ressemblent et on corrige au hasard. C'est
+ * précisément ce qu'on vient de faire deux fois.
+ *
+ * La réponse porte le solde du compte, jamais la clé. L'extrait est donc
+ * enregistrable dans `derniere_erreur`, que l'écran Avis affiche.
+ */
+export async function verifierIdentifiants(
+  identifiants: Identifiants,
+  recuperer: typeof fetch = fetch,
+): Promise<string> {
+  if (identifiants.fournisseur !== 'africastalking') return 'SONDE_NON_APPLICABLE';
+
+  const url =
+    'https://api.africastalking.com/version1/user?username=' +
+    encodeURIComponent(identifiants.compte);
+
+  try {
+    const reponse = await recuperer(url, {
+      headers: { apiKey: identifiants.secret, Accept: 'application/json' },
+    });
+    const extrait = (await reponse.text()).replace(/\s+/g, ' ').trim().slice(0, 100);
+
+    return reponse.ok
+      ? `COMPTE_RECONNU — la passerelle accepte ces identifiants (${extrait})`
+      : `COMPTE_REFUSE ${reponse.status} — ${extrait}`;
+  } catch (cause) {
+    return `SONDE_IMPOSSIBLE ${cause instanceof Error ? cause.name : ''}`.trim();
+  }
+}
+
 /** Envoie un message. `recuperer` est injectable pour les tests. */
 export async function envoyer(
   identifiants: Identifiants,
