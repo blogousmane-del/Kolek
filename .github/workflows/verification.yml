@@ -1,0 +1,159 @@
+# Kolek — la vérification tourne sur chaque poussée, pas quand on y pense
+#
+# ## Le trou que ce fichier bouche
+#
+# Le 2026-08-29, trois correctifs de sécurité ont été versés puis déployés à la
+# main : migration par `supabase db push`, fonction par `supabase functions
+# deploy`. Rien, nulle part, n'aurait signalé un oubli.
+#
+# C'est le pire genre de défaut : **un correctif versé et non déployé est
+# indiscernable d'un correctif appliqué.** Le dépôt est vert, la revue est
+# faite, le commit est poussé — et la production porte encore la faille.
+#
+# Second trou, plus discret : `verifier:bundles` refuse un artefact contenant
+# une clé de service. Il ne tournait que lorsqu'un humain lançait
+# `npm run verifier`. Le jour où personne ne le lance est exactement le jour où
+# il aurait servi — c'est ainsi que la clé du 2026-08-24 est partie.
+#
+# ## Ce qui n'est pas ici, et pourquoi
+#
+# `verifier:dns` et `verifier:en-ligne` interrogent la production. Les mettre
+# ici les ferait échouer sur toute branche dont la construction ne correspond
+# pas encore à ce qui est servi — c'est-à-dire toute branche en cours. Ils
+# restent des contrôles d'après-déploiement, lancés à la main.
+#
+# Le déploiement automatique n'y est pas non plus : il demande
+# `SUPABASE_ACCESS_TOKEN`, la référence du projet et le mot de passe de la base
+# en secrets de dépôt. C'est un choix qui appartient à GTCS, pas au CI.
+
+name: Vérification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Deux poussées rapprochées sur la même branche : seule la dernière compte.
+concurrency:
+  group: verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  depot:
+    name: Dépôt — thème, tests, construction, fuites
+    runs-on: ubuntu-latest
+
+    # Environnement **synthétique**, et c'est délibéré. `garde-env.mjs` exige
+    # une adresse de projet bien formée et une clé qui ne soit pas secrète ; il
+    # accepte `sb_publishable_` sans chercher à l'authentifier. Ces deux valeurs
+    # suffisent donc à construire.
+    #
+    # Poser ici la vraie clé publiable n'apporterait rien : le CI ne parle à
+    # aucun projet. Et une valeur réelle dans un fichier de workflow d'un dépôt
+    # public est une habitude dont on ne veut pas, même quand elle est publique
+    # par conception — c'est le glissement qui finit par y faire entrer autre
+    # chose.
+    env:
+      VITE_SUPABASE_URL: https://exemple-ci.supabase.co
+      VITE_SUPABASE_ANON_KEY: sb_publishable_valeur-de-ci-sans-effet
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 26 comme les trois `netlify.toml`. Une version différente ici
+          # validerait une construction que la production ne fait pas.
+          node-version: '26'
+          cache: npm
+
+      - run: npm ci
+
+      # Les générateurs d'abord : ils sont rapides, et un thème désynchronisé
+      # fait échouer des tests d'interface d'une manière qui envoie chercher
+      # ailleurs.
+      - name: Thème, marque, paliers
+        run: |
+          npm run verifier:theme
+          npm run verifier:marque
+          npm run verifier:paliers
+
+      - name: Tests des applications
+        run: npm test
+
+      - name: Tests des scripts
+        run: npm run test:scripts
+
+      - name: Construction
+        run: npm run build
+
+      # Le contrôle qui aurait vu passer la clé du 2026-08-24. Il inspecte les
+      # trois `dist` et refuse de conclure si l'un manque.
+      - name: Aucune clé de service dans les artefacts
+        run: npm run verifier:bundles
+
+  base:
+    name: Base — RLS, journal, isolation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # `supabase start` applique les migrations au premier démarrage. Les 366
+      # tests de `supabase/tests/` tournent donc contre le schéma du commit, y
+      # compris les garde-fous qui échouent à la migration — dont celui qui
+      # vérifie que les six triggers de journal couvrent bien les trois
+      # événements.
+      #
+      # Le coureur GitHub a assez de mémoire pour la pile entière : les
+      # exclusions nécessaires sur un poste à 4 Go de Docker n'ont pas lieu
+      # d'être ici.
+      - name: Pile Supabase
+        run: supabase start
+
+      - name: Tests de base
+        run: npm run test:db
+
+      # Le journal de la fonction est plus utile que sa sortie quand la pile
+      # refuse de monter.
+      - name: État de la pile en cas d'échec
+        if: failure()
+        run: supabase status || true
+
+  rappel-deploiement:
+    name: Rappel — ce qui ne se déploie pas tout seul
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    needs: [depot, base]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Deux commits pour pouvoir comparer la poussée à son parent.
+          fetch-depth: 2
+
+      # Tant que le déploiement n'est pas automatisé, le moins qu'on puisse
+      # faire est de dire à voix haute ce qui vient de changer et n'est pas
+      # parti. Un `::notice` n'échoue pas la vérification — bloquer une
+      # poussée pour un rappel serait vite contourné, et un garde-fou contourné
+      # ne garde plus rien.
+      - name: Signaler les migrations et fonctions modifiées
+        run: |
+          modifies=$(git diff --name-only HEAD~1 HEAD -- supabase/migrations supabase/functions || true)
+          if [ -n "$modifies" ]; then
+            echo "$modifies"
+            echo "::notice title=À déployer à la main::Des migrations ou des Edge Functions ont changé. Elles ne partent pas toutes seules — « npx supabase db push » et « npx supabase functions deploy <nom> »."
+          else
+            echo "Ni migration ni fonction touchée par cette poussée."
+          fi
