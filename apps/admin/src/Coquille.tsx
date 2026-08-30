@@ -9,6 +9,7 @@ import { EncaisserMise } from './ecrans/EncaisserMise';
 import { EncoursSoldes } from './ecrans/EncoursSoldes';
 import { Demandes } from './ecrans/Demandes';
 import { Reglages } from './ecrans/Reglages';
+import { SuperAdmin } from './ecrans/SuperAdmin';
 import { TableauDeBord } from './ecrans/TableauDeBord';
 import { useVueGlobale } from './donnees';
 import { supabase } from './supabase';
@@ -17,7 +18,14 @@ import { supabase } from './supabase';
     la liste, et la barre latérale reste sur « Collecteurs ». */
 type Page = CleNavAdmin | 'detail';
 
-export function Coquille() {
+/**
+ * `estSuper` vient du portillon, qui a demandé `est_super_admin()` au serveur.
+ * Il ne protège rien : les deux Edge Functions du Super Admin reposent la même
+ * question sous l'identité de l'appelant, et la base ne croit que celle-là. Ici,
+ * il décide de ce que le menu montre — inutile d'apprendre à un administrateur
+ * métier qu'il existe un niveau au-dessus du sien.
+ */
+export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
   const [page, setPage] = useState<Page>('tableau');
   const [erreurSortie, setErreurSortie] = useState<string | null>(null);
   /** Quel collecteur la fiche détaillée affiche. `null` avant tout clic. */
@@ -67,7 +75,12 @@ export function Coquille() {
           signent rien, ils prennent de la largeur au contenu. */}
       <div className="flex w-full m-1.5 sm:m-3 rounded-lg sm:rounded-xl overflow-hidden shadow-lg">
         <div className="hidden lg:flex">
-          <BarreLaterale actif={actif} onNaviguer={naviguer} onDeconnexion={deconnecter} />
+          <BarreLaterale
+            actif={actif}
+            onNaviguer={naviguer}
+            onDeconnexion={deconnecter}
+            estSuper={estSuper}
+          />
         </div>
 
         <div className="flex-1 min-w-0 bg-canvas flex flex-col">
@@ -140,6 +153,10 @@ export function Coquille() {
               {page === 'demandes' && <Demandes />}
               {page === 'avis' && <Avis />}
               {page === 'reglages' && <Reglages />}
+              {/* L'écran a sa propre source — `super-admin-etat` — mais il
+                  attend quand même la vue globale : la liste des collecteurs
+                  est ce dans quoi on choisit à qui appliquer une remise. */}
+              {page === 'super' && <SuperAdmin vue={donnees.vue} />}
             </>
           )}
         </div>
@@ -162,6 +179,7 @@ export function Coquille() {
               onNaviguer={naviguer}
               onDeconnexion={deconnecter}
               onFermer={() => setMenuOuvert(false)}
+              estSuper={estSuper}
             />
           </div>
         </div>
