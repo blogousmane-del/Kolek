@@ -52,6 +52,16 @@ interface Comptage {
   palier: string;
   total: number;
   actifs: number;
+  /**
+   * La somme des remises en cours sur ce palier, exprimée en fraction
+   * d'abonnement : deux collecteurs à −20 % valent 0,4 offert.
+   *
+   * C'est la forme qui permet à la base de dire ce qu'on a consenti sans jamais
+   * connaître un prix. Un montant ici obligerait à recopier la grille en SQL, et
+   * deux copies d'un prix finissent par diverger — ce que tout ce fichier existe
+   * pour empêcher.
+   */
+  offerts: number;
 }
 
 /**
@@ -62,11 +72,19 @@ interface Comptage {
  * Seuls les abonnements `actif` comptent. Un abonnement suspendu ou expiré
  * n'encaisse rien, et le faire figurer au MRR reviendrait à annoncer un revenu
  * qui n'arrive pas.
+ *
+ * Les remises se déduisent ici, pour la même raison : `offerts` est un nombre
+ * d'abonnements, la grille en fait des francs. Le MRR annoncé est donc celui
+ * qu'on encaissera, et `mrrCatalogue` reste à côté — sans lui, une remise mal
+ * saisie ressemblerait à une perte de clients.
  */
 function calculerMrr(comptages: Comptage[]) {
   const parPalier = TARIFS.map((tarif) => {
     const trouve = comptages.find((c) => c.palier === tarif.cle);
     const actifs = trouve?.actifs ?? 0;
+    // Borné à `actifs` : la base garantit déjà qu'une remise vaut au plus un
+    // abonnement, mais un MRR négatif serait plus difficile à voir qu'à causer.
+    const offerts = Math.min(Math.max(Number(trouve?.offerts ?? 0), 0), actifs);
     return {
       palier: tarif.cle,
       nom: tarif.nom,
@@ -74,7 +92,10 @@ function calculerMrr(comptages: Comptage[]) {
       limiteClients: tarif.limiteClients,
       total: trouve?.total ?? 0,
       actifs,
-      mrr: actifs * tarif.prix,
+      offerts,
+      mrrCatalogue: actifs * tarif.prix,
+      remise: offerts * tarif.prix,
+      mrr: (actifs - offerts) * tarif.prix,
     };
   });
 
@@ -86,6 +107,8 @@ function calculerMrr(comptages: Comptage[]) {
 
   return {
     mrr: parPalier.reduce((somme, p) => somme + p.mrr, 0),
+    mrrCatalogue: parPalier.reduce((somme, p) => somme + p.mrrCatalogue, 0),
+    remise: parPalier.reduce((somme, p) => somme + p.remise, 0),
     parPalier,
   };
 }
@@ -154,8 +177,14 @@ Deno.serve(async (requete) => {
 
   let abonnements;
   try {
-    const { mrr, parPalier } = calculerMrr(comptages);
-    abonnements = { ...(brut.abonnements as Record<string, unknown>), mrr, parPalier };
+    const { mrr, mrrCatalogue, remise, parPalier } = calculerMrr(comptages);
+    abonnements = {
+      ...(brut.abonnements as Record<string, unknown>),
+      mrr,
+      mrrCatalogue,
+      remise,
+      parPalier,
+    };
   } catch (cause) {
     console.error('Palier inconnu en base :', cause instanceof Error ? cause.message : cause);
     return reponse({ erreur: 'PALIER_INCONNU' }, 500, requete);
