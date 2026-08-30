@@ -9,7 +9,8 @@ export type CleNavAdmin =
   | 'abonnements'
   | 'demandes'
   | 'avis'
-  | 'reglages';
+  | 'reglages'
+  | 'super';
 
 interface Entree {
   cle: CleNavAdmin;
@@ -66,6 +67,27 @@ const SYSTEME: Entree[] = [
   { cle: 'reglages', icone: 'settings', libelle: 'Réglages', disponible: true },
 ];
 
+/**
+ * L'administration de la plateforme elle-même, réservée au niveau `super`.
+ *
+ * **Masquée et non grisée**, et ce fichier porte déjà deux fois la raison : les
+ * entrées mortes ont été retirées le 2026-08-21, les deux raccourcis grisés le
+ * 2026-08-22, avec l'argument « un menu qui promet ce qu'il ne tiendra jamais
+ * est pire qu'un menu court ». Une entrée grisée pour cause de privilège fait
+ * pire encore : elle apprend à l'administrateur métier qu'il existe un niveau
+ * au-dessus du sien, et lui donne quelque chose à réclamer.
+ *
+ * Ce masquage ne protège rien, et il ne prétend rien protéger. Le portillon est
+ * `est_super_admin()`, vérifié par la base sous l'identité de l'appelant, et
+ * les Edge Functions le redemandent à chaque appel.
+ */
+const SUPER_ADMIN: Entree = {
+  cle: 'super',
+  icone: 'shield-check',
+  libelle: 'Super Admin',
+  disponible: true,
+};
+
 interface Props {
   actif: CleNavAdmin;
   onNaviguer: (cle: CleNavAdmin) => void;
@@ -74,6 +96,9 @@ interface Props {
       présence est ce qui fait apparaître la croix de fermeture : sur un écran
       large, la barre est toujours là et n'a rien à fermer. */
   onFermer?: () => void;
+  /** Ajoute l'entrée « Super Admin ». Absent par défaut : un menu ne montre pas
+      ce qu'il ne sait pas encore autorisé. */
+  estSuper?: boolean;
 }
 
 function Section({
@@ -131,7 +156,9 @@ function Section({
   );
 }
 
-export function BarreLaterale({ actif, onNaviguer, onDeconnexion, onFermer }: Props) {
+export function BarreLaterale({ actif, onNaviguer, onDeconnexion, onFermer, estSuper }: Props) {
+  const systeme = estSuper ? [...SYSTEME, SUPER_ADMIN] : SYSTEME;
+
   return (
     // `overflow-y-auto` : la barre porte huit entrées, deux raccourcis et un
     // encart de promotion. Sur un portable en 768 px de haut, le bas était
@@ -174,7 +201,7 @@ export function BarreLaterale({ actif, onNaviguer, onDeconnexion, onFermer }: Pr
 
       <Section
         titre="Système"
-        entrees={SYSTEME}
+        entrees={systeme}
         actif={actif}
         onNaviguer={onNaviguer}
         className="px-4 mt-4 mb-1"

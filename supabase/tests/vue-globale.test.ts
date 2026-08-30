@@ -221,7 +221,19 @@ describe('admin_vue_globale — ce qu’elle compte', () => {
     for (const p of parPalier) {
       // Tri explicite : `jsonb_build_object` ne garantit pas l'ordre des clés au
       // retour, et le figer reviendrait à tester PostgreSQL plutôt que la vue.
-      expect([...Object.keys(p)].sort()).toEqual(['actifs', 'palier', 'total']);
+      //
+      // `offerts` est entré le 2026-08-30 avec les codes promo. Il ne rompt pas
+      // la frontière : c'est un nombre d'abonnements — deux collecteurs à −20 %
+      // valent 0,4 — et non un montant. La remise en francs se calcule là où se
+      // calcule le MRR, et nulle part ailleurs.
+      expect([...Object.keys(p)].sort()).toEqual(['actifs', 'offerts', 'palier', 'total']);
+
+      // Ce qui est vraiment interdit ici : un montant. Une clé qui en porterait
+      // un serait une troisième copie des tarifs, et deux copies d'un prix
+      // finissent toujours par diverger.
+      for (const cle of Object.keys(p)) {
+        expect(cle).not.toMatch(/prix|montant|tarif|mrr|fcfa/i);
+      }
     }
 
     // Le palier de A est `pro` et son abonnement est actif : il doit être compté

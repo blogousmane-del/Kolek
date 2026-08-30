@@ -288,8 +288,11 @@ const MESSAGES_SUPPRESSION: Record<string, string> = {
   VERIFICATION_IMPOSSIBLE: "Impossible de v\u00e9rifier les droits d'acc\u00e8s.",
   COLLECTEUR_INTROUVABLE: 'Ce collecteur n\u2019existe plus.',
   SUPPRESSION_DE_SOI: 'Tu ne peux pas supprimer ton propre compte depuis cet \u00e9cran.',
+  // Le retrait se faisait dans Supabase faute d'\u00e9cran pour le porter. L'\u00e9cran
+  // Super Admin le fait maintenant, et garder l'ancien message enverrait
+  // l'administrateur dans une console \u00e0 laquelle il n'a pas forc\u00e9ment acc\u00e8s.
   CIBLE_ADMINISTRATEUR:
-    'Ce compte est un compte d\u2019administration. Son retrait se fait dans Supabase, pas ici.',
+    'Ce compte est un compte d\u2019administration. Retire-lui ce droit depuis l\u2019\u00e9cran Super Admin, puis reviens le supprimer.',
   SUPPRESSION_IMPOSSIBLE: 'Suppression impossible. R\u00e9essaie.',
   CORPS_ILLISIBLE: 'Requ\u00eate mal form\u00e9e.',
 };
