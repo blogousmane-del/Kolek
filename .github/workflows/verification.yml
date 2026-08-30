@@ -131,8 +131,86 @@ jobs:
         if: failure()
         run: supabase status || true
 
-  rappel-deploiement:
-    name: Rappel — ce qui ne se déploie pas tout seul
+  fonctions:
+    name: Déploiement — Edge Functions
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    # Ne déployer que ce qui a passé les deux vérifications. C'est tout
+    # l'intérêt d'avoir un CI : la production ne reçoit rien qu'un test n'ait
+    # regardé.
+    needs: [depot, base]
+
+    # Groupe **distinct** de celui du fichier, et sans annulation. La règle du
+    # haut annule une exécution en cours quand une nouvelle poussée arrive —
+    # excellent pour des tests, désastreux au milieu d'un déploiement, qui
+    # laisserait la moitié des fonctions dans une version et l'autre dans la
+    # suivante.
+    concurrency:
+      group: deploiement-fonctions
+      cancel-in-progress: false
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      # La référence n'est pas un secret : elle est déjà en clair dans la CSP
+      # des trois netlify.toml. La mettre en secret donnerait l'illusion de
+      # protéger quelque chose, et ferait échouer le job en silence le jour où
+      # quelqu'un oublie de la poser.
+      PROJET: yfnwmokxkznejotgpfgf
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Deux commits pour comparer la poussée à son parent.
+          fetch-depth: 2
+
+      - name: Y a-t-il quelque chose à déployer ?
+        id: portee
+        run: |
+          modifiees=$(git diff --name-only HEAD~1 HEAD -- supabase/functions || true)
+          if [ -n "$modifiees" ]; then
+            echo "$modifiees"
+            echo "deployer=oui" >> "$GITHUB_OUTPUT"
+          else
+            echo "Aucune Edge Function touchée par cette poussée."
+            echo "deployer=non" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Le jeton est-il posé ?
+        id: jeton
+        if: steps.portee.outputs.deployer == 'oui'
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::warning title=Déploiement sauté::SUPABASE_ACCESS_TOKEN n'est pas posé dans les secrets du dépôt. Les fonctions modifiées restent à déployer à la main."
+            echo "pret=non" >> "$GITHUB_OUTPUT"
+          else
+            echo "pret=oui" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: supabase/setup-cli@v1
+        if: steps.jeton.outputs.pret == 'oui'
+        with:
+          version: latest
+
+      # **Toutes** les fonctions, pas seulement celles dont le fichier a changé.
+      #
+      # Le regroupement se fait au déploiement : chaque fonction embarque une
+      # copie des modules de `_shared/` qu'elle importe. Une correction dans
+      # `cors.ts` ou `plancher.ts` ne parvient donc à une fonction que si
+      # **cette fonction** est redéployée. Ne pousser que le fichier modifié
+      # laisserait douze copies de l'ancien module partagé en ligne — et le
+      # symptôme serait une correction de sécurité appliquée à une fonction sur
+      # treize, ce qui ne se voit d'aucune manière.
+      #
+      # Treize déploiements coûtent quelques minutes. Le raisonnement pour
+      # n'en faire que deux coûterait un jour de recherche le jour où il est
+      # faux.
+      - name: Déployer
+        if: steps.jeton.outputs.pret == 'oui'
+        run: supabase functions deploy --project-ref "$PROJET"
+
+  rappel-migrations:
+    name: Rappel — les migrations ne partent pas toutes seules
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     needs: [depot, base]
@@ -140,20 +218,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Deux commits pour pouvoir comparer la poussée à son parent.
           fetch-depth: 2
 
-      # Tant que le déploiement n'est pas automatisé, le moins qu'on puisse
-      # faire est de dire à voix haute ce qui vient de changer et n'est pas
-      # parti. Un `::notice` n'échoue pas la vérification — bloquer une
-      # poussée pour un rappel serait vite contourné, et un garde-fou contourné
-      # ne garde plus rien.
-      - name: Signaler les migrations et fonctions modifiées
+      # Les migrations restent manuelles : `supabase db push` demande le mot de
+      # passe de la base, que Supabase n'affiche qu'à la création du projet. Le
+      # poser en secret supposerait de le réinitialiser — un geste qui casse
+      # temporairement les `db push` locaux, et qui ne se fait pas au détour
+      # d'un fichier de CI.
+      #
+      # Un `::notice` plutôt qu'un échec. Bloquer une poussée pour un rappel
+      # serait vite contourné, et un garde-fou contourné ne garde plus rien.
+      - name: Signaler les migrations modifiées
         run: |
-          modifies=$(git diff --name-only HEAD~1 HEAD -- supabase/migrations supabase/functions || true)
-          if [ -n "$modifies" ]; then
-            echo "$modifies"
-            echo "::notice title=À déployer à la main::Des migrations ou des Edge Functions ont changé. Elles ne partent pas toutes seules — « npx supabase db push » et « npx supabase functions deploy <nom> »."
+          modifiees=$(git diff --name-only HEAD~1 HEAD -- supabase/migrations || true)
+          if [ -n "$modifiees" ]; then
+            echo "$modifiees"
+            echo "::notice title=À appliquer à la main::Des migrations ont changé. Lancer « npx supabase db push », puis vérifier avec « npx supabase migration list --linked »."
           else
-            echo "Ni migration ni fonction touchée par cette poussée."
+            echo "Aucune migration touchée par cette poussée."
           fi
