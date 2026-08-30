@@ -200,6 +200,38 @@ describe('l’application d’un code', () => {
     expect(await utilisationsDe(CODE_EPUISE)).toBe(1);
   });
 
+  it('ne brûle qu’une unité de quota quand deux codes arrivent ensemble', async () => {
+    // Constat d'audit de kolek-00, le 2026-08-30. La lecture de `remise_fin`
+    // se faisait avant tout verrou : deux applications simultanées la
+    // trouvaient nulle toutes les deux, passaient toutes les deux, et
+    // consommaient deux quotas pour une seule remise — la dernière écrite.
+    const solo = await creerCollecteur(`Course ${MARQUE}`, `+225085${Date.now() % 100000}`);
+    const codeA = `COURSEA${MARQUE}`;
+    const codeB = `COURSEB${MARQUE}`;
+    const base = { valide_du: '2026-01-01', valide_au: '2099-12-31', quota: 5, utilisations: 0 };
+    await admin.from('codes_promo').insert([
+      { code: codeA, remise_pct: 10, ...base },
+      { code: codeB, remise_pct: 15, ...base },
+    ]);
+
+    try {
+      const [premier, second] = await Promise.all([
+        admin.rpc('appliquer_code_promo', { p_collecteur: solo.id, p_code: codeA }),
+        admin.rpc('appliquer_code_promo', { p_collecteur: solo.id, p_code: codeB }),
+      ]);
+      const verdicts = [premier.data, second.data] as Array<{ applique: boolean }>;
+
+      expect(verdicts.filter((v) => v.applique).length).toBe(1);
+      expect((await utilisationsDe(codeA)) + (await utilisationsDe(codeB))).toBe(1);
+    } finally {
+      await admin
+        .from('collecteurs')
+        .update({ promo_code: null, remise_pct: null, remise_fin: null })
+        .eq('id', solo.id);
+      await admin.from('codes_promo').delete().in('code', [codeA, codeB]);
+    }
+  });
+
   it('laisse la remise en place quand le code est supprimé', async () => {
     // Le taux est une copie datée, pas une jointure : retirer la campagne ne
     // reprend pas ce qui a été promis.
