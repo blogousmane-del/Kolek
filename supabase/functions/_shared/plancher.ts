@@ -75,6 +75,23 @@
  * Le mesurer à nouveau : trois appels sur une adresse bien formée et
  * inexistante suffisent à épuiser le plafond, et l'écart entre le troisième et
  * le quatrième donne directement ce que le plancher doit couvrir.
+ *
+ * ## Confirmé par la mesure qui manquait — 2026-08-30
+ *
+ * Les 3000 ms couvraient le chemin « adresse connue » par déduction : le
+ * mesurer suppose d'envoyer une vraie réinitialisation, ce que les sondes
+ * précédentes ne pouvaient pas faire. Fait depuis, sur une adresse réelle,
+ * après un appel de réveil pour écarter le démarrage à froid :
+ *
+ * | Chemin | Durée |
+ * |---|---|
+ * | Adresse inconnue | 3370 ms |
+ * | Adresse connue — appelle réellement la passerelle | 3361 ms |
+ *
+ * **9 ms d'écart.** Avant le plancher, cet écart valait l'aller-retour complet
+ * vers la passerelle. Les deux chemins sortent désormais ensemble, et la règle
+ * qui gouverne `mot-de-passe-oublie` tient enfin dans le temps comme elle
+ * tenait déjà dans le corps de la réponse.
  */
 export const PLANCHER_DEFAUT_MS = 3000;
 
