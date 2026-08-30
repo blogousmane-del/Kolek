@@ -196,3 +196,89 @@ describe('l’envoi', () => {
     expect(corpsEnvoye).toContain('to=%2B2250701020304');
   });
 });
+
+/**
+ * Le 201 qui ment.
+ *
+ * ## Ce que l'audit du 2026-08-30 a trouvé
+ *
+ * `lireIssue` ne regarde que le statut HTTP. C'est juste pour Twilio, qui refuse
+ * une requête mal formée par un 4xx. Ce ne l'est pas pour Africa's Talking, qui
+ * répond **201 même quand le destinataire est rejeté** : le verdict par
+ * destinataire vit dans le corps, sous `SMSMessageData.Recipients[].statusCode`.
+ *
+ * Conséquence en production, sur les deux tables à la fois :
+ *
+ * | Ce qui se passe | Ce que Kolek en fait |
+ * |---|---|
+ * | numéro invalide, 201 | l'avis passe en `envoye` |
+ * | solde épuisé, 201 | le quota du collecteur est consommé |
+ *
+ * Le client est réputé prévenu sans l'avoir été, et le collecteur paie un
+ * message qui n'est jamais parti. C'est mot pour mot ce que l'en-tête du module
+ * s'interdit — « un dispositif qui prétendrait avoir envoyé ce qu'il n'a pas
+ * envoyé serait pire que pas de dispositif du tout ».
+ *
+ * ## Les codes d'Africa's Talking
+ *
+ * 100 traité, 101 envoyé, 102 en file : le message part. Tout le reste est un
+ * refus, et seuls le solde épuisé et les erreurs de passerelle valent d'être
+ * rejoués — un numéro invalide le restera au quatrième essai.
+ */
+
+const succes = (code: number) =>
+  JSON.stringify({
+    SMSMessageData: {
+      Message: 'Sent to 1/1',
+      Recipients: [{ statusCode: code, number: '+2250701020304', cost: 'XOF 25.0000' }],
+    },
+  });
+
+describe("le verdict par destinataire d'Africa's Talking", () => {
+  it('refuse de marquer envoyé un numéro que la passerelle a rejeté', async () => {
+    // 403 InvalidPhoneNumber, servi dans un 201.
+    const faux = (async () =>
+      new Response(succes(403), { status: 201 })) as unknown as typeof fetch;
+
+    const issue = await envoyer(AT, '0701020304', 'texte', faux);
+    expect(issue.ok, "un 201 portant un refus ne doit pas compter comme envoyé").toBe(false);
+    expect(issue).toMatchObject({ reessayable: false, raison: 'REFUS_403' });
+  });
+
+  it('rejoue un solde épuisé, qui se résout en créditant le compte', async () => {
+    const faux = (async () =>
+      new Response(succes(405), { status: 201 })) as unknown as typeof fetch;
+
+    const issue = await envoyer(AT, '0701020304', 'texte', faux);
+    expect(issue).toMatchObject({ ok: false, reessayable: true, raison: 'REFUS_405' });
+  });
+
+  it('accepte les trois codes qui veulent dire « parti »', async () => {
+    for (const code of [100, 101, 102]) {
+      const faux = (async () =>
+        new Response(succes(code), { status: 201 })) as unknown as typeof fetch;
+      expect(await envoyer(AT, '0701020304', 'texte', faux), `code ${code}`).toEqual({ ok: true });
+    }
+  });
+
+  it('ne conclut rien d’un corps illisible, et ne le rejoue pas', async () => {
+    // Ni « envoyé » — on n'en sait rien — ni un rejeu, qui enverrait deux fois
+    // un message peut-être parti. L'avis tombe en `abandonne`, où il se voit.
+    const faux = (async () =>
+      new Response('<html>maintenance</html>', { status: 201 })) as unknown as typeof fetch;
+
+    const issue = await envoyer(AT, '0701020304', 'texte', faux);
+    expect(issue).toMatchObject({ ok: false, reessayable: false, raison: 'REPONSE_ILLISIBLE' });
+  });
+
+  it('laisse Twilio décider par son statut, sans lire le corps', async () => {
+    // Le garde-fou de la correction : Twilio répond 201 avec un corps qui ne
+    // porte aucun `Recipients`. L'y chercher le ferait échouer partout.
+    const faux = (async () =>
+      new Response(JSON.stringify({ sid: 'SM123', status: 'queued' }), {
+        status: 201,
+      })) as unknown as typeof fetch;
+
+    expect(await envoyer(TWILIO, '0701020304', 'texte', faux)).toEqual({ ok: true });
+  });
+});

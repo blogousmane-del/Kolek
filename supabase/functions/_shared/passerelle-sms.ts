@@ -13,6 +13,11 @@
  * quand le coût des messages dépasse le prix de l'abonnement. Le choix est une
  * variable d'environnement, pas une réécriture.
  *
+ * Le contrat est commun à l'entrée — mêmes identifiants, même `envoyer` — mais
+ * **pas à la sortie**, et le croire a coûté un défaut : Twilio dit son verdict
+ * par le statut HTTP, Africa's Talking le met dans le corps d'un `201`. Voir
+ * `lireIssueAfricastalking`.
+ *
  * ## Ce que ce module ne fait pas
  *
  * **Il n'invente aucun identifiant.** Sans configuration, `passerelleDepuis`
@@ -138,12 +143,15 @@ export type Issue =
   | { ok: false; reessayable: boolean; raison: string };
 
 /**
- * Interprète la réponse de la passerelle.
+ * Interprète le **statut HTTP** de la passerelle.
  *
  * La distinction qui compte est **réessayable ou non**. Un 5xx ou une coupure
  * réseau se rejoue ; un numéro invalide ou un compte non provisionné se
  * rejouerait mille fois pour le même échec, en consommant à chaque tour la
  * fenêtre d'exécution de la fonction.
+ *
+ * Suffisant pour Twilio, qui refuse une requête mal formée par un 4xx. Pas pour
+ * Africa's Talking — voir `lireIssueAfricastalking` juste en dessous.
  */
 export function lireIssue(statut: number): Issue {
   if (statut >= 200 && statut < 300) return { ok: true };
@@ -160,6 +168,63 @@ export function lireIssue(statut: number): Issue {
   return { ok: false, reessayable: false, raison: `REFUS_${statut}` };
 }
 
+/**
+ * Les codes de `Recipients[].statusCode` qui veulent dire « le message part » :
+ * 100 traité, 101 envoyé, 102 en file. Tout le reste est un refus.
+ */
+const AT_ACCEPTES = new Set([100, 101, 102]);
+
+/**
+ * Les refus qui valent d'être rejoués : 405 solde épuisé — il se résout en
+ * créditant le compte — et les erreurs de passerelle. Un numéro invalide (403)
+ * ou un expéditeur non déclaré (402) le resteront au quatrième essai.
+ */
+const AT_REESSAYABLES = new Set([405, 500, 501, 502]);
+
+/**
+ * Interprète la réponse d'Africa's Talking, **corps compris**.
+ *
+ * Trouvé à l'audit du 2026-08-30, avant le premier envoi réel. Africa's Talking
+ * répond `201` même lorsqu'il rejette le destinataire : le verdict vit dans le
+ * corps, sous `SMSMessageData.Recipients[].statusCode`. S'arrêter au statut HTTP
+ * marquait donc `envoye` un message refusé, **et consommait le quota du
+ * collecteur** — `envoyer-avis` n'avance ce compteur que sur un `ok`.
+ *
+ * Le client était réputé prévenu sans l'avoir été, et le collecteur payait un
+ * message qui n'est jamais parti. C'est précisément ce que l'en-tête de ce
+ * module s'interdit.
+ *
+ * Un corps qu'on ne sait pas lire ne conclut rien : ni « envoyé », puisqu'on
+ * n'en sait rien, ni un rejeu, qui enverrait deux fois un message peut-être
+ * parti. L'avis tombe en `abandonne`, où quelqu'un le voit.
+ */
+export function lireIssueAfricastalking(statut: number, texte: string): Issue {
+  const parStatut = lireIssue(statut);
+  if (!parStatut.ok) return parStatut;
+
+  let destinataires: unknown;
+  try {
+    const corps = JSON.parse(texte) as { SMSMessageData?: { Recipients?: unknown } };
+    destinataires = corps?.SMSMessageData?.Recipients;
+  } catch {
+    return { ok: false, reessayable: false, raison: 'REPONSE_ILLISIBLE' };
+  }
+
+  if (!Array.isArray(destinataires) || destinataires.length === 0) {
+    // Un 201 sans destinataire : la passerelle n'a rien accepté, et le dire
+    // autrement qu'en refus serait mentir.
+    return { ok: false, reessayable: false, raison: 'AUCUN_DESTINATAIRE' };
+  }
+
+  const code = (destinataires[0] as { statusCode?: unknown }).statusCode;
+  if (typeof code !== 'number') {
+    return { ok: false, reessayable: false, raison: 'REPONSE_ILLISIBLE' };
+  }
+
+  if (AT_ACCEPTES.has(code)) return { ok: true };
+  return { ok: false, reessayable: AT_REESSAYABLES.has(code), raison: `REFUS_${code}` };
+}
+
 /** Envoie un message. `recuperer` est injectable pour les tests. */
 export async function envoyer(
   identifiants: Identifiants,
@@ -172,13 +237,13 @@ export async function envoyer(
 
   const requete = construireRequete(identifiants, numero, corps);
 
+  let reponse: Response;
   try {
-    const reponse = await recuperer(requete.url, {
+    reponse = await recuperer(requete.url, {
       method: 'POST',
       headers: requete.entetes,
       body: requete.corps,
     });
-    return lireIssue(reponse.status);
   } catch (cause) {
     // Une coupure réseau est réessayable. On ne marque rien comme envoyé.
     return {
@@ -187,4 +252,17 @@ export async function envoyer(
       raison: cause instanceof Error ? `RESEAU_${cause.name}` : 'RESEAU',
     };
   }
+
+  if (identifiants.fournisseur !== 'africastalking') return lireIssue(reponse.status);
+
+  let texte: string;
+  try {
+    texte = await reponse.text();
+  } catch {
+    // Distinct de la coupure ci-dessus, et **non réessayable** : la requête est
+    // partie. La rejouer enverrait un second message au même client.
+    return { ok: false, reessayable: false, raison: 'REPONSE_ILLISIBLE' };
+  }
+
+  return lireIssueAfricastalking(reponse.status, texte);
 }
