@@ -282,3 +282,55 @@ describe("le verdict par destinataire d'Africa's Talking", () => {
     expect(await envoyer(TWILIO, '0701020304', 'texte', faux)).toEqual({ ok: true });
   });
 });
+
+/**
+ * L'expéditeur qu'on n'a pas encore.
+ *
+ * ## Le blocage, réel, du 2026-08-30
+ *
+ * En Côte d'Ivoire un identifiant alphanumérique — `KOLEK` — doit être homologué
+ * auprès des opérateurs avant de fonctionner. L'homologation prend des jours et
+ * ne dépend pas de nous. Or `passerelleDepuis` exigeait `SMS_EXPEDITEUR` : sans
+ * lui, aucune passerelle, donc aucun envoi possible avant l'homologation.
+ *
+ * Africa's Talking envoie depuis un **code court partagé** quand `from` est
+ * absent. Le rendre facultatif débloque les envois tout de suite, et l'ajout de
+ * l'identifiant homologué se fera par une variable, sans redéploiement.
+ *
+ * Twilio, lui, refuse une requête sans `From`. Le champ y reste obligatoire —
+ * l'assouplir n'y produirait qu'un échec plus tardif et moins lisible.
+ */
+describe("l'expéditeur facultatif", () => {
+  it("laisse Africa's Talking fournir l'expéditeur quand on n'en a pas", () => {
+    const sans = passerelleDepuis({
+      SMS_FOURNISSEUR: 'africastalking',
+      SMS_COMPTE: 'gtcs',
+      SMS_SECRET: 'cle-api',
+    });
+
+    expect(sans, "sans expéditeur, la passerelle doit rester utilisable").not.toBeNull();
+    expect(sans?.expediteur).toBe('');
+  });
+
+  it('omet le champ from plutôt que de l’envoyer vide', () => {
+    // `from=` vide n'est pas la même chose que `from` absent : la passerelle le
+    // lit comme un expéditeur nul et rejette, au lieu de choisir le sien.
+    const requete = construireRequete({ ...AT, expediteur: '' }, '+2250701020304', 'texte');
+    expect(requete.corps).not.toContain('from=');
+    expect(requete.corps).toContain('username=gtcs');
+  });
+
+  it("garde le from quand l'identifiant est homologué", () => {
+    const requete = construireRequete(AT, '+2250701020304', 'texte');
+    expect(requete.corps).toContain('from=KOLEK');
+  });
+
+  it('continue d’exiger From pour Twilio', () => {
+    const sans = passerelleDepuis({
+      SMS_FOURNISSEUR: 'twilio',
+      SMS_COMPTE: 'ACxxxxxxxx',
+      SMS_SECRET: 'jeton',
+    });
+    expect(sans, 'Twilio refuse un envoi sans From').toBeNull();
+  });
+});

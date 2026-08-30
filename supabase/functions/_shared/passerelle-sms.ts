@@ -36,8 +36,17 @@ export interface Identifiants {
   compte: string;
   /** Twilio : l'Auth Token. Africa's Talking : la clé d'API. */
   secret: string;
-  /** L'expéditeur affiché. En Côte d'Ivoire, un identifiant alphanumérique
-      doit être déclaré auprès de l'opérateur avant de fonctionner. */
+  /**
+   * L'expéditeur affiché.
+   *
+   * En Côte d'Ivoire, un identifiant alphanumérique — `KOLEK` — doit être
+   * homologué auprès des opérateurs avant de fonctionner, ce qui prend des
+   * jours et ne dépend pas de nous.
+   *
+   * Vide est donc une valeur légitime **pour Africa's Talking**, qui envoie
+   * alors depuis un code court partagé. Le jour de l'homologation, poser la
+   * variable suffit : aucun redéploiement. Twilio, lui, exige `From`.
+   */
   expediteur: string;
 }
 
@@ -84,9 +93,13 @@ export function passerelleDepuis(
   const expediteur = env.SMS_EXPEDITEUR;
 
   if (fournisseur !== 'twilio' && fournisseur !== 'africastalking') return null;
-  if (!compte || !secret || !expediteur) return null;
+  if (!compte || !secret) return null;
 
-  return { fournisseur, compte, secret, expediteur };
+  // Twilio rejette une requête sans `From`. L'accepter ici ne ferait que
+  // déplacer l'échec dans un journal de passerelle, où il est moins lisible.
+  if (fournisseur === 'twilio' && !expediteur) return null;
+
+  return { fournisseur, compte, secret, expediteur: expediteur ?? '' };
 }
 
 /**
@@ -124,8 +137,13 @@ export function construireRequete(
     username: identifiants.compte,
     to: destinataire,
     message: corps,
-    from: identifiants.expediteur,
   });
+
+  // Omis, et non envoyé vide : `from=` sans valeur se lit comme un expéditeur
+  // nul et fait rejeter le message, au lieu de laisser la passerelle choisir
+  // son code court partagé.
+  if (identifiants.expediteur) parametres.set('from', identifiants.expediteur);
+
   return {
     url: 'https://api.africastalking.com/version1/messaging',
     entetes: {
