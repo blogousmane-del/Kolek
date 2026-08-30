@@ -25,7 +25,18 @@ import type { EtatSuperAdmin } from '../superadmin';
 const agirSuperAdmin = vi.fn();
 const chargerJournal = vi.fn();
 const recharger = vi.fn();
+const rechargerVue = vi.fn();
 const utiliserEtat = vi.fn();
+
+const modifierCollecteur = vi.fn();
+
+// `../donnees` n'est pas remplacé en entier : `FicheModifiable` et le tableau
+// des abonnés n'en tirent que cette écriture, et le reste du module — les types,
+// les messages d'erreur — sert tel quel.
+vi.mock('../donnees', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  modifierCollecteur: (...args: unknown[]) => modifierCollecteur(...args),
+}));
 
 vi.mock('../superadmin', async (original) => ({
   ...(await original<Record<string, unknown>>()),
@@ -159,7 +170,7 @@ function poser(etat: Record<string, unknown>) {
  * `Coquille.test.tsx` ; ici, on vérifie ce que chacune affiche.
  */
 function rendre(onglet: CleNavSuper) {
-  return render(<SuperAdmin vue={VUE} onglet={onglet} />);
+  return render(<SuperAdmin vue={VUE} onglet={onglet} onRecharger={rechargerVue} />);
 }
 
 afterEach(() => {
@@ -167,6 +178,8 @@ afterEach(() => {
   agirSuperAdmin.mockReset();
   chargerJournal.mockReset();
   recharger.mockReset();
+  rechargerVue.mockReset();
+  modifierCollecteur.mockReset();
   utiliserEtat.mockReset();
 });
 
@@ -437,5 +450,89 @@ describe('le journal de sécurité', () => {
     fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
 
     expect(await screen.findByText(/n\u2019a pas pu produire/)).toBeDefined();
+  });
+});
+
+/**
+ * Les deux commandes de ligne du tableau des abonnés.
+ *
+ * Elles étaient `disabled` depuis la maquette — dessinées, jamais branchées.
+ * Ce dépôt a retiré trois fois des commandes de ce genre ; celles-ci ont été
+ * branchées plutôt que retirées, parce que les routes existaient déjà :
+ * `admin-modifier-collecteur` pour le palier et le statut, `appliquer_code`
+ * pour la remise. Ces tests sont ce qui les empêche de redevenir décoratives.
+ */
+describe('les commandes d’une ligne d’abonné', () => {
+  it('ouvre la fiche du collecteur au crayon', () => {
+    poser({ statut: 'ok', etat: ETAT });
+
+    rendre('abonnements');
+    fireEvent.click(screen.getByRole('button', { name: /modifier Bakary Touré/i }));
+
+    expect(screen.getByText('Modifier la fiche')).toBeDefined();
+  });
+
+  it('suspend un abonnement depuis le menu, et recharge la vue', async () => {
+    poser({ statut: 'ok', etat: ETAT });
+    modifierCollecteur.mockResolvedValue({ ok: true });
+
+    rendre('abonnements');
+    fireEvent.click(screen.getByRole('button', { name: /plus d.options pour Chantal Yao/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /suspendre l.abonnement/i }));
+
+    await waitFor(() =>
+      expect(modifierCollecteur).toHaveBeenCalledWith('ccc', { abonnementStatut: 'suspendu' }),
+    );
+    // La vue globale porte la liste des collecteurs : sans rechargement, la
+    // ligne resterait « Actif » alors que la base dit le contraire.
+    await waitFor(() => expect(rechargerVue).toHaveBeenCalled());
+  });
+
+  it('dit pourquoi la suspension a échoué, et ne recharge rien', async () => {
+    poser({ statut: 'ok', etat: ETAT });
+    modifierCollecteur.mockResolvedValue({ ok: false, message: 'Modification impossible.' });
+
+    rendre('abonnements');
+    fireEvent.click(screen.getByRole('button', { name: /plus d.options pour Chantal Yao/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /suspendre l.abonnement/i }));
+
+    expect((await screen.findByRole('alert')).textContent).toMatch(/impossible/i);
+    expect(rechargerVue).not.toHaveBeenCalled();
+  });
+
+  it('applique un code promo au collecteur de la ligne', async () => {
+    poser({ statut: 'ok', etat: ETAT });
+    agirSuperAdmin.mockResolvedValue({ ok: true, corps: { fait: true } });
+
+    rendre('abonnements');
+    fireEvent.click(screen.getByRole('button', { name: /plus d.options pour Chantal Yao/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /code promo/i }));
+
+    fireEvent.change(screen.getByLabelText(/^code$/i), { target: { value: 'RENTREE' } });
+    screen.getByRole('button', { name: /^appliquer$/i }).click();
+
+    await waitFor(() =>
+      expect(agirSuperAdmin).toHaveBeenCalledWith({
+        action: 'appliquer_code',
+        collecteur: 'ccc',
+        code: 'RENTREE',
+      }),
+    );
+  });
+
+  it('ne propose que les codes en cours', () => {
+    poser({ statut: 'ok', etat: ETAT });
+
+    rendre('abonnements');
+    fireEvent.click(screen.getByRole('button', { name: /plus d.options pour Chantal Yao/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /code promo/i }));
+
+    const choix = screen.getByLabelText(/^code$/i) as HTMLSelectElement;
+    const valeurs = [...choix.options].map((o) => o.value).filter(Boolean);
+    const enCours = ETAT.codes_promo.filter((c) => c.statut === 'en_cours').map((c) => c.code);
+
+    // Un code programmé ou expiré ne s'applique pas : la base le refuserait, et
+    // le proposer ferait porter le refus à l'écran plutôt qu'au formulaire.
+    expect(valeurs).toEqual(enCours);
   });
 });
