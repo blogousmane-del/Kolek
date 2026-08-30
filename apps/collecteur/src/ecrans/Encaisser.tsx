@@ -69,19 +69,19 @@ export function Encaisser({
 
   return (
     <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-liste">
-      {/* En-tête */}
-      <div className="bg-sidebar px-marge pt-entete pb-5 lg:rounded-2xl lg:pt-6">
+      {/* En-tête avec dégradé subtil */}
+      <div className="bg-[image:var(--degrade-hero)] px-marge pt-entete pb-5 lg:rounded-3xl lg:pt-6 shadow-md">
         <div className="flex items-center justify-between mb-1">
           <button
             type="button"
             onClick={() => onNaviguer('clients')}
             aria-label="Revenir aux clients"
-            className="w-9 h-9 rounded-pill bg-white/10 flex items-center justify-center cursor-pointer"
+            className="anim-pression w-10 h-10 rounded-pill bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-md flex items-center justify-center cursor-pointer transition-colors shadow-xs"
           >
-            <Icone nom="arrow-left" className="text-white" />
+            <Icone nom="arrow-left" className="text-white" taille={18} />
           </button>
-          <p className="font-headings font-bold text-white text-lg">Encaisser une mise</p>
-          <div className="w-9" />
+          <p className="font-headings font-bold text-white text-lg tracking-tight">Encaisser une mise</p>
+          <div className="w-10" />
         </div>
       </div>
 
@@ -90,9 +90,12 @@ export function Encaisser({
       {!carte ? (
         // On arrive ici par l'onglet du bas, sans être passé par la liste. Dire
         // quoi faire plutôt que d'afficher un formulaire sans destinataire.
-        <Carte className="mx-4 mt-4 p-4">
-          <p className="text-base font-body text-ink m-0">Aucune carte choisie.</p>
-          <p className="text-sm font-body text-muted-foreground mt-1 mb-3">
+        <Carte className="mx-4 mt-6 p-6 text-center shadow-md">
+          <div className="w-14 h-14 rounded-pill bg-secondary mx-auto mb-3 flex items-center justify-center text-primary">
+            <Icone nom="circle-dollar-sign" taille={26} />
+          </div>
+          <p className="font-headings font-bold text-lg text-ink m-0">Aucune carte choisie</p>
+          <p className="text-sm font-body text-muted-foreground mt-1 mb-5 max-w-xs mx-auto">
             Ouvre la liste de tes clients et touche « Encaisser » sur la carte concernée.
           </p>
           <Bouton pleineLargeur onClick={() => onNaviguer('clients')}>
@@ -102,19 +105,25 @@ export function Encaisser({
       ) : (
         <>
           {/* Client */}
-          <div className="mx-4 mt-3 bg-surface rounded-xl border border-hairline p-4 flex items-center gap-3 shadow-md">
-            <Avatar nom={carte.clientNom} className="w-12 h-12" />
+          <div className="mx-4 mt-4 bg-surface rounded-2xl border border-hairline/80 p-4 flex items-center gap-3.5 shadow-sm">
+            <Avatar nom={carte.clientNom} className="w-12 h-12 ring-2 ring-hairline" />
             <div className="flex-1 min-w-0">
-              <p className="font-headings font-bold text-lg text-ink truncate">
+              <p className="font-headings font-bold text-lg text-ink truncate leading-tight">
                 {carte.clientNom}
               </p>
-              <span className="text-sm font-body text-muted-foreground">
-                Jour {carte.misesEncaissees}/{MISES_PAR_CYCLE}
-              </span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs font-body font-medium text-muted-foreground">
+                  Jour {carte.misesEncaissees}/{MISES_PAR_CYCLE}
+                </span>
+                <span className="w-1 h-1 rounded-pill bg-muted-foreground/40" />
+                <span className="text-xs font-body font-semibold text-accent">
+                  Cycle 1
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="mx-4 mt-3">
+          <div className="mx-4 mt-3.5">
             <CarteCollecte
               nomClient={carte.clientNom}
               misePar={formatMontant(carte.mise)}
@@ -125,76 +134,68 @@ export function Encaisser({
           </div>
 
           {/* Montant — imposé par la carte */}
-          <div className="mx-4 mt-5">
-            <p className="text-sm font-body font-semibold text-ink mb-2">Montant de la mise</p>
-            <div className="flex items-baseline gap-2 bg-surface border border-hairline rounded-md px-4 py-3">
-              <span className="font-headings font-bold text-3xl text-ink tabular-nums">
+          <div className="mx-4 mt-4">
+            <p className="text-xs font-body font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 px-0.5">
+              Montant de la mise
+            </p>
+            <div className="flex items-baseline justify-between bg-surface border border-hairline/80 rounded-2xl px-5 py-3.5 shadow-xs">
+              <span className="font-headings font-bold text-3xl xs:text-4xl text-ink tabular-nums tracking-tight">
                 {formatMontant(carte.mise)}
               </span>
-              <span className="text-base font-body font-medium text-muted-foreground">FCFA</span>
+              <span className="text-sm font-body font-bold text-accent px-2.5 py-1 rounded-md bg-secondary">
+                FCFA
+              </span>
             </div>
-            <p className="text-xs font-body text-muted-foreground mt-1.5">
-              Fixé à l’ouverture de la carte. Une mise d’un autre montant est refusée par le
-              serveur.
+            <p className="text-xs font-body text-muted-foreground mt-1.5 px-0.5">
+              Fixé à l’ouverture du carnet. Ne peut être altéré.
             </p>
           </div>
 
-          <div className="flex-1 min-h-4" />
+          <div className="flex-1 min-h-6" />
 
           {erreur && (
-            <p role="alert" className="mx-4 mb-2 text-sm font-body text-negative">
+            <p role="alert" className="mx-4 mb-3 rounded-xl bg-negative-tint/80 border border-negative/20 p-3.5 text-sm font-body font-medium text-negative">
               {erreur}
             </p>
           )}
-          {/* Le moment signature du produit.
 
-              La conception prévoyait d'animer la case fraîchement remplie de la
-              carte de collecte. Impossible ici, et il vaut mieux le dire que le
-              contourner : la coquille remet `carteChoisie` à `null` après un
-              encaissement réussi, donc `CarteCollecte` est démontée au moment
-              précis où l'animation devrait jouer. Ce que le collecteur voit,
-              c'est ce message — c'est donc lui qui porte la récompense.
-
-              Le geste est répété trente fois par jour, debout, devant une
-              cliente. La confirmation doit se lire d'un coup d'œil, sans lire
-              un mot. */}
+          {/* Le moment signature du produit */}
           {succes && (
-            <p
+            <div
               role="status"
-              className="anim-reussite mx-4 mb-2 rounded-md bg-positive-tint px-3 py-2 text-sm font-body font-medium text-positive"
+              className="anim-reussite mx-4 mb-4 rounded-2xl bg-positive-tint border border-positive/30 p-4 flex items-center gap-3 shadow-md"
             >
-              {succes}
-            </p>
+              <div className="w-10 h-10 rounded-pill bg-positive text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Icone nom="check-circle" taille={22} />
+              </div>
+              <p className="text-sm font-body font-semibold text-positive flex-1">
+                {succes}
+              </p>
+            </div>
           )}
 
-          {/* Confirmation */}
-          <div className="mx-4 mb-4">
+          {/* Bouton de confirmation signature */}
+          <div className="mx-4 mb-5">
             <button
               type="button"
               onClick={confirmer}
-              // `succes` désarme le bouton, et c'est lui qui remplace le
-              // `null` que la coquille posait autrefois sur la carte. Le
-              // serveur **accepte** deux mises le même jour sur la même carte —
-              // `mises_avant_insert` refuse un doublon d'identifiant, une carte
-              // clôturée, un cycle complet, un montant faux, pas celle-là. Le
-              // seul garde-fou est ici, et il doit rester : une mise est
-              // immuable, et un doigt qui insiste sur un écran qui n'a pas
-              // bougé est le geste le plus naturel du monde.
               disabled={
                 envoi ||
                 succes !== null ||
                 collecteurId === null ||
                 carte.misesEncaissees >= MISES_PAR_CYCLE
               }
-              className="w-full rounded-pill bg-primary text-primary-foreground font-body font-bold text-lg py-4 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-default"
+              className="anim-pression w-full rounded-pill bg-gradient-to-r from-primary to-accent hover:from-accent hover:to-primary text-white font-headings font-bold text-base xs:text-lg py-4 flex items-center justify-center gap-2.5 cursor-pointer shadow-action disabled:opacity-50 disabled:cursor-default disabled:hover:from-primary disabled:hover:to-accent border border-white/20 transition-all"
             >
-              <Icone nom="check-circle" taille={20} />
-              {envoi
-                ? 'Enregistrement…'
-                : `Confirmer la mise — ${formatMontant(carte.mise)} FCFA`}
+              <Icone nom="check-circle" taille={22} className="text-chart-mint" />
+              <span>
+                {envoi
+                  ? 'Enregistrement…'
+                  : `Confirmer la mise — ${formatMontant(carte.mise)} FCFA`}
+              </span>
             </button>
             {carte.misesEncaissees >= MISES_PAR_CYCLE && (
-              <p className="text-xs text-center text-muted-foreground font-body mt-2">
+              <p className="text-xs text-center text-muted-foreground font-body mt-2.5">
                 Le cycle de {MISES_PAR_CYCLE} mises est complet. La carte doit être clôturée.
               </p>
             )}

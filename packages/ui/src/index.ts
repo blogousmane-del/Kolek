@@ -24,3 +24,4 @@ export { LigneTransaction, type TypeMontant } from './LigneTransaction';
 export { Logo, Marque } from './Logo';
 export { NavBureau, type CleNavBureau } from './NavBureau';
 export { NavMobile, type CleNavCollecteur } from './NavMobile';
+export { Squelette, SqueletteKPI, SqueletteLigne } from './Squelette';

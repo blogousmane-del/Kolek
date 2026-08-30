@@ -1,7 +1,9 @@
-import { BarreHaute, Bouton, Carte } from '@kolek/ui';
+import { PALIERS, formatMontant } from '@kolek/core';
+import { Avatar, BadgeStatut, BarreHaute, Bouton, Carte, Icone, type NomIcone } from '@kolek/ui';
 import { useState } from 'react';
 
-import type { VueGlobale } from '../donnees';
+import type { LigneCollecteur, VueGlobale } from '../donnees';
+import { dateDuJour, telechargerCsv, versCsv } from '../exporter';
 import {
   agirSuperAdmin,
   chargerJournal,
@@ -14,7 +16,14 @@ import {
 } from '../superadmin';
 
 /**
- * L'écran système : qui administre, quelles remises courent, ce que pèse la base.
+ * L'écran système, restructuré en onglets le 2026-08-30.
+ *
+ * La maquette de référence place l'administration de la plateforme derrière une
+ * sous-navigation dédiée plutôt que dans un seul rouleau vertical. L'onglet par
+ * défaut — « Abonnements » — fusionne les KPI financiers, les paliers et le
+ * tableau des collecteurs abonnés. Les quatre autres onglets reprennent le
+ * contenu qui existait déjà : administrateurs, codes promo et remises, journal
+ * de sécurité, et volumes de la plateforme.
  *
  * ## Ce n'est pas le Dashboard
  *
@@ -30,26 +39,68 @@ import {
  * deux Edge Functions redemandent `est_super_admin()` avec le jeton de
  * l'appelant. Recopier ces règles ici donnerait deux vérités, et la seconde
  * finirait par diverger de celle qui décide.
- *
- * Ce que l'écran fait quand même : ne pas proposer un geste dont la seule issue
- * connue est un refus. Sa propre ligne ne porte aucun bouton — pas pour protéger
- * quoi que ce soit, mais parce qu'un clic qui ne peut qu'échouer est une
- * promesse fausse.
- *
- * ## Le journal se demande
- *
- * Sa lecture s'enregistre dans le journal lui-même. Le charger à l'ouverture de
- * l'écran remplirait la table de la preuve qu'on la regarde et enterrerait
- * dessous ce qu'elle protège. Il faut donc cliquer : un geste de plus, assumé.
  */
 
-function dateLisible(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+/* ================================ Types ================================= */
+
+type OngletSuperAdmin = 'abonnements' | 'administrateurs' | 'promos' | 'securite' | 'plateforme';
+
+type FiltreStatut = 'tous' | 'actif' | 'expirant' | 'suspendu';
+
+/* ============================== Constantes ============================== */
+
+interface ConfigOnglet {
+  cle: OngletSuperAdmin;
+  icone: NomIcone;
+  libelle: string;
+  filAriane: string[];
+  titre: string;
 }
+
+const ONGLETS: ConfigOnglet[] = [
+  {
+    cle: 'abonnements',
+    icone: 'credit-card',
+    libelle: 'Abonnements',
+    filAriane: ['Super Admin', 'Abonnements'],
+    titre: 'Gestion des abonnements',
+  },
+  {
+    cle: 'administrateurs',
+    icone: 'users',
+    libelle: 'Administrateurs',
+    filAriane: ['Super Admin', 'Administrateurs'],
+    titre: 'Administrateurs',
+  },
+  {
+    cle: 'promos',
+    icone: 'coins',
+    libelle: 'Promotions',
+    filAriane: ['Super Admin', 'Promotions'],
+    titre: 'Codes promo & Remises',
+  },
+  {
+    cle: 'securite',
+    icone: 'shield-check',
+    libelle: 'Sécurité',
+    filAriane: ['Super Admin', 'Sécurité'],
+    titre: 'Journal de sécurité',
+  },
+  {
+    cle: 'plateforme',
+    icone: 'bar-chart-2',
+    libelle: 'Plateforme',
+    filAriane: ['Super Admin', 'Plateforme'],
+    titre: 'Plateforme',
+  },
+];
+
+const FILTRES: { cle: FiltreStatut; libelle: string }[] = [
+  { cle: 'tous', libelle: 'Tous' },
+  { cle: 'actif', libelle: 'Actif' },
+  { cle: 'expirant', libelle: 'Expirant' },
+  { cle: 'suspendu', libelle: 'Suspendu' },
+];
 
 const LIBELLE_STATUT: Record<CodePromo['statut'], string> = {
   en_cours: 'En cours',
@@ -69,8 +120,70 @@ const CHAMP =
   'w-full min-h-11 px-3 bg-surface border border-hairline rounded-md font-body text-base text-ink outline-none focus:border-primary';
 const ETIQUETTE = 'block font-body text-sm font-semibold text-ink mb-1';
 
+const COLONNES_ABONNES = '1fr 100px 110px 120px 120px 110px 60px';
+const LARGEUR_MINIMALE_ABONNES = 'min-w-[860px]';
+
+/* ========================== Fonctions utilitaires ======================== */
+
+function dateLisible(iso: string): string {
+  return new Date(iso).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+/** Un MRR nul se lit « — » et non « 0 FCFA » : le collecteur est en essai, il ne
+    paie pas encore ; zéro laisserait croire à un impayé. */
+function mrrLisible(mrr: number): string {
+  return mrr === 0 ? '—' : `${formatMontant(mrr)} FCFA`;
+}
+
+function PastillePalier({ palier }: { palier: string }) {
+  const description = PALIERS.find((p) => p.cle === palier);
+  if (!description) {
+    return (
+      <span className="px-2.5 py-1 rounded-pill text-xs font-body font-semibold bg-negative-tint text-negative whitespace-nowrap">
+        {palier} ?
+      </span>
+    );
+  }
+  return (
+    <span
+      className="px-2.5 py-1 rounded-pill text-xs font-body font-semibold w-fit whitespace-nowrap"
+      style={{ background: description.fond, color: description.texte }}
+    >
+      {description.nom}
+    </span>
+  );
+}
+
+function PastilleStatut({ c }: { c: LigneCollecteur }) {
+  if (c.abonnement_statut === 'actif') {
+    const joursRestants = Math.ceil(
+      (new Date(c.abonnement_echeance).getTime() - Date.now()) / 86_400_000,
+    );
+    if (joursRestants <= 7) {
+      return (
+        <span className="px-2.5 py-1 rounded-pill text-xs font-body font-semibold bg-negative-tint text-negative whitespace-nowrap">
+          Expire dans {Math.max(joursRestants, 0)} j
+        </span>
+      );
+    }
+    return <BadgeStatut statut="Actif" />;
+  }
+  return (
+    <span className="px-2.5 py-1 rounded-pill text-xs font-body font-semibold bg-negative-tint text-negative whitespace-nowrap">
+      {c.abonnement_statut === 'suspendu' ? 'Suspendu' : 'Expiré'}
+    </span>
+  );
+}
+
+/* ========================= Composant principal ========================== */
+
 export function SuperAdmin({ vue }: { vue: VueGlobale }) {
   const etat = useEtatSuperAdmin();
+  const [onglet, setOnglet] = useState<OngletSuperAdmin>('abonnements');
   /** Le dernier verdict du serveur, succès comme refus. Un seul emplacement :
       deux messages simultanés sur un même écran laissent croire à deux
       opérations, alors qu'une seule part à la fois. */
@@ -89,32 +202,82 @@ export function SuperAdmin({ vue }: { vue: VueGlobale }) {
       return;
     }
     setVerdict({ ok: true, message: succes });
-    // Rechargé plutôt que rafistolé sur place : la base recalcule les statuts
-    // des codes et « ajouté par » se relit dans le journal. Réécrire ces
-    // dérivés dans l'écran donnerait un affichage juste jusqu'à la première
-    // divergence.
     etat.recharger();
   }
 
-  return (
-    <>
-      <BarreHaute
-        filAriane={['Accueil', 'Super Admin']}
-        titre="Administration système"
-        actions={[
+  const configOnglet = ONGLETS.find((o) => o.cle === onglet)!;
+
+  function exporter() {
+    telechargerCsv(
+      `kolek-abonnements-${dateDuJour()}.csv`,
+      versCsv(
+        ['Collecteur', 'Téléphone', 'Zone', 'Palier', 'Prix mensuel', 'Statut', 'Échéance', 'Clients'],
+        vue.collecteurs.map((c: LigneCollecteur) => [
+          c.nom,
+          c.telephone,
+          c.zone ?? '',
+          c.palier,
+          PALIERS.find((p) => p.cle === c.palier)?.prix ?? '',
+          c.abonnement_statut,
+          c.abonnement_echeance,
+          c.clients,
+        ]),
+      ),
+    );
+  }
+
+  const actions =
+    onglet === 'abonnements'
+      ? [
           {
-            icone: 'history',
+            icone: 'download' as NomIcone,
+            libelle: 'Exporter',
+            onActiver: exporter,
+            disponible: vue.collecteurs.length > 0,
+          },
+          {
+            icone: 'history' as NomIcone,
             libelle: 'Rafraîchir',
             onActiver: etat.recharger,
             disponible: etat.statut !== 'chargement',
           },
-        ]}
-      />
+        ]
+      : [
+          {
+            icone: 'history' as NomIcone,
+            libelle: 'Rafraîchir',
+            onActiver: etat.recharger,
+            disponible: etat.statut !== 'chargement',
+          },
+        ];
+
+  return (
+    <>
+      <BarreHaute filAriane={configOnglet.filAriane} titre={configOnglet.titre} actions={actions} />
+
+      {/* Barre d'onglets */}
+      <div className="flex items-center gap-1 px-4 sm:px-6 lg:px-8 border-b border-hairline bg-canvas overflow-x-auto flex-shrink-0">
+        {ONGLETS.map((o) => (
+          <button
+            key={o.cle}
+            type="button"
+            onClick={() => setOnglet(o.cle)}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-body font-medium border-b-2 whitespace-nowrap cursor-pointer transition-colors ${
+              onglet === o.cle
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-ink'
+            }`}
+          >
+            <Icone nom={o.icone} taille={16} />
+            {o.libelle}
+          </button>
+        ))}
+      </div>
 
       <div className="px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 overflow-y-auto">
         {etat.statut === 'chargement' && (
           <p role="status" className="font-body text-sm text-muted-foreground">
-            Chargement de l’état de la plateforme…
+            Chargement de l'état de la plateforme…
           </p>
         )}
 
@@ -136,41 +299,51 @@ export function SuperAdmin({ vue }: { vue: VueGlobale }) {
               <p
                 role={verdict.ok ? 'status' : 'alert'}
                 className={`font-body text-sm font-medium px-4 py-2.5 rounded-md ${
-                  verdict.ok
-                    ? 'bg-positive-tint text-positive'
-                    : 'bg-negative-tint text-negative'
+                  verdict.ok ? 'bg-positive-tint text-positive' : 'bg-negative-tint text-negative'
                 }`}
               >
                 {verdict.message}
               </p>
             )}
 
-            <Indicateurs etat={etat.etat} />
-            <Administrateurs
-              etat={etat.etat}
-              occupe={occupe}
-              onDefinir={(cible, niveau) =>
-                void agir(
-                  { action: 'definir_niveau', cible, niveau },
-                  niveau === 'super' ? 'Compte promu super administrateur.' : 'Niveau ramené à administrateur.',
-                )
-              }
-              onRevoquer={(cible) =>
-                void agir({ action: 'revoquer', cible }, 'Accès d’administration retiré.')
-              }
-            />
-            <CodesPromo
-              etat={etat.etat}
-              vue={vue}
-              occupe={occupe}
-              onCreer={(demande) => void agir(demande, `Code ${demande.code} créé.`)}
-              onAppliquer={(demande) =>
-                void agir(demande, `Code ${demande.code} appliqué au collecteur.`)
-              }
-            />
-            <Remises etat={etat.etat} />
-            <Journal />
-            <Plateforme etat={etat.etat} />
+            {onglet === 'abonnements' && <OngletAbonnements vue={vue} />}
+
+            {onglet === 'administrateurs' && (
+              <Administrateurs
+                etat={etat.etat}
+                occupe={occupe}
+                onDefinir={(cible, niveau) =>
+                  void agir(
+                    { action: 'definir_niveau', cible, niveau },
+                    niveau === 'super'
+                      ? 'Compte promu super administrateur.'
+                      : 'Niveau ramené à administrateur.',
+                  )
+                }
+                onRevoquer={(cible) =>
+                  void agir({ action: 'revoquer', cible }, 'Accès d\u2019administration retiré.')
+                }
+              />
+            )}
+
+            {onglet === 'promos' && (
+              <>
+                <CodesPromo
+                  etat={etat.etat}
+                  vue={vue}
+                  occupe={occupe}
+                  onCreer={(demande) => void agir(demande, `Code ${demande.code} créé.`)}
+                  onAppliquer={(demande) =>
+                    void agir(demande, `Code ${demande.code} appliqué au collecteur.`)
+                  }
+                />
+                <Remises etat={etat.etat} />
+              </>
+            )}
+
+            {onglet === 'securite' && <Journal />}
+
+            {onglet === 'plateforme' && <Plateforme etat={etat.etat} />}
           </>
         )}
       </div>
@@ -178,47 +351,284 @@ export function SuperAdmin({ vue }: { vue: VueGlobale }) {
   );
 }
 
-/* ------------------------------ Indicateurs ------------------------------ */
+/* ========================= Onglet Abonnements =========================== */
 
-function Indicateurs({ etat }: { etat: EtatSuperAdmin }) {
-  const supers = etat.administrateurs.filter((a) => a.niveau === 'super').length;
-  const enCours = etat.codes_promo.filter((c) => c.statut === 'en_cours').length;
+function OngletAbonnements({ vue }: { vue: VueGlobale }) {
+  const { abonnements, collecteurs } = vue;
+  const prixParPalier = new Map(abonnements.parPalier.map((p) => [p.palier, p.prix]));
+  const [filtre, setFiltre] = useState<FiltreStatut>('tous');
+  const [recherche, setRecherche] = useState('');
 
-  const cases = [
-    { libelle: 'Administrateurs', valeur: String(etat.administrateurs.length), precision: `dont ${supers} super` },
-    { libelle: 'Codes actifs', valeur: String(enCours), precision: `${etat.codes_promo.length} au total` },
+  const collecteursFiltres = collecteurs.filter((c) => {
+    // Recherche textuelle — déclenchée à partir de 3 caractères.
+    if (recherche.length >= 3) {
+      const q = recherche.toLowerCase();
+      if (!c.nom.toLowerCase().includes(q) && !c.telephone.toLowerCase().includes(q)) {
+        return false;
+      }
+    }
+
+    switch (filtre) {
+      case 'actif': {
+        if (c.abonnement_statut !== 'actif') return false;
+        const jours = Math.ceil(
+          (new Date(c.abonnement_echeance).getTime() - Date.now()) / 86_400_000,
+        );
+        return jours > 7;
+      }
+      case 'expirant': {
+        if (c.abonnement_statut !== 'actif') return false;
+        const jours = Math.ceil(
+          (new Date(c.abonnement_echeance).getTime() - Date.now()) / 86_400_000,
+        );
+        return jours <= 7;
+      }
+      case 'suspendu':
+        return c.abonnement_statut === 'suspendu' || c.abonnement_statut === 'expire';
+      default:
+        return true;
+    }
+  });
+
+  const indicateurs = [
     {
-      libelle: 'Remises en cours',
-      valeur: String(etat.remises.length),
-      precision: 'abonnements réduits',
+      libelle: 'MRR total',
+      valeur: formatMontant(abonnements.mrr),
+      unite: 'FCFA',
+      precision: `${abonnements.collecteurs_actifs} abonnement${abonnements.collecteurs_actifs > 1 ? 's' : ''} actif${abonnements.collecteurs_actifs > 1 ? 's' : ''}`,
+      alerte: false,
     },
     {
-      libelle: 'Lignes de journal',
-      valeur: String(etat.volumes.audit_log ?? 0),
-      precision: etat.journal.derniere_ecriture
-        ? `dernière écriture ${dateLisible(etat.journal.derniere_ecriture)}`
-        : 'aucune écriture',
+      libelle: 'Collecteurs actifs',
+      valeur: String(abonnements.collecteurs_actifs),
+      unite: '',
+      precision: `sur ${abonnements.collecteurs_total} inscrits`,
+      alerte: false,
+    },
+    {
+      libelle: 'Expirations ce mois',
+      valeur: String(abonnements.expirations_ce_mois),
+      unite: '',
+      precision: abonnements.expirations_ce_mois > 0 ? 'À traiter' : 'Aucune expiration',
+      alerte: abonnements.expirations_ce_mois > 0,
+    },
+    {
+      libelle: 'En défaut',
+      valeur: String(abonnements.suspendus + abonnements.expires),
+      unite: '',
+      precision: `${abonnements.suspendus} suspendu${abonnements.suspendus > 1 ? 's' : ''}, ${abonnements.expires} expiré${abonnements.expires > 1 ? 's' : ''}`,
+      alerte: abonnements.suspendus + abonnements.expires > 0,
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-      {cases.map((c) => (
-        <Carte key={c.libelle} className="p-5">
-          <span className="text-sm font-body font-medium text-muted-foreground block mb-1">
-            {c.libelle}
-          </span>
-          <p className="font-headings font-bold text-2xl sm:text-3xl text-ink tabular-nums">
-            {c.valeur}
+    <>
+      {/* Indicateurs clés */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {indicateurs.map((ind) => (
+          <Carte key={ind.libelle} className="p-5">
+            <span className="text-sm font-body font-medium text-muted-foreground block mb-1">
+              {ind.libelle}
+            </span>
+            <p
+              className={`font-headings font-bold text-2xl sm:text-3xl tabular-nums ${
+                ind.alerte ? 'text-negative' : 'text-ink'
+              }`}
+            >
+              {ind.valeur}
+              {ind.unite && (
+                <span className="text-lg font-body font-medium text-muted-foreground ml-1">
+                  {ind.unite}
+                </span>
+              )}
+            </p>
+            <span
+              className={`text-sm font-body mt-2 block ${
+                ind.alerte ? 'text-negative font-medium' : 'text-muted-foreground'
+              }`}
+            >
+              {ind.precision}
+            </span>
+          </Carte>
+        ))}
+      </div>
+
+      {/* Paliers d'abonnement */}
+      <div>
+        <h2 className="font-headings font-bold text-xl text-ink mb-3">Paliers d'abonnement</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {PALIERS.map((palier) => {
+            const compte = abonnements.parPalier.find((p) => p.palier === palier.cle);
+            return (
+              <Carte key={palier.cle} className="overflow-hidden flex flex-col">
+                <div className="h-1.5 w-full" style={{ background: palier.teinte }} />
+                <div className="p-5 flex flex-col flex-1">
+                  <div className="flex items-baseline justify-between gap-2 mb-3">
+                    <span className="font-headings font-bold text-lg text-ink">{palier.nom}</span>
+                    <span className="text-2xl font-headings font-bold text-ink tabular-nums text-right">
+                      {palier.prix === 0 ? (
+                        <span className="text-muted-foreground text-lg">Gratuit</span>
+                      ) : (
+                        <>
+                          {formatMontant(palier.prix)}{' '}
+                          <span className="text-xs font-body font-medium text-muted-foreground">
+                            FCFA/mois
+                          </span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                  <p className="text-sm font-body text-muted-foreground mb-3">{palier.limite}</p>
+
+                  {palier.fonctions
+                    .filter((f) => f.incluse)
+                    .map((fonction) => (
+                      <div key={fonction.libelle} className="flex items-center gap-2 mb-1.5">
+                        <Icone nom="check" taille={13} className="text-positive flex-shrink-0" />
+                        <span className="text-sm font-body text-ink">{fonction.libelle}</span>
+                      </div>
+                    ))}
+
+                  <div className="mt-auto pt-3 border-t border-hairline flex items-center justify-between">
+                    <span className="text-sm font-body text-muted-foreground">
+                      {compte?.actifs ?? 0} actif{(compte?.actifs ?? 0) > 1 ? 's' : ''}
+                    </span>
+                    <span className="text-sm font-body font-semibold text-ink tabular-nums">
+                      {mrrLisible(compte?.mrr ?? 0)}
+                    </span>
+                  </div>
+                </div>
+              </Carte>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Tableau des collecteurs abonnés */}
+      <Carte className="overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-hairline">
+          <h2 className="font-headings font-bold text-xl text-ink">Collecteurs abonnés</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Filtres */}
+            <div className="flex items-center gap-1">
+              {FILTRES.map((f) => (
+                <button
+                  key={f.cle}
+                  type="button"
+                  onClick={() => setFiltre(f.cle)}
+                  className={`px-3 py-1.5 rounded-pill text-sm font-body font-medium cursor-pointer transition-colors ${
+                    filtre === f.cle
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-secondary'
+                  }`}
+                >
+                  {f.libelle}
+                </button>
+              ))}
+            </div>
+            {/* Recherche */}
+            <div className="relative">
+              <Icone
+                nom="search"
+                taille={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+              />
+              <input
+                type="text"
+                placeholder="Rechercher…"
+                value={recherche}
+                onChange={(e) => setRecherche(e.target.value)}
+                className="pl-9 pr-3 h-9 bg-surface border border-hairline rounded-md font-body text-sm text-ink outline-none focus:border-primary w-44"
+              />
+            </div>
+          </div>
+        </div>
+
+        {collecteursFiltres.length === 0 ? (
+          <p className="px-4 sm:px-6 py-8 text-sm font-body text-muted-foreground">
+            {recherche.length >= 3
+              ? 'Aucun collecteur ne correspond à cette recherche.'
+              : 'Aucun collecteur dans ce filtre.'}
           </p>
-          <span className="text-sm font-body text-muted-foreground mt-2 block">{c.precision}</span>
-        </Carte>
-      ))}
-    </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className={LARGEUR_MINIMALE_ABONNES}>
+              <div
+                className="grid px-4 sm:px-6 py-3 bg-canvas border-b border-hairline text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground gap-4"
+                style={{ gridTemplateColumns: COLONNES_ABONNES }}
+              >
+                <span>Collecteur</span>
+                <span>Palier</span>
+                <span>Depuis</span>
+                <span className="text-right">Expiration</span>
+                <span className="text-right">MRR</span>
+                <span className="text-right">Statut</span>
+                <span />
+              </div>
+
+              {collecteursFiltres.map((c, i) => (
+                <div
+                  key={c.id}
+                  className={`grid items-center px-4 sm:px-6 py-3.5 gap-4 ${
+                    i < collecteursFiltres.length - 1 ? 'border-b border-hairline' : ''
+                  }`}
+                  style={{ gridTemplateColumns: COLONNES_ABONNES }}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Avatar nom={c.nom} className="w-8 h-8 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-base font-body font-semibold text-ink truncate">
+                        {c.nom}
+                      </p>
+                      <p className="text-xs font-body text-muted-foreground truncate">
+                        {c.telephone}
+                      </p>
+                    </div>
+                  </div>
+                  <PastillePalier palier={c.palier} />
+                  <span className="text-sm font-body text-muted-foreground tabular-nums">
+                    {dateLisible(c.cree_le)}
+                  </span>
+                  <span className="text-right text-sm font-body text-muted-foreground tabular-nums">
+                    {dateLisible(c.abonnement_echeance)}
+                  </span>
+                  <span className="text-right text-sm font-body font-semibold text-ink tabular-nums">
+                    {mrrLisible(
+                      c.abonnement_statut === 'actif' ? (prixParPalier.get(c.palier) ?? 0) : 0,
+                    )}
+                  </span>
+                  <div className="flex justify-end">
+                    <PastilleStatut c={c} />
+                  </div>
+                  <div className="flex justify-end gap-1">
+                    <button
+                      type="button"
+                      disabled
+                      title="Modifier"
+                      className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground opacity-50 cursor-default"
+                    >
+                      <Icone nom="edit" taille={14} />
+                    </button>
+                    <button
+                      type="button"
+                      disabled
+                      title="Plus d'options"
+                      className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground opacity-50 cursor-default"
+                    >
+                      <Icone nom="more-horizontal" taille={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Carte>
+    </>
   );
 }
 
-/* ---------------------------- Administrateurs ---------------------------- */
+/* ============================ Administrateurs ============================ */
 
 function Administrateurs({
   etat,
@@ -257,7 +667,7 @@ function Administrateurs({
                   {a.nom}
                   {cestMoi && (
                     <span className="ml-2 px-2 py-0.5 rounded-pill bg-secondary text-secondary-foreground text-xs font-semibold">
-                      C’est toi
+                      C'est toi
                     </span>
                   )}
                 </p>
@@ -311,7 +721,7 @@ function Administrateurs({
   );
 }
 
-/* ------------------------------ Codes promo ------------------------------ */
+/* =============================== Codes promo ============================= */
 
 function CodesPromo({
   etat,
@@ -341,13 +751,13 @@ function CodesPromo({
     <section>
       <h2 className="font-headings font-bold text-xl text-ink mb-1">Codes promo</h2>
       <p className="font-body text-sm text-muted-foreground mb-3">
-        Un code réduit le prix du palier d’un collecteur jusqu’à sa date de fin. Seul le Super
-        Admin l’applique : le collecteur ne saisit rien.
+        Un code réduit le prix du palier d'un collecteur jusqu'à sa date de fin. Seul le Super
+        Admin l'applique : le collecteur ne saisit rien.
       </p>
 
       <Carte className="divide-y divide-hairline mb-4">
         {etat.codes_promo.length === 0 && (
-          <p className="p-4 font-body text-sm text-muted-foreground">Aucun code pour l’instant.</p>
+          <p className="p-4 font-body text-sm text-muted-foreground">Aucun code pour l'instant.</p>
         )}
         {etat.codes_promo.map((c) => (
           <div
@@ -366,8 +776,6 @@ function CodesPromo({
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
               <span className="font-body text-sm text-ink tabular-nums">
-                {/* Un quota absent se lit « illimité » et non « 0 » : les deux
-                    sont des nombres à l'écran et des choses opposées en base. */}
                 {c.utilisations} / {c.quota ?? 'illimité'}
               </span>
               <span
@@ -455,15 +863,10 @@ function CodesPromo({
               onClick={() => {
                 onCreer({
                   action: 'creer_code',
-                  // Mis en majuscules ici plutôt que refusé à la frappe : la
-                  // contrainte de table n'admet que `[A-Z0-9]`, et rejeter une
-                  // saisie pour une casse ferait deviner une règle de stockage.
                   code: code.trim().toUpperCase(),
                   remise_pct: Number(remise),
                   valide_du: du,
                   valide_au: au,
-                  // Une case vide vaut `null`, jamais `0` : `0` serait un code
-                  // épuisé d'avance, `null` veut dire sans limite.
                   quota: quota === '' ? null : Number(quota),
                 });
                 setCode('');
@@ -512,9 +915,6 @@ function CodesPromo({
                 onChange={(e) => setCodeApplique(e.target.value)}
               >
                 <option value="">Choisir…</option>
-                {/* Seuls les codes en cours : un code programmé ou épuisé serait
-                    refusé par la base, et l'offrir au clic promettrait un geste
-                    qui ne peut qu'échouer. */}
                 {codesApplicables.map((c) => (
                   <option key={c.code} value={c.code}>
                     {c.code} (−{c.remise_pct} %)
@@ -545,14 +945,14 @@ function CodesPromo({
   );
 }
 
-/* -------------------------------- Remises -------------------------------- */
+/* ================================ Remises ================================ */
 
 function Remises({ etat }: { etat: EtatSuperAdmin }) {
   return (
     <section>
       <h2 className="font-headings font-bold text-xl text-ink mb-1">Remises en cours</h2>
       <p className="font-body text-sm text-muted-foreground mb-3">
-        Ce que la plateforme offre aujourd’hui. Une remise échue disparaît d’ici : elle n’est plus
+        Ce que la plateforme offre aujourd'hui. Une remise échue disparaît d'ici : elle n'est plus
         une dépense, elle appartient au journal.
       </p>
 
@@ -572,7 +972,7 @@ function Remises({ etat }: { etat: EtatSuperAdmin }) {
               {' · '}
               <span className="text-ink">−{r.remise_pct} %</span>
               {' · '}
-              jusqu’au {dateLisible(r.remise_fin)}
+              jusqu'au {dateLisible(r.remise_fin)}
             </p>
           </div>
         ))}
@@ -581,7 +981,7 @@ function Remises({ etat }: { etat: EtatSuperAdmin }) {
   );
 }
 
-/* -------------------------------- Journal -------------------------------- */
+/* ================================ Journal ================================ */
 
 const TAILLE_PAGE = 50;
 
@@ -631,8 +1031,8 @@ function Journal() {
       <p className="font-body text-sm text-muted-foreground mb-3">
         Qui a fait quoi, sur quelle ligne, et quand. Le journal est en écriture seule : un
         déclencheur refuse toute modification, y compris par la clé de service.{' '}
-        <strong className="font-semibold text-ink">Le consulter s’enregistre</strong> — c’est
-        pourquoi il ne s’affiche pas de lui-même.
+        <strong className="font-semibold text-ink">Le consulter s'enregistre</strong> — c'est
+        pourquoi il ne s'affiche pas de lui-même.
       </p>
 
       <Carte className="p-5">
@@ -687,9 +1087,6 @@ function Journal() {
                     <span className="text-muted-foreground">{horodatage(l.survenu_le)}</span>
                   </p>
                   <p className="font-body text-xs text-muted-foreground break-all">
-                    {/* Deux identifiants distincts, et les confondre était le
-                        défaut que la colonne `acteur_id` a corrigé : l'un dit
-                        qui a agi, l'autre sur qui. */}
                     acteur {l.acteur_id ?? 'inconnu'} · ligne {l.ligne_id ?? '—'}
                   </p>
                 </div>
@@ -720,14 +1117,10 @@ function Journal() {
   );
 }
 
-/* ------------------------------- Plateforme ------------------------------ */
+/* =============================== Plateforme ============================== */
 
 /**
  * Les libellés des tables, repris de l'écran Réglages d'où cette section vient.
- *
- * Une table absente de la liste s'affiche sous son nom brut : une migration qui
- * ajoute une table ne doit pas la faire disparaître de l'écran en attendant que
- * quelqu'un pense à la nommer ici.
  */
 const LIBELLES_VOLUMES: Record<string, string> = {
   collecteurs: 'Collecteurs',
@@ -748,14 +1141,11 @@ function Plateforme({ etat }: { etat: EtatSuperAdmin }) {
     <section>
       <h2 className="font-headings font-bold text-xl text-ink mb-1">Plateforme</h2>
       <p className="font-body text-sm text-muted-foreground mb-3">
-        Mesuré à l’instant, côté serveur — ce n’est pas ce que le dépôt déclare, c’est ce que la
+        Mesuré à l'instant, côté serveur — ce n'est pas ce que le dépôt déclare, c'est ce que la
         base répond. Comptes exacts et non estimations du planificateur : sur des tables de cette
-        taille, l’estimation peut être fausse de moitié.
+        taille, l'estimation peut être fausse de moitié.
       </p>
 
-      {/* Le repère est porté par une enveloppe : `Carte` n'ouvre que
-          `className` et `style`, et lui ajouter un passe-plat d'attributs pour
-          un test reviendrait à percer le composant pour l'extérieur. */}
       <div data-testid="plateforme">
       <Carte className="p-5">
         <dl className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -772,14 +1162,14 @@ function Plateforme({ etat }: { etat: EtatSuperAdmin }) {
         {rejets > 0 && (
           <p role="alert" className="font-body text-sm text-negative mt-4">
             Des mises ont été refusées à la synchronisation et attendent un arbitrage humain.
-            L’argent a changé de main dans le monde réel : ces lignes ne doivent pas rester en
+            L'argent a changé de main dans le monde réel : ces lignes ne doivent pas rester en
             attente.
           </p>
         )}
 
         <p className="font-body text-sm font-semibold text-ink mt-5 mb-2">Tables journalisées</p>
         <p className="font-body text-xs text-muted-foreground mb-2">
-          Lu dans <code>pg_trigger</code> : c’est la configuration en vigueur, pas une liste écrite
+          Lu dans <code>pg_trigger</code> : c'est la configuration en vigueur, pas une liste écrite
           à la main qui deviendrait fausse à la première migration. Le journal est en écriture
           seule — un déclencheur refuse toute modification, y compris par la clé de service.
         </p>

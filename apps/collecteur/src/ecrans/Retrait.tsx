@@ -1,5 +1,5 @@
 import { MISES_PAR_CYCLE, formatMontant } from '@kolek/core';
-import { Bouton, Carte, Icone } from '@kolek/ui';
+import { Bouton, Carte, Icone, Squelette } from '@kolek/ui';
 import { useState } from 'react';
 
 import type { ClientCible } from '../Coquille';
@@ -172,7 +172,24 @@ export function Retrait({
             )}
 
             {!cartes && !erreur && (
-              <p className="font-body text-sm text-muted-foreground text-center py-8">Lecture…</p>
+              <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
+                <Carte className="p-4 space-y-3">
+                  <div className="flex justify-between">
+                    <Squelette hauteur="h-5" largeur="w-28" />
+                    <Squelette hauteur="h-4" largeur="w-20" />
+                  </div>
+                  <Squelette hauteur="h-16" largeur="w-full" />
+                  <Squelette hauteur="h-10" largeur="w-32" />
+                </Carte>
+                <Carte className="p-4 space-y-3">
+                  <div className="flex justify-between">
+                    <Squelette hauteur="h-5" largeur="w-28" />
+                    <Squelette hauteur="h-4" largeur="w-20" />
+                  </div>
+                  <Squelette hauteur="h-16" largeur="w-full" />
+                  <Squelette hauteur="h-10" largeur="w-32" />
+                </Carte>
+              </div>
             )}
 
             {visibles?.length === 0 && (
@@ -197,7 +214,7 @@ export function Retrait({
               return (
                 <Carte
                   key={carte.carteId}
-                  className={`p-4 ${carte.cycleComplet ? 'border-positive' : ''} ${
+                  className={`p-4 rounded-2xl border border-hairline/80 shadow-xs hover:shadow-sm transition-all ${carte.cycleComplet ? 'border-positive/80 shadow-positive/5 ring-1 ring-positive/20' : ''} ${
                     premier ? 'anim-cascade' : ''
                   }`}
                   style={rangCascade(rang, premier)}

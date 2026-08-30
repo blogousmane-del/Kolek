@@ -49,20 +49,20 @@ export function EnTeteEcran({
 }) {
   return (
     <div
-      className={`anim-entree bg-sidebar px-marge pt-entete pb-6 lg:mx-auto lg:w-full lg:rounded-2xl lg:pt-6 ${LARGEURS[largeur]}`}
+      className={`anim-entree bg-[image:var(--degrade-hero)] px-marge pt-entete pb-6 shadow-md lg:mx-auto lg:w-full lg:rounded-3xl lg:pt-6 ${LARGEURS[largeur]}`}
     >
       <div className="flex items-center gap-3 mb-4">
         <button
           type="button"
           onClick={onRetour}
           aria-label="Revenir à l’accueil"
-          className="anim-pression w-9 h-9 rounded-pill bg-white/10 flex items-center justify-center cursor-pointer shrink-0"
+          className="anim-pression w-10 h-10 rounded-pill bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-md flex items-center justify-center cursor-pointer shrink-0 transition-colors shadow-xs"
         >
-          <Icone nom="arrow-left" className="text-white" />
+          <Icone nom="arrow-left" className="text-white" taille={18} />
         </button>
         <div className="min-w-0">
-          <p className="text-white font-headings font-bold text-xl truncate">{titre}</p>
-          {sousTitre && <p className="text-white/60 text-sm font-body truncate">{sousTitre}</p>}
+          <p className="text-white font-headings font-bold text-xl tracking-tight truncate">{titre}</p>
+          {sousTitre && <p className="text-white/70 text-xs font-body truncate mt-0.5">{sousTitre}</p>}
         </div>
       </div>
       {enfants}
@@ -102,12 +102,12 @@ export function RienAMontrer({ icone, titre, detail }: {
   detail: string;
 }) {
   return (
-    <div className="text-center py-12 px-6">
-      <div className="w-14 h-14 rounded-pill bg-muted mx-auto mb-3 flex items-center justify-center">
-        <Icone nom={icone} taille={24} className="text-muted-foreground" />
+    <div className="text-center py-12 px-6 bg-surface rounded-2xl border border-hairline/70 shadow-xs max-w-md mx-auto my-4">
+      <div className="w-14 h-14 rounded-2xl bg-secondary mx-auto mb-3.5 flex items-center justify-center text-primary shadow-xs">
+        <Icone nom={icone} taille={24} />
       </div>
       <p className="font-headings font-bold text-lg text-ink mb-1">{titre}</p>
-      <p className="font-body text-sm text-muted-foreground">{detail}</p>
+      <p className="font-body text-sm text-muted-foreground max-w-xs mx-auto">{detail}</p>
     </div>
   );
 }
