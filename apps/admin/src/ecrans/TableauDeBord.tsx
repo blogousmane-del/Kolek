@@ -142,8 +142,11 @@ export function TableauDeBord({
                   <span className="text-xs font-body font-medium text-ink">FCFA</span>
                 </div>
               </div>
+              {/* Le nombre insécable, l'unité libre de descendre : la colonne
+                  de gauche descend à un tiers de la largeur à partir de `xl`, et
+                  « 436 000 » s'y coupait en deux. */}
               <p className="font-headings font-bold text-3xl sm:text-4xl text-ink mb-2 tabular-nums">
-                {formatMontant(totaux.total_encaisse)}{' '}
+                <span className="whitespace-nowrap">{formatMontant(totaux.total_encaisse)}</span>{' '}
                 <span className="text-lg sm:text-xl font-body font-medium text-muted-foreground">
                   FCFA
                 </span>

@@ -265,14 +265,14 @@ describe('fiche d’un client à plusieurs cartes', () => {
     // La propriété que gardait ce test tient toujours, et c'est elle qui
     // compte : la mise est immuable, le bouton doit dire ce qu'il encaisse.
     // Il porte le montant de la carte regardée, et de celle-là seulement.
-    expect(await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Encaisser 2 000 FCFA' })).toBeNull();
+    expect(await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Encaisser 2 000 FCFA' })).toBeNull();
 
     // Et il change avec elle : le point de la seconde carte l'amène en face.
     fireEvent.click(screen.getByRole('button', { name: 'Carte 2 sur 2' }));
 
-    expect(await screen.findByRole('button', { name: 'Encaisser 2 000 FCFA' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Encaisser 6 000 FCFA' })).toBeNull();
+    expect(await screen.findByRole('button', { name: 'Encaisser 2 000 FCFA' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Encaisser 6 000 FCFA' })).toBeNull();
   });
 
   it('envoie l’identifiant de la carte touchée, pas celui de sa voisine', async () => {
@@ -294,7 +294,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
     // Le tri met la carte la plus avancée en premier : kB (20 mises) s'ouvre en
     // face, kA (5 mises) est sa voisine. Vérifié plutôt que supposé — c'est cet
     // ordre-là qui rend la confusion possible si le tri venait à changer.
-    expect(await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' })).toBeTruthy();
 
     // On amène la voisine en face, et c'est elle qu'on touche. Le carrousel
     // déplace le risque sans le supprimer : le bouton est unique, donc il ne
@@ -302,7 +302,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
     // carte visible sans retard. Une mise est immuable — encaisser sur la
     // mauvaise carte ne se rattrape pas.
     fireEvent.click(screen.getByRole('button', { name: 'Carte 2 sur 2' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Encaisser 2 000 FCFA' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Encaisser 2 000 FCFA' }));
 
     expect(onEncaisser).toHaveBeenCalledTimes(1);
     expect(onEncaisser).toHaveBeenCalledWith({

@@ -3,9 +3,9 @@ import { formatDateLocale, formatFCFA, formatHeureLocale, formatMontant } from '
 
 describe('formatFCFA', () => {
   it('groupe les milliers par espace et suffixe FCFA', () => {
-    expect(formatFCFA(817432)).toBe('817 432 FCFA');
-    expect(formatFCFA(2500)).toBe('2 500 FCFA');
-    expect(formatFCFA(1000000)).toBe('1 000 000 FCFA');
+    expect(formatFCFA(817432)).toBe('817 432 FCFA');
+    expect(formatFCFA(2500)).toBe('2 500 FCFA');
+    expect(formatFCFA(1000000)).toBe('1 000 000 FCFA');
   });
 
   it('gère zéro et les petits montants sans séparateur', () => {
@@ -14,11 +14,11 @@ describe('formatFCFA', () => {
   });
 
   it('gère les montants négatifs', () => {
-    expect(formatFCFA(-1000)).toBe('-1 000 FCFA');
+    expect(formatFCFA(-1000)).toBe('-1 000 FCFA');
   });
 
   it('tronque toute décimale - le FCFA n\'a pas de sous-unité', () => {
-    expect(formatFCFA(1000.9)).toBe('1 000 FCFA');
+    expect(formatFCFA(1000.9)).toBe('1 000 FCFA');
   });
 
   it('refuse une valeur non finie', () => {
@@ -29,7 +29,7 @@ describe('formatFCFA', () => {
 
 describe('formatMontant', () => {
   it('formate sans le suffixe', () => {
-    expect(formatMontant(817432)).toBe('817 432');
+    expect(formatMontant(817432)).toBe('817 432');
   });
 });
 

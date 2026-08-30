@@ -24,9 +24,16 @@ export function LigneTransaction({ nom, meta, montant, type = 'positive', dernie
       <Avatar nom={nom} className="w-9 h-9 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-base font-body font-semibold text-ink truncate">{nom}</p>
-        <p className="text-sm font-body text-muted-foreground">{meta}</p>
+        {/* Tronqué comme le nom au-dessus : « 30 août · Commission » passait sur
+            deux lignes dans le volet de droite, et la ligne suivante remontait
+            contre elle. */}
+        <p className="text-sm font-body text-muted-foreground truncate">{meta}</p>
       </div>
-      <p className={`text-base font-body font-bold tabular-nums ${COULEURS[type]}`}>
+      {/* Le montant ne se coupe pas et ne se comprime pas : c'est la colonne que
+          l'œil suit de haut en bas. */}
+      <p
+        className={`text-base font-body font-bold tabular-nums whitespace-nowrap flex-shrink-0 ${COULEURS[type]}`}
+      >
         {montant} FCFA
       </p>
     </div>
