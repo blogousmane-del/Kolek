@@ -19,15 +19,16 @@ import type { EtatSuperAdmin } from '../superadmin';
  * quoi que ce soit, mais pour ne pas offrir un clic dont la seule issue est un
  * message d'erreur.
  *
- * ## Le journal n'est pas ici
+ * ## Le journal ne se charge pas tout seul
  *
- * `super_admin_journal()` existe en base, testée et fermée, mais aucune Edge
- * Function ne la sert encore. Un onglet « Journal » vide apprendrait à
- * l'administrateur que l'interface promet ce qu'elle ne tient pas — la leçon que
- * `BarreLaterale.tsx` porte déjà deux fois. Il arrivera avec sa route.
+ * Chaque lecture du journal s'inscrit dans le journal. La déclencher à
+ * l'ouverture de l'écran remplirait la table de la preuve qu'on la regarde. Le
+ * premier test de cette série est ce qui empêche un `useEffect` bien intentionné
+ * de la rendre bavarde.
  */
 
 const agirSuperAdmin = vi.fn();
+const chargerJournal = vi.fn();
 const recharger = vi.fn();
 const utiliserEtat = vi.fn();
 
@@ -35,6 +36,7 @@ vi.mock('../superadmin', async (original) => ({
   ...(await original<Record<string, unknown>>()),
   useEtatSuperAdmin: () => utiliserEtat(),
   agirSuperAdmin: (...args: unknown[]) => agirSuperAdmin(...args),
+  chargerJournal: (...args: unknown[]) => chargerJournal(...args),
 }));
 
 const { SuperAdmin } = await import('./SuperAdmin');
@@ -104,6 +106,7 @@ function poser(etat: Record<string, unknown>) {
 afterEach(() => {
   cleanup();
   agirSuperAdmin.mockReset();
+  chargerJournal.mockReset();
   recharger.mockReset();
   utiliserEtat.mockReset();
 });
@@ -309,5 +312,80 @@ describe('les remises en cours', () => {
     const ligne = screen.getByTestId(`remise-${AUTRE}`);
     expect(within(ligne).getByText(/RENTREE/)).toBeDefined();
     expect(within(ligne).getByText(/30\s*%/)).toBeDefined();
+  });
+});
+
+describe('le journal de sécurité', () => {
+  const LIGNE = {
+    id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    survenu_le: '2026-08-30T07:59:00Z',
+    table_cible: 'collecteurs',
+    action: 'update',
+    ligne_id: AUTRE,
+    acteur_id: MOI,
+    collecteur_id: AUTRE,
+    donnees: { palier: 'pro' },
+  };
+
+  it('ne lit rien tant qu’on ne le demande pas', () => {
+    // Chaque lecture du journal s'enregistre dans le journal. La déclencher à
+    // l'ouverture de l'écran remplirait la table de la preuve qu'on la regarde,
+    // et enterrerait dessous ce qu'elle protège.
+    poser({ statut: 'ok', etat: ETAT });
+
+    render(<SuperAdmin vue={VUE} />);
+
+    expect(chargerJournal).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /afficher le journal/i })).toBeDefined();
+  });
+
+  it('affiche les lignes une fois demandé', async () => {
+    poser({ statut: 'ok', etat: ETAT });
+    chargerJournal.mockResolvedValue({ lignes: [LIGNE], a_suivre: false, page: 1, taille: 50 });
+
+    render(<SuperAdmin vue={VUE} />);
+    fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
+
+    expect(await screen.findByTestId(`journal-${LIGNE.id}`)).toBeDefined();
+    expect(chargerJournal).toHaveBeenCalledWith({ page: 1, taille: 50, consultations: false });
+  });
+
+  it('avance d’une page quand il en reste', async () => {
+    poser({ statut: 'ok', etat: ETAT });
+    chargerJournal.mockResolvedValue({ lignes: [LIGNE], a_suivre: true, page: 1, taille: 50 });
+
+    render(<SuperAdmin vue={VUE} />);
+    fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
+
+    fireEvent.click(await screen.findByRole('button', { name: /page suivante/i }));
+
+    await waitFor(() =>
+      expect(chargerJournal).toHaveBeenCalledWith({ page: 2, taille: 50, consultations: false }),
+    );
+  });
+
+  it('montre les consultations à la demande', async () => {
+    poser({ statut: 'ok', etat: ETAT });
+    chargerJournal.mockResolvedValue({ lignes: [LIGNE], a_suivre: false, page: 1, taille: 50 });
+
+    render(<SuperAdmin vue={VUE} />);
+    fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
+    await screen.findByTestId(`journal-${LIGNE.id}`);
+
+    fireEvent.click(screen.getByLabelText(/consultations/i));
+
+    await waitFor(() =>
+      expect(chargerJournal).toHaveBeenCalledWith({ page: 1, taille: 50, consultations: true }),
+    );
+  });
+
+  it('dit pourquoi la page n’est pas venue', async () => {
+    poser({ statut: 'ok', etat: ETAT });
+    chargerJournal.mockRejectedValue(new Error('La base n’a pas pu produire cette page.'));
+
+    render(<SuperAdmin vue={VUE} />);
+    fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
+
+    expect(await screen.findByText(/n’a pas pu produire/)).toBeDefined();
   });
 });

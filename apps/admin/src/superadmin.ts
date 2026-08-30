@@ -77,6 +77,7 @@ const MESSAGES: Record<string, string> = {
   ECRITURE_IMPOSSIBLE: 'L’écriture a échoué côté serveur. Réessaie.',
   CHAMPS_INVALIDES: 'Un champ du formulaire est mal rempli.',
   ACTION_INCONNUE: 'Cette action n’existe pas côté serveur.',
+  LECTURE_IMPOSSIBLE: 'La base n’a pas pu produire cette page du journal.',
   CORPS_ILLISIBLE: 'Requête mal formée.',
   METHODE_NON_AUTORISEE: 'Requête mal formée.',
   CONFIGURATION: 'Le serveur est mal configuré.',
@@ -172,6 +173,62 @@ export function useEtatSuperAdmin(): EtatSuper & { recharger: () => void } {
   useEffect(() => recharger(), [recharger]);
 
   return { ...etat, recharger };
+}
+
+/* -------------------------------- Journal -------------------------------- */
+
+export interface LigneJournal {
+  id: string;
+  survenu_le: string;
+  table_cible: string;
+  action: string;
+  ligne_id: string | null;
+  /** Qui a agi. Nul pour les lignes écrites avant la migration du 2026-08-30. */
+  acteur_id: string | null;
+  /** Sur qui. Ce n'est pas le même que `acteur_id`, et confondre les deux
+      était exactement le défaut que cette colonne a corrigé. */
+  collecteur_id: string | null;
+  donnees: Record<string, unknown> | null;
+}
+
+export interface PageJournal {
+  lignes: LigneJournal[];
+  /** Vrai s'il reste une page après celle-ci. Le serveur lit une ligne de plus
+      que demandé plutôt que de compter une table qui ne rétrécit jamais. */
+  a_suivre: boolean;
+  /** Ce que le serveur a réellement appliqué après ses propres bornes. */
+  page: number;
+  taille: number;
+}
+
+/**
+ * Lit une page du journal.
+ *
+ * Les paramètres voyagent dans le corps : `functions.invoke` ne sait pas
+ * construire de chaîne de requête, et la route lit les deux formes.
+ *
+ * Cette lecture s'enregistre côté serveur. Ce n'est pas un appel à faire à
+ * l'ouverture d'un écran : le journal se remplirait de la preuve qu'on le
+ * regarde, et ce qu'il protège finirait enterré dessous.
+ */
+export async function chargerJournal({
+  page,
+  taille,
+  consultations = false,
+}: {
+  page: number;
+  taille: number;
+  consultations?: boolean;
+}): Promise<PageJournal> {
+  const { data, error } = await supabase.functions.invoke('super-admin-journal', {
+    body: { page, taille, consultations },
+  });
+
+  if (error) {
+    throw new Error(enClair(await decoder(error)) ?? error.message);
+  }
+
+  return data as PageJournal;
 }
 
 export type ActionSuperAdmin =

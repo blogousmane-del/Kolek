@@ -30,7 +30,7 @@ vi.mock('./supabase', () => ({
   supabase: { functions: { invoke: (...args: unknown[]) => invoke(...args) } },
 }));
 
-const { agirSuperAdmin, chargerEtatSuperAdmin } = await import('./superadmin');
+const { agirSuperAdmin, chargerEtatSuperAdmin, chargerJournal } = await import('./superadmin');
 
 /** Reproduit ce que `functions.invoke` rend pour un statut hors 2xx : un
     message générique, et le vrai corps dans `context`. */
@@ -128,5 +128,26 @@ describe('les actions du Super Admin', () => {
     const resultat = await agirSuperAdmin({ action: 'appliquer_code', collecteur: 'x', code: 'Y' });
 
     expect(resultat.ok).toBe(false);
+  });
+});
+
+describe('le journal', () => {
+  it('demande une page précise, consultations masquées par défaut', async () => {
+    invoke.mockResolvedValue({ data: { lignes: [], a_suivre: false, page: 2, taille: 25 }, error: null });
+
+    const page = await chargerJournal({ page: 2, taille: 25 });
+
+    expect(page.page).toBe(2);
+    // Les paramètres voyagent dans le corps : `functions.invoke` ne sait pas
+    // construire de chaîne de requête, et la route lit les deux formes.
+    expect(invoke).toHaveBeenCalledWith('super-admin-journal', {
+      body: { page: 2, taille: 25, consultations: false },
+    });
+  });
+
+  it('traduit un échec de lecture', async () => {
+    invoke.mockResolvedValue(echec(500, { erreur: 'LECTURE_IMPOSSIBLE' }));
+
+    await expect(chargerJournal({ page: 1, taille: 50 })).rejects.toThrow(/journal/i);
   });
 });
