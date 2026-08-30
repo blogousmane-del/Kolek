@@ -9,10 +9,11 @@ import {
   type CleNavSuper,
   type NomIcone,
 } from '@kolek/ui';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-import type { LigneCollecteur, VueGlobale } from '../donnees';
+import { modifierCollecteur, type LigneCollecteur, type VueGlobale } from '../donnees';
 import { dateDuJour, telechargerCsv, versCsv } from '../exporter';
+import { FicheModifiable } from './FicheModifiable';
 import {
   agirSuperAdmin,
   chargerJournal,
@@ -193,7 +194,19 @@ function PastilleStatut({ c }: { c: LigneCollecteur }) {
 
 /* ========================= Composant principal ========================== */
 
-export function SuperAdmin({ vue, onglet }: { vue: VueGlobale; onglet: OngletSuperAdmin }) {
+export function SuperAdmin({
+  vue,
+  onglet,
+  onRecharger,
+}: {
+  vue: VueGlobale;
+  onglet: OngletSuperAdmin;
+  /** Recharge la vue globale — la liste des collecteurs, donc les lignes du
+      tableau des abonnés. Distinct de `etat.recharger`, qui ne rapporte que
+      l'état de la plateforme : modifier le palier d'un collecteur change la
+      première et pas la seconde. */
+  onRecharger: () => void;
+}) {
   const etat = useEtatSuperAdmin();
   /** Le dernier verdict du serveur, succès comme refus. Un seul emplacement :
       deux messages simultanés sur un même écran laissent croire à deux
@@ -298,7 +311,18 @@ export function SuperAdmin({ vue, onglet }: { vue: VueGlobale; onglet: OngletSup
               </p>
             )}
 
-            {onglet === 'abonnements' && <OngletAbonnements vue={vue} />}
+            {onglet === 'abonnements' && (
+              <OngletAbonnements
+                vue={vue}
+                etat={etat.etat}
+                occupe={occupe}
+                onRecharger={onRecharger}
+                onVerdict={(ok, message) => setVerdict({ ok, message })}
+                onAppliquer={(demande) =>
+                  void agir(demande, `Code ${demande.code} appliqué au collecteur.`)
+                }
+              />
+            )}
 
             {onglet === 'administrateurs' && (
               <Administrateurs
@@ -345,11 +369,73 @@ export function SuperAdmin({ vue, onglet }: { vue: VueGlobale; onglet: OngletSup
 
 /* ========================= Onglet Abonnements =========================== */
 
-function OngletAbonnements({ vue }: { vue: VueGlobale }) {
+function OngletAbonnements({
+  vue,
+  etat,
+  occupe,
+  onRecharger,
+  onVerdict,
+  onAppliquer,
+}: {
+  vue: VueGlobale;
+  etat: EtatSuperAdmin;
+  occupe: boolean;
+  onRecharger: () => void;
+  /** Un seul emplacement de message pour tout l'écran, tenu par le parent :
+      deux verdicts simultanés laisseraient croire à deux opérations. */
+  onVerdict: (ok: boolean, message: string) => void;
+  onAppliquer: (demande: Extract<ActionSuperAdmin, { action: 'appliquer_code' }>) => void;
+}) {
   const { abonnements, collecteurs } = vue;
   const prixParPalier = new Map(abonnements.parPalier.map((p) => [p.palier, p.prix]));
   const [filtre, setFiltre] = useState<FiltreStatut>('tous');
   const [recherche, setRecherche] = useState('');
+  /** Le collecteur dont la fiche est ouverte en correction, et celui pour qui
+      on choisit un code promo. Deux panneaux, jamais les deux à la fois : ils
+      parlent du même abonnement et se contrediraient à l'écran. */
+  const [edition, setEdition] = useState<string | null>(null);
+  const [promo, setPromo] = useState<string | null>(null);
+  /** L'identifiant de la ligne dont une bascule est en vol. Il désactive les
+      commandes de cette ligne-là seulement : suspendre un collecteur n'a pas
+      à figer le tableau entier. */
+  const [enVol, setEnVol] = useState<string | null>(null);
+  const [codeChoisi, setCodeChoisi] = useState('');
+
+  const enEdition = edition ? (collecteurs.find((c) => c.id === edition) ?? null) : null;
+  const enPromo = promo ? (collecteurs.find((c) => c.id === promo) ?? null) : null;
+  const codesApplicables = etat.codes_promo.filter((c) => c.statut === 'en_cours');
+
+  /**
+   * Suspendre ou réactiver un abonnement.
+   *
+   * Passe par `admin-modifier-collecteur`, pas par `super-admin-action` : c'est
+   * le même geste que celui de la fiche collecteur du Dashboard, avec les mêmes
+   * règles côté serveur. Lui ouvrir une seconde route donnerait deux façons de
+   * suspendre, et un jour deux comportements.
+   *
+   * L'échéance n'est pas touchée. Repousser une date revient à offrir du
+   * service, et cela relève de la facturation — la même raison qu'en
+   * `FicheModifiable`.
+   */
+  async function basculerAbonnement(c: LigneCollecteur) {
+    if (enVol) return;
+    const suspendre = c.abonnement_statut !== 'suspendu';
+    setEnVol(c.id);
+    const resultat = await modifierCollecteur(c.id, {
+      abonnementStatut: suspendre ? 'suspendu' : 'actif',
+    });
+    setEnVol(null);
+
+    if (!resultat.ok) {
+      onVerdict(false, resultat.message);
+      return;
+    }
+    onVerdict(
+      true,
+      suspendre ? `Abonnement de ${c.nom} suspendu.` : `Abonnement de ${c.nom} réactivé.`,
+    );
+    onRecharger();
+  }
 
   const collecteursFiltres = collecteurs.filter((c) => {
     // Recherche textuelle — déclenchée à partir de 3 caractères.
@@ -415,6 +501,82 @@ function OngletAbonnements({ vue }: { vue: VueGlobale }) {
 
   return (
     <>
+      {/* Les deux panneaux d'action, au-dessus du tableau et non en surcouche :
+          une boîte modale demande un piège de focus, une touche Échap et un
+          retour au bouton d'origine, et rien de tout cela n'existe encore dans
+          ce produit. Une modale à moitié faite se referme au clavier sur du
+          vide — un panneau posé dans le flux, non. */}
+      {enEdition && (
+        <section aria-label={`Modifier ${enEdition.nom}`}>
+          <FicheModifiable
+            collecteur={enEdition}
+            onEnregistre={() => {
+              setEdition(null);
+              onVerdict(true, `Fiche de ${enEdition.nom} enregistrée.`);
+              onRecharger();
+            }}
+            onAnnuler={() => setEdition(null)}
+          />
+        </section>
+      )}
+
+      {enPromo && (
+        <Carte className="p-5">
+          <h3 className="font-headings font-bold text-lg text-ink mb-1">
+            Appliquer un code promo
+          </h3>
+          <p className="font-body text-sm text-muted-foreground mb-4">
+            {enPromo.nom} — palier {PALIERS.find((pa) => pa.cle === enPromo.palier)?.nom ?? enPromo.palier}.
+            La remise court jusqu'à la date de fin du code.
+          </p>
+
+          {codesApplicables.length === 0 ? (
+            <p className="font-body text-sm text-muted-foreground mb-4">
+              Aucun code en cours. Crée-le dans l'écran Promotions : un code programmé ou expiré ne
+              s'applique pas.
+            </p>
+          ) : (
+            <label className="flex flex-col gap-1.5 mb-4 max-w-xs">
+              <span className="text-sm font-body font-medium text-ink">Code</span>
+              <select
+                value={codeChoisi}
+                onChange={(e) => setCodeChoisi(e.target.value)}
+                className="h-11 px-3 rounded-md border border-input bg-surface font-body text-sm text-ink cursor-pointer"
+              >
+                <option value="">Choisir un code…</option>
+                {codesApplicables.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} — −{c.remise_pct} % jusqu'au {dateLisible(c.valide_au)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <Bouton
+              disabled={occupe || !codeChoisi}
+              onClick={() => {
+                onAppliquer({ action: 'appliquer_code', collecteur: enPromo.id, code: codeChoisi });
+                setPromo(null);
+                setCodeChoisi('');
+              }}
+            >
+              Appliquer
+            </Bouton>
+            <Bouton
+              variante="fantome"
+              onClick={() => {
+                setPromo(null);
+                setCodeChoisi('');
+              }}
+            >
+              Annuler
+            </Bouton>
+          </div>
+        </Carte>
+      )}
+
       {/* Indicateurs clés */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {indicateurs.map((ind) => (
@@ -561,6 +723,7 @@ function OngletAbonnements({ vue }: { vue: VueGlobale }) {
               {collecteursFiltres.map((c, i) => (
                 <div
                   key={c.id}
+                  data-testid={`abonne-${c.id}`}
                   className={`grid items-center px-4 sm:px-6 py-3.5 gap-4 ${
                     i < collecteursFiltres.length - 1 ? 'border-b border-hairline' : ''
                   }`}
@@ -595,20 +758,29 @@ function OngletAbonnements({ vue }: { vue: VueGlobale }) {
                   <div className="flex justify-end gap-1">
                     <button
                       type="button"
-                      disabled
+                      disabled={enVol === c.id}
+                      aria-label={`Modifier ${c.nom}`}
                       title="Modifier"
-                      className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground opacity-50 cursor-default"
+                      onClick={() => {
+                        setPromo(null);
+                        setEdition(c.id);
+                      }}
+                      className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground ${
+                        enVol === c.id ? 'opacity-50 cursor-default' : 'cursor-pointer'
+                      }`}
                     >
                       <Icone nom="edit" taille={14} />
                     </button>
-                    <button
-                      type="button"
-                      disabled
-                      title="Plus d'options"
-                      className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground opacity-50 cursor-default"
-                    >
-                      <Icone nom="more-horizontal" taille={14} />
-                    </button>
+                    <MenuLigne
+                      c={c}
+                      occupe={enVol === c.id}
+                      onPromo={() => {
+                        setEdition(null);
+                        setCodeChoisi('');
+                        setPromo(c.id);
+                      }}
+                      onBasculer={() => void basculerAbonnement(c)}
+                    />
                   </div>
                 </div>
               ))}
@@ -617,6 +789,109 @@ function OngletAbonnements({ vue }: { vue: VueGlobale }) {
         )}
       </Carte>
     </>
+  );
+}
+
+/**
+ * Le menu « … » d'une ligne du tableau des abonnés.
+ *
+ * Deux entrées seulement, et toutes deux mènent quelque part : appliquer un
+ * code promo, suspendre ou réactiver l'abonnement. C'est la contrepartie de ce
+ * que ce dépôt a retiré trois fois — une commande qui ne fait rien coûte plus
+ * cher que son absence. Ces deux boutons-là étaient `disabled` depuis la
+ * maquette ; ils font maintenant ce que leur infobulle promet.
+ *
+ * La modification de la fiche n'est pas dans le menu : elle a le crayon à côté,
+ * et la ranger ici la cacherait derrière un clic de plus pour le geste le plus
+ * courant.
+ */
+function MenuLigne({
+  c,
+  occupe,
+  onPromo,
+  onBasculer,
+}: {
+  c: LigneCollecteur;
+  occupe: boolean;
+  onPromo: () => void;
+  onBasculer: () => void;
+}) {
+  const [ouvert, setOuvert] = useState(false);
+  const boite = useRef<HTMLDivElement>(null);
+  const suspendu = c.abonnement_statut === 'suspendu';
+
+  // Échap et clic à côté referment, comme le sélecteur d'espace de la barre
+  // latérale. Un menu de ligne qui reste ouvert pendant qu'on lit une autre
+  // ligne recouvre celle qu'on lit.
+  useEffect(() => {
+    if (!ouvert) return;
+    const surTouche = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOuvert(false);
+    };
+    const surClic = (e: MouseEvent) => {
+      if (!boite.current?.contains(e.target as Node)) setOuvert(false);
+    };
+    window.addEventListener('keydown', surTouche);
+    document.addEventListener('mousedown', surClic);
+    return () => {
+      window.removeEventListener('keydown', surTouche);
+      document.removeEventListener('mousedown', surClic);
+    };
+  }, [ouvert]);
+
+  return (
+    <div className="relative" ref={boite}>
+      <button
+        type="button"
+        disabled={occupe}
+        aria-haspopup="menu"
+        aria-expanded={ouvert}
+        aria-label={`Plus d'options pour ${c.nom}`}
+        title="Plus d'options"
+        onClick={() => setOuvert((o) => !o)}
+        className={`w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground ${
+          occupe ? 'opacity-50 cursor-default' : 'cursor-pointer'
+        }`}
+      >
+        <Icone nom="more-horizontal" taille={14} />
+      </button>
+
+      {ouvert && (
+        <div
+          role="menu"
+          className="absolute right-0 top-9 z-20 w-56 rounded-md bg-surface border border-hairline shadow-lg overflow-hidden py-1"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOuvert(false);
+              onPromo();
+            }}
+            className="w-full text-left flex items-center gap-2.5 px-3 py-2.5 font-body text-sm text-ink cursor-pointer"
+          >
+            <Icone nom="coins" taille={15} className="text-primary flex-shrink-0" />
+            Appliquer un code promo
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOuvert(false);
+              onBasculer();
+            }}
+            className="w-full text-left flex items-center gap-2.5 px-3 py-2.5 font-body text-sm text-ink cursor-pointer"
+          >
+            <Icone
+              nom={suspendu ? 'check-circle' : 'bell-off'}
+              taille={15}
+              className={`flex-shrink-0 ${suspendu ? 'text-positive' : 'text-negative'}`}
+            />
+            {suspendu ? "Réactiver l'abonnement" : "Suspendre l'abonnement"}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

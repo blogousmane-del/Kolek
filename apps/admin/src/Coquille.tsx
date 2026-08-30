@@ -175,7 +175,7 @@ export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
               et par les mêmes deux états que la maquette n'avait pas à
               représenter. */}
           {donnees.statut === 'ok' && espace === 'super' && (
-            <SuperAdmin vue={donnees.vue} onglet={pageSuper} />
+            <SuperAdmin vue={donnees.vue} onglet={pageSuper} onRecharger={donnees.recharger} />
           )}
 
           {donnees.statut === 'ok' && espace === 'admin' && (
