@@ -263,6 +263,43 @@ describe('les codes promo', () => {
   });
 });
 
+describe('la plateforme', () => {
+  it('traduit les noms de tables en libellés lisibles', () => {
+    poser({ statut: 'ok', etat: ETAT });
+
+    render(<SuperAdmin vue={VUE} />);
+
+    // Cherché dans sa carte : « Lignes de journal » figure aussi parmi les
+    // indicateurs du haut, et un `getByText` global le trouverait deux fois.
+    const carte = within(screen.getByTestId('plateforme'));
+    expect(carte.getByText('Collecteurs')).toBeDefined();
+    expect(carte.getByText('Lignes de journal')).toBeDefined();
+  });
+
+  it('nomme les tables journalisées', () => {
+    poser({ statut: 'ok', etat: ETAT });
+
+    render(<SuperAdmin vue={VUE} />);
+
+    const carte = within(screen.getByTestId('plateforme'));
+    expect(carte.getByText('collecteurs')).toBeDefined();
+    expect(carte.getByText('admins')).toBeDefined();
+  });
+
+  it('alerte quand des rejets de synchronisation attendent un arbitrage', () => {
+    // L'argent a changé de main dans le monde réel : ces lignes ne doivent pas
+    // dormir. Un compteur parmi douze autres ne se remarque pas.
+    poser({
+      statut: 'ok',
+      etat: { ...ETAT, volumes: { ...ETAT.volumes, rejets_non_traites: 3 } },
+    });
+
+    render(<SuperAdmin vue={VUE} />);
+
+    expect(screen.getByRole('alert').textContent).toMatch(/arbitrage/i);
+  });
+});
+
 describe('les remises en cours', () => {
   it('nomme le collecteur, son code et la fin de la remise', () => {
     poser({ statut: 'ok', etat: ETAT });
