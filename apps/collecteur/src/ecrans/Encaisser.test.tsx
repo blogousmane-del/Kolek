@@ -49,7 +49,7 @@ describe('après une mise réussie', () => {
 
     expect(await screen.findByRole('status')).toHaveProperty(
       'textContent',
-      'Mise de 1 000 FCFA enregistrée pour Hj.',
+      'Mise de 1 000 FCFA enregistrée pour Hj.',
     );
     expect(screen.queryByText('Aucune carte choisie.')).toBeNull();
   });

@@ -92,6 +92,6 @@ describe('alerte d’une carte au bout de son cycle', () => {
     const complete = alertes.find((a) => a.cle === 'complete-k1');
 
     // 31 mises de 1 000, moins la première qui est la commission du collecteur.
-    expect(complete?.detail).toContain('30 000');
+    expect(complete?.detail).toContain('30 000');
   });
 });

@@ -134,7 +134,7 @@ describe('vocabulaire de l’écran de retrait', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Faire le retrait' })[0]!);
 
     const texte = screen.getByText(/Confirmer le retrait/).textContent ?? '';
-    expect(texte).toContain('30 000');
+    expect(texte).toContain('30 000');
     // La carte se clôture, et c'est définitif. Le taire serait pire que le dire.
     expect(texte).toContain('clôture');
   });
