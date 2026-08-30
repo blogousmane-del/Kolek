@@ -1,15 +1,18 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { CleNavSuper } from '@kolek/ui';
+
 import type { VueGlobale } from '../donnees';
 import type { EtatSuperAdmin } from '../superadmin';
 
 /**
- * L'écran Super Admin, restructuré en onglets.
+ * La console de plateforme, découpée en cinq écrans.
  *
- * Chaque groupe de tests commence par naviguer vers l'onglet concerné. L'onglet
- * par défaut — « Abonnements » — montre les KPI financiers, les paliers et le
- * tableau des collecteurs ; les autres onglets reprennent le contenu existant.
+ * Chaque groupe de tests rend directement l'entrée concernée : la navigation a
+ * quitté cet écran pour la barre latérale de la coquille. L'entrée par défaut —
+ * « Abonnements » — montre les KPI financiers, les paliers et le tableau des
+ * collecteurs ; les quatre autres reprennent le contenu existant.
  *
  * ## Ce que cet écran ne décide pas
  *
@@ -147,9 +150,16 @@ function poser(etat: Record<string, unknown>) {
   utiliserEtat.mockReturnValue({ ...etat, recharger });
 }
 
-/** Navigue vers un onglet de l'écran Super Admin. */
-function allerA(libelle: string) {
-  fireEvent.click(screen.getByRole('button', { name: libelle }));
+/**
+ * Rend la console de plateforme sur une de ses entrées.
+ *
+ * L'écran n'a plus de barre d'onglets à cliquer : depuis le 2026-08-30, sa
+ * navigation est celle de la coquille — la barre latérale — et il reçoit
+ * l'entrée courante en propriété. Où mène chaque entrée est donc vérifié dans
+ * `Coquille.test.tsx` ; ici, on vérifie ce que chacune affiche.
+ */
+function rendre(onglet: CleNavSuper) {
+  return render(<SuperAdmin vue={VUE} onglet={onglet} />);
 }
 
 afterEach(() => {
@@ -164,7 +174,7 @@ describe('les états de chargement', () => {
   it('annonce le chargement plutôt qu’un écran vide', () => {
     poser({ statut: 'chargement' });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('abonnements');
 
     expect(screen.getByRole('status')).toBeDefined();
   });
@@ -172,7 +182,7 @@ describe('les états de chargement', () => {
   it('dit pourquoi rien ne s’affiche, et propose de réessayer', () => {
     poser({ statut: 'erreur', message: 'Cet écran est réservé aux super administrateurs.' });
 
-    render(<SuperAdmin vue={VUE} />);
+    rendre('abonnements');
 
     expect(screen.getByRole('alert').textContent).toMatch(/réservé/i);
     screen.getByRole('button', { name: /réessayer/i }).click();
@@ -184,8 +194,7 @@ describe('les administrateurs', () => {
   it('liste les comptes avec leur niveau', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Administrateurs');
+    rendre('administrateurs');
 
     expect(within(screen.getByTestId(`admin-${MOI}`)).getByText(/Aya Konan/)).toBeDefined();
     const autre = within(screen.getByTestId(`admin-${AUTRE}`));
@@ -196,8 +205,7 @@ describe('les administrateurs', () => {
   it('marque sa propre ligne et n’y propose aucun geste', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Administrateurs');
+    rendre('administrateurs');
 
     const maLigne = screen.getByTestId(`admin-${MOI}`);
     expect(within(maLigne).getByText(/c'est toi/i)).toBeDefined();
@@ -208,8 +216,7 @@ describe('les administrateurs', () => {
     poser({ statut: 'ok', etat: ETAT });
     agirSuperAdmin.mockResolvedValue({ ok: true, corps: { fait: true } });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Administrateurs');
+    rendre('administrateurs');
 
     within(screen.getByTestId(`admin-${AUTRE}`))
       .getByRole('button', { name: /promouvoir/i })
@@ -229,8 +236,7 @@ describe('les administrateurs', () => {
     poser({ statut: 'ok', etat: ETAT });
     agirSuperAdmin.mockResolvedValue({ ok: false, message: 'Ton compte n\u2019est plus super.' });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Administrateurs');
+    rendre('administrateurs');
 
     within(screen.getByTestId(`admin-${AUTRE}`))
       .getByRole('button', { name: /révoquer/i })
@@ -245,8 +251,7 @@ describe('les codes promo', () => {
   it('liste les codes avec leur consommation', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Promotions');
+    rendre('promos');
 
     const ligne = screen.getByTestId('code-RENTREE');
     expect(within(ligne).getByText('12 / 50')).toBeDefined();
@@ -256,8 +261,7 @@ describe('les codes promo', () => {
     poser({ statut: 'ok', etat: ETAT });
     agirSuperAdmin.mockResolvedValue({ ok: true, corps: { fait: true } });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Promotions');
+    rendre('promos');
 
     fireEvent.change(screen.getByLabelText(/^code$/i), { target: { value: 'noel' } });
     fireEvent.change(screen.getByLabelText(/remise/i), { target: { value: '25' } });
@@ -282,8 +286,7 @@ describe('les codes promo', () => {
     poser({ statut: 'ok', etat: ETAT });
     agirSuperAdmin.mockResolvedValue({ ok: true, corps: { fait: true } });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Promotions');
+    rendre('promos');
 
     fireEvent.change(screen.getByLabelText(/^code$/i), { target: { value: 'LIBRE' } });
     fireEvent.change(screen.getByLabelText(/remise/i), { target: { value: '10' } });
@@ -300,8 +303,7 @@ describe('les codes promo', () => {
     poser({ statut: 'ok', etat: ETAT });
     agirSuperAdmin.mockResolvedValue({ ok: true, corps: { fait: true, remise_pct: 30 } });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Promotions');
+    rendre('promos');
 
     fireEvent.change(screen.getByLabelText(/collecteur/i), { target: { value: 'ccc' } });
     fireEvent.change(screen.getByLabelText(/code à appliquer/i), { target: { value: 'RENTREE' } });
@@ -321,8 +323,7 @@ describe('la plateforme', () => {
   it('traduit les noms de tables en libellés lisibles', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Plateforme');
+    rendre('plateforme');
 
     const carte = within(screen.getByTestId('plateforme'));
     expect(carte.getByText('Collecteurs')).toBeDefined();
@@ -332,8 +333,7 @@ describe('la plateforme', () => {
   it('nomme les tables journalisées', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Plateforme');
+    rendre('plateforme');
 
     const carte = within(screen.getByTestId('plateforme'));
     expect(carte.getByText('collecteurs')).toBeDefined();
@@ -346,8 +346,7 @@ describe('la plateforme', () => {
       etat: { ...ETAT, volumes: { ...ETAT.volumes, rejets_non_traites: 3 } },
     });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Plateforme');
+    rendre('plateforme');
 
     expect(screen.getByRole('alert').textContent).toMatch(/arbitrage/i);
   });
@@ -357,8 +356,7 @@ describe('les remises en cours', () => {
   it('nomme le collecteur, son code et la fin de la remise', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Promotions');
+    rendre('promos');
 
     const ligne = screen.getByTestId(`remise-${AUTRE}`);
     expect(within(ligne).getByText(/RENTREE/)).toBeDefined();
@@ -381,8 +379,7 @@ describe('le journal de sécurité', () => {
   it('ne lit rien tant qu’on ne le demande pas', () => {
     poser({ statut: 'ok', etat: ETAT });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Sécurité');
+    rendre('securite');
 
     expect(chargerJournal).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /afficher le journal/i })).toBeDefined();
@@ -392,8 +389,7 @@ describe('le journal de sécurité', () => {
     poser({ statut: 'ok', etat: ETAT });
     chargerJournal.mockResolvedValue({ lignes: [LIGNE], a_suivre: false, page: 1, taille: 50 });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Sécurité');
+    rendre('securite');
 
     fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
 
@@ -405,8 +401,7 @@ describe('le journal de sécurité', () => {
     poser({ statut: 'ok', etat: ETAT });
     chargerJournal.mockResolvedValue({ lignes: [LIGNE], a_suivre: true, page: 1, taille: 50 });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Sécurité');
+    rendre('securite');
 
     fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
 
@@ -421,8 +416,7 @@ describe('le journal de sécurité', () => {
     poser({ statut: 'ok', etat: ETAT });
     chargerJournal.mockResolvedValue({ lignes: [LIGNE], a_suivre: false, page: 1, taille: 50 });
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Sécurité');
+    rendre('securite');
 
     fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
     await screen.findByTestId(`journal-${LIGNE.id}`);
@@ -438,8 +432,7 @@ describe('le journal de sécurité', () => {
     poser({ statut: 'ok', etat: ETAT });
     chargerJournal.mockRejectedValue(new Error('La base n\u2019a pas pu produire cette page.'));
 
-    render(<SuperAdmin vue={VUE} />);
-    allerA('Sécurité');
+    rendre('securite');
 
     fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
 

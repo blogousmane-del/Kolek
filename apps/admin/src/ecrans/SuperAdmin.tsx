@@ -1,5 +1,14 @@
 import { PALIERS, formatMontant } from '@kolek/core';
-import { Avatar, BadgeStatut, BarreHaute, Bouton, Carte, Icone, type NomIcone } from '@kolek/ui';
+import {
+  Avatar,
+  BadgeStatut,
+  BarreHaute,
+  Bouton,
+  Carte,
+  Icone,
+  type CleNavSuper,
+  type NomIcone,
+} from '@kolek/ui';
 import { useState } from 'react';
 
 import type { LigneCollecteur, VueGlobale } from '../donnees';
@@ -16,14 +25,17 @@ import {
 } from '../superadmin';
 
 /**
- * L'écran système, restructuré en onglets le 2026-08-30.
+ * La console de plateforme, découpée en cinq écrans le 2026-08-30.
  *
- * La maquette de référence place l'administration de la plateforme derrière une
- * sous-navigation dédiée plutôt que dans un seul rouleau vertical. L'onglet par
- * défaut — « Abonnements » — fusionne les KPI financiers, les paliers et le
- * tableau des collecteurs abonnés. Les quatre autres onglets reprennent le
- * contenu qui existait déjà : administrateurs, codes promo et remises, journal
- * de sécurité, et volumes de la plateforme.
+ * Elle n'a pas de navigation à elle : la barre latérale de la coquille la
+ * porte, et cet écran reçoit l'entrée courante en `onglet`. Une console qui
+ * s'atteint par un sélecteur d'espace, et qui remettrait ses propres onglets
+ * sous le titre, poserait deux niveaux de menu pour une seule destination.
+ *
+ * L'entrée par défaut — « Abonnements » — fusionne les KPI financiers, les
+ * paliers et le tableau des collecteurs abonnés. Les quatre autres reprennent
+ * le contenu qui existait déjà : administrateurs, codes promo et remises,
+ * journal de sécurité, et volumes de la plateforme.
  *
  * ## Ce n'est pas le Dashboard
  *
@@ -43,16 +55,26 @@ import {
 
 /* ================================ Types ================================= */
 
-type OngletSuperAdmin = 'abonnements' | 'administrateurs' | 'promos' | 'securite' | 'plateforme';
+/**
+ * La navigation de cette console vit dans la barre latérale depuis le
+ * 2026-08-30 : les onglets qui coiffaient l'écran ont été promus entrées de
+ * menu, et la clé vient donc de `@kolek/ui`. Une seule liste, un seul jeu de
+ * libellés — deux barres de navigation pour le même écran donnaient deux
+ * réponses possibles à « où suis-je ».
+ */
+type OngletSuperAdmin = CleNavSuper;
 
 type FiltreStatut = 'tous' | 'actif' | 'expirant' | 'suspendu';
 
 /* ============================== Constantes ============================== */
 
+/**
+ * Ce que la barre haute affiche pour chaque entrée du menu. Pas d'icône ni de
+ * libellé de navigation ici : la barre latérale les porte déjà, et les
+ * dupliquer ferait deux listes à tenir à jour pour un seul menu.
+ */
 interface ConfigOnglet {
   cle: OngletSuperAdmin;
-  icone: NomIcone;
-  libelle: string;
   filAriane: string[];
   titre: string;
 }
@@ -60,36 +82,26 @@ interface ConfigOnglet {
 const ONGLETS: ConfigOnglet[] = [
   {
     cle: 'abonnements',
-    icone: 'credit-card',
-    libelle: 'Abonnements',
     filAriane: ['Super Admin', 'Abonnements'],
     titre: 'Gestion des abonnements',
   },
   {
     cle: 'administrateurs',
-    icone: 'users',
-    libelle: 'Administrateurs',
     filAriane: ['Super Admin', 'Administrateurs'],
     titre: 'Administrateurs',
   },
   {
     cle: 'promos',
-    icone: 'coins',
-    libelle: 'Promotions',
     filAriane: ['Super Admin', 'Promotions'],
     titre: 'Codes promo & Remises',
   },
   {
     cle: 'securite',
-    icone: 'shield-check',
-    libelle: 'Sécurité',
     filAriane: ['Super Admin', 'Sécurité'],
     titre: 'Journal de sécurité',
   },
   {
     cle: 'plateforme',
-    icone: 'bar-chart-2',
-    libelle: 'Plateforme',
     filAriane: ['Super Admin', 'Plateforme'],
     titre: 'Plateforme',
   },
@@ -181,9 +193,8 @@ function PastilleStatut({ c }: { c: LigneCollecteur }) {
 
 /* ========================= Composant principal ========================== */
 
-export function SuperAdmin({ vue }: { vue: VueGlobale }) {
+export function SuperAdmin({ vue, onglet }: { vue: VueGlobale; onglet: OngletSuperAdmin }) {
   const etat = useEtatSuperAdmin();
-  const [onglet, setOnglet] = useState<OngletSuperAdmin>('abonnements');
   /** Le dernier verdict du serveur, succès comme refus. Un seul emplacement :
       deux messages simultanés sur un même écran laissent croire à deux
       opérations, alors qu'une seule part à la fois. */
@@ -254,25 +265,6 @@ export function SuperAdmin({ vue }: { vue: VueGlobale }) {
   return (
     <>
       <BarreHaute filAriane={configOnglet.filAriane} titre={configOnglet.titre} actions={actions} />
-
-      {/* Barre d'onglets */}
-      <div className="flex items-center gap-1 px-4 sm:px-6 lg:px-8 border-b border-hairline bg-canvas overflow-x-auto flex-shrink-0">
-        {ONGLETS.map((o) => (
-          <button
-            key={o.cle}
-            type="button"
-            onClick={() => setOnglet(o.cle)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-body font-medium border-b-2 whitespace-nowrap cursor-pointer transition-colors ${
-              onglet === o.cle
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-ink'
-            }`}
-          >
-            <Icone nom={o.icone} taille={16} />
-            {o.libelle}
-          </button>
-        ))}
-      </div>
 
       <div className="px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 overflow-y-auto">
         {etat.statut === 'chargement' && (

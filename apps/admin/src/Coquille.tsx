@@ -1,4 +1,12 @@
-import { BandeauOffre, BarreLaterale, Bouton, Icone, type CleNavAdmin } from '@kolek/ui';
+import {
+  BandeauOffre,
+  BarreLaterale,
+  Bouton,
+  Icone,
+  type CleNavAdmin,
+  type CleNavSuper,
+  type Espace,
+} from '@kolek/ui';
 import { useEffect, useState } from 'react';
 
 import { Abonnements } from './ecrans/Abonnements';
@@ -18,7 +26,25 @@ import { supabase } from './supabase';
     la liste, et la barre latérale reste sur « Collecteurs ». */
 type Page = CleNavAdmin | 'detail';
 
+/** Le libellé de l'espace courant, pour l'en-tête mobile — la barre latérale y
+    est repliée, et son sélecteur avec elle. */
+const TITRE_ESPACE: Record<Espace, string> = {
+  admin: 'Kolek · Admin',
+  super: 'Kolek · Super Admin',
+};
+
 /**
+ * La coquille tient **deux** consoles.
+ *
+ * `espace` dit laquelle : `admin` pilote la collecte d'une organisation,
+ * `super` administre la plateforme. On passe de l'une à l'autre par le
+ * sélecteur en haut de la barre latérale — l'encart « Kolek · Admin », dont le
+ * chevron double n'ouvrait rien jusqu'au 2026-08-30.
+ *
+ * Chaque espace garde sa propre page courante. Revenir au Dashboard après un
+ * détour par la plateforme retrouve l'écran qu'on y avait laissé ; sans ça, le
+ * détour coûterait la navigation en plus du trajet.
+ *
  * `estSuper` vient du portillon, qui a demandé `est_super_admin()` au serveur.
  * Il ne protège rien : les deux Edge Functions du Super Admin reposent la même
  * question sous l'identité de l'appelant, et la base ne croit que celle-là. Ici,
@@ -26,7 +52,9 @@ type Page = CleNavAdmin | 'detail';
  * métier qu'il existe un niveau au-dessus du sien.
  */
 export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
+  const [espace, setEspace] = useState<Espace>('admin');
   const [page, setPage] = useState<Page>('tableau');
+  const [pageSuper, setPageSuper] = useState<CleNavSuper>('abonnements');
   const [erreurSortie, setErreurSortie] = useState<string | null>(null);
   /** Quel collecteur la fiche détaillée affiche. `null` avant tout clic. */
   const [collecteurOuvert, setCollecteurOuvert] = useState<string | null>(null);
@@ -59,13 +87,28 @@ export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
   }
 
   /** Naviguer referme le tiroir : sur mobile il recouvre l'écran qu'on vient
-      de demander, et le laisser ouvert donne l'impression que rien n'a bougé. */
-  function naviguer(cle: CleNavAdmin) {
-    setPage(cle);
+      de demander, et le laisser ouvert donne l'impression que rien n'a bougé.
+
+      Une seule barre latérale pour deux menus, donc une seule commande de
+      navigation : `espace` décide laquelle des deux pages courantes elle
+      déplace. Les deux jeux de clés se recouvrent sur `abonnements` — les
+      paliers vendus aux collecteurs d'un côté, les abonnements des
+      organisations de l'autre — et c'est ce test, pas la clé, qui les
+      sépare. */
+  function naviguer(cle: CleNavAdmin | CleNavSuper) {
+    if (espace === 'super') setPageSuper(cle as CleNavSuper);
+    else setPage(cle as CleNavAdmin);
     setMenuOuvert(false);
   }
 
-  const actif = page === 'detail' ? 'collecteurs' : page;
+  /** Changer d'espace referme le tiroir pour la même raison, et ne touche
+      à aucune des deux pages courantes : chacune attend son retour. */
+  function changerEspace(cible: Espace) {
+    setEspace(cible);
+    setMenuOuvert(false);
+  }
+
+  const actif = espace === 'super' ? pageSuper : page === 'detail' ? 'collecteurs' : page;
 
   return (
     <div className="flex min-h-dvh bg-dark-canvas">
@@ -76,10 +119,12 @@ export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
       <div className="flex w-full m-1.5 sm:m-3 rounded-lg sm:rounded-xl overflow-hidden shadow-lg">
         <div className="hidden lg:flex">
           <BarreLaterale
+            espace={espace}
             actif={actif}
             onNaviguer={naviguer}
             onDeconnexion={deconnecter}
             estSuper={estSuper}
+            onChangerEspace={changerEspace}
           />
         </div>
 
@@ -96,13 +141,17 @@ export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
               <Icone nom="menu" className="text-white/70" />
             </button>
             <span className="font-headings font-bold text-surface text-lg tracking-tight">
-              Kolek · Admin
+              {TITRE_ESPACE[espace]}
             </span>
           </div>
 
           {/* La maquette omettait ce bandeau sur la fiche collecteur. L'état de
-              l'abonnement ne dépend pas de la page où l'on se trouve. */}
-          <BandeauOffre />
+              l'abonnement ne dépend pas de la page où l'on se trouve.
+
+              Il ne dépend en revanche que de l'espace : la console de plateforme
+              n'est l'abonnée de personne, et y afficher une échéance de palier
+              parlerait de l'organisation qu'on vient de quitter. */}
+          {espace === 'admin' && <BandeauOffre />}
 
           {erreurSortie && (
             <p
@@ -119,9 +168,19 @@ export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
             <EcranErreur message={donnees.message} onReessayer={donnees.recharger} />
           )}
 
-          {donnees.statut === 'ok' && (
+          {/* La console de plateforme a sa propre source — `super-admin-etat` —
+              mais elle attend quand même la vue globale : la liste des
+              collecteurs est ce dans quoi on choisit à qui appliquer une
+              remise. Elle passe donc par le même chargement que le Dashboard,
+              et par les mêmes deux états que la maquette n'avait pas à
+              représenter. */}
+          {donnees.statut === 'ok' && espace === 'super' && (
+            <SuperAdmin vue={donnees.vue} onglet={pageSuper} />
+          )}
+
+          {donnees.statut === 'ok' && espace === 'admin' && (
             <>
-              {page === "tableau" && <TableauDeBord vue={donnees.vue} onNaviguer={setPage} />}
+              {page === 'tableau' && <TableauDeBord vue={donnees.vue} onNaviguer={setPage} />}
               {page === 'collecteurs' && (
                 <Collecteurs
                   vue={donnees.vue}
@@ -153,10 +212,6 @@ export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
               {page === 'demandes' && <Demandes />}
               {page === 'avis' && <Avis />}
               {page === 'reglages' && <Reglages />}
-              {/* L'écran a sa propre source — `super-admin-etat` — mais il
-                  attend quand même la vue globale : la liste des collecteurs
-                  est ce dans quoi on choisit à qui appliquer une remise. */}
-              {page === 'super' && <SuperAdmin vue={donnees.vue} />}
             </>
           )}
         </div>
@@ -175,11 +230,13 @@ export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
           />
           <div className="relative z-50 h-dvh">
             <BarreLaterale
+              espace={espace}
               actif={actif}
               onNaviguer={naviguer}
               onDeconnexion={deconnecter}
               onFermer={() => setMenuOuvert(false)}
               estSuper={estSuper}
+              onChangerEspace={changerEspace}
             />
           </div>
         </div>

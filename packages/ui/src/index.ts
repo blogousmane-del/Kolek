@@ -5,7 +5,12 @@ export { BadgeStatut, type Statut } from './BadgeStatut';
 export { BandeauHorsLigne, BandeauOffre, useEnLigne } from './Bandeaux';
 export { BarreEmpilee, type PartRepartition } from './BarreEmpilee';
 export { BarreHaute, type ActionBarre } from './BarreHaute';
-export { BarreLaterale, type CleNavAdmin } from './BarreLaterale';
+export {
+  BarreLaterale,
+  type CleNavAdmin,
+  type CleNavSuper,
+  type Espace,
+} from './BarreLaterale';
 export { Bouton } from './Bouton';
 export { Carte, EnteteCarte, EnteteSection, LienBloc } from './Carte';
 export { CarteCollecte } from './CarteCollecte';
