@@ -336,3 +336,62 @@ Le dépôt garde ce qu'il produit. Il ne garde pas ce que les tableaux de bord
 détiennent. Les deux mesures qui ont réellement piloté ce chantier —
 `/auth/v1/settings` sur l'ancienne clé, `updated_at` sur les variables Netlify —
 sont des sondes extérieures. C'est là qu'il faut investir la prochaine fois.
+
+---
+
+## La fermeture portait sur trois sites. Il y en a six — 2026-08-30
+
+Découvert par accident, en cherchant pourquoi la PR #2 affichait des contrôles
+rouges. La liste des vérifications GitHub nomme **cinq projets Netlify** branchés
+sur ce dépôt, plus un sixième en état neutre :
+
+| Projet | Connu de l'audit ? | Contrôles sur la PR |
+|---|---|---|
+| `kolek-site` | oui | neutres |
+| `kolek-collecteur` | oui | neutres |
+| `kolek-admin` | oui | verts |
+| `calm-begonia-7139bf` | **non** | **en échec** |
+| `mellifluous-cuchufli-182dc7` | **non** | **en échec** |
+| `helpful-kleicha-e77441` | **non** | neutres |
+
+Les trois derniers portent des noms auto-générés par Netlify, ce qui est la
+signature d'un « Import from Git » lancé plusieurs fois.
+
+### Ce que cela change dans ce document
+
+Tout ce qui est écrit plus haut sous la forme « les trois sites » doit se lire
+« les trois sites **connus** ». Concrètement :
+
+- la clé publiable a été vérifiée sur trois sites sur six ;
+- le retrait de `JWT_KEY` a été constaté sur trois sites sur six ;
+- la conclusion « trois sites conformes » était exacte, et incomplète.
+
+### Ce qui a été mesuré le 2026-08-30
+
+Les trois projets inconnus ne servent rien publiquement — `HTTP 404` sur leur
+adresse `*.netlify.app`, ce qui est cohérent avec des constructions qui
+échouent. **Aucun artefact n'est donc exposé aujourd'hui.**
+
+C'est la seule chose que cette mesure établit. Un projet Netlify conserve ses
+variables d'environnement sans avoir jamais publié, et ses journaux de
+construction avec. Si `JWT_KEY`, une clé `service_role` ou un `sb_secret_` y ont
+été posés pendant la période du 2026-08-24, ils y sont encore.
+
+### À faire, et ce n'est pas à la main du dépôt
+
+Ouvrir chacun des trois projets inconnus dans Netlify, relever ses variables
+d'environnement, puis le supprimer s'il ne sert à rien — ce que son absence de
+déploiement réussi laisse penser. Un projet supprimé emporte ses variables ;
+un projet oublié les garde.
+
+### La leçon, qui est la même que celle du bas de page
+
+La section précédente dit : « le dépôt garde ce qu'il produit, il ne garde pas
+ce que les tableaux de bord détiennent ». Ce constat va un cran plus loin.
+
+L'audit ne s'est pas trompé sur les sites qu'il a examinés. Il s'est trompé sur
+**le nombre de sites qu'il y avait à examiner**, et il ne pouvait pas s'en
+apercevoir : rien dans le dépôt ne dit combien de tableaux de bord consomment le
+dépôt. La question « ai-je tout vu ? » n'a pas de réponse à l'intérieur du
+périmètre qu'on s'est donné. Il faut la poser depuis l'extérieur — et cette
+fois, c'est la liste des contrôles d'une pull request qui a répondu.
