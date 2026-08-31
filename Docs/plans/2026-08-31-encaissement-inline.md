@@ -31,7 +31,7 @@
 | `packages/ui/src/CarteCollecte.test.tsx` | ses tests | créé |
 | `packages/ui/src/CarrouselCartes.tsx` | `rendreAction`, appelée pour chaque carte, et isolation des gestes | modifié |
 | `packages/ui/src/CarrouselCartes.test.tsx` | tests ajoutés | modifié |
-| `apps/collecteur/src/ecrans/FicheClient.tsx` | minuteur, bouton, bandeau de sursis, écriture | modifié |
+| `apps/collecteur/src/ecrans/FicheClient.tsx` | minuteur, bouton, bandeau de sursis, écriture, purge | modifié |
 | `apps/collecteur/src/ecrans/FicheClient.test.tsx` | tests réécrits et ajoutés | modifié |
 | `apps/collecteur/src/ecrans/Clients.tsx` | la propriété `onEncaisser` devenue morte disparaît | modifié |
 | `apps/collecteur/src/ecrans/Clients.test.tsx` | la propriété disparaît des rendus | modifié |
@@ -603,7 +603,7 @@ EOF
 - Modifier : `apps/collecteur/src/ecrans/FicheClient.tsx`
 - Modifier : `apps/collecteur/src/ecrans/Clients.tsx:89,103,469-473`
 - Modifier : `apps/collecteur/src/Coquille.tsx:198-212`
-- Test : `apps/collecteur/src/ecrans/FicheClient.test.tsx` (réécrire deux tests, en ajouter trois)
+- Test : `apps/collecteur/src/ecrans/FicheClient.test.tsx` (réécrire deux tests, en ajouter sept)
 - Test : `apps/collecteur/src/ecrans/Clients.test.tsx` (retirer la propriété morte)
 - Test : `apps/collecteur/src/Coquille.test.tsx` (déplacer le déclencheur)
 
@@ -774,6 +774,191 @@ afterEach(() => {
     expect(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' })).toBeTruthy();
     expect(screen.getByText('20/31 j · 65 %')).toBeTruthy();
   });
+
+  it('retire « Annuler » dès que la mise est partie', async () => {
+    // Passé le sursis, l'insertion est en vol. Laisser « Annuler » à l'écran
+    // promettrait un retour arrière que la base refuse.
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+    enregistrerMise.mockResolvedValue({ ok: true, miseId: 'm1' });
+
+    render(
+      <FicheClient
+        clientId="cli3"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(screen.getByRole('button', { name: 'Annuler' })).toBeTruthy();
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(screen.queryByRole('button', { name: 'Annuler' })).toBeNull();
+    expect(screen.getByText(/FCFA encaissé/)).toBeTruthy();
+  });
+
+  it('laisse le bandeau sur sa carte quand on en choisit une autre', async () => {
+    // Le décompte court pendant que le collecteur va regarder l'autre carnet —
+    // c'est même le geste que la rangée existe pour rendre facile. La mise qui
+    // part ne peut pas disparaître de l'écran à ce moment-là.
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+    enregistrerMise.mockResolvedValue({ ok: true, miseId: 'm1' });
+
+    render(
+      <FicheClient
+        clientId="cli3"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Carte 2 sur 2' }));
+
+    // kA est désormais la carte choisie et porte son bouton — et le bandeau de
+    // kB est toujours là, avec son « Annuler ».
+    expect(screen.getByRole('button', { name: 'Encaisser 2 000 FCFA' })).toBeTruthy();
+    expect(screen.getByText(/FCFA encaissé/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Annuler' })).toBeTruthy();
+  });
+
+  it('fait partir la mise en attente quand on encaisse une autre carte', async () => {
+    // Une seule attente à la fois. Celle qu'on abandonne ne doit pas se perdre
+    // pour autant : deux mises le même jour sont acceptées par le serveur, ce
+    // n'est pas à cet écran de les interdire.
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+    enregistrerMise.mockResolvedValue({ ok: true, miseId: 'm1' });
+
+    render(
+      <FicheClient
+        clientId="cli3"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(enregistrerMise).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Carte 2 sur 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 2 000 FCFA' }));
+
+    // kB part maintenant, kA prend sa place dans le sursis.
+    expect(enregistrerMise).toHaveBeenCalledTimes(1);
+    expect(enregistrerMise).toHaveBeenCalledWith('col1', 'kB', 6000);
+
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
+    expect(enregistrerMise).toHaveBeenCalledTimes(2);
+    expect(enregistrerMise).toHaveBeenLastCalledWith('col1', 'kA', 2000);
+  });
+
+  it('laisse la case remplie quand le serveur refuse, et propose de réessayer', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+    enregistrerMise.mockResolvedValue({
+      ok: false,
+      echec: { code: 'RESEAU', message: 'Réseau indisponible. Réessaie.' },
+    });
+
+    render(
+      <FicheClient
+        clientId="cli3"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
+
+    // Les minuteurs sont gelés **avant** l'appui : celui-ci pose le `setTimeout`
+    // du sursis, et un minuteur né sous l'horloge réelle ne répond pas à
+    // `advanceTimersByTime`.
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
+    // Rendus à l'horloge réelle avant le `findBy` qui suit : il attend une
+    // promesse d'écriture, et `waitFor` s'appuie sur les mêmes minuteurs.
+    vi.useRealTimers();
+
+    // La case reste remplie : elle dit ce que le collecteur croit avoir
+    // encaissé. Le message dit que la base ne le sait pas encore. L'effacer
+    // ferait le contraire des deux.
+    expect(await screen.findByText('Réseau indisponible. Réessaie.')).toBeTruthy();
+    expect(screen.getByText('21/31 j · 68 %')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Annuler' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
+  });
+
+  it('renvoie la même mise, sur la même carte, quand on réessaie', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+    enregistrerMise.mockResolvedValue({
+      ok: false,
+      echec: { code: 'RESEAU', message: 'Réseau indisponible. Réessaie.' },
+    });
+
+    render(
+      <FicheClient
+        clientId="cli3"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
+    vi.useRealTimers();
+
+    const reessayer = await screen.findByRole('button', { name: 'Réessayer' });
+    enregistrerMise.mockResolvedValue({ ok: true, miseId: 'm2' });
+    fireEvent.click(reessayer);
+
+    expect(enregistrerMise).toHaveBeenCalledTimes(2);
+    expect(enregistrerMise).toHaveBeenLastCalledWith('col1', 'kB', 6000);
+  });
 ```
 
 **(d)** dans chacun des autres rendus de `<FicheClient …>` du fichier (lignes ~187, 217, 237, 327, 360, 381), retirer la ligne `onEncaisser={vi.fn()}`.
@@ -943,14 +1128,13 @@ export function FicheClient({
  *
  * `mises` est append-only — voir `encaissement-differe.ts`, qui porte la règle.
  * L'appui remplit la case à l'écran et n'écrit rien ; l'insertion part six
- * secondes plus tard. Fermer la fiche ou passer l'application en arrière-plan
- * ne perd pas la mise : elle part tout de suite.
+ * secondes plus tard, et « Annuler » l'empêche jusque-là.
  *
  * ## Pourquoi l'attente est aussi tenue en référence
  *
- * La purge est appelée depuis un démontage et depuis un écouteur du document.
- * Ni l'un ni l'autre ne voit autre chose que l'état du premier rendu ; une
- * référence, si.
+ * Un minuteur ne voit que l'état du rendu qui l'a posé. La référence, elle,
+ * dit ce qui attend au moment où le minuteur se déclenche — et c'est ce qui
+ * permet à `purger` d'être appelée d'ailleurs que d'un gestionnaire de clic.
  */
 function CartesEnCours({
   actives,
@@ -976,7 +1160,6 @@ function CartesEnCours({
   const enCours = useRef<EnAttente | null>(null);
   const sursis = useRef<number | null>(null);
   const decompte = useRef<number | null>(null);
-  const monte = useRef(true);
 
   // Le contexte d'écriture suit chaque rendu, pour la même raison que
   // l'attente : la purge part d'endroits qui ne referment rien.
@@ -985,9 +1168,7 @@ function CartesEnCours({
 
   function poser(en: EnAttente | null) {
     enCours.current = en;
-    // Après le démontage, la référence reste utile — l'écriture en cours la
-    // lit — mais l'état ne peut plus rien afficher.
-    if (monte.current) setAttente(en);
+    setAttente(en);
   }
 
   function arreter() {
@@ -995,7 +1176,7 @@ function CartesEnCours({
     if (decompte.current !== null) window.clearInterval(decompte.current);
     sursis.current = null;
     decompte.current = null;
-    if (monte.current) setRestant(0);
+    setRestant(0);
   }
 
   async function ecrire(en: EnAttente) {
@@ -1065,28 +1246,6 @@ function CartesEnCours({
     poser(repris);
     void ecrire(repris);
   }
-
-  useEffect(() => {
-    monte.current = true;
-    return () => {
-      monte.current = false;
-      purger();
-    };
-    // `purger` ne touche que des références : la refermer à chaque rendu ne
-    // changerait rien, et ce dénouement appartient au seul démontage.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    function surMasquage() {
-      // L'application passe en arrière-plan : le sursis n'a plus de témoin, et
-      // le système peut la tuer sans prévenir. Ce qui attendait part maintenant.
-      if (document.visibilityState === 'hidden') purger();
-    }
-    document.addEventListener('visibilitychange', surMasquage);
-    return () => document.removeEventListener('visibilitychange', surMasquage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Le compte réel de la carte qui attend, s'il y en a une et qu'elle est
   // toujours là. `null` quand la carte a disparu de la fiche — clôturée.
@@ -1291,7 +1450,7 @@ function BandeauSursis({
 npm test -w @kolek/collecteur
 ```
 
-Attendu : toute la suite du collecteur passe, dont les 4 tests de la fiche réécrits ou ajoutés.
+Attendu : toute la suite du collecteur passe, dont les 9 tests de la fiche réécrits ou ajoutés.
 
 - [ ] **Étape 5 : vérifier que TypeScript est d'accord**
 
@@ -1326,14 +1485,15 @@ EOF
 
 ### Tâche 5 : la purge à la fermeture et à la mise en arrière-plan
 
-Le code de la tâche 4 la porte déjà. Cette tâche la **verrouille** par des tests : sans eux, un futur nettoyage des effets ferait disparaître la garantie sans rien casser de visible.
+Le sursis est un délai, pas une promesse d'oubli. Tout ce qui fait perdre le témoin du décompte — la fiche qu'on referme, l'application qui passe en arrière-plan — doit faire partir l'écriture au lieu de l'attendre : le système peut tuer une application masquée sans prévenir, et la mise ne se rattraperait pas.
 
 **Fichiers :**
+- Modifier : `apps/collecteur/src/ecrans/FicheClient.tsx`
 - Test : `apps/collecteur/src/ecrans/FicheClient.test.tsx` (ajouter un `describe`)
 
 **Interfaces :**
-- Consomme : tout ce que produit la tâche 4.
-- Produit : rien de nouveau.
+- Consomme : `purger()`, `poser()`, `arreter()` et la garde `envoyee` de la tâche 4.
+- Produit : rien de nouveau à l'extérieur. `CartesEnCours` gagne deux effets et une référence `monte`.
 
 - [ ] **Étape 1 : écrire les tests qui échouent**
 
@@ -1341,12 +1501,11 @@ Ajouter à `apps/collecteur/src/ecrans/FicheClient.test.tsx`, après le `describ
 
 ```tsx
 /**
- * Les six secondes sont un sursis, pas une promesse d'oubli.
+ * Le sursis est un délai, pas une promesse d'oubli.
  *
- * Tout ce qui fait perdre le témoin du décompte — la fiche qu'on referme,
- * l'application qui passe en arrière-plan — doit faire partir l'écriture au
- * lieu de l'attendre. Le système peut tuer une application masquée sans
- * prévenir, et la mise ne se rattraperait pas.
+ * Le système peut tuer une application masquée sans prévenir, et une fiche
+ * refermée n'a plus personne pour regarder le décompte. Dans les deux cas
+ * l'écriture part maintenant.
  */
 describe('ce qui attend part quand on cesse de regarder', () => {
   it('écrit tout de suite quand la fiche se referme pendant le sursis', async () => {
@@ -1368,23 +1527,24 @@ describe('ce qui attend part quand on cesse de regarder', () => {
 
     vi.useFakeTimers();
     fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
-
     act(() => {
       vi.advanceTimersByTime(2000);
     });
     expect(enregistrerMise).not.toHaveBeenCalled();
 
     // `clientId` à `null` referme la feuille, qui ne rend plus rien.
-    rerender(
-      <FicheClient
-        clientId={null}
-        revision={0}
-        collecteurId="col1"
-        onFermer={vi.fn()}
-        onEcriture={vi.fn()}
-        onRetrait={vi.fn()}
-      />,
-    );
+    act(() => {
+      rerender(
+        <FicheClient
+          clientId={null}
+          revision={0}
+          collecteurId="col1"
+          onFermer={vi.fn()}
+          onEcriture={vi.fn()}
+          onRetrait={vi.fn()}
+        />,
+      );
+    });
 
     expect(enregistrerMise).toHaveBeenCalledTimes(1);
     expect(enregistrerMise).toHaveBeenCalledWith('col1', 'kB', 6000);
@@ -1409,7 +1569,6 @@ describe('ce qui attend part quand on cesse de regarder', () => {
 
     vi.useFakeTimers();
     fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
-
     act(() => {
       vi.advanceTimersByTime(1000);
     });
@@ -1452,137 +1611,124 @@ describe('ce qui attend part quand on cesse de regarder', () => {
 
     vi.useFakeTimers();
     fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
-
     act(() => {
       vi.advanceTimersByTime(6000);
     });
     expect(enregistrerMise).toHaveBeenCalledTimes(1);
 
-    rerender(
-      <FicheClient
-        clientId={null}
-        revision={0}
-        collecteurId="col1"
-        onFermer={vi.fn()}
-        onEcriture={vi.fn()}
-        onRetrait={vi.fn()}
-      />,
-    );
+    act(() => {
+      rerender(
+        <FicheClient
+          clientId={null}
+          revision={0}
+          collecteurId="col1"
+          onFermer={vi.fn()}
+          onEcriture={vi.fn()}
+          onRetrait={vi.fn()}
+        />,
+      );
+    });
 
     expect(enregistrerMise).toHaveBeenCalledTimes(1);
-  });
-
-  it('fait partir la mise en attente quand on encaisse une autre carte', async () => {
-    // Une seule attente à la fois. Celle qu'on abandonne ne doit pas se perdre
-    // pour autant : deux mises le même jour sont acceptées par le serveur, ce
-    // n'est pas à cet écran de les interdire.
-    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
-    enregistrerMise.mockResolvedValue({ ok: true, miseId: 'm1' });
-
-    render(
-      <FicheClient
-        clientId="cli3"
-        revision={0}
-        collecteurId="col1"
-        onFermer={vi.fn()}
-        onEcriture={vi.fn()}
-        onRetrait={vi.fn()}
-      />,
-    );
-
-    await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
-
-    vi.useFakeTimers();
-    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
-    act(() => {
-      vi.advanceTimersByTime(2000);
-    });
-    expect(enregistrerMise).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Carte 2 sur 2' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 2 000 FCFA' }));
-
-    // kB part maintenant, kA prend sa place dans le sursis.
-    expect(enregistrerMise).toHaveBeenCalledTimes(1);
-    expect(enregistrerMise).toHaveBeenCalledWith('col1', 'kB', 6000);
-
-    act(() => {
-      vi.advanceTimersByTime(6000);
-    });
-    expect(enregistrerMise).toHaveBeenCalledTimes(2);
-    expect(enregistrerMise).toHaveBeenLastCalledWith('col1', 'kA', 2000);
-  });
-});
-
-/**
- * Le bandeau appartient à sa carte, pas à l'écran.
- *
- * Pendant le décompte, le collecteur doit pouvoir aller regarder une autre
- * carte — c'est même le geste que la rangée existe pour rendre facile. La mise
- * qui est en train de partir ne peut pas disparaître de l'écran à ce moment-là.
- */
-describe('le bandeau de sursis reste sur sa carte', () => {
-  it('survit au choix d’une autre carte', async () => {
-    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
-    enregistrerMise.mockResolvedValue({ ok: true, miseId: 'm1' });
-
-    render(
-      <FicheClient
-        clientId="cli3"
-        revision={0}
-        collecteurId="col1"
-        onFermer={vi.fn()}
-        onEcriture={vi.fn()}
-        onRetrait={vi.fn()}
-      />,
-    );
-
-    await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
-
-    vi.useFakeTimers();
-    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
-    act(() => {
-      vi.advanceTimersByTime(1000);
-    });
-    expect(screen.getByText(/FCFA encaissé/)).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Carte 2 sur 2' }));
-
-    // kA est désormais la carte choisie et porte son bouton — et le bandeau de
-    // kB est toujours là, avec son « Annuler ».
-    expect(screen.getByRole('button', { name: 'Encaisser 2 000 FCFA' })).toBeTruthy();
-    expect(screen.getByText(/FCFA encaissé/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Annuler' })).toBeTruthy();
   });
 });
 ```
 
-- [ ] **Étape 2 : lancer les tests**
+- [ ] **Étape 2 : lancer les tests, vérifier qu'ils échouent**
 
 ```bash
 npm test -w @kolek/collecteur -- src/ecrans/FicheClient.test.tsx
 ```
 
-Attendu : PASS, les cinq. Si l'un échoue, c'est l'implémentation de la tâche 4 qui est en cause — corriger `purger()` ou `rendreAction` plutôt que le test.
+Attendu : ÉCHEC sur les deux premiers — `enregistrerMise` n'est appelée ni à la fermeture ni au masquage. Le troisième peut passer d'emblée : il verrouille une garde que la tâche 4 a déjà posée, et c'est le seul chemin qui l'exerce ici.
 
-- [ ] **Étape 3 : committer**
+- [ ] **Étape 3 : écrire l'implémentation**
+
+Dans `apps/collecteur/src/ecrans/FicheClient.tsx`, compléter le bloc de documentation de `CartesEnCours` — ajouter, après le paragraphe « Les six secondes » :
+
+```tsx
+ * Fermer la fiche ou passer l'application en arrière-plan ne perd pas la mise :
+ * elle part tout de suite. Le décompte n'a plus de témoin, et le système peut
+ * tuer une application masquée sans prévenir.
+```
+
+Ajouter la référence `monte`, aux côtés des autres :
+
+```tsx
+  const decompte = useRef<number | null>(null);
+  // Après le démontage, les références restent utiles — l'écriture en cours
+  // les lit — mais l'état ne peut plus rien afficher. React avertit sur une
+  // pose d'état après démontage ; ici elle serait en plus sans effet.
+  const monte = useRef(true);
+```
+
+Poser la garde dans `poser` et dans `arreter` :
+
+```tsx
+  function poser(en: EnAttente | null) {
+    enCours.current = en;
+    if (monte.current) setAttente(en);
+  }
+
+  function arreter() {
+    if (sursis.current !== null) window.clearTimeout(sursis.current);
+    if (decompte.current !== null) window.clearInterval(decompte.current);
+    sursis.current = null;
+    decompte.current = null;
+    if (monte.current) setRestant(0);
+  }
+```
+
+Et ajouter les deux effets, juste avant le calcul de `reelles` :
+
+```tsx
+  useEffect(() => {
+    monte.current = true;
+    return () => {
+      // L'ordre compte : le témoin tombe d'abord, sinon `purger` tenterait de
+      // poser un état sur un composant démonté.
+      monte.current = false;
+      purger();
+    };
+    // `purger` ne touche que des références : la refermer à chaque rendu ne
+    // changerait rien, et ce dénouement appartient au seul démontage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    function surMasquage() {
+      // L'application passe en arrière-plan : le sursis n'a plus de témoin, et
+      // le système peut la tuer sans prévenir. Ce qui attendait part maintenant.
+      if (document.visibilityState === 'hidden') purger();
+    }
+    document.addEventListener('visibilitychange', surMasquage);
+    return () => document.removeEventListener('visibilitychange', surMasquage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+```
+
+- [ ] **Étape 4 : lancer les tests, vérifier qu'ils passent**
 
 ```bash
-git add apps/collecteur/src/ecrans/FicheClient.test.tsx
+npm test -w @kolek/collecteur -- src/ecrans/FicheClient.test.tsx
+```
+
+Attendu : PASS, les trois, et tous les tests de la tâche 4 restent verts.
+
+- [ ] **Étape 5 : committer**
+
+```bash
+git add apps/collecteur/src/ecrans/FicheClient.tsx apps/collecteur/src/ecrans/FicheClient.test.tsx
 git commit -F - <<'EOF'
-test(encaissement): le sursis n'est pas une promesse d'oubli
+feat(encaissement): le sursis n'est pas une promesse d'oubli
 
-Tout ce qui fait perdre le temoin du decompte — la fiche refermee,
-l'application masquee, une autre carte encaissee — doit faire partir
-l'ecriture au lieu de l'attendre. Le systeme peut tuer une application en
-arriere-plan sans prevenir.
+Ce qui fait perdre le temoin du decompte — la fiche refermee,
+l'application masquee — fait partir l'ecriture au lieu de l'attendre. Le
+systeme peut tuer une application en arriere-plan sans prevenir, et la
+mise ne se rattraperait pas.
 
-Et la garde qui empeche le double envoi : la relecture qui suit une
-ecriture reussie demonte la section, et ce demontage renverrait la mise.
-
-Enfin, le bandeau appartient a sa carte : faire defiler pendant le
-decompte ne doit pas effacer de l'ecran la mise qui est en train de
-partir.
+La garde `envoyee` tient l'autre bout : la relecture qui suit une ecriture
+reussie demonte cette section, et ce demontage renverrait la mise.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
@@ -1590,27 +1736,31 @@ EOF
 
 ---
 
-### Tâche 6 : l'échec d'écriture, et « Réessayer »
+### Tâche 6 : la promesse rejetée
+
+`enregistrerMise` rend `{ ok: false }` sur les refus du serveur — c'est le chemin que la tâche 4 traite. Mais une coupure franche fait **rejeter** la promesse, et là le bandeau reste vert et figé : « Annuler » a disparu, « Réessayer » n'apparaît jamais, le collecteur n'a plus aucune sortie. C'est le motif que la revue de branche du 2026-08-25 avait relevé sur `Encaisser.tsx` et `FicheClient.tsx` en le classant hors périmètre ; le sursis le rend bloquant.
 
 **Fichiers :**
+- Modifier : `apps/collecteur/src/ecrans/FicheClient.tsx`
 - Test : `apps/collecteur/src/ecrans/FicheClient.test.tsx` (ajouter un `describe`)
 
 **Interfaces :**
-- Consomme : `BandeauSursis` et `reessayer` de la tâche 4.
-- Produit : rien de nouveau.
+- Consomme : `ecrire()`, `poser()` et `BandeauSursis` de la tâche 4.
+- Produit : rien de nouveau à l'extérieur.
 
 - [ ] **Étape 1 : écrire les tests qui échouent**
 
 Ajouter à `apps/collecteur/src/ecrans/FicheClient.test.tsx` :
 
 ```tsx
-describe('quand l’écriture échoue', () => {
-  it('laisse la case remplie, et dit que la base ne le sait pas', async () => {
+describe('quand l’écriture ne rend rien du tout', () => {
+  it('ouvre une sortie même sur une promesse rejetée', async () => {
+    // `enregistrerMise` rend `{ ok: false }` sur les refus du serveur, mais une
+    // coupure franche fait rejeter la promesse. Sans filet, le bandeau reste
+    // vert et figé : « Annuler » a disparu, « Réessayer » n'arrive jamais, et
+    // le collecteur n'a plus aucune sortie.
     chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
-    enregistrerMise.mockResolvedValue({
-      ok: false,
-      echec: { code: 'RESEAU', message: 'Réseau indisponible. Réessaie.' },
-    });
+    enregistrerMise.mockRejectedValue(new Error('Failed to fetch'));
 
     render(
       <FicheClient
@@ -1625,42 +1775,30 @@ describe('quand l’écriture échoue', () => {
 
     await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
 
-    // Les minuteurs sont gelés **avant** l'appui : celui-ci pose le `setTimeout`
-    // du sursis, et un minuteur né sous l'horloge réelle ne répond pas à
-    // `advanceTimersByTime`.
     vi.useFakeTimers();
     fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
     act(() => {
       vi.advanceTimersByTime(6000);
     });
-    // Rendus à l'horloge réelle avant le `findBy` qui suit : il attend une
-    // promesse d'écriture, et `waitFor` s'appuie sur les mêmes minuteurs.
     vi.useRealTimers();
 
-    // La case reste remplie : elle dit ce que le collecteur croit avoir
-    // encaissé. Le message dit que la base ne le sait pas encore. L'effacer
-    // ferait le contraire des deux.
-    expect(await screen.findByText('Réseau indisponible. Réessaie.')).toBeTruthy();
-    expect(screen.getByText('21/31 j · 68 %')).toBeTruthy();
-
-    // Plus d'« Annuler » : la mise est peut-être partie. Seul « Réessayer »
-    // a encore un sens.
-    expect(screen.queryByRole('button', { name: 'Annuler' })).toBeNull();
+    // Le message ne promet rien : l'écriture a pu aboutir avant que la réponse
+    // ne se perde.
+    expect(await screen.findByText(/Vérifie la carte avant de réessayer/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
+    expect(screen.getByText('21/31 j · 68 %')).toBeTruthy();
   });
 
-  it('renvoie la même mise, sur la même carte, quand on réessaie', async () => {
+  it('le dit plutôt que de laisser un bandeau vert sur rien', async () => {
+    // Sans identifiant de collecteur, aucune insertion ne peut partir. Le
+    // bandeau vert prétendrait qu'une mise est en vol.
     chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
-    enregistrerMise.mockResolvedValue({
-      ok: false,
-      echec: { code: 'RESEAU', message: 'Réseau indisponible. Réessaie.' },
-    });
 
     render(
       <FicheClient
         clientId="cli3"
         revision={0}
-        collecteurId="col1"
+        collecteurId={null}
         onFermer={vi.fn()}
         onEcriture={vi.fn()}
         onRetrait={vi.fn()}
@@ -1669,37 +1807,80 @@ describe('quand l’écriture échoue', () => {
 
     await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
 
-    // Les minuteurs sont gelés **avant** l'appui : celui-ci pose le `setTimeout`
-    // du sursis, et un minuteur né sous l'horloge réelle ne répond pas à
-    // `advanceTimersByTime`.
     vi.useFakeTimers();
     fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
     act(() => {
       vi.advanceTimersByTime(6000);
     });
-    // Rendus à l'horloge réelle avant le `findBy` qui suit : il attend une
-    // promesse d'écriture, et `waitFor` s'appuie sur les mêmes minuteurs.
     vi.useRealTimers();
 
-    const reessayer = await screen.findByRole('button', { name: 'Réessayer' });
-    enregistrerMise.mockResolvedValue({ ok: true, miseId: 'm2' });
-    fireEvent.click(reessayer);
-
-    expect(enregistrerMise).toHaveBeenCalledTimes(2);
-    expect(enregistrerMise).toHaveBeenLastCalledWith('col1', 'kB', 6000);
+    expect(enregistrerMise).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Session perdue/)).toBeTruthy();
   });
 });
 ```
 
-- [ ] **Étape 2 : lancer les tests**
+- [ ] **Étape 2 : lancer les tests, vérifier qu'ils échouent**
 
 ```bash
 npm test -w @kolek/collecteur -- src/ecrans/FicheClient.test.tsx
 ```
 
-Attendu : PASS, les deux. Si `Réessayer` reste introuvable, la branche `attente.echec` de `BandeauSursis` n'est pas atteinte — vérifier que `ecrire` repose bien l'attente avec `echec` sur un résultat `ok: false`.
+Attendu : ÉCHEC sur les deux — aucun message n'apparaît, et le premier lève en plus un rejet non traité.
 
-- [ ] **Étape 3 : lancer toute la suite du dépôt**
+- [ ] **Étape 3 : écrire l'implémentation**
+
+Dans `apps/collecteur/src/ecrans/FicheClient.tsx`, remplacer `ecrire` par :
+
+```tsx
+  async function ecrire(en: EnAttente) {
+    const { collecteurId: id, onEcriture: prevenir } = contexte.current;
+    if (!id) {
+      // Sans identifiant de collecteur, rien ne peut partir. Le dire, plutôt
+      // que de laisser un bandeau vert sur une écriture qui n'aura pas lieu.
+      poser({
+        ...en,
+        envoyee: true,
+        echec: 'Session perdue. Reconnecte-toi avant de réessayer.',
+      });
+      return;
+    }
+    try {
+      const resultat = await enregistrerMise(id, en.carteId, en.mise);
+      if (resultat.ok) {
+        // L'attente n'est pas levée ici : la relecture s'en charge. La lever
+        // maintenant reviderait la case le temps que la fiche revienne.
+        prevenir();
+        return;
+      }
+      poser({ ...en, envoyee: true, echec: resultat.echec.message });
+    } catch {
+      // `enregistrerMise` rend `{ ok: false }` sur les refus du serveur, mais
+      // une coupure franche fait **rejeter** la promesse. Sans ce filet, le
+      // bandeau reste vert et figé : « Annuler » a disparu — la mise est
+      // peut-être partie — et « Réessayer » n'apparaît jamais. Aucune sortie.
+      //
+      // Le message ne promet rien, parce que l'écriture a pu aboutir avant que
+      // la réponse ne se perde. Même prudence, et presque les mêmes mots, que
+      // le try/catch d'`ActiverCarte`.
+      poser({
+        ...en,
+        envoyee: true,
+        echec: 'Réponse perdue. Vérifie la carte avant de réessayer.',
+      });
+    }
+  }
+```
+
+- [ ] **Étape 4 : lancer les tests, vérifier qu'ils passent**
+
+```bash
+npm test -w @kolek/collecteur -- src/ecrans/FicheClient.test.tsx
+```
+
+Attendu : PASS, les deux, et tous les tests des tâches 4 et 5 restent verts.
+
+- [ ] **Étape 5 : lancer toute la suite du dépôt**
 
 ```bash
 npm test
@@ -1707,7 +1888,7 @@ npm test
 
 Attendu : `@kolek/core`, `@kolek/ui`, `@kolek/collecteur` et `@kolek/admin` passent tous.
 
-- [ ] **Étape 4 : compiler les deux paquets touchés**
+- [ ] **Étape 6 : compiler**
 
 ```bash
 npm run build -w @kolek/collecteur
@@ -1715,18 +1896,21 @@ npm run build -w @kolek/collecteur
 
 Attendu : aucune erreur TypeScript.
 
-- [ ] **Étape 5 : committer**
+- [ ] **Étape 7 : committer**
 
 ```bash
-git add apps/collecteur/src/ecrans/FicheClient.test.tsx
+git add apps/collecteur/src/ecrans/FicheClient.tsx apps/collecteur/src/ecrans/FicheClient.test.tsx
 git commit -F - <<'EOF'
-test(encaissement): une ecriture refusee laisse la case remplie
+fix(encaissement): une reponse perdue laisse une sortie
 
-La case dit ce que le collecteur croit avoir encaisse ; le message dit que
-la base ne le sait pas encore. L'effacer ferait le contraire des deux.
+`enregistrerMise` rend `{ ok: false }` sur les refus du serveur, mais une
+coupure franche fait rejeter la promesse. Le bandeau restait alors vert et
+fige : « Annuler » disparu, « Reessayer » jamais affiche, aucune sortie.
 
-« Annuler » disparait alors — la mise est peut-etre partie — et seul
-« Reessayer » garde un sens.
+Le message ne promet rien — l'ecriture a pu aboutir avant que la reponse
+ne se perde. Meme prudence que le try/catch d'ActiverCarte, releve hors
+perimetre par la revue de branche du 2026-08-25 ; le sursis le rend
+bloquant.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 EOF
