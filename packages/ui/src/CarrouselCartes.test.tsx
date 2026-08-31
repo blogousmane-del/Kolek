@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CarrouselCartes, type CarteItem } from './CarrouselCartes';
@@ -27,7 +27,7 @@ describe('CarrouselCartes', () => {
   it('donne un point par carte, et dit lequel est en face', () => {
     render(<CarrouselCartes cartes={TROIS} visibleId="b" onVisible={vi.fn()} />);
 
-    const points = screen.getAllByRole('button');
+    const points = screen.getAllByRole('button', { name: /^Carte / });
     expect(points).toHaveLength(3);
     expect(points[1].getAttribute('aria-label')).toBe('Carte 2 sur 3');
     expect(points[1].getAttribute('aria-current')).toBe('true');
@@ -169,5 +169,117 @@ describe('CarrouselCartes — déplacer les cartes', () => {
 
     // Bintou apparaît deux fois — celle rangée en tête, et la neuve en queue.
     expect(nomsAffiches()).toEqual(['Bintou', 'Aïcha', 'Chérif', 'Bintou']);
+  });
+});
+
+/**
+ * Les trois tailles, ajoutées le 2026-08-31.
+ *
+ * Le nombre de cartes réellement visibles ensemble dépend d'une largeur d'écran
+ * que jsdom ne calcule pas. Ce qui se teste ici est ce qui la décide : la
+ * largeur posée sur chaque carte, et la taille annoncée par la commande.
+ */
+describe('CarrouselCartes — la taille des cartes', () => {
+  function classesDe(rang: number): string {
+    return screen.getAllByRole('listitem')[rang].className;
+  }
+
+  it('ne propose aucune taille pour une carte seule', () => {
+    // Réduire une carte unique ne montrerait rien de plus, et laisserait un
+    // vide à côté de rien.
+    render(<CarrouselCartes cartes={[carte('a', 'Aïcha')]} visibleId="a" onVisible={vi.fn()} />);
+
+    expect(screen.queryByRole('button', { name: 'Réduire' })).toBeNull();
+    expect(classesDe(0)).toMatch(/w-full/);
+  });
+
+  it('ouvre en petit, pour que deux cartes tiennent ensemble', () => {
+    render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={vi.fn()} />);
+
+    const petit = screen.getByRole('button', { name: 'Réduire' });
+    expect(petit.getAttribute('aria-pressed')).toBe('true');
+    expect(classesDe(0)).toMatch(/w-40/);
+  });
+
+  it('agrandit jusqu’à une carte par écran', () => {
+    render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agrandir' }));
+
+    expect(classesDe(0)).toMatch(/w-full/);
+    expect(screen.getByRole('button', { name: 'Agrandir' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Réduire' }).getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+  });
+});
+
+/**
+ * Quelle carte le bouton d'encaissement va servir.
+ *
+ * C'est la question la plus chère de cet écran : se tromper de carte, c'est
+ * encaisser sur le mauvais cycle. Chacun de ces tests garde une des trois
+ * manières de la désigner, ou une des deux manières de ne pas la désigner.
+ */
+describe('CarrouselCartes — choisir la carte que le bouton servira', () => {
+  it('choisit la carte qu’on touche', () => {
+    const onVisible = vi.fn();
+    render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={onVisible} />);
+
+    fireEvent.click(screen.getAllByRole('listitem')[2]);
+    expect(onVisible).toHaveBeenCalledWith('c');
+  });
+
+  it('marque la carte choisie, pour qu’aucun doute ne porte sur le montant', () => {
+    render(<CarrouselCartes cartes={TROIS} visibleId="b" onVisible={vi.fn()} />);
+
+    const cartes = screen.getAllByRole('listitem');
+    expect(cartes[1].getAttribute('aria-current')).toBe('true');
+    expect(cartes[1].className).toMatch(/ring-primary/);
+    expect(cartes[0].className).not.toMatch(/ring-primary/);
+  });
+
+  it('ne choisit pas la carte qu’on vient de ranger', () => {
+    // Un appui long produit aussi un clic au relâchement. Sans témoin, chaque
+    // rangement changerait le montant du bouton en même temps que l'ordre.
+    vi.useFakeTimers();
+    try {
+      const onVisible = vi.fn();
+      render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={onVisible} />);
+
+      const troisieme = screen.getAllByRole('listitem')[2];
+      fireEvent.pointerDown(troisieme, { clientX: 100, pointerId: 1 });
+      act(() => {
+        vi.advanceTimersByTime(400);
+      });
+      fireEvent.pointerUp(troisieme);
+      fireEvent.click(troisieme);
+
+      expect(onVisible).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ne laisse plus le défilement désigner quand les cartes tiennent ensemble', () => {
+    const onVisible = vi.fn();
+    render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={onVisible} />);
+
+    // jsdom ne calcule aucune géométrie : la piste est posée à la main, sinon
+    // la garde de division par zéro rendrait ce test vert pour la mauvaise
+    // raison.
+    const piste = screen.getByRole('group');
+    Object.defineProperty(piste, 'clientWidth', { value: 300, configurable: true });
+    Object.defineProperty(piste, 'scrollLeft', { value: 600, configurable: true });
+
+    fireEvent.scroll(piste);
+    expect(onVisible).not.toHaveBeenCalled();
+
+    // Une carte par écran : la position du défilement redevient la désignation.
+    fireEvent.click(screen.getByRole('button', { name: 'Agrandir' }));
+    fireEvent.scroll(piste);
+    expect(onVisible).toHaveBeenCalledWith('c');
   });
 });
