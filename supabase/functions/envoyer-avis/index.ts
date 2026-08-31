@@ -1,6 +1,12 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-import { envoyer, passerelleDepuis, verifierIdentifiants } from '../_shared/passerelle-sms.ts';
+import {
+  envoyer,
+  passerelleDepuis,
+  sondeDemandee,
+  verdictPublic,
+  verifierIdentifiants,
+} from '../_shared/passerelle-sms.ts';
 
 /**
  * Le drainage de la file des avis.
@@ -66,6 +72,16 @@ Deno.serve(async (requete) => {
     // Ni erreur ni succès : un état, nommé. La file est intacte.
     console.log('Aucune passerelle configurée — la file reste en attente.');
     return reponse({ etat: 'PASSERELLE_NON_CONFIGUREE', envoyes: 0, echecs: 0 });
+  }
+
+  // La sonde passe avant la file : elle ne lit rien, n'envoie rien, et répond
+  // à la seule question qui bloquait — « ces identifiants sont-ils acceptés ? »
+  // Chercher la réponse dans un vrai envoi obligeait à déranger un client pour
+  // un diagnostic qui ne le concerne pas.
+  if (await sondeDemandee(requete)) {
+    const verdict = await verifierIdentifiants(passerelle);
+    console.log('Sonde des identifiants :', verdict);
+    return reponse({ etat: 'SONDE', verdict: verdictPublic(verdict) });
   }
 
   const client = createClient(url, cleService, {

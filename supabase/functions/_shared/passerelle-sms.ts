@@ -364,3 +364,50 @@ export async function envoyer(
 
   return lireIssueAfricastalking(reponse.status, texte);
 }
+
+/**
+ * La requête demande-t-elle une sonde plutôt qu'un drainage ?
+ *
+ * Chercher pourquoi un SMS ne part pas supposait jusqu'ici d'en envoyer un :
+ * remettre en file l'avis d'un vrai client, appeler le drainage, et lire la
+ * raison du refus. Un avis daté de la veille arrive alors chez quelqu'un qui
+ * n'a rien fait aujourd'hui, pour un diagnostic qui ne le concerne pas.
+ *
+ * Un corps `{"sonde": true}` demande la seule question qui vaille — « ces
+ * identifiants sont-ils acceptés ? » — sans destinataire, sans message, et sans
+ * toucher à la file.
+ *
+ * Un corps vide ou illisible n'est pas une erreur : c'est l'appel de la tâche
+ * planifiée, qui n'en envoie aucun.
+ */
+export async function sondeDemandee(requete: Request): Promise<boolean> {
+  try {
+    const corps: unknown = await requete.json();
+    if (typeof corps !== 'object' || corps === null) return false;
+    return (corps as Record<string, unknown>).sonde === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Le verdict réduit à ce qui peut sortir par HTTP.
+ *
+ * Ce qui sort : le verdict, le code, et les longueurs. Ce qui reste aux
+ * journaux : le message brut de la passerelle.
+ *
+ * Le partage a d'abord été fait à l'envers, les longueurs retenues comme le
+ * secret à protéger. Elles ne protègent rien : toutes les clés d'un même
+ * fournisseur ont la même taille, et la connaître n'avance personne. C'est en
+ * revanche le seul chiffre qui distingue une clé fausse d'une clé tronquée par
+ * un copier-coller — sans lui, on régénère une clé parfaitement valide, ce qui
+ * a déjà été fait deux fois.
+ *
+ * Le message de la passerelle, lui, est du texte venu du dehors, de longueur et
+ * de contenu non maîtrisés. Il n'a rien à faire dans une réponse HTTP.
+ */
+export function verdictPublic(verdict: string): string {
+  const tete = verdict.split(' — ')[0] ?? verdict;
+  const formes = verdict.match(/\[[^\]]*\]$/);
+  return formes ? `${tete} ${formes[0]}` : tete;
+}

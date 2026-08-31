@@ -6,6 +6,8 @@ import {
   lireIssue,
   normaliserNumero,
   passerelleDepuis,
+  sondeDemandee,
+  verdictPublic,
   verifierIdentifiants,
   type Identifiants,
 } from '../functions/_shared/passerelle-sms.ts';
@@ -468,5 +470,60 @@ describe('les valeurs rognées', () => {
         SMS_SECRET: 'cle-api',
       }),
     ).toBeNull();
+  });
+});
+
+/**
+ * La sonde appelée à la demande, ajoutée le 2026-08-31.
+ *
+ * Elle existe parce que la seule façon de savoir pourquoi un SMS ne partait pas
+ * était d'en envoyer un : remettre en file l'avis d'un vrai client, et lire le
+ * refus. Un avis de la veille arrivait alors chez quelqu'un qui n'avait rien
+ * fait ce jour-là.
+ */
+describe('sondeDemandee', () => {
+  function requete(corps?: string): Request {
+    return new Request('https://exemple.test/envoyer-avis', { method: 'POST', body: corps });
+  }
+
+  it('reconnaît la demande de sonde', async () => {
+    expect(await sondeDemandee(requete(JSON.stringify({ sonde: true })))).toBe(true);
+  });
+
+  it('laisse passer le drainage quand le corps est vide', async () => {
+    // L'appel de la tâche planifiée. Un corps absent n'est pas une erreur, et
+    // le prendre pour une sonde arrêterait tous les envois.
+    expect(await sondeDemandee(requete())).toBe(false);
+  });
+
+  it('laisse passer le drainage quand le corps est illisible', async () => {
+    expect(await sondeDemandee(requete('ceci n’est pas du JSON'))).toBe(false);
+  });
+
+  it('n’accepte que le vrai booléen', async () => {
+    // « true » en chaîne vient d'un client qui sérialise mal, pas d'une
+    // intention. Une sonde déclenchée par erreur ne draine pas la file.
+    expect(await sondeDemandee(requete(JSON.stringify({ sonde: 'true' })))).toBe(false);
+    expect(await sondeDemandee(requete(JSON.stringify({ sonde: 1 })))).toBe(false);
+    expect(await sondeDemandee(requete(JSON.stringify(null)))).toBe(false);
+  });
+});
+
+describe('verdictPublic', () => {
+  it('garde le verdict, le code et les longueurs, laisse le message aux journaux', () => {
+    // La longueur est ce qui distingue une clé fausse d'une clé tronquée. Ce
+    // qui ne sort pas, c'est le message de la passerelle : du texte venu du
+    // dehors, de contenu non maîtrisé.
+    expect(
+      verdictPublic('COMPTE_REFUSE 401 — {"errorMessage":"…"} [compte 32 car., clé 77 car.]'),
+    ).toBe('COMPTE_REFUSE 401 [compte 32 car., clé 77 car.]');
+    expect(verdictPublic('COMPTE_RECONNU — la passerelle accepte ces identifiants (…)')).toBe(
+      'COMPTE_RECONNU',
+    );
+  });
+
+  it('rend tel quel ce qui ne porte aucun détail', () => {
+    expect(verdictPublic('SONDE_NON_APPLICABLE')).toBe('SONDE_NON_APPLICABLE');
+    expect(verdictPublic('SONDE_IMPOSSIBLE TypeError')).toBe('SONDE_IMPOSSIBLE TypeError');
   });
 });
