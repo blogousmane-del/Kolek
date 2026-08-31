@@ -46,7 +46,10 @@ describe('genererCssTheme', () => {
     const css = genererCssTheme();
     expect(css).toContain('@theme {');
     expect(css).toContain('--color-primary: #14402C;');
-    expect(css).toContain('--radius-lg: 16px;');
+    // Le rayon est lu depuis `rayons` et non écrit en dur. Ce test dit « la
+    // valeur traverse » ; il n'a pas à dire laquelle. Écrit en dur, il faisait
+    // échouer le passage au carré du 2026-08-31 sans rien signaler de faux.
+    expect(css).toContain(`--radius-lg: ${rayons.lg};`);
     expect(css).toContain('--shadow-sm:');
   });
 

@@ -74,12 +74,48 @@ export const couleurs = {
   orDoux: '#E5D5A3',
 } as const;
 
-/** Design System §3.4. `xl` est donné pour 20–24 px ; on prend le haut. */
+/**
+ * Design System §3.4, **révisé le 2026-08-31 : le produit passe au carré.**
+ *
+ * ## Ce qui change, et pourquoi c'est ici et pas dans un écran
+ *
+ * La v1 posait « coins largement arrondis, effet carte posée » (§1) et « coins
+ * très arrondis → douceur » (§2.3). GTCS a tranché dans l'autre sens : angles
+ * vifs, parti pris net, plus proche de ce qui se fait aujourd'hui.
+ *
+ * Le changement vit dans ce fichier et nulle part ailleurs. Les noms de classes
+ * ne bougent pas — `rounded-lg` existe toujours, il vaut simplement autre
+ * chose. Aucun composant, aucun écran n'a été touché pour ça, et c'est la
+ * preuve que le jeu de tokens tenait sa promesse.
+ *
+ * ## Pourquoi partout, et pas seulement dans le collecteur
+ *
+ * La demande venait de l'application collecteur. Le §7 des interdits répond
+ * lui-même : **« ne jamais mélanger plusieurs jeux de rayons »**. Un carré
+ * réservé à une surface aurait donné deux langages visuels dans un même
+ * produit, avec le même bouton de deux formes selon l'écran où on le rencontre.
+ *
+ * ## Pourquoi 2 px et non 0
+ *
+ * Un `border-radius` nul laisse l'anticrénelage des bordures produire des
+ * angles sales sur les écrans à faible densité — et le collecteur travaille sur
+ * un téléphone d'entrée de gamme, en plein soleil d'Abidjan. Deux pixels ne se
+ * voient pas et nettoient l'arête. `lg` et `xl` gardent 4 px : ce sont de
+ * grandes surfaces, où l'arête vive devient une pointe.
+ *
+ * ## `pill` ne change pas
+ *
+ * Il porte deux choses que rien ne distingue ici : les avatars et pastilles,
+ * qui doivent rester ronds, et les badges de statut, qui sont des rectangles.
+ * Les carrer ensemble transformerait les avatars en carrés, ce que personne n'a
+ * demandé. Les séparer demande un token de plus — à faire quand on aura vu le
+ * rendu, pas avant.
+ */
 export const rayons = {
-  sm: '8px',
-  md: '12px',
-  lg: '16px',
-  xl: '24px',
+  sm: '2px',
+  md: '2px',
+  lg: '4px',
+  xl: '4px',
   pill: '9999px',
 } as const;
 
