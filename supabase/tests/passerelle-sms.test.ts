@@ -5,6 +5,8 @@ import {
   envoyer,
   lireIssue,
   normaliserNumero,
+  formeCle,
+  formeCompte,
   passerelleDepuis,
   sondeDemandee,
   verdictPublic,
@@ -438,6 +440,39 @@ describe('la sonde des identifiants', () => {
     expect(await verifierIdentifiants(TWILIO, faux)).toBe('SONDE_NON_APPLICABLE');
     expect(appele, 'aucun appel ne doit partir vers Africa’s Talking').toBe(false);
   });
+
+  it('distingue le bac à sable d’une clé fausse', async () => {
+    // Africa's Talking ouvre tout compte neuf sur une application de bac à
+    // sable, dont la clé rend le même 401 qu'une clé fausse en production.
+    // Deux corrections de bonne foi — régénérer la clé, corriger le nom — n'y
+    // changent rien, et rien dans la réponse ne dit laquelle est en cause.
+    const vus: string[] = [];
+    const faux = (async (url: string) => {
+      vus.push(url);
+      return url.includes('sandbox')
+        ? new Response('{"UserData":{"balance":"KES 1.00"}}', { status: 200 })
+        : new Response('The supplied authentication is invalid', { status: 401 });
+    }) as unknown as typeof fetch;
+
+    const verdict = await verifierIdentifiants(AT, faux);
+
+    expect(verdict).toContain('COMPTE_BAC_A_SABLE');
+    expect(verdict, 'les longueurs restent, c’est ce qui distingue une clé tronquée').toContain(
+      'compte 4 car.',
+    );
+    expect(vus).toHaveLength(2);
+  });
+
+  it('ne dérange pas le bac à sable quand la production accepte', async () => {
+    const vus: string[] = [];
+    const faux = (async (url: string) => {
+      vus.push(url);
+      return new Response('{"UserData":{}}', { status: 200 });
+    }) as unknown as typeof fetch;
+
+    await verifierIdentifiants(AT, faux);
+    expect(vus).toHaveLength(1);
+  });
 });
 
 /**
@@ -525,5 +560,52 @@ describe('verdictPublic', () => {
   it('rend tel quel ce qui ne porte aucun détail', () => {
     expect(verdictPublic('SONDE_NON_APPLICABLE')).toBe('SONDE_NON_APPLICABLE');
     expect(verdictPublic('SONDE_IMPOSSIBLE TypeError')).toBe('SONDE_IMPOSSIBLE TypeError');
+  });
+});
+
+/**
+ * La forme, jamais la valeur.
+ *
+ * Trois corrections de bonne foi ont laissé le même 401 : clé régénérée, nom
+ * corrigé, nom corrigé encore. La longueur seule ne tranche pas — elle ne
+ * distingue pas une clé fausse d'une clé juste, précédée de son étiquette.
+ */
+describe('formeCle', () => {
+  it('reconnaît une clé bien formée sans rien en dire', () => {
+    const propre = 'a'.repeat(64);
+    expect(formeCle(propre)).toBe('64 car.');
+  });
+
+  it('signale le préfixe et ce qui n’est pas hexadécimal', () => {
+    expect(formeCle('atsk_' + 'f'.repeat(64))).toContain('préfixe atsk_');
+    expect(formeCle('atsk_' + 'f'.repeat(64))).toBe('69 car., préfixe atsk_');
+  });
+
+  it('nomme l’étiquette emportée par le copier-coller', () => {
+    // « API Key: <clé> » est l'accident qu'une longueur seule ne montre pas.
+    const forme = formeCle('API Key: ' + '0'.repeat(64));
+    expect(forme).toContain('73 car.');
+    expect(forme).toContain('un espace');
+    expect(forme).toContain('un deux-points');
+  });
+
+  it('ne laisse échapper aucun caractère de la valeur', () => {
+    // La sonde sort par HTTP. Ce qu'elle rend doit être un décompte, pas un
+    // fragment de clé.
+    const secret = 'z9-SECRET-z9';
+    expect(formeCle(secret)).not.toContain('SECRET');
+    expect(formeCle(secret)).not.toContain('z9');
+  });
+});
+
+describe('formeCompte', () => {
+  it('rend la longueur d’un nom simple', () => {
+    expect(formeCompte('kolek')).toBe('5 car.');
+  });
+
+  it('dit qu’on a rangé là une adresse de courriel', () => {
+    // Arrivé deux fois : 32 puis 51 caractères, là où un nom d'application en
+    // fait cinq.
+    expect(formeCompte('gtcs@exemple.ci')).toContain('une arobase');
   });
 });

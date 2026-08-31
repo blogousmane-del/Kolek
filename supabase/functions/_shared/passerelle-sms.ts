@@ -293,34 +293,131 @@ export function lireIssueAfricastalking(statut: number, texte: string): Issue {
  * La réponse porte le solde du compte, jamais la clé. L'extrait est donc
  * enregistrable dans `derniere_erreur`, que l'écran Avis affiche.
  */
+/**
+ * Les caractères qui n'ont rien à faire dans un identifiant, et ce qu'ils
+ * trahissent : un copier-coller qui a emporté l'étiquette (« API Key: … »), une
+ * adresse de courriel prise pour un nom d'application, un guillemet ramassé
+ * dans un fichier de configuration.
+ */
+const MARQUES: ReadonlyArray<{ signe: string; nom: string }> = [
+  { signe: ' ', nom: 'un espace' },
+  { signe: ':', nom: 'un deux-points' },
+  { signe: '@', nom: 'une arobase' },
+  { signe: '"', nom: 'un guillemet' },
+  { signe: "'", nom: 'une apostrophe' },
+  { signe: '/', nom: 'une barre oblique' },
+];
+
+function marquesDe(valeur: string): string[] {
+  return MARQUES.filter(({ signe }) => valeur.includes(signe)).map(({ nom }) => nom);
+}
+
+/**
+ * La forme d'un identifiant, jamais sa valeur.
+ *
+ * Trois corrections de bonne foi ont laissé le même 401, et la longueur seule
+ * ne dit pas ce qui cloche : elle ne distingue pas une clé fausse d'une clé
+ * juste précédée de son étiquette. La composition, elle, le dit — une clé
+ * Africa's Talking est faite de chiffres hexadécimaux, éventuellement précédés
+ * de `atsk_`, et rien d'autre.
+ *
+ * Ce qui sort ici est un décompte. Aucun caractère de la valeur n'y figure.
+ */
+export function formeCle(valeur: string): string {
+  // Le préfixe est retiré avant le décompte : ses propres lettres fausseraient
+  // le compte hexadécimal et feraient signaler une clé parfaitement formée.
+  const corps = valeur.startsWith('atsk_') ? valeur.slice(5) : valeur;
+  const hex = (corps.match(/[0-9a-f]/gi) ?? []).length;
+  const morceaux = [`${valeur.length} car.`];
+
+  if (valeur.startsWith('atsk_')) morceaux.push('préfixe atsk_');
+  if (hex !== corps.length) morceaux.push(`${hex} hex sur ${corps.length}`);
+
+  const marques = marquesDe(valeur);
+  if (marques.length > 0) morceaux.push(`contient ${marques.join(' et ')}`);
+
+  return morceaux.join(', ');
+}
+
+/**
+ * La forme d'un nom d'application.
+ *
+ * Un nom d'application Africa's Talking est un mot : quelques lettres, parfois
+ * un chiffre ou un tiret. Une arobase ou un espace dit qu'on a rangé là une
+ * adresse de courriel ou une phrase, ce qui est arrivé deux fois.
+ */
+export function formeCompte(valeur: string): string {
+  const marques = marquesDe(valeur);
+  const morceaux = [`${valeur.length} car.`];
+  if (marques.length > 0) morceaux.push(`contient ${marques.join(' et ')}`);
+  return morceaux.join(', ');
+}
+
+const AT_HOTES = {
+  production: 'https://api.africastalking.com',
+  bacASable: 'https://api.sandbox.africastalking.com',
+} as const;
+
+/** Un appel de sonde vers un hôte donné. Rend le verdict brut, sans le juger. */
+async function sonderChez(
+  hote: string,
+  identifiants: Identifiants,
+  recuperer: typeof fetch,
+): Promise<{ ok: boolean; statut: number; extrait: string }> {
+  const url = `${hote}/version1/user?username=${encodeURIComponent(identifiants.compte)}`;
+  const reponse = await recuperer(url, {
+    headers: { apiKey: identifiants.secret, Accept: 'application/json' },
+  });
+  const extrait = (await reponse.text()).replace(/\s+/g, ' ').trim().slice(0, 100);
+  return { ok: reponse.ok, statut: reponse.status, extrait };
+}
+
 export async function verifierIdentifiants(
   identifiants: Identifiants,
   recuperer: typeof fetch = fetch,
 ): Promise<string> {
   if (identifiants.fournisseur !== 'africastalking') return 'SONDE_NON_APPLICABLE';
 
-  const url =
-    'https://api.africastalking.com/version1/user?username=' +
-    encodeURIComponent(identifiants.compte);
+  // Les longueurs, et pas les valeurs. Une clé Africa's Talking a une taille
+  // stable ; un caractère de trop trahit un copier-coller qui a mordu, et
+  // c'est invisible dans un champ de tableau de bord. Sans ce chiffre on
+  // régénère une clé parfaitement valide — ce qui a déjà été fait deux fois.
+  const formes = `compte ${formeCompte(identifiants.compte)}, clé ${formeCle(identifiants.secret)}`;
 
+  let production: { ok: boolean; statut: number; extrait: string };
   try {
-    const reponse = await recuperer(url, {
-      headers: { apiKey: identifiants.secret, Accept: 'application/json' },
-    });
-    const extrait = (await reponse.text()).replace(/\s+/g, ' ').trim().slice(0, 100);
-
-    // Les longueurs, et pas les valeurs. Une clé Africa's Talking a une taille
-    // stable ; un caractère de trop trahit un copier-coller qui a mordu, et
-    // c'est invisible dans un champ de tableau de bord. Sans ce chiffre on
-    // régénère une clé parfaitement valide — ce qui a déjà été fait deux fois.
-    const formes = `compte ${identifiants.compte.length} car., clé ${identifiants.secret.length} car.`;
-
-    return reponse.ok
-      ? `COMPTE_RECONNU — la passerelle accepte ces identifiants (${extrait})`
-      : `COMPTE_REFUSE ${reponse.status} — ${extrait} [${formes}]`;
+    production = await sonderChez(AT_HOTES.production, identifiants, recuperer);
   } catch (cause) {
     return `SONDE_IMPOSSIBLE ${cause instanceof Error ? cause.name : ''}`.trim();
   }
+
+  if (production.ok) {
+    return `COMPTE_RECONNU — la passerelle accepte ces identifiants (${production.extrait})`;
+  }
+
+  // Le bac à sable, demandé seulement après un refus.
+  //
+  // Africa's Talking ouvre tout compte neuf sur une application de bac à sable,
+  // et sa clé ne vaut que là : présentée à la production, elle rend le même 401
+  // qu'une clé fausse. Deux corrections de bonne foi — régénérer la clé, puis
+  // corriger le nom d'utilisateur — n'y changent rien, et rien dans la réponse
+  // ne distingue les deux causes.
+  //
+  // Cet appel les sépare. Il ne répare rien : un message envoyé au bac à sable
+  // ne sort pas de leur simulateur et n'atteint aucun téléphone. Il dit
+  // seulement que ce qu'il faut corriger est le compte, pas le champ.
+  let bac: { ok: boolean; statut: number; extrait: string } | null = null;
+  try {
+    bac = await sonderChez(AT_HOTES.bacASable, identifiants, recuperer);
+  } catch {
+    // Une sonde secondaire muette ne doit rien retirer à la première.
+  }
+
+  if (bac?.ok) {
+    return `COMPTE_BAC_A_SABLE — ces identifiants sont ceux du bac à sable, refusés en production [${formes}]`;
+  }
+
+  return `COMPTE_REFUSE ${production.statut} — ${production.extrait} [${formes}]`;
 }
 
 /** Envoie un message. `recuperer` est injectable pour les tests. */
