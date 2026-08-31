@@ -4,7 +4,6 @@ import {
   envoyer,
   passerelleDepuis,
   sondeDemandee,
-  verdictPublic,
   verifierIdentifiants,
 } from '../_shared/passerelle-sms.ts';
 
@@ -81,7 +80,7 @@ Deno.serve(async (requete) => {
   if (await sondeDemandee(requete)) {
     const verdict = await verifierIdentifiants(passerelle);
     console.log('Sonde des identifiants :', verdict);
-    return reponse({ etat: 'SONDE', verdict: verdictPublic(verdict) });
+    return reponse({ etat: 'SONDE', verdict });
   }
 
   const client = createClient(url, cleService, {

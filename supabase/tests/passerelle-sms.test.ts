@@ -9,7 +9,6 @@ import {
   formeCompte,
   passerelleDepuis,
   sondeDemandee,
-  verdictPublic,
   verifierIdentifiants,
   type Identifiants,
 } from '../functions/_shared/passerelle-sms.ts';
@@ -544,25 +543,31 @@ describe('sondeDemandee', () => {
   });
 });
 
-describe('verdictPublic', () => {
-  it('garde le verdict, le code et les longueurs, laisse le message aux journaux', () => {
-    // La longueur est ce qui distingue une clé fausse d'une clé tronquée. Ce
-    // qui ne sort pas, c'est le message de la passerelle : du texte venu du
-    // dehors, de contenu non maîtrisé.
-    expect(
-      verdictPublic('COMPTE_REFUSE 401 — {"errorMessage":"…"} [compte 32 car., clé 77 car.]'),
-    ).toBe('COMPTE_REFUSE 401 [compte 32 car., clé 77 car.]');
-    expect(verdictPublic('COMPTE_RECONNU — la passerelle accepte ces identifiants (…)')).toBe(
-      'COMPTE_RECONNU',
-    );
-  });
+/**
+ * Le verdict qui sort par HTTP.
+ *
+ * Il a d'abord été taillé par une fonction à part, qui retenait le message de
+ * la passerelle et ne laissait passer que le verdict et les longueurs. La règle
+ * était à l'envers : ce message est précisément ce qu'il faut lire, et il ne
+ * porte rien de secret. Ce qui ne doit pas sortir est l'inverse — la réponse
+ * d'un compte **reconnu**, qui porte son solde.
+ *
+ * La règle est donc revenue là où la donnée naît : `verifierIdentifiants` ne
+ * met jamais l'état du compte dans son verdict, et le refus rend son motif.
+ */
+describe('ce que le verdict laisse voir', () => {
+  it('ne dit rien du compte quand il est reconnu', async () => {
+    const faux = (async () =>
+      new Response('{"UserData":{"balance":"KES 812.50"}}', {
+        status: 200,
+      })) as unknown as typeof fetch;
 
-  it('rend tel quel ce qui ne porte aucun détail', () => {
-    expect(verdictPublic('SONDE_NON_APPLICABLE')).toBe('SONDE_NON_APPLICABLE');
-    expect(verdictPublic('SONDE_IMPOSSIBLE TypeError')).toBe('SONDE_IMPOSSIBLE TypeError');
+    const verdict = await verifierIdentifiants(AT, faux);
+
+    expect(verdict).toBe('COMPTE_RECONNU');
+    expect(verdict, 'le solde n’a rien à faire dans une réponse HTTP').not.toContain('812');
   });
 });
-
 /**
  * La forme, jamais la valeur.
  *

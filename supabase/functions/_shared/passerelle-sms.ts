@@ -392,7 +392,10 @@ export async function verifierIdentifiants(
   }
 
   if (production.ok) {
-    return `COMPTE_RECONNU — la passerelle accepte ces identifiants (${production.extrait})`;
+    // Sans la réponse d'Africa's Talking : elle porte le solde du compte, et ce
+    // verdict sort par HTTP. Un refus, lui, rend son motif — c'est tout ce
+    // qu'on lui demande, et il ne dit rien de l'état du compte.
+    return 'COMPTE_RECONNU';
   }
 
   // Le bac à sable, demandé seulement après un refus.
@@ -487,24 +490,3 @@ export async function sondeDemandee(requete: Request): Promise<boolean> {
   }
 }
 
-/**
- * Le verdict réduit à ce qui peut sortir par HTTP.
- *
- * Ce qui sort : le verdict, le code, et les longueurs. Ce qui reste aux
- * journaux : le message brut de la passerelle.
- *
- * Le partage a d'abord été fait à l'envers, les longueurs retenues comme le
- * secret à protéger. Elles ne protègent rien : toutes les clés d'un même
- * fournisseur ont la même taille, et la connaître n'avance personne. C'est en
- * revanche le seul chiffre qui distingue une clé fausse d'une clé tronquée par
- * un copier-coller — sans lui, on régénère une clé parfaitement valide, ce qui
- * a déjà été fait deux fois.
- *
- * Le message de la passerelle, lui, est du texte venu du dehors, de longueur et
- * de contenu non maîtrisés. Il n'a rien à faire dans une réponse HTTP.
- */
-export function verdictPublic(verdict: string): string {
-  const tete = verdict.split(' — ')[0] ?? verdict;
-  const formes = verdict.match(/\[[^\]]*\]$/);
-  return formes ? `${tete} ${formes[0]}` : tete;
-}
