@@ -65,7 +65,7 @@ Quatre pièces, une seule neuve.
 | Fichier | Rôle | Nature |
 |---|---|---|
 | `packages/ui/src/CarteCollecte.tsx` | fente `action?: ReactNode` dans le pied | modifié |
-| `packages/ui/src/CarrouselCartes.tsx` | `rendreAction?: (carte) => ReactNode`, appelée pour la seule carte choisie | modifié |
+| `packages/ui/src/CarrouselCartes.tsx` | `rendreAction?: (carte, choisie) => ReactNode`, appelée pour chaque carte | modifié |
 | `apps/collecteur/src/encaissement-differe.ts` | machine à états pure | **neuf** |
 | `apps/collecteur/src/ecrans/FicheClient.tsx` | tient le minuteur, fournit le bouton, écrit la mise | modifié |
 
@@ -96,13 +96,22 @@ et hauteur se resserrent, au même titre que le reste de la carte.
 // packages/ui/src/CarrouselCartes.tsx
 interface Props {
   // … existant
-  /** Appelée pour la seule carte choisie. */
-  rendreAction?: (carte: CarteItem) => ReactNode;
+  /** Appelée pour chaque carte. `choisie` dit laquelle est en cours de choix. */
+  rendreAction?: (carte: CarteItem, choisie: boolean) => ReactNode;
 }
 ```
 
-Le carrousel ne décide de rien : il sait quelle carte est choisie, il demande à
-l'écran ce qu'elle doit porter.
+Le carrousel ne décide de rien : il dit ce qu'il sait — quelle carte est choisie
+— et l'écran répond ce que chacune doit porter, ou `null`.
+
+Appelée pour **chaque** carte, et non pour la seule carte choisie. C'est ce qui
+permet au bandeau de sursis de rester sur sa carte pendant qu'on en regarde une
+autre : sans cela, faire défiler pendant le décompte effacerait de l'écran la
+mise qui est en train de partir — exactement ce que ce bandeau existe pour
+montrer.
+
+Le bouton d'encaissement, lui, ne sort que sur la carte choisie. C'est la
+politique de l'écran, pas une règle du carrousel.
 
 ### L'isolation des gestes
 
@@ -121,21 +130,36 @@ aucun réseau. Le minuteur et l'appel vivent dans `FicheClient` ; ce qui se déc
 se teste sans horloge.
 
 ```ts
+/** Le sursis, en secondes — c'est aussi ce que « Annuler » décompte. */
+export const SURSIS_S = 6;
+export const SURSIS_MS = SURSIS_S * 1000;
+
 export interface EnAttente {
   carteId: string;
   mise: number;
   /** `misesEncaissees` au moment du tap. Sert à savoir quand purger. */
   base: number;
+  /** L'insertion est partie ; on attend seulement que la relecture la ramène. */
+  envoyee: boolean;
   /** Renseigné quand l'écriture a échoué. */
   echec?: string;
 }
 
 /** Ce que la carte doit montrer, une fois l'optimisme pris en compte. */
-export function misesAffichees(reelles: number, attente: EnAttente | null): number;
+export function misesAffichees(
+  carteId: string,
+  reelles: number,
+  attente: EnAttente | null,
+): number;
 
 /** L'attente a-t-elle été rattrapée par la relecture ? */
 export function estRattrapee(reelles: number, attente: EnAttente): boolean;
 ```
+
+`envoyee` porte une garantie et non un confort : la relecture qui suit une
+écriture réussie démonte la section — la fiche repasse par « Lecture… » — et
+c'est ce démontage qui déclenche la purge. Sans ce témoin, la purge renverrait
+une mise déjà écrite, et rien en base ne la retirerait.
 
 ## Le geste, pas à pas
 
@@ -162,11 +186,16 @@ L'attente est purgée quand la relecture ramène `misesEncaissees > base`.
 Purger dès la résolution de l'écriture ferait clignoter la case : elle se
 reviderait le temps que la relecture arrive. Le compteur ne redescend jamais.
 
-### Le second tap pendant un décompte
+### Un second encaissement pendant un décompte
 
-Il purge l'attente en cours — écriture immédiate — et en ouvre une neuve. Deux
-mises le même jour sur la même carte sont acceptées par le serveur ; ce n'est pas
-à cet écran de les interdire, seulement de ne pas les perdre.
+Sur la carte qui décompte, la question ne se pose pas : son bouton a cédé la
+place au bandeau. Elle se pose sur une **autre** carte, et c'est un geste
+courant — deux carnets, deux mises, à la suite.
+
+Il n'y a qu'une attente à la fois. La seconde purge la première : écriture
+immédiate, puis un nouveau sursis. Deux mises le même jour sont acceptées par le
+serveur ; ce n'est pas à cet écran de les interdire, seulement de ne pas les
+perdre en chemin.
 
 ## Les erreurs
 
@@ -199,8 +228,10 @@ celui de la carte.
 
 **`packages/ui`**
 
-- `CarteCollecte` rend la fente quand `action` est fournie, rien sinon.
-- `CarrouselCartes` n'appelle `rendreAction` que pour la carte choisie.
+- `CarteCollecte` rend la fente quand `action` est fournie, rien sinon, et sous
+  le solde plutôt que par-dessus.
+- `CarrouselCartes` interroge chaque carte et dit laquelle est choisie ; il ne
+  pose que ce que l'écran lui rend.
 - Un `pointerdown` sur la fente ne lève pas la carte ; un `click` ne la choisit
   pas.
 
@@ -209,6 +240,10 @@ celui de la carte.
 - `encaissement-differe.ts` : `misesAffichees` et `estRattrapee`, cas nominaux et
   bornes.
 - `FicheClient` : toucher une carte fait sortir le bouton ; toucher le bouton
-  n'écrit rien à 5 s et écrit à 6 s ; « Annuler » n'écrit jamais ; fermer la fiche
-  à 2 s écrit tout de suite ; un échec laisse la case remplie et propose
-  « Réessayer » ; le compteur ne redescend pas entre l'écriture et la relecture.
+  n'écrit rien à 5 s et écrit à 6 s, sur la bonne carte ; la case se remplit
+  avant que rien ne parte ; « Annuler » n'écrit jamais ; fermer la fiche à 2 s
+  écrit tout de suite, et la refermer après 6 s n'écrit pas une seconde fois ;
+  passer en arrière-plan écrit tout de suite ; encaisser une autre carte fait
+  partir celle qui attendait ; le bandeau reste sur sa carte quand on en choisit
+  une autre ; un échec laisse la case remplie, retire « Annuler » et propose
+  « Réessayer », qui renvoie la même mise sur la même carte.
