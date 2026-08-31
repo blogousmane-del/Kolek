@@ -95,13 +95,22 @@ export const couleurs = {
  * réservé à une surface aurait donné deux langages visuels dans un même
  * produit, avec le même bouton de deux formes selon l'écran où on le rencontre.
  *
- * ## Pourquoi 2 px et non 0
+ * ## Le premier essai était trop dur — corrigé le même jour
  *
- * Un `border-radius` nul laisse l'anticrénelage des bordures produire des
- * angles sales sur les écrans à faible densité — et le collecteur travaille sur
- * un téléphone d'entrée de gamme, en plein soleil d'Abidjan. Deux pixels ne se
- * voient pas et nettoient l'arête. `lg` et `xl` gardent 4 px : ce sont de
- * grandes surfaces, où l'arête vive devient une pointe.
+ * Premier jet à 2 px et 4 px, franchement carré. Vu à l'écran, GTCS a tranché :
+ * « c'est trop carré, il faut rendre ça un peu rond ».
+ *
+ * Le défaut n'était pas le parti pris mais son degré. À 2 px, une carte de
+ * collecte ne se lit plus comme un objet posé mais comme une découpe dans le
+ * fond — et l'application entière est bâtie sur la métaphore du carnet qu'on
+ * tient en main. Les valeurs ci-dessous gardent le geste moderne tout en
+ * rendant l'objet à son épaisseur : nettement plus vives que les 8/12/16/24
+ * d'origine, sans l'arête coupante du premier essai.
+ *
+ * Aucune ne descend à zéro : un `border-radius` nul laisse l'anticrénelage des
+ * bordures produire des angles sales sur les écrans à faible densité, et le
+ * collecteur travaille sur un téléphone d'entrée de gamme en plein soleil
+ * d'Abidjan.
  *
  * ## `pill` ne change pas
  *
@@ -112,10 +121,10 @@ export const couleurs = {
  * rendu, pas avant.
  */
 export const rayons = {
-  sm: '2px',
-  md: '2px',
-  lg: '4px',
-  xl: '4px',
+  sm: '4px',
+  md: '6px',
+  lg: '10px',
+  xl: '12px',
   pill: '9999px',
 } as const;
 

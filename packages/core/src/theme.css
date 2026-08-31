@@ -33,10 +33,10 @@
   --color-chart-slate: #AEB7D6;
   --color-or: #D2B24C;
   --color-or-doux: #E5D5A3;
-  --radius-sm: 2px;
-  --radius-md: 2px;
-  --radius-lg: 4px;
-  --radius-xl: 4px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
   --radius-pill: 9999px;
   --text-xs: 11px;
   --text-sm: 13px;
