@@ -4,7 +4,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CarrouselCartes, type CarteItem } from './CarrouselCartes';
 
 // `globals` n'est pas activé dans la configuration Vitest de ce paquet.
-afterEach(cleanup);
+
+// La taille des cartes se garde sur l'appareil : sans ce nettoyage, un test qui
+// agrandit dicterait la taille de départ de tous les suivants.
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 function carte(id: string, nom: string): CarteItem {
   return { id, nomClient: nom, misePar: '5 000', jourCourant: 3, solde: '10 000', cycle: '1' };
@@ -213,6 +219,23 @@ describe('CarrouselCartes — la taille des cartes', () => {
     expect(screen.getByRole('button', { name: 'Réduire' }).getAttribute('aria-pressed')).toBe(
       'false',
     );
+  });
+
+  it('retrouve la taille choisie la fois d’avant', () => {
+    // Un ordre parle de ces cartes-là chez ce client, et meurt avec l'écran.
+    // Une taille parle de l'écran du téléphone : la redemander à chaque
+    // ouverture, c'est reposer une question déjà tranchée.
+    const { unmount } = render(
+      <CarrouselCartes cartes={TROIS} visibleId="a" onVisible={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Agrandir' }));
+    unmount();
+
+    render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Agrandir' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    expect(classesDe(0)).toMatch(/w-full/);
   });
 });
 

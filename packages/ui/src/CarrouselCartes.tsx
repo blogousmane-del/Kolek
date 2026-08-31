@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { CarteCollecte } from './CarteCollecte';
+import { ecrirePreference, lirePreference } from './preference';
 import { deplacer, ordreSuivant, rangCible } from './reordonner';
 
 export interface CarteItem {
@@ -35,6 +36,9 @@ const TAILLES: ReadonlyArray<{ cle: Taille; libelle: string; largeur: string }> 
   { cle: 'grande', libelle: 'Agrandir', largeur: 'w-full' },
 ];
 
+const CLE_TAILLE = 'kolek.cartes.taille';
+const CLES_TAILLE: readonly Taille[] = TAILLES.map(({ cle }) => cle);
+
 /**
  * Les cartes actives d'un client, étalées comme une main de cartes à jouer :
  * on les parcourt du pouce, on en change la taille, et on les réordonne.
@@ -63,11 +67,23 @@ const TAILLES: ReadonlyArray<{ cle: Taille; libelle: string; largeur: string }> 
  * Demande de GTCS : voir deux, trois ou quatre cartes ensemble, et pouvoir
  * réduire ou agrandir. `Réduire` en montre deux sur un téléphone, `Agrandir`
  * en montre une par écran — c'est-à-dire exactement ce que faisait ce
- * carrousel avant. La taille ne se conserve pas d'un écran à l'autre, comme
- * l'ordre : c'est un confort d'affichage, pas une préférence.
+ * carrousel avant.
  *
  * La carte, elle, se mesure toute seule et se réorganise sous 240 px — voir
  * `CarteCollecte`. Aucune taille ne lui est dictée d'ici.
+ *
+ * ### La taille se garde, l'ordre non
+ *
+ * Elle ne se gardait pas non plus au premier jet, rangée avec l'ordre sous
+ * « confort d'affichage ». GTCS a demandé qu'elle survive, et les deux ne sont
+ * pas la même chose. Un ordre parle de **ces** cartes-là, chez **ce** client :
+ * il ne veut plus rien dire demain, ni sur la fiche d'à côté. Une taille parle
+ * de l'écran du téléphone et des yeux de celui qui le tient — la réponse est la
+ * même chaque matin, et la redemander à chaque ouverture, c'est reposer une
+ * question déjà tranchée.
+ *
+ * Elle est écrite sur l'appareil, ce que le cache de lecture s'interdit. Trois
+ * mots, aucun nom, aucun montant : voir `preference.ts`, qui porte la règle.
  *
  * ### Ce que le choix d'une carte veut dire, et pourquoi il a changé
  *
@@ -155,7 +171,14 @@ export function CarrouselCartes({ cartes, visibleId, onVisible }: Props) {
   const geste = useRef<{ id: string; depart: number; x0: number; minuteur: number } | null>(null);
   const [annonce, setAnnonce] = useState('');
 
-  const [taille, setTaille] = useState<Taille>('reduite');
+  const [taille, setTaille] = useState<Taille>(() =>
+    lirePreference(CLE_TAILLE, CLES_TAILLE, 'reduite'),
+  );
+
+  function changerTaille(cle: Taille) {
+    setTaille(cle);
+    ecrirePreference(CLE_TAILLE, cle);
+  }
 
   const seule = rangees.length <= 1;
   // Une carte seule prend toute la place : lui appliquer une largeur réduite
@@ -346,7 +369,7 @@ export function CarrouselCartes({ cartes, visibleId, onVisible }: Props) {
               key={cle}
               type="button"
               aria-pressed={cle === taille}
-              onClick={() => setTaille(cle)}
+              onClick={() => changerTaille(cle)}
               className={`anim-pression px-2.5 py-1.5 rounded-md font-body text-xs font-semibold cursor-pointer border ${
                 cle === taille
                   ? 'bg-secondary border-primary text-primary'

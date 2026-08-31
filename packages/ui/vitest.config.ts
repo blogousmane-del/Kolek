@@ -16,5 +16,8 @@ export default defineConfig({
     // apparaître apparaît, ou le test échoue quand même. 20 s est déjà la valeur
     // retenue par `supabase/tests/vitest.config.ts`.
     testTimeout: 20000,
+    // Voir le fichier : Node prive jsdom de son `localStorage`, et sans lui les
+    // tests du stockage passeraient sans rien stocker.
+    setupFiles: ['./vitest.setup.ts'],
   },
 });
