@@ -70,3 +70,104 @@ describe('CarrouselCartes', () => {
     expect(screen.getByRole('group').getAttribute('aria-label')).toBe('3 cartes en cours');
   });
 });
+
+/**
+ * Le déplacement des cartes, ajouté le 2026-08-31.
+ *
+ * ## Pourquoi le clavier porte ces tests, et pas le doigt
+ *
+ * Le geste tactile repose sur trois choses que jsdom ne fournit pas : une
+ * géométrie mesurée, une capture de pointeur, et un minuteur qui court pendant
+ * qu'un doigt reste immobile. Les tester à travers un rendu reviendrait à
+ * tester des simulacres.
+ *
+ * Le calcul, lui, est isolé dans `reordonner.ts` et testé là — bornes, bascule
+ * à mi-carte, et le cas d'une largeur nulle qui est précisément celui de jsdom.
+ *
+ * Restent ici les deux choses que le rendu peut réellement dire : que le
+ * clavier déplace, et que l'affichage suit.
+ */
+describe('CarrouselCartes — déplacer les cartes', () => {
+  function nomsAffiches(): string[] {
+    return screen.getAllByText(/Aïcha|Bintou|Chérif/).map((n) => n.textContent ?? '');
+  }
+
+  it('déplace la carte courante avec Maj + flèche', () => {
+    render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={vi.fn()} />);
+    const piste = screen.getByRole('group');
+
+    expect(nomsAffiches()).toEqual(['Aïcha', 'Bintou', 'Chérif']);
+
+    fireEvent.keyDown(piste, { key: 'ArrowRight', shiftKey: true });
+    expect(nomsAffiches()).toEqual(['Bintou', 'Aïcha', 'Chérif']);
+
+    fireEvent.keyDown(piste, { key: 'ArrowRight', shiftKey: true });
+    expect(nomsAffiches()).toEqual(['Bintou', 'Chérif', 'Aïcha']);
+  });
+
+  it('ne pousse pas une carte hors de la main', () => {
+    render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={vi.fn()} />);
+    const piste = screen.getByRole('group');
+
+    fireEvent.keyDown(piste, { key: 'ArrowLeft', shiftKey: true });
+    expect(nomsAffiches()).toEqual(['Aïcha', 'Bintou', 'Chérif']);
+  });
+
+  it('déplace sans changer la carte regardée', () => {
+    // La distinction qui donne son sens à la touche Maj : la flèche seule
+    // change ce qu'on regarde, Maj change où la carte se range. Confondre les
+    // deux ferait sauter l'écran à chaque rangement.
+    const onVisible = vi.fn();
+    render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={onVisible} />);
+
+    fireEvent.keyDown(screen.getByRole('group'), { key: 'ArrowRight', shiftKey: true });
+    expect(onVisible).not.toHaveBeenCalled();
+  });
+
+  it('dit à voix haute où la carte a été rangée', () => {
+    // Une carte qui change de place sans rien dire est un déplacement
+    // invisible — et cet écran se tient à bout de bras, en plein soleil.
+    render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={vi.fn()} />);
+
+    fireEvent.keyDown(screen.getByRole('group'), { key: 'ArrowRight', shiftKey: true });
+    expect(screen.getByRole('status').textContent).toBe('Carte déplacée en position 2 sur 3.');
+  });
+
+  it('garde l’ordre choisi quand une carte est clôturée', () => {
+    // L'ordre vit par identifiants, pas par rangs : un rang ne survit pas à une
+    // carte qui disparaît, un identifiant si.
+    const { rerender } = render(
+      <CarrouselCartes cartes={TROIS} visibleId="a" onVisible={vi.fn()} />,
+    );
+
+    fireEvent.keyDown(screen.getByRole('group'), { key: 'ArrowRight', shiftKey: true });
+    expect(nomsAffiches()).toEqual(['Bintou', 'Aïcha', 'Chérif']);
+
+    rerender(
+      <CarrouselCartes
+        cartes={[carte('a', 'Aïcha'), carte('c', 'Chérif')]}
+        visibleId="a"
+        onVisible={vi.fn()}
+      />,
+    );
+    expect(nomsAffiches()).toEqual(['Aïcha', 'Chérif']);
+  });
+
+  it('pose une carte neuve à la fin, sans défaire le rangement', () => {
+    const { rerender } = render(
+      <CarrouselCartes cartes={TROIS} visibleId="a" onVisible={vi.fn()} />,
+    );
+
+    fireEvent.keyDown(screen.getByRole('group'), { key: 'ArrowRight', shiftKey: true });
+    rerender(
+      <CarrouselCartes
+        cartes={[...TROIS, carte('d', 'Bintou')]}
+        visibleId="a"
+        onVisible={vi.fn()}
+      />,
+    );
+
+    // Bintou apparaît deux fois — celle rangée en tête, et la neuve en queue.
+    expect(nomsAffiches()).toEqual(['Bintou', 'Aïcha', 'Chérif', 'Bintou']);
+  });
+});
