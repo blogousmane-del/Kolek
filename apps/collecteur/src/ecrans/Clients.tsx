@@ -14,7 +14,7 @@ import {
 } from '@kolek/ui';
 import { useEffect, useMemo, useState } from 'react';
 
-import type { CarteChoisie, ClientCible } from '../Coquille';
+import type { ClientCible } from '../Coquille';
 import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { supabase } from '../supabase';
@@ -86,7 +86,6 @@ export function Clients({
   ficheAOuvrir,
   onFicheVue,
   onDeconnexion,
-  onEncaisser,
   onEcriture,
   onRetrait,
 }: {
@@ -100,7 +99,6 @@ export function Clients({
   ficheAOuvrir: string | null;
   onFicheVue: () => void;
   onDeconnexion: () => void;
-  onEncaisser: (carte: CarteChoisie) => void;
   onEcriture: () => void;
   /** Ouvre l'écran de retrait, réduit aux cartes de ce client.
       Le client voyage jusque-là parce que le collecteur vient de désigner une
@@ -467,10 +465,6 @@ export function Clients({
         collecteurId={collecteurId}
         revision={revision}
         onFermer={() => setFiche(null)}
-        onEncaisser={(carte) => {
-          setFiche(null);
-          onEncaisser(carte);
-        }}
         onEcriture={onEcriture}
         onRetrait={(nom) => {
           // La fiche se referme, mais le client la suit : l'écran de retrait

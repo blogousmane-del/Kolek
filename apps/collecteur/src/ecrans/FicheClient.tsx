@@ -1,9 +1,15 @@
 import { MISES_PAR_CYCLE, formatMontant, soldeRestituable } from '@kolek/core';
-import { Bouton, CarrouselCartes, Feuille, Icone, LigneTransaction } from '@kolek/ui';
-import { useCallback, useEffect, useState } from 'react';
+import { Bouton, CarrouselCartes, Feuille, Icone, LigneTransaction, type CarteItem } from '@kolek/ui';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { CarteChoisie } from '../Coquille';
-import { definirConsentementAvis, ouvrirCarte } from '../ecritures';
+import { definirConsentementAvis, enregistrerMise, ouvrirCarte } from '../ecritures';
+import {
+  estRattrapee,
+  misesAffichees,
+  SURSIS_MS,
+  SURSIS_S,
+  type EnAttente,
+} from '../encaissement-differe';
 import { chargerFicheClient, type CarteFiche, type FicheClient as Fiche } from '../lectures-ecrans';
 import { ActiverCarte } from './ActiverCarte';
 import { ChoixMise } from './ChoixMise';
@@ -43,7 +49,6 @@ export function FicheClient({
   collecteurId,
   revision,
   onFermer,
-  onEncaisser,
   onEcriture,
   onRetrait,
 }: {
@@ -54,7 +59,6 @@ export function FicheClient({
   collecteurId: string | null;
   revision: number;
   onFermer: () => void;
-  onEncaisser: (carte: CarteChoisie) => void;
   onEcriture: () => void;
   /** Renvoie vers l'écran de retrait, réduit à ce client. Le nom part avec la
       demande : l'écran doit pouvoir le nommer même quand il ne lui reste
@@ -129,7 +133,6 @@ export function FicheClient({
               nomClient={fiche.nom}
               clientId={fiche.id}
               collecteurId={collecteurId}
-              onEncaisser={onEncaisser}
               onRetrait={onRetrait}
               onEcriture={onEcriture}
             />
@@ -273,41 +276,40 @@ function Coordonnees({
 /**
  * Les cartes en cours d'un client, et ce qu'on peut faire de celle qu'on regarde.
  *
- * ## Ce que le carrousel a remplacé, et ce qu'il n'a pas perdu
+ * ## Le bouton est entré dans la carte, le 2026-08-31
  *
- * Les cartes étaient empilées, chacune avec son bouton pleine largeur. À trois
- * carnets, la fiche mesurait trois écrans avant d'arriver aux derniers
- * versements, et le collecteur devait comparer deux cartes séparées par un
- * bouton. En rangée, la fiche garde sa hauteur quel que soit le nombre de
- * cartes.
+ * Il vivait sous la rangée, et il quittait la fiche pour un second écran qui
+ * remontrait la carte en grand avec un bouton « Confirmer ». Deux écrans pour
+ * un geste fait trente fois par matinée, debout, le client en face — et la
+ * carte qu'on venait de regarder disparaissait au moment de décider.
  *
- * Rien de ce qui existait n'a disparu. Le carrousel change la façon d'atteindre
- * une carte, pas ce qu'on peut en faire :
+ * Deux raisons de le loger dans la carte plutôt que sous elle :
  *
- * - **le montant reste sur le bouton** — « Encaisser 5 000 FCFA ». Il y était
- *   parce que deux cartes faisaient deux boutons l'un sous l'autre ; cette
- *   raison-là tombe avec l'empilement, mais pas la bonne : une mise est
- *   immuable, et le bouton qui la déclenche doit dire ce qu'il encaisse. Il
- *   désigne désormais la carte en face, et change quand on fait défiler ;
- * - **les deux portes de fin de cycle** — rendre l'argent, ou repartir sur une
- *   carte de plus — restent côte à côte dans leur bloc, sur la carte pleine ;
- * - **chaque carte reste atteignable**, par le doigt, par les points, ou par
- *   les flèches du clavier.
+ * - **il n'y a plus de doute sur la carte servie.** Depuis que la rangée sait
+ *   montrer deux ou quatre cartes ensemble, un bouton unique posé dessous ne
+ *   désigne plus personne. Le liseré aidait ; il ne suffisait pas, et se
+ *   tromper de carte ici, c'est encaisser sur le mauvais cycle ;
+ * - **il défile avec elle.** Le bandeau de sursis aussi : le collecteur peut
+ *   aller regarder une autre carte pendant le décompte sans perdre de vue ce
+ *   qui est en train de partir.
  *
- * ## La carte visible
+ * ## Les six secondes
  *
- * Elle est tenue ici, et non dans le carrousel : la rangée d'actions et le bloc
- * de fin de cycle en dépendent tous les deux. Le repli sur la première carte
- * n'est pas une précaution de style — après un encaissement, la relecture
- * réordonne les cartes par avancement, et celle qu'on regardait peut avoir
- * changé de rang ou avoir été clôturée.
+ * `mises` est append-only — voir `encaissement-differe.ts`, qui porte la règle.
+ * L'appui remplit la case à l'écran et n'écrit rien ; l'insertion part six
+ * secondes plus tard, et « Annuler » l'empêche jusque-là.
+ *
+ * ## Pourquoi l'attente est aussi tenue en référence
+ *
+ * Un minuteur ne voit que l'état du rendu qui l'a posé. La référence, elle,
+ * dit ce qui attend au moment où le minuteur se déclenche — et c'est ce qui
+ * permet à `purger` d'être appelée d'ailleurs que d'un gestionnaire de clic.
  */
 function CartesEnCours({
   actives,
   nomClient,
   clientId,
   collecteurId,
-  onEncaisser,
   onRetrait,
   onEcriture,
 }: {
@@ -315,18 +317,169 @@ function CartesEnCours({
   nomClient: string;
   clientId: string;
   collecteurId: string | null;
-  onEncaisser: (carte: CarteChoisie) => void;
   /** Le nom accompagne la demande : l'écran de retrait s'ouvre réduit à ce
       client et doit pouvoir le nommer même quand il ne lui reste aucune carte. */
   onRetrait: (clientNom: string) => void;
   onEcriture: () => void;
 }) {
   const [visibleId, setVisibleId] = useState(actives[0].carte.id);
+  const [attente, setAttente] = useState<EnAttente | null>(null);
+  const [restant, setRestant] = useState(0);
+
+  const enCours = useRef<EnAttente | null>(null);
+  const sursis = useRef<number | null>(null);
+  const decompte = useRef<number | null>(null);
+
+  // Le contexte d'écriture suit chaque rendu, pour la même raison que
+  // l'attente : la purge part d'endroits qui ne referment rien.
+  const contexte = useRef({ collecteurId, onEcriture });
+  contexte.current = { collecteurId, onEcriture };
+
+  function poser(en: EnAttente | null) {
+    enCours.current = en;
+    setAttente(en);
+  }
+
+  function arreter() {
+    if (sursis.current !== null) window.clearTimeout(sursis.current);
+    if (decompte.current !== null) window.clearInterval(decompte.current);
+    sursis.current = null;
+    decompte.current = null;
+    setRestant(0);
+  }
+
+  async function ecrire(en: EnAttente) {
+    const { collecteurId: id, onEcriture: prevenir } = contexte.current;
+    if (!id) return;
+    const resultat = await enregistrerMise(id, en.carteId, en.mise);
+    if (resultat.ok) {
+      // L'attente n'est pas levée ici : la relecture s'en charge. La lever
+      // maintenant reviderait la case le temps que la fiche revienne.
+      prevenir();
+      return;
+    }
+    poser({ ...en, envoyee: true, echec: resultat.echec.message });
+  }
+
+  /** Écrit tout de suite ce qui attendait, et rend les minuteurs au repos. */
+  function purger() {
+    arreter();
+    const en = enCours.current;
+    if (!en) return;
+    // Déjà partie et sans échec : la relecture s'en occupe. La renvoyer
+    // écrirait la mise une seconde fois, et rien ne la retirerait.
+    if (en.envoyee && !en.echec) return;
+    const repris: EnAttente = { ...en, envoyee: true, echec: undefined };
+    poser(repris);
+    void ecrire(repris);
+  }
+
+  function encaisser(carte: CarteFiche) {
+    // Un second appui pendant un décompte fait partir le premier. Deux mises
+    // le même jour sur la même carte sont acceptées par le serveur ; ce n'est
+    // pas à cet écran de les interdire, seulement de ne pas les perdre.
+    purger();
+
+    const en: EnAttente = {
+      carteId: carte.id,
+      mise: carte.mise,
+      base: carte.misesEncaissees,
+      envoyee: false,
+    };
+    poser(en);
+    setRestant(SURSIS_S);
+
+    decompte.current = window.setInterval(
+      () => setRestant((seconde) => Math.max(0, seconde - 1)),
+      1000,
+    );
+    sursis.current = window.setTimeout(() => {
+      arreter();
+      // L'attente a pu être annulée ou remplacée entre-temps.
+      if (enCours.current !== en) return;
+      const partie: EnAttente = { ...en, envoyee: true };
+      poser(partie);
+      void ecrire(partie);
+    }, SURSIS_MS);
+  }
+
+  function annuler() {
+    arreter();
+    poser(null);
+  }
+
+  function reessayer() {
+    const en = enCours.current;
+    if (!en) return;
+    const repris: EnAttente = { ...en, envoyee: true, echec: undefined };
+    poser(repris);
+    void ecrire(repris);
+  }
+
+  // Le compte réel de la carte qui attend, s'il y en a une et qu'elle est
+  // toujours là. `null` quand la carte a disparu de la fiche — clôturée.
+  const reelles = attente
+    ? (actives.find(({ carte: c }) => c.id === attente.carteId)?.carte.misesEncaissees ?? null)
+    : null;
+
+  useEffect(() => {
+    if (!attente) return;
+    if (reelles === null || estRattrapee(reelles, attente)) poser(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attente, reelles]);
 
   const courant = actives.find(({ carte }) => carte.id === visibleId) ?? actives[0];
   const { carte } = courant;
-  const complete = carte.misesEncaissees >= MISES_PAR_CYCLE;
-  const solde = formatMontant(soldeRestituable(carte.misesEncaissees, carte.mise));
+  const misesCourantes = misesAffichees(carte.id, carte.misesEncaissees, attente);
+  const complete = misesCourantes >= MISES_PAR_CYCLE;
+  const solde = formatMontant(soldeRestituable(misesCourantes, carte.mise));
+
+  function rendreAction(item: CarteItem, choisie: boolean) {
+    const trouvee = actives.find(({ carte: c }) => c.id === item.id);
+    if (!trouvee) return null;
+    const { carte: c } = trouvee;
+
+    // Le bandeau passe avant le choix : une mise qui part doit rester sous les
+    // yeux même quand on est allé regarder la carte d'à côté. C'est la seule
+    // chose qu'une carte non choisie ait le droit de montrer.
+    if (attente && attente.carteId === c.id) {
+      return (
+        <BandeauSursis
+          attente={attente}
+          restant={restant}
+          onAnnuler={annuler}
+          onReessayer={reessayer}
+        />
+      );
+    }
+
+    // La commande d'argent, elle, ne sort que sur la carte choisie : deux
+    // boutons visibles ensemble, et se tromper de cycle redevient possible.
+    if (!choisie) return null;
+
+    // Une carte au bout de son cycle ne s'encaisse plus : les deux portes de
+    // fin de cycle vivent sous la rangée, où elles ont la place de s'expliquer.
+    if (misesAffichees(c.id, c.misesEncaissees, attente) >= MISES_PAR_CYCLE) return null;
+
+    return (
+      <button
+        type="button"
+        // Le nom accessible porte le montant en toutes lettres, quelle que soit
+        // la largeur : à 160 px le libellé se raccourcit, la mise annoncée non.
+        aria-label={`Encaisser ${formatMontant(c.mise)} FCFA`}
+        onClick={() => encaisser(c)}
+        className="anim-pression w-full min-h-11 px-4 rounded-md bg-primary text-primary-foreground border border-primary font-body font-semibold text-base flex items-center justify-center gap-2 cursor-pointer @max-[240px]:min-h-11 @max-[240px]:px-2 @max-[240px]:text-xs @max-[240px]:gap-1"
+      >
+        <Icone nom="circle-dollar-sign" taille={16} />
+        <span aria-hidden="true" className="@max-[240px]:hidden">
+          Encaisser {formatMontant(c.mise)} FCFA
+        </span>
+        <span aria-hidden="true" className="hidden @max-[240px]:inline">
+          Encaisser
+        </span>
+      </button>
+    );
+  }
 
   return (
     <section>
@@ -335,19 +488,23 @@ function CartesEnCours({
       </p>
 
       <CarrouselCartes
-        cartes={actives.map(({ carte: c, cycle: rang }) => ({
-          id: c.id,
-          nomClient,
-          misePar: formatMontant(c.mise),
-          jourCourant: c.misesEncaissees,
-          solde: formatMontant(soldeRestituable(c.misesEncaissees, c.mise)),
-          cycle: String(rang),
-        }))}
+        cartes={actives.map(({ carte: c, cycle: rang }) => {
+          const affichees = misesAffichees(c.id, c.misesEncaissees, attente);
+          return {
+            id: c.id,
+            nomClient,
+            misePar: formatMontant(c.mise),
+            jourCourant: affichees,
+            solde: formatMontant(soldeRestituable(affichees, c.mise)),
+            cycle: String(rang),
+          };
+        })}
         visibleId={courant.carte.id}
         onVisible={setVisibleId}
+        rendreAction={rendreAction}
       />
 
-      {complete ? (
+      {complete && (
         <div className="bg-positive-tint rounded-md p-3 mt-3 space-y-3">
           <div>
             <p className="font-body text-sm text-ink m-0">
@@ -371,29 +528,73 @@ function CartesEnCours({
             />
           </div>
         </div>
-      ) : (
-        // Le montant reste sur le bouton. Il y était parce que deux cartes
-        // faisaient deux boutons l'un sous l'autre ; le carrousel a supprimé
-        // cette raison-là, mais pas la bonne : une mise est immuable, et le
-        // bouton qui la déclenche doit dire ce qu'il encaisse. Il désigne
-        // maintenant la carte en face, et change avec elle.
-        <Bouton
-          pleineLargeur
-          className="mt-3"
-          icone="circle-dollar-sign"
-          onClick={() =>
-            onEncaisser({
-              carteId: carte.id,
-              clientNom: nomClient,
-              mise: carte.mise,
-              misesEncaissees: carte.misesEncaissees,
-            })
-          }
-        >
-          Encaisser {formatMontant(carte.mise)} FCFA
-        </Bouton>
       )}
     </section>
+  );
+}
+
+/**
+ * Ce que la carte porte pendant les six secondes — et après, si l'écriture a
+ * échoué.
+ *
+ * Le décompte est marqué `aria-hidden` : un nom accessible qui change chaque
+ * seconde rendrait le bouton introuvable pour qui le cherche par son nom, et
+ * bavard pour qui l'écoute.
+ */
+function BandeauSursis({
+  attente,
+  restant,
+  onAnnuler,
+  onReessayer,
+}: {
+  attente: EnAttente;
+  restant: number;
+  onAnnuler: () => void;
+  onReessayer: () => void;
+}) {
+  if (attente.echec) {
+    return (
+      <div className="rounded-md bg-negative-tint border border-negative/30 p-2 @max-[240px]:p-1.5">
+        <p
+          role="alert"
+          className="font-body text-xs font-semibold text-negative m-0 @max-[240px]:text-[10px]"
+        >
+          {attente.echec}
+        </p>
+        <button
+          type="button"
+          onClick={onReessayer}
+          className="anim-pression mt-1.5 w-full min-h-11 rounded-md border border-negative/40 text-negative font-body text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+        >
+          <Icone nom="refresh-cw" taille={14} />
+          Réessayer
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md bg-positive-tint border border-positive/30 p-2 flex items-center justify-between gap-2 @max-[240px]:p-1.5 @max-[240px]:gap-1">
+      <span
+        role="status"
+        className="flex items-center gap-1.5 min-w-0 font-body text-xs font-semibold text-positive @max-[240px]:text-[10px]"
+      >
+        <Icone nom="check-circle" taille={14} className="shrink-0" />
+        <span className="truncate">{formatMontant(attente.mise)} FCFA encaissé</span>
+      </span>
+      {!attente.envoyee && (
+        <button
+          type="button"
+          onClick={onAnnuler}
+          className="anim-pression shrink-0 min-h-11 px-3 rounded-pill border border-positive/40 text-positive font-body text-xs font-semibold cursor-pointer @max-[240px]:px-2"
+        >
+          Annuler{' '}
+          <span aria-hidden="true" className="tabular-nums opacity-70">
+            {restant} s
+          </span>
+        </button>
+      )}
+    </div>
   );
 }
 

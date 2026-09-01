@@ -209,7 +209,6 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
           ficheAOuvrir={clientPourFiche}
           onFicheVue={() => setClientPourFiche(null)}
           onDeconnexion={deconnecter}
-          onEncaisser={encaisserSur}
           onEcriture={() => setRevision((r) => r + 1)}
           onRetrait={allerAuRetrait}
         />
