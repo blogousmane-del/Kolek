@@ -649,7 +649,14 @@ function CartesEnCours({
           chaque défilement demanderait de remonter le composant, ce qui
           effacerait une saisie en cours. Et ce n'est qu'un défaut : la carte
           qu'on ouvre est celle du client, pas celle qu'on regarde, et le
-          montant se corrige avant d'enregistrer. */}
+          montant se corrige avant d'enregistrer.
+
+          `identifiant`, lui, suit bien le carrousel — c'est une propriété lue à
+          chaque rendu, pas un état. Après un défilement, le champ porte donc
+          l'`id` de la carte B tandis que sa valeur vient de la carte A. Sans
+          conséquence : l'`id` ne sert qu'à lier le libellé au champ, et les
+          deux changent dans le même rendu. La relecture qui suit toute écriture
+          remonte le bloc et resynchronise le tout. */}
       <div className="mt-3">
         <ActiverCarte
           collecteurId={collecteurId}

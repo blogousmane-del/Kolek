@@ -135,7 +135,7 @@ const FICHE_DEUX_CARTES_ENCAISSABLES = {
 
 /** Une seule carte active, loin d'être pleine. Le cas le plus courant. */
 const FICHE_UNE_CARTE_EN_COURS = {
-  id: 'cli4',
+  id: 'cli7',
   nom: 'Koné',
   telephone: null,
   marche: null,
@@ -277,7 +277,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
 
     render(
       <FicheClient
-        clientId="cli4"
+        clientId="cli7"
         revision={0}
         collecteurId="col1"
         onFermer={vi.fn()}
@@ -295,6 +295,15 @@ describe('fiche d’un client à plusieurs cartes', () => {
     // Mais rien qui parle de fin de cycle : la carte n'est pas pleine.
     expect(screen.queryByRole('button', { name: 'Aller au retrait' })).toBeNull();
     expect(screen.queryByText(/Cycle terminé/)).toBeNull();
+
+    // Et le panneau déplié non plus. Il annonçait « La carte pleine reste
+    // ouverte » — vrai au bout d'un cycle, faux à 12/31, et c'est précisément
+    // ce cas que ce bloc vient d'ouvrir. Le plan du 2026-08-25 avait relevé le
+    // piège et l'avait contourné en ne posant pas le bloc ici ; le contournement
+    // ne tient plus, donc la phrase est vérifiée.
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+    expect(screen.queryByText(/pleine/)).toBeNull();
+    expect(screen.getByText(/Ce qui est déjà ouvert ne bouge pas/)).toBeTruthy();
   });
 
   it('ne promet plus que la nouvelle carte attend le retrait', async () => {
