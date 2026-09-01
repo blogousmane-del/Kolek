@@ -62,7 +62,7 @@ export function BarreHaute({ filAriane, titre, actions }: Props) {
                 // `aria-label` garde l'intitulé pour les lecteurs d'écran.
                 aria-label={action.libelle}
                 title={disponible ? action.libelle : `${action.libelle} — à venir`}
-                className={`flex items-center gap-2 min-h-11 px-3 sm:px-4 rounded-pill text-base font-body font-medium border ${
+                className={`flex items-center gap-2 min-h-11 px-3 sm:px-4 rounded-md text-base font-body font-medium border ${
                   action.principale
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'bg-surface text-ink border-hairline'

@@ -382,7 +382,7 @@ export function Clients({
             key={f}
             type="button"
             onClick={() => setFiltre(f)}
-            className={`px-4 py-1.5 rounded-pill text-xs xs:text-sm font-body font-semibold border whitespace-nowrap cursor-pointer transition-all shadow-xs ${
+            className={`px-4 py-1.5 rounded-md text-xs xs:text-sm font-body font-semibold border whitespace-nowrap cursor-pointer transition-all shadow-xs ${
               f === filtre
                 ? 'bg-primary text-primary-foreground border-primary'
                 : 'bg-surface text-ink border-hairline/80 hover:bg-muted/50'
@@ -660,7 +660,7 @@ function BasculeAvis({
             type="button"
             disabled={envoi}
             onClick={() => onPoser(true)}
-            className="px-3 py-2 rounded-pill bg-primary text-primary-foreground text-sm font-body font-bold cursor-pointer disabled:opacity-50"
+            className="px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-body font-bold cursor-pointer disabled:opacity-50"
           >
             {envoi ? 'Enregistrement…' : 'Il a accepté'}
           </button>
@@ -668,7 +668,7 @@ function BasculeAvis({
             type="button"
             disabled={envoi}
             onClick={onAnnuler}
-            className="px-3 py-2 rounded-pill border border-hairline text-ink text-sm font-body font-semibold cursor-pointer disabled:opacity-50"
+            className="px-3 py-2 rounded-md border border-hairline text-ink text-sm font-body font-semibold cursor-pointer disabled:opacity-50"
           >
             Annuler
           </button>
@@ -709,7 +709,7 @@ function BasculeAvis({
           // chose : l'appui a été pris. Sans eux, entre le doigt et la réponse
           // du serveur, rien ne bougeait — et en 3G cette attente se compte en
           // secondes, pendant lesquelles le collecteur appuie à nouveau.
-          className="anim-pression px-3 py-1.5 rounded-pill border border-hairline text-ink text-xs font-body font-semibold whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="anim-pression px-3 py-1.5 rounded-md border border-hairline text-ink text-xs font-body font-semibold whitespace-nowrap cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {envoi ? 'Enregistrement…' : client.avis_actifs ? 'Ne plus prévenir' : 'Prévenir'}
         </button>

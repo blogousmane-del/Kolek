@@ -140,7 +140,7 @@ export function EcranConnexion({
               type="button"
               onClick={federer}
               disabled={redirection}
-              className="mb-4 flex w-full cursor-pointer items-center justify-center gap-3 rounded-pill bg-white px-4 py-3 font-body text-sm font-semibold text-ink transition-transform duration-300 hover:-translate-y-px disabled:opacity-60"
+              className="mb-4 flex w-full cursor-pointer items-center justify-center gap-3 rounded-md bg-white px-4 py-3 font-body text-sm font-semibold text-ink transition-transform duration-300 hover:-translate-y-px disabled:opacity-60"
             >
               <LogoGoogle />
               {redirection ? 'Ouverture…' : federee.libelle}

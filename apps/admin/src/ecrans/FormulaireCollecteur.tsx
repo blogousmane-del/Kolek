@@ -159,7 +159,7 @@ export function FormulaireCollecteur({
               key={p.cle}
               type="button"
               onClick={() => setPalier(p.cle)}
-              className={`px-3 py-2 rounded-pill text-sm font-body font-semibold border cursor-pointer ${
+              className={`px-3 py-2 rounded-md text-sm font-body font-semibold border cursor-pointer ${
                 p.cle === palier
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-surface text-ink border-hairline'

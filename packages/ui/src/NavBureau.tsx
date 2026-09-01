@@ -136,7 +136,7 @@ export function NavBureau({ actif, onNaviguer, onDeconnexion, nom }: Props) {
         <button
           type="button"
           onClick={() => onNaviguer(ENCAISSEMENT.cle)}
-          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-pill bg-primary py-3 shadow-action"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-primary py-3 shadow-action"
         >
           <Icone nom={ENCAISSEMENT.icone} taille={20} className="text-primary-foreground" />
           <span className="font-body text-base font-semibold text-primary-foreground">

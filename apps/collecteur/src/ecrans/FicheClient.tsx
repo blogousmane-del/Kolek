@@ -288,7 +288,7 @@ function Coordonnees({
         disabled={envoi}
         aria-pressed={fiche.avisActifs}
         onClick={() => (fiche.avisActifs ? void poser(false) : setDemande(true))}
-        className="anim-pression px-3 py-1.5 rounded-pill border border-hairline text-ink text-xs font-body font-semibold whitespace-nowrap cursor-pointer disabled:opacity-40"
+        className="anim-pression px-3 py-1.5 rounded-md border border-hairline text-ink text-xs font-body font-semibold whitespace-nowrap cursor-pointer disabled:opacity-40"
       >
         {fiche.avisActifs ? 'Ne plus prévenir' : 'Prévenir'}
       </button>
@@ -700,7 +700,7 @@ function BandeauSursis({
         <button
           type="button"
           onClick={onAnnuler}
-          className="anim-pression shrink-0 min-h-11 px-3 rounded-pill border border-positive/40 text-positive font-body text-xs font-semibold cursor-pointer @max-[240px]:px-2"
+          className="anim-pression shrink-0 min-h-11 px-3 rounded-md border border-positive/40 text-positive font-body text-xs font-semibold cursor-pointer @max-[240px]:px-2"
         >
           Annuler{' '}
           <span aria-hidden="true" className="tabular-nums opacity-70">

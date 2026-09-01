@@ -185,7 +185,7 @@ export function Encaisser({
                 collecteurId === null ||
                 carte.misesEncaissees >= MISES_PAR_CYCLE
               }
-              className="anim-pression w-full rounded-pill bg-gradient-to-r from-primary to-accent hover:from-accent hover:to-primary text-white font-headings font-bold text-base xs:text-lg py-4 flex items-center justify-center gap-2.5 cursor-pointer shadow-action disabled:opacity-50 disabled:cursor-default disabled:hover:from-primary disabled:hover:to-accent border border-white/20 transition-all"
+              className="anim-pression w-full rounded-md bg-gradient-to-r from-primary to-accent hover:from-accent hover:to-primary text-white font-headings font-bold text-base xs:text-lg py-4 flex items-center justify-center gap-2.5 cursor-pointer shadow-action disabled:opacity-50 disabled:cursor-default disabled:hover:from-primary disabled:hover:to-accent border border-white/20 transition-all"
             >
               <Icone nom="check-circle" taille={22} className="text-chart-mint" />
               <span>

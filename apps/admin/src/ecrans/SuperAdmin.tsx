@@ -670,7 +670,7 @@ function OngletAbonnements({
                   key={f.cle}
                   type="button"
                   onClick={() => setFiltre(f.cle)}
-                  className={`px-3 py-1.5 rounded-pill text-sm font-body font-medium cursor-pointer transition-colors ${
+                  className={`px-3 py-1.5 rounded-md text-sm font-body font-medium cursor-pointer transition-colors ${
                     filtre === f.cle
                       ? 'bg-primary text-primary-foreground'
                       : 'text-muted-foreground hover:bg-secondary'

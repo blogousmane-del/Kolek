@@ -173,10 +173,10 @@ Padding interne des cartes : `p-5` à `p-6` (admin), `p-4` (mobile). Gouttière 
 | Token | Classe | Valeur | Usage |
 |---|---|---|---|
 | `--radius-sm` | `rounded-sm` | 8 px | Petits éléments, cases de cycle, pastilles de légende. |
-| `--radius-md` | `rounded-md` | 12 px | Boutons carrés, champs, badges. |
+| `--radius-md` | `rounded-md` | 12 px | **Tous les boutons rectangulaires**, champs, blocs. |
 | `--radius-lg` | `rounded-lg` | 16 px | Cartes, widgets. |
 | `--radius-xl` | `rounded-xl` | 24 px | Cartes héros, cadre de l'application admin, carte de collecte. |
-| `--radius-pill` | `rounded-pill` | 9999 px | Pilules, boutons ronds, avatars. |
+| `--radius-pill` | `rounded-pill` | 9999 px | Badges et pastilles, boutons **ronds** à icône seule, avatars, points, barres de progression. Jamais un bouton qui porte du texte. |
 
 ### 3.5 Élévation
 
@@ -347,6 +347,10 @@ Même palette, même typo, mêmes rayons, mêmes badges. On ne redessine jamais 
 - Un attribut `style` pour autre chose qu'une valeur venue de la donnée.
 - Multiplier les couleurs vives ou les dégradés hors éléments héros.
 - Mélanger plusieurs jeux d'icônes ou de rayons.
+- Un bouton rectangulaire en `rounded-pill`. La pilule est pour les badges et
+  les boutons ronds à icône ; un bouton qui porte du texte prend `rounded-md`,
+  comme `Bouton`. Quatorze boutons avaient dérivé avant le 2026-09-01 — la
+  règle existait déjà, elle n'était juste écrite nulle part sur cette ligne.
 - Des montants non alignés, au format `$`, ou avec centimes.
 - Un composant « maison » qui n'existe pas dans ce système.
 - Un bouton qui n'écrit rien mais laisse croire le contraire. S'il n'est pas branché, il est désactivé et il le dit.

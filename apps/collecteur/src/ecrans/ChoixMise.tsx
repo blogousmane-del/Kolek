@@ -61,7 +61,7 @@ export function ChoixMise({
               setSaisie('');
               onChoisir(m);
             }}
-            className={`anim-pression px-3 py-2 rounded-pill text-base font-body font-semibold border tabular-nums cursor-pointer ${
+            className={`anim-pression px-3 py-2 rounded-md text-base font-body font-semibold border tabular-nums cursor-pointer ${
               !libre && m === mise
                 ? 'bg-primary text-primary-foreground border-primary'
                 : 'bg-surface text-ink border-hairline'
@@ -74,7 +74,7 @@ export function ChoixMise({
         <button
           type="button"
           onClick={() => setLibre(true)}
-          className={`anim-pression px-3 py-2 rounded-pill text-base font-body font-semibold border cursor-pointer ${
+          className={`anim-pression px-3 py-2 rounded-md text-base font-body font-semibold border cursor-pointer ${
             libre
               ? 'bg-primary text-primary-foreground border-primary'
               : 'bg-surface text-ink border-hairline'

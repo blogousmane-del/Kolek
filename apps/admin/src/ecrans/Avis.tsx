@@ -293,7 +293,7 @@ function Editeur({
             type="button"
             onClick={() => setPolitique({ ...politique, canal: c.cle })}
             title={c.note}
-            className={`px-3 py-2 rounded-pill text-sm font-body font-semibold border cursor-pointer ${
+            className={`px-3 py-2 rounded-md text-sm font-body font-semibold border cursor-pointer ${
               politique.canal === c.cle
                 ? 'bg-primary text-primary-foreground border-primary'
                 : 'bg-surface text-ink border-hairline'
