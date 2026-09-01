@@ -226,7 +226,7 @@ Puis, aux trois emplacements — dans `creerClientAvecCarte` (vers la ligne 129)
 par :
 
 ```ts
-        message: `La mise doit être d'au moins ${MISE_MIN} FCFA.`,
+        message: `La mise doit être d’au moins ${MISE_MIN} FCFA.`,
 ```
 
 Le code `MISE_HORS_BORNES` ne change pas : la borne basse existe toujours.
@@ -281,7 +281,7 @@ Aux lignes 104 et 157, remplacer les deux occurrences de :
 par :
 
 ```ts
-      echec: { code: 'MISE_HORS_BORNES', message: "La mise doit être d'au moins 500 FCFA." },
+      echec: { code: 'MISE_HORS_BORNES', message: 'La mise doit être d’au moins 500 FCFA.' },
 ```
 
 - [ ] **Étape 8 : vérifier que plus rien n'importe `MISE_MAX`**
@@ -506,7 +506,7 @@ le total d'un montant qu'il vient de quitter.
 
 - [ ] **Étape 2 : lancer le test pour vérifier qu'il échoue**
 
-Run: `npx vitest run --dir apps/collecteur src/ecrans/ChoixMise.test.tsx`
+Run: `npm test --workspace @kolek/collecteur -- src/ecrans/ChoixMise.test.tsx`
 
 Expected: FAIL. Les cas « palier » et « montant libre ordinaire » passent déjà ; les six autres échouent — `Unable to find an accessible element with the role "checkbox"` pour la plupart, et `expected 1000 to be null` pour la saisie invalide.
 
@@ -725,7 +725,7 @@ export function ChoixMise({
 
 - [ ] **Étape 4 : lancer les tests de `ChoixMise`**
 
-Run: `npx vitest run --dir apps/collecteur src/ecrans/ChoixMise.test.tsx`
+Run: `npm test --workspace @kolek/collecteur -- src/ecrans/ChoixMise.test.tsx`
 
 Expected: PASS, 9 tests.
 
