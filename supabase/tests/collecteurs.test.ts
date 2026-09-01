@@ -53,20 +53,23 @@ describe('contraintes du schéma cartes', () => {
     expect((data ?? []).every((c) => c.statut === 'active')).toBe(true);
   });
 
-  it('refuse une mise journalière hors des bornes 500 – 10 000', async () => {
+  it('refuse une mise journalière sous le plancher de 500', async () => {
+    // Le plafond de 10 000 a été levé par `20260901090000_mise_sans_plafond.sql` —
+    // voir `mise-sans-plafond.test.ts` pour la couverture complète du nouveau
+    // comportement (carte à 50 000 acceptée, mise au-delà de l'integer rendue
+    // juste). Ici, on ne garde que la vérification schéma qui subsiste : le
+    // plancher.
     const a = await creerCollecteur('Yao Kouassi', `+225072${Date.now() % 10000000}`);
     const clientId = crypto.randomUUID();
     await admin.from('clients').insert({ id: clientId, collecteur_id: a.id, nom: 'Adjoua' });
 
-    for (const mise of [499, 10001]) {
-      const { error } = await admin.from('cartes').insert({
-        id: crypto.randomUUID(),
-        collecteur_id: a.id,
-        client_id: clientId,
-        mise,
-      });
-      expect(error?.code).toBe('23514');
-    }
+    const { error } = await admin.from('cartes').insert({
+      id: crypto.randomUUID(),
+      collecteur_id: a.id,
+      client_id: clientId,
+      mise: 499,
+    });
+    expect(error?.code).toBe('23514');
   });
 
   it('laisse rouvrir une carte une fois la précédente clôturée', async () => {
