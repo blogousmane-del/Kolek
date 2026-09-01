@@ -744,15 +744,19 @@ function FormulaireClient({
   const [nom, setNom] = useState('');
   const [telephone, setTelephone] = useState('');
   const [marche, setMarche] = useState('');
-  const [mise, setMise] = useState(1000);
+  const [mise, setMise] = useState<number | null>(1000);
   const [avisActifs, setAvisActifs] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
-  const pret = nom.trim().length > 0 && validerMise(mise) && collecteurId !== null;
+  const pret = nom.trim().length > 0 && mise !== null && validerMise(mise) && collecteurId !== null;
 
   async function enregistrer() {
-    if (!pret || !collecteurId) return;
+    // Le test `mise === null` est redondant avec `pret` pour un humain, mais
+    // pas pour TypeScript : `pret` est un booléen, il ne rétrécit pas le type
+    // de `mise` dans le corps de la fonction. Sans lui, l'appel ci-dessous ne
+    // compile pas.
+    if (!pret || !collecteurId || mise === null) return;
     setEnvoi(true);
     setErreur(null);
 
