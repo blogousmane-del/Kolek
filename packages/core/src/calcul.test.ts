@@ -70,7 +70,7 @@ describe('soldeRestituable', () => {
 describe('validerMise', () => {
   it('accepte le plancher, les paliers usuels et bien au-delà', () => {
     for (const m of [500, 1000, 2000, 5000, 10000, 50_000, 50_000_000, MISE_MAX_STOCKABLE]) {
-      expect(validerMise(m)).toBe(true);
+      expect(validerMise(m), `${m} doit être acceptée`).toBe(true);
     }
   });
 

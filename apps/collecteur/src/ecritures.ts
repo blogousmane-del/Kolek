@@ -126,7 +126,7 @@ export async function creerClientAvecCarte(
       ok: false,
       echec: {
         code: 'MISE_HORS_BORNES',
-        message: `La mise doit être d'au moins ${MISE_MIN} FCFA.`,
+        message: `La mise doit Ãªtre d’au moins ${MISE_MIN} FCFA.`,
       },
     };
   }
@@ -192,7 +192,7 @@ export async function enregistrerMise(
       ok: false,
       echec: {
         code: 'MISE_HORS_BORNES',
-        message: `La mise doit être d'au moins ${MISE_MIN} FCFA.`,
+        message: `La mise doit Ãªtre d’au moins ${MISE_MIN} FCFA.`,
       },
     };
   }
@@ -299,7 +299,7 @@ export async function ouvrirCarte(
       ok: false,
       echec: {
         code: 'MISE_HORS_BORNES',
-        message: `La mise doit être d'au moins ${MISE_MIN} FCFA.`,
+        message: `La mise doit Ãªtre d’au moins ${MISE_MIN} FCFA.`,
       },
     };
   }
