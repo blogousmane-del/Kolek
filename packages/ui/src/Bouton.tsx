@@ -51,7 +51,7 @@ export function Bouton({
       disabled={disabled}
       title={title}
       onClick={onClick}
-      className={`anim-pression min-h-11 px-5 rounded-pill font-body font-semibold text-base flex items-center justify-center gap-2 ${
+      className={`anim-pression min-h-11 px-5 rounded-none font-body font-semibold text-base flex items-center justify-center gap-2 ${
         VARIANTES[variante]
       } ${pleineLargeur ? 'w-full' : ''} ${
         disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'
