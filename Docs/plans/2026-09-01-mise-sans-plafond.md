@@ -23,7 +23,8 @@
 - Vitest n'a **pas** `globals` : `describe`, `it`, `expect`, `vi` s'importent depuis `'vitest'`.
 - **`@testing-library/jest-dom` n'est pas installé** : `apps/collecteur/vitest.config.ts` n'a pas de `setupFiles`. `toBeChecked`, `toHaveTextContent`, `toBeInTheDocument` n'existent pas. Le style du dépôt est `.textContent` + `toContain`, `toBeTruthy()`, `queryBy… → toBeNull()`, et `(el as HTMLInputElement).checked → toBe(true)`.
 - `formatMontant` ne suffixe pas « FCFA » : `formatMontant(10000) === '10 000'` avec une **espace insécable**. Dans les tests, appeler `formatMontant` plutôt que d'écrire le nombre à la main — c'est la seule façon de ne pas se tromper d'espace.
-- Le vrai contrôle de types est `npx tsc -b` à la racine. `tsc --noEmit -p apps/collecteur` ne vérifie rien (fichier solution à `"files": []`).
+- Le contrôle de types est `npx tsc -b apps/collecteur packages/core` — **il n'y a pas de `tsconfig.json` à la racine**, donc `npx tsc -b` seul échoue avec `TS6053: File 'tsconfig.json' not found` et un `$?` trompeur de 0 quand il est mis en fin de pipeline. `tsc --noEmit -p apps/collecteur` ne vérifie rien non plus (fichier solution à `"files": []`).
+- Les tests d'un workspace passent par lui : `npm test --workspace @kolek/collecteur -- <chemin relatif>`. `npx vitest run --dir apps/collecteur` ne charge **pas** `apps/collecteur/vitest.config.ts` et laisse `render()` échouer faute de jsdom.
 - Textes d'interface en français, apostrophe typographique `’` comme dans le code existant.
 
 ---
@@ -286,7 +287,7 @@ par :
 
 - [ ] **Étape 8 : vérifier que plus rien n'importe `MISE_MAX`**
 
-Run: `npx tsc -b`
+Run: `npx tsc -b apps/collecteur packages/core`
 
 Expected: exit 0, aucune sortie. Si une erreur `Module '"@kolek/core"' has no exported member 'MISE_MAX'` apparaît, le fichier cité a été oublié : le reprendre.
 
@@ -799,7 +800,7 @@ Le bouton (vers la ligne 773) :
 
 - [ ] **Étape 8 : vérifier les types et la suite entière du collecteur**
 
-Run: `npx tsc -b`
+Run: `npx tsc -b apps/collecteur packages/core`
 
 Expected: exit 0. Toute erreur `Argument of type 'number | null' is not assignable to parameter of type 'number'` désigne un appelant dont la garde manque : la corriger, ne pas ajouter de `!` ni de `as number`.
 

@@ -101,7 +101,7 @@ describe('activer une carte de plus', () => {
   it('affiche le refus du serveur sans fermer le bloc', async () => {
     ouvrirCarte.mockResolvedValue({
       ok: false,
-      echec: { code: 'MISE_HORS_BORNES', message: 'La mise doit Ãªtre d’au moins 500 FCFA.' },
+      echec: { code: 'MISE_HORS_BORNES', message: 'La mise doit être d’au moins 500 FCFA.' },
     });
     const onOuverte = vi.fn();
 
@@ -154,7 +154,7 @@ describe('activer une carte de plus', () => {
     // un second refus — sur une saisie que le serveur n'a pourtant jamais vue.
     ouvrirCarte.mockResolvedValue({
       ok: false,
-      echec: { code: 'MISE_HORS_BORNES', message: 'La mise doit Ãªtre d’au moins 500 FCFA.' },
+      echec: { code: 'MISE_HORS_BORNES', message: 'La mise doit être d’au moins 500 FCFA.' },
     });
     const onOuverte = vi.fn();
 
