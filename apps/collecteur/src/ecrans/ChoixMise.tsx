@@ -1,4 +1,4 @@
-import { MISE_MAX, MISE_MIN, formatMontant, validerMise } from '@kolek/core';
+import { MISE_MAX_STOCKABLE, MISE_MIN, formatMontant, validerMise } from '@kolek/core';
 import { useState } from 'react';
 
 /**
@@ -8,10 +8,9 @@ import { useState } from 'react';
  *
  * Les cinq montants proposés — 500, 1 000, 2 000, 5 000, 10 000 — sont ceux
  * qu'on entend le plus au marché, et ils couvrent la majorité des cartes. Mais
- * la base accepte **tout entier entre 500 et 10 000** : la contrainte de
- * `cartes.mise` est un intervalle, pas une liste. Une cliente qui veut mettre
- * 750 FCFA par jour a le droit, et jusqu'ici l'application le lui refusait sans
- * qu'aucune règle du produit ne l'exige.
+ * la base accepte **tout entier à partir de 500** : la contrainte de
+ * `cartes.mise` est un plancher, pas une liste. Une cliente qui veut mettre
+ * 750 FCFA par jour a le droit, et une autre qui met 50 000 aussi.
  *
  * Le collecteur négocie ce montant devant l'étal. L'interface doit pouvoir
  * écrire ce qui a été convenu, pas le plus proche des cinq.
@@ -24,7 +23,7 @@ import { useState } from 'react';
  * un bouton.
  */
 
-/** Paliers usuels du marché, tous compris dans [MISE_MIN, MISE_MAX]. */
+/** Paliers usuels du marché, tous compris dans [MISE_MIN, MISE_INHABITUELLE]. */
 export const MISES_USUELLES = [500, 1000, 2000, 5000, 10000] as const;
 
 export function ChoixMise({
@@ -98,7 +97,6 @@ export function ChoixMise({
               type="number"
               inputMode="numeric"
               min={MISE_MIN}
-              max={MISE_MAX}
               step={50}
               value={saisie}
               autoFocus
@@ -119,7 +117,9 @@ export function ChoixMise({
 
           {saisie.trim() !== '' && !saisieValide && (
             <p role="alert" className="text-sm font-body text-negative mt-1">
-              Entre {formatMontant(MISE_MIN)} et {formatMontant(MISE_MAX)} FCFA, sans centimes.
+              {valeurSaisie > MISE_MAX_STOCKABLE
+                ? "Montant trop grand."
+                : `Au moins ${formatMontant(MISE_MIN)} FCFA, sans centimes.`}
             </p>
           )}
         </div>

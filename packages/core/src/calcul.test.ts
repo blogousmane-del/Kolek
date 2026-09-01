@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   MISES_PAR_CYCLE,
+  MISE_INHABITUELLE,
+  MISE_MAX_STOCKABLE,
   commission,
   cycleComplet,
+  miseInhabituelle,
   peutEncaisser,
   progression,
   soldeRestituable,
@@ -52,24 +55,48 @@ describe('soldeRestituable', () => {
     expect(() => soldeRestituable(-1, 1000)).toThrow(RangeError);
   });
 
-  it('refuse une mise hors des bornes 500 – 10 000', () => {
+  it('refuse une mise sous le plancher', () => {
     expect(() => soldeRestituable(10, 499)).toThrow(RangeError);
-    expect(() => soldeRestituable(10, 10001)).toThrow(RangeError);
+  });
+
+  it("calcule sans broncher au-dessus de l'ancien plafond", () => {
+    // 1 500 000 000 : au-delà de ce que l'ancienne borne de 10 000 autorisait,
+    // et bien au-delà de ce qu'un `integer` porterait sur 31 mises. Le calcul
+    // se fait en JavaScript, où le nombre est exact jusqu'à 2^53.
+    expect(soldeRestituable(31, 50_000_000)).toBe(1_500_000_000);
   });
 });
 
 describe('validerMise', () => {
-  it('accepte les bornes et les paliers usuels', () => {
-    for (const m of [500, 1000, 2000, 5000, 10000]) {
+  it('accepte le plancher, les paliers usuels et bien au-delà', () => {
+    for (const m of [500, 1000, 2000, 5000, 10000, 50_000, 50_000_000, MISE_MAX_STOCKABLE]) {
       expect(validerMise(m)).toBe(true);
     }
   });
 
-  it('refuse hors bornes et non entiers', () => {
+  it('refuse sous le plancher, au-delà du stockable, et les non-entiers', () => {
     expect(validerMise(499)).toBe(false);
-    expect(validerMise(10001)).toBe(false);
+    expect(validerMise(MISE_MAX_STOCKABLE + 1)).toBe(false);
     expect(validerMise(1000.5)).toBe(false);
     expect(validerMise(Number.NaN)).toBe(false);
+  });
+});
+
+describe('miseInhabituelle', () => {
+  it("laisse passer l'ancien plafond sans rien demander", () => {
+    // 10 000 est le seuil, pas au-dessus. Tout ce qui passait hier sans
+    // confirmation passe encore sans confirmation : c'est la promesse du
+    // chantier, et c'est le cas limite qu'on casse le plus facilement.
+    expect(miseInhabituelle(MISE_INHABITUELLE)).toBe(false);
+    expect(miseInhabituelle(10_001)).toBe(true);
+  });
+
+  it('est faux pour une mise invalide, quelle que soit sa taille', () => {
+    // Une valeur refusée n'est pas « inhabituelle » : elle n'existe pas. Sans
+    // ce test, l'écran afficherait une case à cocher sous un message d'erreur.
+    expect(miseInhabituelle(499)).toBe(false);
+    expect(miseInhabituelle(MISE_MAX_STOCKABLE + 1)).toBe(false);
+    expect(miseInhabituelle(20_000.5)).toBe(false);
   });
 });
 

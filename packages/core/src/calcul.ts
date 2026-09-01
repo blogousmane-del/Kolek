@@ -2,7 +2,24 @@ import type { Carte } from './types';
 
 export const MISES_PAR_CYCLE = 31;
 export const MISE_MIN = 500;
-export const MISE_MAX = 10_000;
+
+/**
+ * Au-delà, l'écran demande confirmation. Ce n'est plus un refus.
+ *
+ * C'est l'ancien plafond. Le choix du chiffre est délibéré : tout ce qui était
+ * interdit hier demande aujourd'hui une confirmation, et tout ce qui passait
+ * hier passe encore sans rien demander.
+ */
+export const MISE_INHABITUELLE = 10_000;
+
+/**
+ * Ce que la colonne `integer` de Postgres sait porter.
+ *
+ * Borne physique, pas commerciale : sans elle, la base refuserait avec
+ * « value out of range for type integer », que le collecteur ne peut pas
+ * comprendre ni corriger.
+ */
+export const MISE_MAX_STOCKABLE = 2_147_483_647;
 
 function verifierEntrees(misesEncaissees: number, mise: number): void {
   if (!Number.isInteger(misesEncaissees) || misesEncaissees < 0 || misesEncaissees > MISES_PAR_CYCLE) {
@@ -14,7 +31,18 @@ function verifierEntrees(misesEncaissees: number, mise: number): void {
 }
 
 export function validerMise(montant: number): boolean {
-  return Number.isInteger(montant) && montant >= MISE_MIN && montant <= MISE_MAX;
+  return Number.isInteger(montant) && montant >= MISE_MIN && montant <= MISE_MAX_STOCKABLE;
+}
+
+/**
+ * Vrai pour une mise valide mais au-dessus du seuil de confirmation.
+ *
+ * Faux pour une mise invalide : une valeur que la base refuserait n'est pas
+ * « inhabituelle », elle n'existe pas. L'écran doit lui montrer une erreur, pas
+ * une case à cocher.
+ */
+export function miseInhabituelle(montant: number): boolean {
+  return validerMise(montant) && montant > MISE_INHABITUELLE;
 }
 
 /**
