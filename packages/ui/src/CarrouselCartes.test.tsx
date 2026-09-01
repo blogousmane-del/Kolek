@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CarrouselCartes, type CarteItem } from './CarrouselCartes';
 
@@ -304,5 +304,95 @@ describe('CarrouselCartes — choisir la carte que le bouton servira', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Agrandir' }));
     fireEvent.scroll(piste);
     expect(onVisible).toHaveBeenCalledWith('c');
+  });
+});
+
+/**
+ * La fente, et pourquoi elle doit couper les gestes de la piste.
+ *
+ * Le `li` écoute déjà `pointerdown` — l'appui long de 350 ms qui lève une
+ * carte — et `click`, qui la choisit. Un bouton posé dedans hérite des deux :
+ * le toucher lèverait la carte au lieu d'encaisser.
+ */
+describe('CarrouselCartes — la fente d’action', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Un écran qui ne veut de commande que sur la carte choisie. */
+  function fente(carte: CarteItem, choisie: boolean) {
+    if (!choisie) return null;
+    return (
+      <button type="button" aria-label={`agir sur ${carte.id}`}>
+        agir
+      </button>
+    );
+  }
+
+  it('interroge chaque carte, et dit laquelle est choisie', () => {
+    // Chaque carte, et non la seule choisie : le bandeau de sursis d'une carte
+    // doit pouvoir rester visible pendant qu'on en regarde une autre. Ce qui
+    // sort, et où, est la décision de l'écran.
+    const rendreAction = vi.fn(fente);
+    render(
+      <CarrouselCartes
+        cartes={TROIS}
+        visibleId="b"
+        onVisible={vi.fn()}
+        rendreAction={rendreAction}
+      />,
+    );
+
+    const interrogees = rendreAction.mock.calls.map(([carte]) => carte.id);
+    expect(new Set(interrogees)).toEqual(new Set(['a', 'b', 'c']));
+    expect(rendreAction).toHaveBeenCalledWith(TROIS[1], true);
+    expect(rendreAction).toHaveBeenCalledWith(TROIS[0], false);
+    expect(rendreAction).toHaveBeenCalledWith(TROIS[2], false);
+  });
+
+  it('ne pose que ce que l’écran lui rend', () => {
+    render(<CarrouselCartes cartes={TROIS} visibleId="b" onVisible={vi.fn()} rendreAction={fente} />);
+
+    expect(screen.getByRole('button', { name: 'agir sur b' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'agir sur a' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'agir sur c' })).toBeNull();
+  });
+
+  it('ne rend rien de plus quand aucune fente n’est fournie', () => {
+    render(<CarrouselCartes cartes={TROIS} visibleId="b" onVisible={vi.fn()} />);
+
+    expect(screen.queryByRole('button', { name: /^agir/ })).toBeNull();
+  });
+
+  it('ne re-choisit pas la carte quand on touche la fente', () => {
+    // Sans cette coupure, toucher le bouton rappellerait `onVisible` — anodin
+    // ici, mais c'est le même chemin que l'appui long ci-dessous.
+    const onVisible = vi.fn();
+    render(
+      <CarrouselCartes cartes={TROIS} visibleId="b" onVisible={onVisible} rendreAction={fente} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'agir sur b' }));
+    expect(onVisible).not.toHaveBeenCalled();
+  });
+
+  it('ne lève pas la carte quand le doigt s’attarde sur la fente', () => {
+    render(
+      <CarrouselCartes cartes={TROIS} visibleId="b" onVisible={vi.fn()} rendreAction={fente} />,
+    );
+
+    const carteB = screen.getAllByRole('listitem')[1];
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'agir sur b' }));
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+
+    // `scale-105` n'est posé que sur la carte levée. Le doigt est resté plus
+    // longtemps que les 350 ms de l'appui long, et rien ne s'est levé.
+    expect(carteB.className).not.toMatch(/scale-105/);
   });
 });
