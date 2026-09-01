@@ -158,30 +158,70 @@ La première mise est ta commission.
   ☐ Je confirme ce montant
 ```
 
-**Règle de rétention :** tant que la case n'est pas cochée, `onChoisir` ne
-remonte rien. Le parent garde le dernier montant valide et confirmé ; son bouton
-d'enregistrement ne peut donc jamais partir sur une valeur non reconnue.
-Changer le montant décoche la case.
+**Règle de rétention :** tant que la case n'est pas cochée, le parent ne détient
+**aucun** montant utilisable. Changer le montant décoche.
+
+La première rédaction disait « le parent garde le dernier montant valide ».
+C'était un défaut, pas une garantie : le collecteur tape 50 000, ne coche pas,
+appuie sur « Ouvrir la carte », et la carte s'ouvre **silencieusement à 1 000** —
+le montant retenu. Pour une valeur figée à l'ouverture et impossible à corriger,
+un enregistrement muet au mauvais montant est pire qu'un refus.
+
+**L'invariant, à la place :** tant que le champ libre est ouvert, le parent
+détient exactement ce que le champ montre — `null` si le champ est vide,
+invalide, ou inhabituel-non-confirmé.
+
+Ce que ça impose à la signature :
+
+```ts
+mise: number | null;
+onChoisir: (montant: number | null) => void;
+```
+
+`null` n'est pas une commodité : c'est ce qui force `tsc -b` à faire échouer
+tout appelant qui n'aurait pas gardé son bouton. Le compilateur remplace une
+règle qu'on aurait dû se rappeler.
+
+**Vérification faite sur les trois appelants, et elle contredit la première
+rédaction :** `Clients.tsx:752` gate bien (`pret` contient `validerMise(mise)`),
+mais **ni `ActiverCarte.tsx:114` ni `FicheClient.tsx:773`** ne le font — leur
+`disabled` est `envoi || collecteurId === null`. Deux écrans, pas un. Et le gate
+de `Clients` n'aurait rien changé de toute façon : `validerMise(1000)` est vrai.
+Seul `null` ferme le trou. Les trois passent donc en `useState<number | null>`
+et ajoutent `mise === null` à leur garde.
+
+**Effet de bord voulu :** l'invariant ferme aussi un trou préexistant. Aujourd'hui,
+taper « 5 » dans le champ libre affiche l'erreur mais laisse 1 000 chez le parent,
+et le bouton d'`ActiverCarte` reste actif. Après ce chantier, une saisie invalide
+remonte `null` et le bouton s'éteint.
+
+**Un montant inhabituel reçu à l'ouverture est déjà confirmé.** Si `misePreremplie`
+vaut 50 000 — la carte précédente du client — la case naît **cochée** :
+`useState(mise !== null && miseInhabituelle(mise))`. Sinon l'invariant serait
+violé dès le montage, le parent tenant une valeur que l'écran présente comme
+non confirmée.
 
 Ce choix place la confirmation en **un seul endroit** pour les trois appelants —
 `ActiverCarte.tsx:98`, `Clients.tsx:833` (souscription) et `FicheClient.tsx:761`
-(`NouvelleCarte`) — qui ne changent pas.
+(`NouvelleCarte`) — dont seule la garde du bouton change.
 
 Autres retouches dans le même fichier :
 
 - L'attribut `max={MISE_MAX}` disparaît du champ. `min={MISE_MIN}` et
   `step={50}` restent.
-- Le message d'erreur devient : `Au moins {formatMontant(MISE_MIN)} FCFA, sans centimes.`
+- Le message d'erreur devient `Au moins {formatMontant(MISE_MIN)} FCFA, sans
+  centimes.`, sauf au-delà de `MISE_MAX_STOCKABLE`, où il devient
+  `Montant trop grand.` — la borne physique doit se dire autrement que la borne
+  basse, sinon elle est incomprehensible.
+- La ligne du cycle 31 jours se calcule sur le montant que l'écran **porte**
+  (`libre && saisieValide ? valeurSaisie : mise`), pas sur ce que le parent
+  détient. C'est précisément ce chiffre qui motive la confirmation : le faire
+  disparaître pendant l'attente retirerait la raison de cocher.
 - Le commentaire d'en-tête, qui affirme « la base accepte tout entier entre 500
   et 10 000 », est réécrit.
 - `MISES_USUELLES = [500, 1000, 2000, 5000, 10000]` ne bouge pas. Aucun palier
   n'est **au-dessus** du seuil, donc un appui sur un palier ne demande jamais
   rien — y compris 10 000, qui est égal au seuil et non supérieur.
-
-**Un défaut corrigé au passage :** [FicheClient.tsx:773](../../apps/collecteur/src/ecrans/FicheClient.tsx#L773)
-n'inclut pas `validerMise(mise)` dans son `disabled`, contrairement aux deux
-autres appelants. Aujourd'hui c'est sans conséquence ; avec la rétention, ce
-serait le seul écran où un état non confirmé pourrait s'enregistrer.
 
 ## 5. Les textes de refus
 
@@ -199,11 +239,21 @@ toujours. Les deux assertions correspondantes dans `ActiverCarte.test.tsx`
 
 ## 6. Un plafond qui subsiste, et qu'on assume
 
-`operations.cash_attendu` est un `integer` qui cumule les encaissements d'une
-journée, et `operations.ecart` est une colonne **générée stockée** qui en
-dépend (`20260815232256_socle_operations.sql:8,10`). Au-delà d'environ
-2,1 milliards de FCFA encaissés dans une seule journée par un seul collecteur,
-l'écriture échouerait.
+`operations.cash_attendu` est un `integer` qui porte la recette d'une journée,
+et `operations.ecart` est une colonne **générée stockée** qui en dépend
+(`20260815232256_socle_operations.sql:8,10`).
+
+Le point de rupture exact est le `::integer` final de
+`public.cash_attendu_du_jour(uuid, date)`
+(`20260825110000_cash_attendu_retraits.sql:35-66`). Ses deux sous-requêtes sont
+des `sum()` sur `integer`, donc déjà des `bigint` — rien ne déborde à
+l'intérieur. C'est la conversion du résultat qui échoue si la valeur nette du
+jour — mises encaissées **moins** restitutions — sort de
+`[−2 147 483 648, 2 147 483 647]`.
+
+Les deux sens comptent. Clôturer deux cartes à 50 000 FCFA de mise le même jour
+restitue 3 milliards de FCFA : la valeur nette est très négative, et
+`caisses_rafraichir_apres_retrait` ferait échouer le retrait.
 
 Élargir ces colonnes obligerait à démonter et reconstruire une colonne générée
 sur une table de production. C'est hors du périmètre de ce chantier. Le plafond
@@ -223,12 +273,17 @@ en production.
   autour de la seule borne basse.
 
 **`apps/collecteur`** (nouveau `ChoixMise.test.tsx`)
-- Un montant ≤ 10 000 remonte immédiatement par `onChoisir`, sans case à cocher
-  affichée.
-- Un montant > 10 000 n'appelle pas `onChoisir` tant que la case n'est pas
-  cochée ; l'appelle une fois cochée.
-- Changer le montant après confirmation décoche et retient de nouveau.
-- Un appui sur le palier 10 000 ne demande rien.
+- Un montant libre ≤ 10 000 remonte immédiatement par `onChoisir`, sans case à
+  cocher affichée.
+- Un montant > 10 000 remonte `null` et affiche la case ; cocher remonte le
+  montant.
+- Changer le montant après confirmation décoche et remonte `null` de nouveau.
+- Une saisie invalide (« 5 ») remonte `null` — le trou préexistant.
+- Un appui sur le palier 10 000 remonte 10 000 sans rien demander.
+- Une `mise` inhabituelle reçue en propriété naît avec la case cochée et ne
+  remonte rien au montage.
+- La ligne du cycle 31 jours affiche le montant en attente de confirmation, pas
+  celui que le parent détient.
 
 **Base** (harnais de migration existant)
 - `cartes.mise = 50 000` et `mises.montant = 50 000` sont acceptés ; 499 est
