@@ -730,12 +730,12 @@ function NouvelleCarte({
   premiere: boolean;
   onOuverte: () => void;
 }) {
-  const [mise, setMise] = useState(1000);
+  const [mise, setMise] = useState<number | null>(1000);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
   async function ouvrir() {
-    if (!collecteurId) return;
+    if (!collecteurId || mise === null) return;
     setEnvoi(true);
     setErreur(null);
     const resultat = await ouvrirCarte(collecteurId, clientId, mise);
@@ -770,7 +770,7 @@ function NouvelleCarte({
         pleineLargeur
         icone="plus"
         className="mt-3"
-        disabled={envoi || collecteurId === null}
+        disabled={envoi || collecteurId === null || mise === null}
         onClick={() => void ouvrir()}
       >
         {envoi ? 'Ouverture…' : 'Ouvrir la carte'}

@@ -6,6 +6,12 @@ dist/
 build/
 .vite/
 
+# Cache incrémental de `tsc -b`. Aucun paquet n'en versionnait jusqu'ici parce
+# que rien ne lançait `tsc -b` hors de `npm run build`, où la sortie tombe dans
+# `dist/`. Vérifier les types d'un paquet sans script de build — `packages/core`
+# — en dépose un à la racine du paquet.
+*.tsbuildinfo
+
 # Environnement — jamais de secret versionné
 .env
 .env.*

@@ -52,7 +52,7 @@ Ce document regroupe le **cahier de charges Phase 1** (Partie I), le **dossier s
 
 | Paramètre | Règle |
 |---|---|
-| Mise journalière | Montant fixe `M` défini à la souscription, **de 500 à 10 000 FCFA** (ex. 500, 1 000, 2 000, 5 000, 10 000). |
+| Mise journalière | Montant fixe `M` défini à la souscription, **à partir de 500 FCFA**, sans plafond (ex. 500, 1 000, 2 000, 5 000, 10 000). Au-delà de 10 000, l'application demande une confirmation : la mise est figée à l'ouverture de la carte et ne se corrige pas. |
 | Cycle | **31 mises encaissées** — on compte les versements réels, pas les jours du calendrier. |
 | Commission collecteur | **1 mise par carte.** La 1ʳᵉ mise encaissée est fléchée « commission ». |
 | Retrait | Possible **à tout moment**. Le retrait **clôture la carte** ; la commission d'une mise est prélevée sur le solde encaissé. |

@@ -1,0 +1,327 @@
+# Mise journalière sans plafond — dessin
+
+**Date :** 2026-09-01
+**État :** validé, prêt pour le plan
+
+## Le problème
+
+La mise journalière d'une carte est aujourd'hui bornée à `[500, 10 000]` FCFA.
+La borne haute existe en quatre endroits — `packages/core`, deux contraintes
+`CHECK`, et les messages de refus des écritures — et elle refuse un métier réel :
+un commerçant qui met 50 000 FCFA par jour de côté n'a pas de carte chez Kolek.
+
+Rien dans le produit ne justifie 10 000. C'était le palier haut du marché au
+moment du socle, pas une règle. La borne basse, elle, a une raison : en dessous
+de 500 FCFA la commission du collecteur ne paie pas son déplacement.
+
+## La décision
+
+**La borne haute disparaît. La borne basse reste.**
+
+Le plafond servait aussi de garde-fou contre la faute de frappe — un zéro de
+trop transforme 5 000 en 50 000, et **une mise ne se corrige pas** : elle est
+figée à l'ouverture de la carte, et les 31 versements qui suivent en dépendent.
+Ce garde-fou ne disparaît pas, il change de nature : au lieu de refuser, il
+demande confirmation.
+
+**Seuil de confirmation : 10 000 FCFA** — l'ancien plafond. Tout ce qui était
+interdit hier demande aujourd'hui une confirmation ; tout ce qui passait hier
+passe encore sans rien demander.
+
+## 1. Le noyau — `packages/core/src/calcul.ts`
+
+`MISE_MAX` disparaît en tant que refus commercial. Deux constantes le
+remplacent, chacune avec un rôle distinct :
+
+```ts
+export const MISE_MIN = 500;
+
+/** Au-delà, l'écran demande confirmation. Ce n'est plus un refus. */
+export const MISE_INHABITUELLE = 10_000;
+
+/**
+ * La plus grande mise que le chemin de l'argent porte de bout en bout.
+ *
+ * Ce n'est pas la borne d'une colonne mais celle d'une **opération** : la
+ * clôture écrit `(mises − 1) × mise` — soit 30 × mise sur une carte pleine —
+ * dans `retraits.montant_restitue`, qui est un `integer`. Au-delà, l'insertion
+ * lève `22003`, la clôture rend `CLOTURE_IMPOSSIBLE`, et la carte reste active
+ * définitivement : `cartes.mise` est figée à l'ouverture et `mises` est
+ * append-only. Refuser à l'ouverture est donc la seule protection qui existe.
+ */
+export const MISE_MAX_RESTITUABLE = Math.floor(2_147_483_647 / 30);
+
+export function validerMise(montant: number): boolean {
+  return Number.isInteger(montant) && montant >= MISE_MIN && montant <= MISE_MAX_RESTITUABLE;
+}
+
+/** Vrai pour une mise valide mais au-dessus du seuil de confirmation. */
+export function miseInhabituelle(montant: number): boolean {
+  return validerMise(montant) && montant > MISE_INHABITUELLE;
+}
+```
+
+`MISE_MAX` cesse d'être exporté. `packages/core/src/index.ts` fait
+`export * from './calcul'`, donc le retirer de `calcul.ts` suffit — aucun
+fichier de barrière à modifier. Ses consommateurs — `ChoixMise.tsx` (deux
+usages) et les trois gardes d'`ecritures.ts` — sont repris ci-dessous. Un
+`tsc -b` échouant sur un `MISE_MAX` oublié est la vérification.
+
+`verifierEntrees`, `soldeRestituable`, `commission`, `progression`,
+`cycleComplet` et `peutEncaisser` ne changent pas : ils appellent `validerMise`,
+qui s'élargit sous eux.
+
+## 2. La base — une migration
+
+Deux contraintes portent la borne haute :
+
+| Table | Contrainte | Dernière définition |
+|---|---|---|
+| `cartes.mise` | `cartes_mise_check` | `20260815135037_socle_collecteurs.sql:43` |
+| `mises.montant` | `mises_montant_borne` | `20260818010000_socle_storage_et_bornes.sql:57` |
+
+```sql
+alter table public.cartes drop constraint cartes_mise_check;
+alter table public.cartes add  constraint cartes_mise_check check (mise >= 500);
+
+alter table public.mises drop constraint mises_montant_borne;
+alter table public.mises add  constraint mises_montant_borne check (montant >= 500);
+```
+
+Les noms sont conservés — le garde-fou de `20260818010000` vérifie
+`mises_montant_borne` par son nom.
+
+Élargir un `CHECK` ne réécrit aucune ligne : toutes les mises existantes sont
+dans le nouvel intervalle, et Postgres valide la nouvelle contrainte par un
+simple parcours. La migration ne peut pas échouer sur des données réelles.
+
+**Ce qui ne bouge pas :** `mises_avant_insert` (qui exige `new.montant = c.mise`
+sans borne propre), l'immuabilité de `mises` (`mises_immuables`), et les grants
+`insert`-seul de la Data API.
+
+**Ce qui a été mal lu ici :** une première rédaction affirmait que
+`retraits.montant_restitue`, dont la contrainte `>= 0` n'a pas de borne haute,
+« n'a jamais eu de borne haute — une grosse carte pourra se clôturer ». C'est
+faux, et l'erreur venait de n'avoir regardé que le `CHECK`. La colonne est un
+`integer` : elle a une borne haute, elle n'est simplement pas écrite dans une
+contrainte. La clôture y insère `(mises_encaissees − 1) × mise`, soit
+30 × mise sur une carte pleine. Au-delà de `2 147 483 647 / 30`, soit
+71 582 788 par mise, l'insertion lève `22003` et la clôture échoue —
+**définitivement**, puisque `cartes.mise` est figée à l'ouverture et `mises`
+est append-only. C'est le vrai plafond du produit ; voir `packages/core` et
+§6.
+
+## 3. Le débordement — la vraie condition du chantier
+
+Sans cette section, le plafond ne disparaît pas : il devient un plantage. Le
+produit `(mises_encaissees − 1) × mise` est calculé en `integer × integer` dans
+plusieurs objets SQL. Postgres déborde à 2 147 483 647, soit une mise d'environ
+**71,5 millions** sur une carte complète — bien en deçà de ce que la colonne
+`mise` accepte désormais. Le message serait « integer out of range », levé
+pendant un encaissement.
+
+Trois objets à reprendre :
+
+| Objet | Dernière définition | Ce qui déborde |
+|---|---|---|
+| `public.admin_vue_globale()` | `20260830110000_mrr_net_des_remises.sql:118` | `greatest(ca.mises_encaissees - 1, 0) * ca.mise as solde_restituable` |
+| `public.mettre_en_file_avis()` | `20260823160000_avis_ouverture_et_administration.sql:96` | même produit, dans le texte du SMS de versement |
+| `public.grouper_milliers(integer)` | `20260823140000_notifications_clients.sql:248` | signature `integer` |
+
+Le débordement se produit **à la multiplication**, avant tout appel de fonction.
+Il faut donc deux choses ensemble :
+
+1. Couler un opérande en `bigint` sur chaque produit :
+   `greatest(ca.mises_encaissees - 1, 0)::bigint * ca.mise`
+2. Élargir `grouper_milliers` à un paramètre `bigint`, sinon le résultat
+   `bigint` redéborde en redescendant dans la fonction.
+
+`grouper_milliers` a quatre appelants, tous à l'intérieur de
+`mettre_en_file_avis` — qui est redéfini de toute façon. Le changement de
+signature ne casse rien ailleurs.
+
+Postgres traite `grouper_milliers(integer)` et `grouper_milliers(bigint)` comme
+deux fonctions distinctes : un `create or replace` sur la seconde laisserait la
+première en place, et un appel avec un argument `integer` continuerait de la
+choisir par correspondance exacte. **L'ordre dans la migration est donc
+imposé :**
+
+1. `drop function if exists public.grouper_milliers(integer);`
+2. `create function public.grouper_milliers(valeur bigint)` — corps inchangé
+3. `create or replace function public.mettre_en_file_avis()` — produit coulé en `bigint`
+4. `create or replace function public.admin_vue_globale()` — produit coulé en `bigint`
+
+L'étape 1 est sans danger même si `mettre_en_file_avis` référence encore
+l'ancienne signature à ce moment-là : plpgsql résout les appels à l'exécution,
+et l'étape 3 arrive dans la même transaction de migration.
+
+Les agrégats (`sum(solde_restituable)`) ne posent pas de problème : `sum` sur
+`integer` renvoie déjà `bigint` en Postgres.
+
+## 4. La confirmation, dans `ChoixMise`
+
+`ChoixMise` affiche déjà le cycle complet — « ça fait combien au bout ? ». La
+confirmation se pose là, sous le chiffre qui la motive.
+
+```
+Montant convenu avec le client  [ 50000 ] FCFA / jour
+
+31 jours · le client verse 1 550 000 FCFA, tu lui rends 1 500 000 FCFA.
+La première mise est ta commission.
+
+⚠ Montant inhabituel. Une mise est figée à l'ouverture de la carte
+  et ne se corrige pas.
+  ☐ Je confirme ce montant
+```
+
+**Règle de rétention :** tant que la case n'est pas cochée, le parent ne détient
+**aucun** montant utilisable. Changer le montant décoche.
+
+La première rédaction disait « le parent garde le dernier montant valide ».
+C'était un défaut, pas une garantie : le collecteur tape 50 000, ne coche pas,
+appuie sur « Ouvrir la carte », et la carte s'ouvre **silencieusement à 1 000** —
+le montant retenu. Pour une valeur figée à l'ouverture et impossible à corriger,
+un enregistrement muet au mauvais montant est pire qu'un refus.
+
+**L'invariant, à la place :** tant que le champ libre est ouvert, le parent
+détient exactement ce que le champ montre — `null` si le champ est vide,
+invalide, ou inhabituel-non-confirmé.
+
+Ce que ça impose à la signature :
+
+```ts
+mise: number | null;
+onChoisir: (montant: number | null) => void;
+```
+
+`null` n'est pas une commodité : c'est ce qui force `tsc -b` à faire échouer
+tout appelant qui n'aurait pas gardé son bouton. Le compilateur remplace une
+règle qu'on aurait dû se rappeler.
+
+**Vérification faite sur les trois appelants, et elle contredit la première
+rédaction :** `Clients.tsx:752` gate bien (`pret` contient `validerMise(mise)`),
+mais **ni `ActiverCarte.tsx:114` ni `FicheClient.tsx:773`** ne le font — leur
+`disabled` est `envoi || collecteurId === null`. Deux écrans, pas un. Et le gate
+de `Clients` n'aurait rien changé de toute façon : `validerMise(1000)` est vrai.
+Seul `null` ferme le trou. Les trois passent donc en `useState<number | null>`
+et ajoutent `mise === null` à leur garde.
+
+**Effet de bord voulu :** l'invariant ferme aussi un trou préexistant. Aujourd'hui,
+taper « 5 » dans le champ libre affiche l'erreur mais laisse 1 000 chez le parent,
+et le bouton d'`ActiverCarte` reste actif. Après ce chantier, une saisie invalide
+remonte `null` et le bouton s'éteint.
+
+**Un montant inhabituel reçu à l'ouverture est déjà confirmé.** Si `misePreremplie`
+vaut 50 000 — la carte précédente du client — la case naît **cochée** :
+`useState(mise !== null && miseInhabituelle(mise))`. Sinon l'invariant serait
+violé dès le montage, le parent tenant une valeur que l'écran présente comme
+non confirmée.
+
+Ce choix place la confirmation en **un seul endroit** pour les trois appelants —
+`ActiverCarte.tsx:98`, `Clients.tsx:833` (souscription) et `FicheClient.tsx:761`
+(`NouvelleCarte`) — dont seule la garde du bouton change.
+
+Autres retouches dans le même fichier :
+
+- L'attribut `max={MISE_MAX}` disparaît du champ. `min={MISE_MIN}` et
+  `step={50}` restent.
+- Le message d'erreur devient `Au moins {formatMontant(MISE_MIN)} FCFA, sans
+  centimes.`, sauf au-delà de `MISE_MAX_RESTITUABLE`, où il devient
+  `Montant trop grand.` — la borne physique doit se dire autrement que la borne
+  basse, sinon elle est incomprehensible.
+- La ligne du cycle 31 jours se calcule sur le montant que l'écran **porte**
+  (`libre && saisieValide ? valeurSaisie : mise`), pas sur ce que le parent
+  détient. C'est précisément ce chiffre qui motive la confirmation : le faire
+  disparaître pendant l'attente retirerait la raison de cocher.
+- Le commentaire d'en-tête, qui affirme « la base accepte tout entier entre 500
+  et 10 000 », est réécrit.
+- `MISES_USUELLES = [500, 1000, 2000, 5000, 10000]` ne bouge pas. Aucun palier
+  n'est **au-dessus** du seuil, donc un appui sur un palier ne demande jamais
+  rien — y compris 10 000, qui est égal au seuil et non supérieur.
+
+## 5. Les textes de refus
+
+Trois gardes identiques dans `apps/collecteur/src/ecritures.ts` (lignes 129, 195,
+302) portent le message `La mise doit être comprise entre ${MISE_MIN} et
+${MISE_MAX} FCFA.` sous le code `MISE_HORS_BORNES`. Ils deviennent :
+
+```ts
+message: `La mise doit être d'au moins ${MISE_MIN} FCFA.`
+```
+
+Le code d'erreur `MISE_HORS_BORNES` ne change pas : la borne basse existe
+toujours. Les deux assertions correspondantes dans `ActiverCarte.test.tsx`
+(lignes 104 et 157) suivent le nouveau texte.
+
+## 6. Deux plafonds qui subsistent, et qu'on assume
+
+Il n'existe pas de table `operations` — c'est le nom du fichier de migration
+(`20260815232256_socle_operations.sql`), pas d'une relation SQL. La table est
+`public.caisses_jour`. `caisses_jour.cash_attendu` est un `integer` qui porte
+la recette d'une journée, et `caisses_jour.ecart` est une colonne **générée
+stockée** qui en dépend (`20260815232256_socle_operations.sql:8,10`).
+
+Le point de rupture exact est le `::integer` final de
+`public.cash_attendu_du_jour(uuid, date)`
+(`20260825110000_cash_attendu_retraits.sql:35-66`). Ses deux sous-requêtes sont
+des `sum()` sur `integer`, donc déjà des `bigint` — rien ne déborde à
+l'intérieur. C'est la conversion du résultat qui échoue si la valeur nette du
+jour — mises encaissées **moins** restitutions — sort de
+`[−2 147 483 648, 2 147 483 647]`.
+
+Les deux sens comptent. Clôturer deux cartes à 50 000 FCFA de mise le même jour
+restitue 3 milliards de FCFA : la valeur nette est très négative, et
+`caisses_rafraichir_apres_retrait` ferait échouer le retrait.
+
+Élargir ces colonnes obligerait à démonter et reconstruire une colonne générée
+sur une table de production. C'est hors du périmètre de ce chantier.
+
+**Le plafond réel du produit tient donc en deux nombres, pas un.** Le premier,
+et le plus bas, est celui de `retraits.montant_restitue` (§2) : une mise ne
+peut pas dépasser 71 582 788 FCFA, sans quoi la clôture de la carte échoue
+définitivement. C'est lui que `MISE_MAX_RESTITUABLE` refuse à l'ouverture, et
+c'est la vraie limite qu'un collecteur peut atteindre. Le second, bien plus
+haut et laissé en l'état par ce chantier, est celui de
+`cash_attendu_du_jour` : ~2,1 milliards de FCFA de recette nette par
+collecteur et par jour — une limite qu'aucun usage plausible n'atteint, mais
+qui est documentée ici pour ne pas être redécouverte en production.
+
+## 7. Tests
+
+**`packages/core`** (`calcul.test.ts`)
+- `validerMise` accepte 500, 10 000, 50 000 et 50 000 000 ; refuse 499, 1000.5,
+  `NaN`, et `MISE_MAX_RESTITUABLE + 1`.
+- `miseInhabituelle` : faux à 10 000, vrai à 10 001, faux à 499 (invalide).
+- `soldeRestituable(31, 50_000)` vaut 1 500 000 ; ne lève plus pour 10 001.
+- Le test existant « refuse une mise hors des bornes 500 – 10 000 » est réécrit
+  autour de la seule borne basse.
+
+**`apps/collecteur`** (nouveau `ChoixMise.test.tsx`)
+- Un montant libre ≤ 10 000 remonte immédiatement par `onChoisir`, sans case à
+  cocher affichée.
+- Un montant > 10 000 remonte `null` et affiche la case ; cocher remonte le
+  montant.
+- Changer le montant après confirmation décoche et remonte `null` de nouveau.
+- Une saisie invalide (« 5 ») remonte `null` — le trou préexistant.
+- Un appui sur le palier 10 000 remonte 10 000 sans rien demander.
+- Une `mise` inhabituelle reçue en propriété naît avec la case cochée et ne
+  remonte rien au montage.
+- La ligne du cycle 31 jours affiche le montant en attente de confirmation, pas
+  celui que le parent détient.
+
+**Base** (harnais de migration existant)
+- `cartes.mise = 50 000` et `mises.montant = 50 000` sont acceptés ; 499 est
+  toujours refusé.
+- `admin_vue_globale()` rend un `solde_restituable` juste sur une carte à
+  100 000 000 de mise, au lieu de lever « integer out of range ».
+- L'insertion d'une mise sur une telle carte produit un avis dont le texte
+  contient le total exact.
+
+## Ce que ce chantier ne fait pas
+
+- Ne touche pas à l'immuabilité de `mises`.
+- Ne change pas la commission (une mise, dès le premier encaissement).
+- Ne change pas les 31 mises par cycle.
+- Ne touche pas à la grille d'abonnement (`paliers.ts`).
+- Ne touche pas aux paliers proposés dans `MISES_USUELLES`.
+- N'élargit pas `caisses_jour.cash_attendu` (voir §6).

@@ -285,7 +285,7 @@ Pas de portrait. Un produit qui manipule l'épargne de commerçants n'affiche pa
 - Toujours des **chiffres tabulaires** et le format FCFA.
 
 ### 4.14 Champs de formulaire
-Fond `input`, contour `hairline` 1,5 px, `rounded-md`, focus = contour `primary`. Label `text-sm` gras au-dessus. Sélecteur de mise = pilules `500 / 1 000 / 2 000 / 5 000 / 10 000`, bornées par `MISE_MIN` et `MISE_MAX` de `@kolek/core`.
+Fond `input`, contour `hairline` 1,5 px, `rounded-md`, focus = contour `primary`. Label `text-sm` gras au-dessus. Sélecteur de mise = pilules `500 / 1 000 / 2 000 / 5 000 / 10 000`, plus un champ libre à partir de `MISE_MIN`. Au-delà de `MISE_INHABITUELLE`, une case à cocher s'ouvre sous le champ et retient le montant tant qu'elle n'est pas cochée. Les trois constantes viennent de `@kolek/core`.
 
 Un champ de montant est en `type="text"` avec `inputMode="numeric"`, jamais en `type="number"` : un champ numérique natif refuse l'espace des milliers, et le montant s'afficherait « 10000 » là où tout le reste du produit écrit « 10 000 ».
 

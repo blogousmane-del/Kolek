@@ -45,7 +45,7 @@ export function ActiverCarte({
   onOuverte: () => void;
 }) {
   const [deplie, setDeplie] = useState(false);
-  const [mise, setMise] = useState(misePreremplie);
+  const [mise, setMise] = useState<number | null>(misePreremplie);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -54,7 +54,7 @@ export function ActiverCarte({
     // requête en vol retombe à `envoi = false` à la réponse, et un second
     // appui sur « Ouvrir la carte » repart pour un second appel — donc une
     // seconde commission, sur une carte que le client n'a jamais demandée.
-    if (!collecteurId || envoi) return;
+    if (!collecteurId || envoi || mise === null) return;
     setEnvoi(true);
     setErreur(null);
 
@@ -114,7 +114,7 @@ export function ActiverCarte({
       )}
 
       <div className="flex gap-2">
-        <Bouton onClick={ouvrir} disabled={envoi || collecteurId === null}>
+        <Bouton onClick={ouvrir} disabled={envoi || collecteurId === null || mise === null}>
           {envoi ? 'Ouverture…' : 'Ouvrir la carte'}
         </Bouton>
         <Bouton variante="contour" onClick={() => setDeplie(false)} disabled={envoi}>
