@@ -358,15 +358,40 @@ function CartesEnCours({
 
   async function ecrire(en: EnAttente) {
     const { collecteurId: id, onEcriture: prevenir } = contexte.current;
-    if (!id) return;
-    const resultat = await enregistrerMise(id, en.carteId, en.mise);
-    if (resultat.ok) {
-      // L'attente n'est pas levée ici : la relecture s'en charge. La lever
-      // maintenant reviderait la case le temps que la fiche revienne.
-      prevenir();
+    if (!id) {
+      // Sans identifiant de collecteur, rien ne peut partir. Le dire, plutôt
+      // que de laisser un bandeau vert sur une écriture qui n'aura pas lieu.
+      poser({
+        ...en,
+        envoyee: true,
+        echec: 'Session perdue. Reconnecte-toi avant de réessayer.',
+      });
       return;
     }
-    poser({ ...en, envoyee: true, echec: resultat.echec.message });
+    try {
+      const resultat = await enregistrerMise(id, en.carteId, en.mise);
+      if (resultat.ok) {
+        // L'attente n'est pas levée ici : la relecture s'en charge. La lever
+        // maintenant reviderait la case le temps que la fiche revienne.
+        prevenir();
+        return;
+      }
+      poser({ ...en, envoyee: true, echec: resultat.echec.message });
+    } catch {
+      // `enregistrerMise` rend `{ ok: false }` sur les refus du serveur, mais
+      // une coupure franche fait **rejeter** la promesse. Sans ce filet, le
+      // bandeau reste vert et figé : « Annuler » a disparu — la mise est
+      // peut-être partie — et « Réessayer » n'apparaît jamais. Aucune sortie.
+      //
+      // Le message ne promet rien, parce que l'écriture a pu aboutir avant que
+      // la réponse ne se perde. Même prudence, et presque les mêmes mots, que
+      // le try/catch d'`ActiverCarte`.
+      poser({
+        ...en,
+        envoyee: true,
+        echec: 'Réponse perdue. Vérifie la carte avant de réessayer.',
+      });
+    }
   }
 
   /** Écrit tout de suite ce qui attendait, et rend les minuteurs au repos. */

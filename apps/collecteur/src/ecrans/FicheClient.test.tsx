@@ -779,3 +779,69 @@ describe('client sans carte active : le bloc d’ouverture reste atteignable', (
     expect(screen.queryByText('Ouvrir sa première carte')).toBeNull();
   });
 });
+
+describe('quand l’écriture ne rend rien du tout', () => {
+  it('ouvre une sortie même sur une promesse rejetée', async () => {
+    // `enregistrerMise` rend `{ ok: false }` sur les refus du serveur, mais une
+    // coupure franche fait rejeter la promesse. Sans filet, le bandeau reste
+    // vert et figé : « Annuler » a disparu, « Réessayer » n'arrive jamais, et
+    // le collecteur n'a plus aucune sortie.
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+    enregistrerMise.mockRejectedValue(new Error('Failed to fetch'));
+
+    render(
+      <FicheClient
+        clientId="cli3"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
+    vi.useRealTimers();
+
+    // Le message ne promet rien : l'écriture a pu aboutir avant que la réponse
+    // ne se perde.
+    expect(await screen.findByText(/Vérifie la carte avant de réessayer/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Réessayer' })).toBeTruthy();
+    expect(screen.getByText('21/31 j · 68 %')).toBeTruthy();
+  });
+
+  it('le dit plutôt que de laisser un bandeau vert sur rien', async () => {
+    // Sans identifiant de collecteur, aucune insertion ne peut partir. Le
+    // bandeau vert prétendrait qu'une mise est en vol.
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+
+    render(
+      <FicheClient
+        clientId="cli3"
+        revision={0}
+        collecteurId={null}
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
+    vi.useRealTimers();
+
+    expect(enregistrerMise).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Session perdue/)).toBeTruthy();
+  });
+});
