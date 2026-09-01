@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { formatMontant } from '@kolek/core';
+import { MISE_MAX_RESTITUABLE, formatMontant } from '@kolek/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ChoixMise } from './ChoixMise';
@@ -134,6 +134,16 @@ describe('ChoixMise — la confirmation', () => {
     expect(caseAcocher().checked).toBe(false);
   });
 
+  it('accepte la plus grande mise que la clôture saura rendre', async () => {
+    const onChoisir = vi.fn();
+    render(<ChoixMise mise={1000} onChoisir={onChoisir} identifiant="t" />);
+
+    const utilisateur = await saisir(String(MISE_MAX_RESTITUABLE));
+    await utilisateur.click(caseAcocher());
+
+    expect(dernier(onChoisir)).toBe(MISE_MAX_RESTITUABLE);
+  });
+
   it('reçoit un montant inhabituel déjà confirmé, et ne le retire pas au parent', () => {
     const onChoisir = vi.fn();
     // Le cas réel : la carte précédente du client était à 50 000, et
@@ -153,5 +163,17 @@ describe('ChoixMise — la confirmation', () => {
     // Sans ça, « Autre » puis « Ouvrir la carte » enregistrerait le palier que
     // le collecteur venait justement de quitter.
     expect(dernier(onChoisir)).toBeNull();
+  });
+
+  it('ne détruit pas un montant libre déjà en place quand on rappuie sur « Autre »', async () => {
+    const onChoisir = vi.fn();
+    // 750 n'est pas un palier : le champ s'ouvre déjà rempli, et « Autre » est
+    // la pilule allumée.
+    render(<ChoixMise mise={750} onChoisir={onChoisir} identifiant="t" />);
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Autre' }));
+
+    expect(onChoisir).not.toHaveBeenCalled();
+    expect(champ().value).toBe('750');
   });
 });

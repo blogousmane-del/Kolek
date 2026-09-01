@@ -40,14 +40,19 @@ export const MISE_MIN = 500;
 export const MISE_INHABITUELLE = 10_000;
 
 /**
- * Ce que la colonne `integer` de Postgres sait porter. Borne physique, pas
- * commerciale : sans elle, la base refuserait avec « value out of range for
- * type integer », que le collecteur ne peut pas comprendre.
+ * La plus grande mise que le chemin de l'argent porte de bout en bout.
+ *
+ * Ce n'est pas la borne d'une colonne mais celle d'une **opération** : la
+ * clôture écrit `(mises − 1) × mise` — soit 30 × mise sur une carte pleine —
+ * dans `retraits.montant_restitue`, qui est un `integer`. Au-delà, l'insertion
+ * lève `22003`, la clôture rend `CLOTURE_IMPOSSIBLE`, et la carte reste active
+ * définitivement : `cartes.mise` est figée à l'ouverture et `mises` est
+ * append-only. Refuser à l'ouverture est donc la seule protection qui existe.
  */
-export const MISE_MAX_STOCKABLE = 2_147_483_647;
+export const MISE_MAX_RESTITUABLE = Math.floor(2_147_483_647 / 30);
 
 export function validerMise(montant: number): boolean {
-  return Number.isInteger(montant) && montant >= MISE_MIN && montant <= MISE_MAX_STOCKABLE;
+  return Number.isInteger(montant) && montant >= MISE_MIN && montant <= MISE_MAX_RESTITUABLE;
 }
 
 /** Vrai pour une mise valide mais au-dessus du seuil de confirmation. */
@@ -91,9 +96,20 @@ dans le nouvel intervalle, et Postgres valide la nouvelle contrainte par un
 simple parcours. La migration ne peut pas échouer sur des données réelles.
 
 **Ce qui ne bouge pas :** `mises_avant_insert` (qui exige `new.montant = c.mise`
-sans borne propre), l'immuabilité de `mises` (`mises_immuables`), les grants
-`insert`-seul de la Data API, et `retraits.montant_restitue`, dont la contrainte
-`>= 0` n'a jamais eu de borne haute — une grosse carte pourra se clôturer.
+sans borne propre), l'immuabilité de `mises` (`mises_immuables`), et les grants
+`insert`-seul de la Data API.
+
+**Ce qui a été mal lu ici :** une première rédaction affirmait que
+`retraits.montant_restitue`, dont la contrainte `>= 0` n'a pas de borne haute,
+« n'a jamais eu de borne haute — une grosse carte pourra se clôturer ». C'est
+faux, et l'erreur venait de n'avoir regardé que le `CHECK`. La colonne est un
+`integer` : elle a une borne haute, elle n'est simplement pas écrite dans une
+contrainte. La clôture y insère `(mises_encaissees − 1) × mise`, soit
+30 × mise sur une carte pleine. Au-delà de `2 147 483 647 / 30`, soit
+71 582 788 par mise, l'insertion lève `22003` et la clôture échoue —
+**définitivement**, puisque `cartes.mise` est figée à l'ouverture et `mises`
+est append-only. C'est le vrai plafond du produit ; voir `packages/core` et
+§6.
 
 ## 3. Le débordement — la vraie condition du chantier
 
@@ -210,7 +226,7 @@ Autres retouches dans le même fichier :
 - L'attribut `max={MISE_MAX}` disparaît du champ. `min={MISE_MIN}` et
   `step={50}` restent.
 - Le message d'erreur devient `Au moins {formatMontant(MISE_MIN)} FCFA, sans
-  centimes.`, sauf au-delà de `MISE_MAX_STOCKABLE`, où il devient
+  centimes.`, sauf au-delà de `MISE_MAX_RESTITUABLE`, où il devient
   `Montant trop grand.` — la borne physique doit se dire autrement que la borne
   basse, sinon elle est incomprehensible.
 - La ligne du cycle 31 jours se calcule sur le montant que l'écran **porte**
@@ -237,11 +253,13 @@ Le code d'erreur `MISE_HORS_BORNES` ne change pas : la borne basse existe
 toujours. Les deux assertions correspondantes dans `ActiverCarte.test.tsx`
 (lignes 104 et 157) suivent le nouveau texte.
 
-## 6. Un plafond qui subsiste, et qu'on assume
+## 6. Deux plafonds qui subsistent, et qu'on assume
 
-`operations.cash_attendu` est un `integer` qui porte la recette d'une journée,
-et `operations.ecart` est une colonne **générée stockée** qui en dépend
-(`20260815232256_socle_operations.sql:8,10`).
+Il n'existe pas de table `operations` — c'est le nom du fichier de migration
+(`20260815232256_socle_operations.sql`), pas d'une relation SQL. La table est
+`public.caisses_jour`. `caisses_jour.cash_attendu` est un `integer` qui porte
+la recette d'une journée, et `caisses_jour.ecart` est une colonne **générée
+stockée** qui en dépend (`20260815232256_socle_operations.sql:8,10`).
 
 Le point de rupture exact est le `::integer` final de
 `public.cash_attendu_du_jour(uuid, date)`
@@ -256,17 +274,23 @@ restitue 3 milliards de FCFA : la valeur nette est très négative, et
 `caisses_rafraichir_apres_retrait` ferait échouer le retrait.
 
 Élargir ces colonnes obligerait à démonter et reconstruire une colonne générée
-sur une table de production. C'est hors du périmètre de ce chantier. Le plafond
-réel du produit passe donc de **10 000 FCFA par mise** à **~2,1 milliards de
-FCFA de recette journalière par collecteur** — une limite qu'aucun usage
-plausible n'atteint, mais qui est documentée ici pour ne pas être redécouverte
-en production.
+sur une table de production. C'est hors du périmètre de ce chantier.
+
+**Le plafond réel du produit tient donc en deux nombres, pas un.** Le premier,
+et le plus bas, est celui de `retraits.montant_restitue` (§2) : une mise ne
+peut pas dépasser 71 582 788 FCFA, sans quoi la clôture de la carte échoue
+définitivement. C'est lui que `MISE_MAX_RESTITUABLE` refuse à l'ouverture, et
+c'est la vraie limite qu'un collecteur peut atteindre. Le second, bien plus
+haut et laissé en l'état par ce chantier, est celui de
+`cash_attendu_du_jour` : ~2,1 milliards de FCFA de recette nette par
+collecteur et par jour — une limite qu'aucun usage plausible n'atteint, mais
+qui est documentée ici pour ne pas être redécouverte en production.
 
 ## 7. Tests
 
 **`packages/core`** (`calcul.test.ts`)
 - `validerMise` accepte 500, 10 000, 50 000 et 50 000 000 ; refuse 499, 1000.5,
-  `NaN`, et `MISE_MAX_STOCKABLE + 1`.
+  `NaN`, et `MISE_MAX_RESTITUABLE + 1`.
 - `miseInhabituelle` : faux à 10 000, vrai à 10 001, faux à 499 (invalide).
 - `soldeRestituable(31, 50_000)` vaut 1 500 000 ; ne lève plus pour 10 001.
 - Le test existant « refuse une mise hors des bornes 500 – 10 000 » est réécrit
@@ -300,4 +324,4 @@ en production.
 - Ne change pas les 31 mises par cycle.
 - Ne touche pas à la grille d'abonnement (`paliers.ts`).
 - Ne touche pas aux paliers proposés dans `MISES_USUELLES`.
-- N'élargit pas `operations.cash_attendu` (voir §6).
+- N'élargit pas `caisses_jour.cash_attendu` (voir §6).

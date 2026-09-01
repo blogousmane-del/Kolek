@@ -1,5 +1,5 @@
 import {
-  MISE_MAX_STOCKABLE,
+  MISE_MAX_RESTITUABLE,
   MISE_MIN,
   formatMontant,
   miseInhabituelle,
@@ -108,13 +108,18 @@ export function ChoixMise({
         <button
           type="button"
           onClick={() => {
+            // Le nettoyage ne vaut que si l'on **quitte un palier** : sans lui,
+            // « Autre » puis « Ouvrir la carte » enregistrerait le palier que
+            // le collecteur venait de quitter. Quand le champ est déjà ouvert,
+            // la pilule est simplement celle qui est allumée, et l'appui dessus
+            // veut dire « je viens modifier ça » — effacer y détruirait un
+            // montant que le parent détient déjà, `misePreremplie` compris.
+            if (!libre) {
+              setSaisie('');
+              setConfirme(false);
+              onChoisir(null);
+            }
             setLibre(true);
-            setSaisie('');
-            setConfirme(false);
-            // Le champ s'ouvre vide, donc le parent ne détient plus rien. Sans
-            // ça, « Autre » puis « Ouvrir la carte » enregistrerait le palier
-            // que le collecteur venait justement de quitter.
-            onChoisir(null);
           }}
           className={`anim-pression px-3 py-2 rounded-md text-base font-body font-semibold border cursor-pointer ${
             libre
@@ -160,7 +165,7 @@ export function ChoixMise({
 
           {saisie.trim() !== '' && !saisieValide && (
             <p role="alert" className="text-sm font-body text-negative mt-1">
-              {valeurSaisie > MISE_MAX_STOCKABLE
+              {valeurSaisie > MISE_MAX_RESTITUABLE
                 ? 'Montant trop grand.'
                 : `Au moins ${formatMontant(MISE_MIN)} FCFA, sans centimes.`}
             </p>

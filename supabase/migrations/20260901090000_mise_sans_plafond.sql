@@ -25,6 +25,15 @@
 --
 -- ## Le plafond qui subsiste, et qu'on assume
 --
+-- Deux colonnes le portent, pas une.
+--
+-- `retraits.montant_restitue` est un `integer` : la clôture y écrit
+-- (mises_encaissees - 1) * mise, soit 30 * mise sur une carte pleine. Au-delà
+-- de 2 147 483 647 / 30, soit 71 582 788 par mise, l'insertion lève 22003 et la
+-- clôture échoue définitivement — cartes.mise est figée à l'ouverture et mises
+-- est append-only. C'est ce plafond, et non celui de cartes.mise, que
+-- MISE_MAX_RESTITUABLE (packages/core) refuse dès l'ouverture de la carte.
+--
 -- `caisses_jour.cash_attendu` est un `integer`, et `ecart` une colonne générée
 -- stockée qui en dépend. Le point de rupture est le `::integer` final de
 -- `public.cash_attendu_du_jour` : ses sous-requêtes sont des `sum()` sur
@@ -35,8 +44,9 @@
 --
 -- Corriger cela demanderait de démonter et reconstruire une colonne générée sur
 -- une table de production. Hors périmètre. Le plafond réel du produit passe
--- donc de 10 000 FCFA par mise à ~2,1 milliards de recette journalière par
--- collecteur.
+-- donc de 10 000 FCFA par mise à 71 582 788 FCFA par mise (clôture), avec un
+-- second plafond bien plus haut à ~2,1 milliards de recette journalière par
+-- collecteur (caisse).
 
 /* --------------------- 1. Le groupeur de milliers ------------------------ */
 

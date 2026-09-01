@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MISES_PAR_CYCLE,
   MISE_INHABITUELLE,
-  MISE_MAX_STOCKABLE,
+  MISE_MAX_RESTITUABLE,
   commission,
   cycleComplet,
   miseInhabituelle,
@@ -69,16 +69,26 @@ describe('soldeRestituable', () => {
 
 describe('validerMise', () => {
   it('accepte le plancher, les paliers usuels et bien au-delà', () => {
-    for (const m of [500, 1000, 2000, 5000, 10000, 50_000, 50_000_000, MISE_MAX_STOCKABLE]) {
+    for (const m of [500, 1000, 2000, 5000, 10000, 50_000, 50_000_000, MISE_MAX_RESTITUABLE]) {
       expect(validerMise(m), `${m} doit être acceptée`).toBe(true);
     }
   });
 
-  it('refuse sous le plancher, au-delà du stockable, et les non-entiers', () => {
+  it('refuse sous le plancher, au-delà du restituable, et les non-entiers', () => {
     expect(validerMise(499)).toBe(false);
-    expect(validerMise(MISE_MAX_STOCKABLE + 1)).toBe(false);
+    expect(validerMise(MISE_MAX_RESTITUABLE + 1)).toBe(false);
     expect(validerMise(1000.5)).toBe(false);
     expect(validerMise(Number.NaN)).toBe(false);
+  });
+
+  it('refuse une mise dont la restitution ne tiendrait pas', () => {
+    // 30 × mise, parce qu'une carte pleine rend 30 mises sur 31 — la première
+    // est la commission. Écrit ainsi plutôt qu'en dur : si le cycle change, le
+    // test dit lequel des deux nombres a bougé.
+    expect(30 * MISE_MAX_RESTITUABLE).toBeLessThanOrEqual(2_147_483_647);
+    expect(30 * (MISE_MAX_RESTITUABLE + 1)).toBeGreaterThan(2_147_483_647);
+    expect(validerMise(MISE_MAX_RESTITUABLE)).toBe(true);
+    expect(validerMise(MISE_MAX_RESTITUABLE + 1)).toBe(false);
   });
 });
 
@@ -95,7 +105,7 @@ describe('miseInhabituelle', () => {
     // Une valeur refusée n'est pas « inhabituelle » : elle n'existe pas. Sans
     // ce test, l'écran afficherait une case à cocher sous un message d'erreur.
     expect(miseInhabituelle(499)).toBe(false);
-    expect(miseInhabituelle(MISE_MAX_STOCKABLE + 1)).toBe(false);
+    expect(miseInhabituelle(MISE_MAX_RESTITUABLE + 1)).toBe(false);
     expect(miseInhabituelle(20_000.5)).toBe(false);
   });
 });

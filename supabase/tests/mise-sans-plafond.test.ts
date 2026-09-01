@@ -158,3 +158,32 @@ describe('ce que la base restitue au-delà de l’integer', () => {
     expect(data?.[0]?.corps).toContain('4 000 000 000');
   });
 });
+
+describe('ce que la clôture saura rendre', () => {
+  it('accepte une restitution à la borne, et refuse juste au-dessus', async () => {
+    // `retraits.montant_restitue` est un `integer`. La clôture y écrit
+    // 30 × mise sur une carte pleine. C'est cette colonne, et non celle de
+    // `cartes.mise`, qui fixe le vrai plafond du produit — la spec avait
+    // d'abord regardé la contrainte CHECK et conclu l'inverse.
+    const clientId = await creerClient();
+    const { carteId } = await ouvrirCarte(clientId, 1000);
+
+    const { error: tenu } = await admin.from('retraits').insert({
+      collecteur_id: collecteur.id,
+      carte_id: carteId,
+      montant_restitue: 30 * 71_582_788,
+      commission: 1000,
+    });
+    expect(tenu).toBeNull();
+
+    const { carteId: autre } = await ouvrirCarte(await creerClient(), 1000);
+    const { error: deborde } = await admin.from('retraits').insert({
+      collecteur_id: collecteur.id,
+      carte_id: autre,
+      montant_restitue: 30 * 71_582_789,
+      commission: 1000,
+    });
+    // 22003 : numeric_value_out_of_range. Pas un CHECK — le type de la colonne.
+    expect(deborde?.code).toBe('22003');
+  });
+});
