@@ -67,6 +67,14 @@ export function FicheClient({
 }) {
   const [fiche, setFiche] = useState<Fiche | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+  // La carte choisie vit ici, un cran au-dessus de `CartesEnCours`, et pas
+  // dans son propre `useState`. `CartesEnCours` démonte et remonte à chaque
+  // relecture réussie : l'effet ci-dessous fait passer `fiche` par `null`
+  // avant de relire, ce qui emporte tout `{fiche && (…)}`. Un `useState` posé
+  // plus bas s'y réinitialiserait sur `actives[0]` — la carte la plus avancée
+  // — à chaque encaissement, exactement le défaut que ce bouton devait faire
+  // disparaître, simplement relogé un niveau plus bas.
+  const [visibleId, setVisibleId] = useState<string | null>(null);
 
   const relire = useCallback(async () => {
     if (!clientId) return;
@@ -91,6 +99,14 @@ export function FicheClient({
     setErreur(null);
     void relire();
   }, [relire, revision]);
+
+  useEffect(() => {
+    // Seul le changement de client remet la carte choisie à zéro : une
+    // relecture (donc un changement de `revision`) ne doit jamais la faire
+    // bouger — c'est justement ce que l'effet précédent provoque en
+    // interne, sans que le collecteur ait rien décidé.
+    setVisibleId(null);
+  }, [clientId]);
 
   // Le numéro de cycle est une donnée chronologique — la énième carte que ce
   // client a ouverte — et se lit dans la position au sein de `fiche.cartes`,
@@ -135,6 +151,8 @@ export function FicheClient({
               collecteurId={collecteurId}
               onRetrait={onRetrait}
               onEcriture={onEcriture}
+              visibleId={visibleId}
+              onVisible={setVisibleId}
             />
           ) : (
             <NouvelleCarte
@@ -316,6 +334,8 @@ function CartesEnCours({
   collecteurId,
   onRetrait,
   onEcriture,
+  visibleId,
+  onVisible,
 }: {
   actives: Array<{ carte: CarteFiche; cycle: number }>;
   nomClient: string;
@@ -325,8 +345,11 @@ function CartesEnCours({
       client et doit pouvoir le nommer même quand il ne lui reste aucune carte. */
   onRetrait: (clientNom: string) => void;
   onEcriture: () => void;
+  /** Tenue par `FicheClient`, qui survit à la relecture — voir le
+      commentaire posé là-bas sur ce `useState`. */
+  visibleId: string | null;
+  onVisible: (id: string) => void;
 }) {
-  const [visibleId, setVisibleId] = useState(actives[0].carte.id);
   const [attente, setAttente] = useState<EnAttente | null>(null);
   const [restant, setRestant] = useState(0);
 
@@ -368,15 +391,16 @@ function CartesEnCours({
       });
       return;
     }
+    // Le `try` ne couvre que l'appel réseau, pas `prevenir()` : ce dernier est
+    // le rappel du composant appelant, et un rejet synchrone qui y prendrait
+    // naissance n'a rien à voir avec l'écriture, qui a réussi. Le laisser dans
+    // le `try` le ferait atterrir dans le `catch` ci-dessous et afficher
+    // « Réponse perdue » sur une mise pourtant enregistrée — avec un
+    // « Réessayer » qui l'insérerait une seconde fois, irréversiblement. Même
+    // découpage que le try/catch d'`ActiverCarte`.
+    let resultat;
     try {
-      const resultat = await enregistrerMise(id, en.carteId, en.mise);
-      if (resultat.ok) {
-        // L'attente n'est pas levée ici : la relecture s'en charge. La lever
-        // maintenant reviderait la case le temps que la fiche revienne.
-        prevenir();
-        return;
-      }
-      poser({ ...en, envoyee: true, echec: resultat.echec.message });
+      resultat = await enregistrerMise(id, en.carteId, en.mise);
     } catch {
       // `enregistrerMise` rend `{ ok: false }` sur les refus du serveur, mais
       // une coupure franche fait **rejeter** la promesse. Sans ce filet, le
@@ -391,7 +415,15 @@ function CartesEnCours({
         envoyee: true,
         echec: 'Réponse perdue. Vérifie la carte avant de réessayer.',
       });
+      return;
     }
+    if (resultat.ok) {
+      // L'attente n'est pas levée ici : la relecture s'en charge. La lever
+      // maintenant reviderait la case le temps que la fiche revienne.
+      prevenir();
+      return;
+    }
+    poser({ ...en, envoyee: true, echec: resultat.echec.message });
   }
 
   /** Écrit tout de suite ce qui attendait, et rend les minuteurs au repos. */
@@ -419,6 +451,18 @@ function CartesEnCours({
       base: carte.misesEncaissees,
       envoyee: false,
     };
+
+    if (!contexte.current.collecteurId) {
+      // Sans identifiant de collecteur, rien ne partira jamais : `ecrire` le
+      // découvre déjà, mais seulement six secondes plus tard. Sur une session
+      // qu'on sait morte d'avance, faire attendre le décompte à chaque appui
+      // n'apprend rien de plus — le dire tout de suite. Le garde-fou dans
+      // `ecrire` reste en place : `purger` et `reessayer` l'atteignent par
+      // d'autres chemins que celui-ci.
+      poser({ ...en, envoyee: true, echec: 'Session perdue. Reconnecte-toi avant de réessayer.' });
+      return;
+    }
+
     poser(en);
     setRestant(SURSIS_S);
 
@@ -488,7 +532,14 @@ function CartesEnCours({
   const courant = actives.find(({ carte }) => carte.id === visibleId) ?? actives[0];
   const { carte } = courant;
   const misesCourantes = misesAffichees(carte.id, carte.misesEncaissees, attente);
-  const complete = misesCourantes >= MISES_PAR_CYCLE;
+  // Tant que la mise du jour peut encore être annulée sur cette carte, le
+  // cycle n'est pas vraiment terminé : rien n'est inscrit en base. Proposer
+  // « Aller au retrait » à cet instant rendrait de l'argent sur un dépôt qui
+  // n'existe pas encore — et « Aller au retrait » démonte cette section, ce
+  // qui purge et commet la mise avant la fin des six secondes, en silence.
+  const miseEnSursisSurCetteCarte =
+    attente !== null && attente.carteId === carte.id && !attente.envoyee;
+  const complete = misesCourantes >= MISES_PAR_CYCLE && !miseEnSursisSurCetteCarte;
   const solde = formatMontant(soldeRestituable(misesCourantes, carte.mise));
 
   function rendreAction(item: CarteItem, choisie: boolean) {
@@ -557,7 +608,7 @@ function CartesEnCours({
           };
         })}
         visibleId={courant.carte.id}
-        onVisible={setVisibleId}
+        onVisible={onVisible}
         rendreAction={rendreAction}
       />
 
