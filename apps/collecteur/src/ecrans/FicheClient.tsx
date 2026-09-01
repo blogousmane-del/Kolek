@@ -15,6 +15,16 @@ import { ActiverCarte } from './ActiverCarte';
 import { ChoixMise } from './ChoixMise';
 
 /**
+ * Ce que voit le collecteur quand plus aucune écriture ne peut partir.
+ *
+ * Dit une seule fois, parce que deux chemins y mènent : le garde-fou d'`ecrire`,
+ * et celui d'`encaisser` qui l'anticipe pour ne pas faire attendre six secondes
+ * un sursis sans objet. Deux copies du même message finissent par diverger sur
+ * une virgule, et c'est le même bandeau qui les affiche.
+ */
+const SESSION_PERDUE = 'Session perdue. Reconnecte-toi avant de réessayer.';
+
+/**
  * La fiche d'un client, en panneau flottant.
  *
  * ## Ce qu'elle remplace
@@ -384,11 +394,7 @@ function CartesEnCours({
     if (!id) {
       // Sans identifiant de collecteur, rien ne peut partir. Le dire, plutôt
       // que de laisser un bandeau vert sur une écriture qui n'aura pas lieu.
-      poser({
-        ...en,
-        envoyee: true,
-        echec: 'Session perdue. Reconnecte-toi avant de réessayer.',
-      });
+      poser({ ...en, envoyee: true, echec: SESSION_PERDUE });
       return;
     }
     // Le `try` ne couvre que l'appel réseau, pas `prevenir()` : ce dernier est
@@ -459,7 +465,7 @@ function CartesEnCours({
       // n'apprend rien de plus — le dire tout de suite. Le garde-fou dans
       // `ecrire` reste en place : `purger` et `reessayer` l'atteignent par
       // d'autres chemins que celui-ci.
-      poser({ ...en, envoyee: true, echec: 'Session perdue. Reconnecte-toi avant de réessayer.' });
+      poser({ ...en, envoyee: true, echec: SESSION_PERDUE });
       return;
     }
 

@@ -938,6 +938,11 @@ describe('un rappel qui lève après coup ne doit pas se faire passer pour un é
     // rappel qui lève exprès. Vitest ignore un rejet non géré dès qu'un
     // second écouteur existe sur l'événement (voir `listenForErrors` dans son
     // runtime) : ce test en pose un, pour la seule durée du test.
+    //
+    // Ce seuil est un détail d'implémentation de Vitest, pas un contrat. Si une
+    // montée de version casse ce test, c'est la bonne direction — il passera au
+    // rouge, jamais au vert silencieux. Re-dériver le mécanisme alors, plutôt
+    // que de chercher un défaut dans le code testé.
     // `process` n'a pas de types ici : `tsconfig.app.json` ne charge que
     // `vite/client`, pas `@types/node` — Vitest tourne bien sous Node, et
     // `process` y existe à l'exécution, seul le typage manque.
