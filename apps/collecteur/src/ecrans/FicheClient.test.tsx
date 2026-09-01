@@ -133,6 +133,27 @@ const FICHE_DEUX_CARTES_ENCAISSABLES = {
   mises: [],
 };
 
+/** Une seule carte active, loin d'être pleine. Le cas le plus courant. */
+const FICHE_UNE_CARTE_EN_COURS = {
+  id: 'cli7',
+  nom: 'Koné',
+  telephone: null,
+  marche: null,
+  activite: null,
+  avisActifs: false,
+  cartes: [
+    {
+      id: 'seule',
+      mise: 1000,
+      statut: 'active' as const,
+      misesEncaissees: 12,
+      ouverteLe: '2026-08-14T08:00:00.000Z',
+      clotureeLe: null,
+    },
+  ],
+  mises: [],
+};
+
 /** Un client inscrit qui n'a encore jamais ouvert de carte. */
 const FICHE_SANS_CARTE = {
   id: 'cli4',
@@ -249,6 +270,40 @@ describe('fiche d’un client à plusieurs cartes', () => {
     // Un choix offert à un endroit et pas aux autres se lit comme un défaut.
     expect(await screen.findByRole('button', { name: 'Aller au retrait' })).toBeTruthy();
     expect(await screen.findByRole('button', { name: 'Activer une carte' })).toBeTruthy();
+  });
+
+  it('propose d’ouvrir une carte de plus sans attendre la fin du cycle', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_UNE_CARTE_EN_COURS);
+
+    render(
+      <FicheClient
+        clientId="cli7"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    // `cartes_multiples` nomme deux besoins, pas un : « un client épargne pour
+    // deux choses à deux rythmes » autant que « un client qui a rempli sa carte
+    // veut continuer ». L'interface n'ouvrait la porte que sur le second, et un
+    // client à 12/31 n'avait aucun chemin vers une seconde carte.
+    expect(await screen.findByRole('button', { name: 'Activer une carte' })).toBeTruthy();
+
+    // Mais rien qui parle de fin de cycle : la carte n'est pas pleine.
+    expect(screen.queryByRole('button', { name: 'Aller au retrait' })).toBeNull();
+    expect(screen.queryByText(/Cycle terminé/)).toBeNull();
+
+    // Et le panneau déplié non plus. Il annonçait « La carte pleine reste
+    // ouverte » — vrai au bout d'un cycle, faux à 12/31, et c'est précisément
+    // ce cas que ce bloc vient d'ouvrir. Le plan du 2026-08-25 avait relevé le
+    // piège et l'avait contourné en ne posant pas le bloc ici ; le contournement
+    // ne tient plus, donc la phrase est vérifiée.
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+    expect(screen.queryByText(/pleine/)).toBeNull();
+    expect(screen.getByText(/Ce qui est déjà ouvert ne bouge pas/)).toBeTruthy();
   });
 
   it('ne promet plus que la nouvelle carte attend le retrait', async () => {

@@ -5,20 +5,32 @@ import { ouvrirCarte } from '../ecritures';
 import { ChoixMise } from './ChoixMise';
 
 /**
- * Ouvrir une carte de plus, sans toucher à celle qui est pleine.
+ * Ouvrir une carte de plus, sans toucher à celles qui existent déjà.
  *
- * C'est la seconde porte du carrefour de fin de cycle. La première rend l'argent
- * et clôture ; celle-ci laisse le solde chez le collecteur et rouvre un cycle.
- * Rien à inventer en base pour cela : une carte à 31/31 reste `active` et refuse
- * simplement d'en prendre davantage, donc son solde reste dû tant qu'aucun
- * retrait n'a eu lieu.
+ * Le composant sert deux moments, et non un seul :
+ *
+ * - **la fin d'un cycle**, où il est la seconde porte du carrefour. La première
+ *   rend l'argent et clôture ; celle-ci laisse le solde chez le collecteur et
+ *   rouvre un cycle. Rien à inventer en base : une carte à 31/31 reste `active`
+ *   et refuse simplement d'en prendre davantage, donc son solde reste dû tant
+ *   qu'aucun retrait n'a eu lieu ;
+ * - **le milieu d'un cycle**, où le client veut épargner pour une seconde chose
+ *   à un autre rythme. C'est l'autre besoin que nomme la migration
+ *   `20260825090000_cartes_multiples`, et il n'avait aucune porte jusqu'au
+ *   2026-09-01 : la fiche ne montrait ce bloc que sur une carte pleine.
+ *
+ * D'où le texte du panneau, qui ne présuppose **aucun** avancement. Le plan du
+ * 2026-08-25 avait relevé le piège dans l'autre sens — « il annonce que la carte
+ * pleine reste ouverte, or il n'y en a pas » — et l'avait contourné en ne posant
+ * pas le bloc là où la phrase serait fausse. Le contournement ne tient plus dès
+ * que le bloc paraît en milieu de cycle : c'est la phrase qui a dû changer.
  *
  * Le bloc est replié par défaut. Déplié, il montre le montant et demande une
  * confirmation : ouvrir une carte engage une commission — la première mise du
  * nouveau cycle — et cela ne se déclenche pas d'un doigt qui glisse.
  *
- * Un fichier à part pour trois appelants : la liste des clients, la fiche, et
- * l'écran de retrait. Écrit trois fois, il divergerait à la première correction.
+ * Un fichier à part pour deux appelants : la fiche du client et l'écran de
+ * retrait. Écrit deux fois, il divergerait à la première correction.
  */
 export function ActiverCarte({
   collecteurId,
@@ -91,8 +103,12 @@ export function ActiverCarte({
 
   return (
     <div className="border border-hairline rounded-md p-3 space-y-3">
+      {/* Aucune mention de « carte pleine » : ce bloc paraît aussi en milieu de
+          cycle depuis le 2026-09-01. La phrase doit rester vraie à 12/31 comme
+          à 31/31 — et dans les deux cas, ce qu'elle rassure est le même : rien
+          de ce qui est déjà ouvert ne bouge. */}
       <p className="font-body text-sm text-ink m-0">
-        La carte pleine reste ouverte, et son solde reste dû au client.
+        Celle-ci s'ajoute. Ce qui est déjà ouvert ne bouge pas, et son solde reste dû au client.
       </p>
 
       <ChoixMise

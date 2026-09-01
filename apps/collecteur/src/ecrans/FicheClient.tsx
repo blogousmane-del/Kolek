@@ -625,24 +625,47 @@ function CartesEnCours({
               Cycle terminé — {MISES_PAR_CYCLE} mises sur {MISES_PAR_CYCLE}.
             </p>
             <p className="font-body text-xs text-muted-foreground mt-1">
-              Tu peux lui rendre ses {solde} FCFA, ou lui activer une carte de plus. Tant qu'il n'y
-              a pas de retrait, cette carte reste ouverte et son solde lui est dû.
+              Tu peux lui rendre ses {solde} FCFA, ou lui activer une carte de plus juste en
+              dessous. Tant qu'il n'y a pas de retrait, cette carte reste ouverte et son solde lui
+              est dû.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Bouton variante="contour" icone="arrow-up-right" onClick={() => onRetrait(nomClient)}>
-              Aller au retrait
-            </Bouton>
-            <ActiverCarte
-              collecteurId={collecteurId}
-              clientId={clientId}
-              misePreremplie={carte.mise}
-              identifiant={`fiche-${carte.id}`}
-              onOuverte={onEcriture}
-            />
-          </div>
+          <Bouton variante="contour" icone="arrow-up-right" onClick={() => onRetrait(nomClient)}>
+            Aller au retrait
+          </Bouton>
         </div>
       )}
+
+      {/* Hors du panneau de fin de cycle, et sans condition d'avancement.
+          `cartes_multiples` nomme deux besoins, pas un : « un client épargne
+          pour deux choses à deux rythmes » autant que « un client qui a rempli
+          sa carte veut continuer ». Seul le second avait une porte, si bien
+          qu'un client à 12/31 ne pouvait pas ouvrir de seconde carte — il
+          fallait attendre 31/31, ou repasser par la création d'un client.
+
+          La mise préremplie est celle de la carte regardée au moment où ce bloc
+          est monté, et elle ne suit pas le carrousel ensuite : `ActiverCarte`
+          la lit dans un `useState` initial. C'est délibéré — la remonter à
+          chaque défilement demanderait de remonter le composant, ce qui
+          effacerait une saisie en cours. Et ce n'est qu'un défaut : la carte
+          qu'on ouvre est celle du client, pas celle qu'on regarde, et le
+          montant se corrige avant d'enregistrer.
+
+          `identifiant`, lui, suit bien le carrousel — c'est une propriété lue à
+          chaque rendu, pas un état. Après un défilement, le champ porte donc
+          l'`id` de la carte B tandis que sa valeur vient de la carte A. Sans
+          conséquence : l'`id` ne sert qu'à lier le libellé au champ, et les
+          deux changent dans le même rendu. La relecture qui suit toute écriture
+          remonte le bloc et resynchronise le tout. */}
+      <div className="mt-3">
+        <ActiverCarte
+          collecteurId={collecteurId}
+          clientId={clientId}
+          misePreremplie={carte.mise}
+          identifiant={`fiche-${carte.id}`}
+          onOuverte={onEcriture}
+        />
+      </div>
     </section>
   );
 }
