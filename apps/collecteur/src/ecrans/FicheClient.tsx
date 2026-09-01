@@ -299,6 +299,10 @@ function Coordonnees({
  * L'appui remplit la case à l'écran et n'écrit rien ; l'insertion part six
  * secondes plus tard, et « Annuler » l'empêche jusque-là.
  *
+ * Fermer la fiche ou passer l'application en arrière-plan ne perd pas la mise :
+ * elle part tout de suite. Le décompte n'a plus de témoin, et le système peut
+ * tuer une application masquée sans prévenir.
+ *
  * ## Pourquoi l'attente est aussi tenue en référence
  *
  * Un minuteur ne voit que l'état du rendu qui l'a posé. La référence, elle,
@@ -329,6 +333,10 @@ function CartesEnCours({
   const enCours = useRef<EnAttente | null>(null);
   const sursis = useRef<number | null>(null);
   const decompte = useRef<number | null>(null);
+  // Après le démontage, les références restent utiles — l'écriture en cours
+  // les lit — mais l'état ne peut plus rien afficher. React avertit sur une
+  // pose d'état après démontage ; ici elle serait en plus sans effet.
+  const monte = useRef(true);
 
   // Le contexte d'écriture suit chaque rendu, pour la même raison que
   // l'attente : la purge part d'endroits qui ne referment rien.
@@ -337,7 +345,7 @@ function CartesEnCours({
 
   function poser(en: EnAttente | null) {
     enCours.current = en;
-    setAttente(en);
+    if (monte.current) setAttente(en);
   }
 
   function arreter() {
@@ -345,7 +353,7 @@ function CartesEnCours({
     if (decompte.current !== null) window.clearInterval(decompte.current);
     sursis.current = null;
     decompte.current = null;
-    setRestant(0);
+    if (monte.current) setRestant(0);
   }
 
   async function ecrire(en: EnAttente) {
@@ -415,6 +423,30 @@ function CartesEnCours({
     poser(repris);
     void ecrire(repris);
   }
+
+  useEffect(() => {
+    monte.current = true;
+    return () => {
+      // L'ordre compte : le témoin tombe d'abord, sinon `purger` tenterait de
+      // poser un état sur un composant démonté.
+      monte.current = false;
+      purger();
+    };
+    // `purger` ne touche que des références : la refermer à chaque rendu ne
+    // changerait rien, et ce dénouement appartient au seul démontage.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    function surMasquage() {
+      // L'application passe en arrière-plan : le sursis n'a plus de témoin, et
+      // le système peut la tuer sans prévenir. Ce qui attendait part maintenant.
+      if (document.visibilityState === 'hidden') purger();
+    }
+    document.addEventListener('visibilitychange', surMasquage);
+    return () => document.removeEventListener('visibilitychange', surMasquage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Le compte réel de la carte qui attend, s'il y en a une et qu'elle est
   // toujours là. `null` quand la carte a disparu de la fiche — clôturée.

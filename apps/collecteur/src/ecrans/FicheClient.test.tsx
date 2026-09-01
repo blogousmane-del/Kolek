@@ -566,6 +566,139 @@ describe('fiche d’un client à plusieurs cartes', () => {
   });
 });
 
+/**
+ * Le sursis est un délai, pas une promesse d'oubli.
+ *
+ * Le système peut tuer une application masquée sans prévenir, et une fiche
+ * refermée n'a plus personne pour regarder le décompte. Dans les deux cas
+ * l'écriture part maintenant.
+ */
+describe('ce qui attend part quand on cesse de regarder', () => {
+  it('écrit tout de suite quand la fiche se referme pendant le sursis', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+    enregistrerMise.mockResolvedValue({ ok: true, miseId: 'm1' });
+
+    const { rerender } = render(
+      <FicheClient
+        clientId="cli3"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(enregistrerMise).not.toHaveBeenCalled();
+
+    // `clientId` à `null` referme la feuille, qui ne rend plus rien.
+    act(() => {
+      rerender(
+        <FicheClient
+          clientId={null}
+          revision={0}
+          collecteurId="col1"
+          onFermer={vi.fn()}
+          onEcriture={vi.fn()}
+          onRetrait={vi.fn()}
+        />,
+      );
+    });
+
+    expect(enregistrerMise).toHaveBeenCalledTimes(1);
+    expect(enregistrerMise).toHaveBeenCalledWith('col1', 'kB', 6000);
+  });
+
+  it('écrit tout de suite quand l’application passe en arrière-plan', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+    enregistrerMise.mockResolvedValue({ ok: true, miseId: 'm1' });
+
+    render(
+      <FicheClient
+        clientId="cli3"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    // `visibilityState` est un accesseur de `Document.prototype`, pas une
+    // propriété propre du document : `vi.spyOn` n'a rien à remplacer dessus.
+    // On pose l'accesseur sur l'instance, et on le retire ensuite.
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    });
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    delete (document as unknown as { visibilityState?: DocumentVisibilityState }).visibilityState;
+
+    expect(enregistrerMise).toHaveBeenCalledTimes(1);
+    expect(enregistrerMise).toHaveBeenCalledWith('col1', 'kB', 6000);
+  });
+
+  it('n’écrit pas deux fois quand la fiche se referme après le sursis', async () => {
+    // La relecture qui suit une écriture réussie démonte cette section — la
+    // fiche repasse par « Lecture… ». Sans la garde `envoyee`, ce démontage
+    // renverrait la mise, et rien en base ne la retirerait.
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+    enregistrerMise.mockResolvedValue({ ok: true, miseId: 'm1' });
+
+    const { rerender } = render(
+      <FicheClient
+        clientId="cli3"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    await screen.findByRole('button', { name: 'Encaisser 6 000 FCFA' });
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Encaisser 6 000 FCFA' }));
+    act(() => {
+      vi.advanceTimersByTime(6000);
+    });
+    expect(enregistrerMise).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      rerender(
+        <FicheClient
+          clientId={null}
+          revision={0}
+          collecteurId="col1"
+          onFermer={vi.fn()}
+          onEcriture={vi.fn()}
+          onRetrait={vi.fn()}
+        />,
+      );
+    });
+
+    expect(enregistrerMise).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('numéro de cycle : l’ancienneté, jamais l’avancement', () => {
   it('numérote depuis la date d’ouverture, pas depuis le tri d’affichage', async () => {
     chargerFicheClient.mockResolvedValue(FICHE_CYCLE_ET_AVANCEMENT);
