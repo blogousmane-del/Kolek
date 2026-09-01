@@ -95,23 +95,15 @@ vi.mock('./ecrans/Encaisser', () => ({
 
 // Trois témoins bavards : le chemin qui pose le filtre de retrait, celui qui
 // devrait le lever, et l'écran qui en subit l'état. Les autres restent muets.
+// `onEncaisser` a quitté la liste des clients le 2026-08-31 : la fiche encaisse
+// désormais sur place. L'accueil reste le seul à renvoyer vers l'écran dédié,
+// depuis sa tuile « carte du jour » — c'est donc lui qui porte le déclencheur.
 vi.mock('./ecrans/Accueil', () => ({
-  Accueil: ({ onNaviguer }: { onNaviguer: (cle: string) => void }) => (
-    <>
-      <div>écran Accueil</div>
-      <button type="button" onClick={() => onNaviguer('retrait')}>
-        tuile Retrait
-      </button>
-    </>
-  ),
-}));
-
-vi.mock('./ecrans/Clients', () => ({
-  Clients: ({
-    onRetrait,
+  Accueil: ({
+    onNaviguer,
     onEncaisser,
   }: {
-    onRetrait: (c: { id: string; nom: string }) => void;
+    onNaviguer: (cle: string) => void;
     onEncaisser: (carte: {
       carteId: string;
       clientNom: string;
@@ -120,9 +112,9 @@ vi.mock('./ecrans/Clients', () => ({
     }) => void;
   }) => (
     <>
-      <div>écran Clients</div>
-      <button type="button" onClick={() => onRetrait({ id: 'cli9', nom: 'Sy' })}>
-        retirer pour Sy
+      <div>écran Accueil</div>
+      <button type="button" onClick={() => onNaviguer('retrait')}>
+        tuile Retrait
       </button>
       <button
         type="button"
@@ -131,6 +123,17 @@ vi.mock('./ecrans/Clients', () => ({
         }
       >
         encaisser k7
+      </button>
+    </>
+  ),
+}));
+
+vi.mock('./ecrans/Clients', () => ({
+  Clients: ({ onRetrait }: { onRetrait: (c: { id: string; nom: string }) => void }) => (
+    <>
+      <div>écran Clients</div>
+      <button type="button" onClick={() => onRetrait({ id: 'cli9', nom: 'Sy' })}>
+        retirer pour Sy
       </button>
     </>
   ),
@@ -186,6 +189,9 @@ describe('ce que la coquille fait de la carte encaissée', () => {
     // L'écran doit dire « c'est fait », pas « va chercher un client ».
     render(<Coquille onDeconnexion={vi.fn()} />);
 
+    const barre = screen.getByRole('navigation', { name: 'Navigation principale' });
+    fireEvent.click(within(barre).getByRole('button', { name: 'Accueil' }));
+
     fireEvent.click(await screen.findByRole('button', { name: 'encaisser k7' }));
     // `findBy` et non `getBy` : sous quatre espaces de travail qui tournent
     // ensemble, le rendu qui suit le clic n'est pas toujours retombé quand
@@ -208,10 +214,12 @@ describe('ce que la coquille fait de la carte encaissée', () => {
     // précédent, et un appui de trop écrirait une seconde mise sur elle.
     render(<Coquille onDeconnexion={vi.fn()} />);
 
+    const barre = screen.getByRole('navigation', { name: 'Navigation principale' });
+    fireEvent.click(within(barre).getByRole('button', { name: 'Accueil' }));
+
     fireEvent.click(await screen.findByRole('button', { name: 'encaisser k7' }));
     fireEvent.click(screen.getByRole('button', { name: 'revenir aux clients' }));
 
-    const barre = screen.getByRole('navigation', { name: 'Navigation principale' });
     fireEvent.click(within(barre).getByRole('button', { name: 'Encaisser' }));
 
     expect(await screen.findByText('Aucune carte choisie.')).toBeTruthy();

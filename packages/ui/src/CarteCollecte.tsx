@@ -1,4 +1,5 @@
 import { MISES_PAR_CYCLE } from '@kolek/core';
+import type { ReactNode } from 'react';
 
 interface Props {
   nomClient: string;
@@ -7,6 +8,13 @@ interface Props {
   totalJours?: number;
   solde: string;
   cycle: string;
+  /**
+   * Ce que la carte porte en pied quand elle est la carte choisie.
+   *
+   * Un nœud et non un libellé : la carte ne connaît ni les montants ni les
+   * écritures. Elle réserve une place, l'écran décide ce qui s'y met.
+   */
+  action?: ReactNode;
 }
 
 /**
@@ -44,6 +52,7 @@ export function CarteCollecte({
   totalJours = MISES_PAR_CYCLE,
   solde,
   cycle,
+  action,
 }: Props) {
   const cases = Array.from({ length: totalJours }, (_, i) => i + 1);
   const pourcentage = Math.round((jourCourant / totalJours) * 100);
@@ -118,6 +127,11 @@ export function CarteCollecte({
             </span>
           </div>
         </div>
+
+        {/* La fente. Dans le flux, et non en calque : le solde est ce qu'on
+            regarde avant d'encaisser, et un bouton posé par-dessus le
+            masquerait au moment précis où il compte. La carte grandit. */}
+        {action && <div className="mt-3 @max-[240px]:mt-2">{action}</div>}
       </div>
     </div>
   );

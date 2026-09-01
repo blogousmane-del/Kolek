@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { CarteCollecte } from './CarteCollecte';
 import { ecrirePreference, lirePreference } from './preference';
@@ -18,6 +18,18 @@ interface Props {
   /** La carte que l'écran considère comme choisie. Pilotée par le parent. */
   visibleId: string;
   onVisible: (id: string) => void;
+  /**
+   * Ce que chaque carte porte en pied. `choisie` dit laquelle est en face.
+   *
+   * Le carrousel ne décide de rien : il dit ce qu'il sait, l'écran répond ce
+   * que chacune doit porter — ou `null`.
+   *
+   * Appelée pour **chaque** carte, et non pour la seule choisie : une carte
+   * peut avoir quelque chose à montrer alors qu'on en regarde une autre. Que
+   * la commande d'argent, elle, ne sorte que sur la carte choisie est une
+   * politique de l'écran ; l'imposer ici la rendrait impossible à contredire.
+   */
+  rendreAction?: (carte: CarteItem, choisie: boolean) => ReactNode;
 }
 
 type Taille = 'reduite' | 'moyenne' | 'grande';
@@ -133,7 +145,7 @@ const CLES_TAILLE: readonly Taille[] = TAILLES.map(({ cle }) => cle);
  * hors-ligne installée sur un téléphone d'entrée de gamme se paient à chaque
  * ouverture, pour un calcul qui tient en trois fonctions pures.
  */
-export function CarrouselCartes({ cartes, visibleId, onVisible }: Props) {
+export function CarrouselCartes({ cartes, visibleId, onVisible, rendreAction }: Props) {
   const piste = useRef<HTMLUListElement>(null);
 
   /**
@@ -406,6 +418,7 @@ export function CarrouselCartes({ cartes, visibleId, onVisible }: Props) {
         {rangees.map((carte, rang) => {
           const leve = saisi === carte.id;
           const choisie = carte.id === visibleId;
+          const contenu = rendreAction?.(carte, choisie);
           return (
             <li
               key={carte.id}
@@ -430,6 +443,21 @@ export function CarrouselCartes({ cartes, visibleId, onVisible }: Props) {
                 jourCourant={carte.jourCourant}
                 solde={carte.solde}
                 cycle={carte.cycle}
+                action={
+                  contenu ? (
+                    // La coupure est posée ici, et non chez l'appelant :
+                    // l'écran n'a pas à connaître les gestes de la piste. Sans
+                    // elle, toucher le bouton lèverait la carte — le `li`
+                    // écoute `pointerdown` pour l'appui long et `click` pour
+                    // le choix.
+                    <div
+                      onPointerDown={(evenement) => evenement.stopPropagation()}
+                      onClick={(evenement) => evenement.stopPropagation()}
+                    >
+                      {contenu}
+                    </div>
+                  ) : undefined
+                }
               />
             </li>
           );

@@ -88,7 +88,6 @@ function rendre(supplement: Record<string, unknown> = {}) {
       ficheAOuvrir={null}
       onFicheVue={vi.fn()}
       onDeconnexion={vi.fn()}
-      onEncaisser={vi.fn()}
       onEcriture={vi.fn()}
       onRetrait={vi.fn()}
       {...supplement}
