@@ -1,3 +1,4 @@
+import { MISES_PAR_CYCLE, MISE_MAX_RESTITUABLE } from '@kolek/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { admin, creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
@@ -171,7 +172,7 @@ describe('ce que la clôture saura rendre', () => {
     const { error: tenu } = await admin.from('retraits').insert({
       collecteur_id: collecteur.id,
       carte_id: carteId,
-      montant_restitue: 30 * 71_582_788,
+      montant_restitue: (MISES_PAR_CYCLE - 1) * MISE_MAX_RESTITUABLE,
       commission: 1000,
     });
     expect(tenu).toBeNull();
@@ -180,7 +181,7 @@ describe('ce que la clôture saura rendre', () => {
     const { error: deborde } = await admin.from('retraits').insert({
       collecteur_id: collecteur.id,
       carte_id: autre,
-      montant_restitue: 30 * 71_582_789,
+      montant_restitue: (MISES_PAR_CYCLE - 1) * (MISE_MAX_RESTITUABLE + 1),
       commission: 1000,
     });
     // 22003 : numeric_value_out_of_range. Pas un CHECK — le type de la colonne.

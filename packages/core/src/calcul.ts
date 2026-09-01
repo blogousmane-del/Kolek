@@ -16,7 +16,8 @@ export const MISE_INHABITUELLE = 10_000;
  * La plus grande mise que le chemin de l'argent porte de bout en bout.
  *
  * Ce n'est pas la borne d'une colonne mais celle d'une **opération** : la
- * clôture écrit `(mises − 1) × mise` — soit 30 × mise sur une carte pleine —
+ * clôture écrit `(mises − 1) × mise` — soit `MISES_PAR_CYCLE - 1` fois la
+ * mise sur une carte pleine, 30 aujourd'hui —
  * dans `retraits.montant_restitue`, qui est un `integer`. Au-delà, l'insertion
  * lève `22003`, la clôture rend `CLOTURE_IMPOSSIBLE`, et la carte reste active
  * **définitivement** : `cartes.mise` est figée à l'ouverture et `mises` est
@@ -26,7 +27,7 @@ export const MISE_INHABITUELLE = 10_000;
  * `cartes.mise` — 2 147 483 647 — est trente fois plus haute et n'aurait rien
  * protégé.
  */
-export const MISE_MAX_RESTITUABLE = Math.floor(2_147_483_647 / 30);
+export const MISE_MAX_RESTITUABLE = Math.floor(2_147_483_647 / (MISES_PAR_CYCLE - 1));
 
 function verifierEntrees(misesEncaissees: number, mise: number): void {
   if (!Number.isInteger(misesEncaissees) || misesEncaissees < 0 || misesEncaissees > MISES_PAR_CYCLE) {

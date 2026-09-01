@@ -85,8 +85,8 @@ describe('validerMise', () => {
     // 30 × mise, parce qu'une carte pleine rend 30 mises sur 31 — la première
     // est la commission. Écrit ainsi plutôt qu'en dur : si le cycle change, le
     // test dit lequel des deux nombres a bougé.
-    expect(30 * MISE_MAX_RESTITUABLE).toBeLessThanOrEqual(2_147_483_647);
-    expect(30 * (MISE_MAX_RESTITUABLE + 1)).toBeGreaterThan(2_147_483_647);
+    expect((MISES_PAR_CYCLE - 1) * MISE_MAX_RESTITUABLE).toBeLessThanOrEqual(2_147_483_647);
+    expect((MISES_PAR_CYCLE - 1) * (MISE_MAX_RESTITUABLE + 1)).toBeGreaterThan(2_147_483_647);
     expect(validerMise(MISE_MAX_RESTITUABLE)).toBe(true);
     expect(validerMise(MISE_MAX_RESTITUABLE + 1)).toBe(false);
   });

@@ -453,20 +453,26 @@ grant execute on function public.admin_vue_globale() to service_role;
 --
 -- Élargir un CHECK ne réécrit aucune ligne : toutes les mises existantes sont
 -- dans le nouvel intervalle, et Postgres valide la contrainte par un simple
--- parcours. Mais un simple `add constraint ... check (...)` prend un verrou
--- `ACCESS EXCLUSIVE` pour toute la durée de ce parcours, bloquant lectures et
--- écritures sur la table. La nouvelle borne est strictement plus faible que
--- l'ancienne (500 au lieu de [500, 10 000]) : aucune ligne existante ne peut la
--- violer, donc `not valid` suivi de `validate constraint` — qui ne prend qu'un
--- verrou `SHARE UPDATE EXCLUSIVE` pour le même parcours — obtient exactement la
--- même garantie sans bloquer le trafic pendant la migration.
+-- parcours.
+--
+-- Ce parcours prend un verrou `ACCESS EXCLUSIVE`, et la parade habituelle est
+-- `add constraint ... not valid` suivi de `validate constraint`, qui ne prend
+-- qu'un `SHARE UPDATE EXCLUSIVE`. **Elle ne sert à rien ici**, et la version
+-- précédente de ce fichier l'appliquait à tort : le CLI joue chaque migration
+-- dans **une seule transaction**, donc l'`ACCESS EXCLUSIVE` pris par le `drop`
+-- puis par le `add` est gardé jusqu'au `commit` — le `validate` qui suit dans
+-- la même transaction bloque exactement autant. La parade ne paie que si le
+-- `validate` part dans une migration ultérieure, ce qui coûterait un second
+-- fichier pour une table qui tient aujourd'hui dans une page.
+--
+-- L'atomicité, elle, est ce qui compte vraiment ici : c'est elle qui garantit
+-- qu'à aucun instant la base n'accepte une valeur que la section 3 ne saurait
+-- pas encore restituer.
 alter table public.cartes drop constraint cartes_mise_check;
-alter table public.cartes add  constraint cartes_mise_check check (mise >= 500) not valid;
-alter table public.cartes validate constraint cartes_mise_check;
+alter table public.cartes add  constraint cartes_mise_check check (mise >= 500);
 
 alter table public.mises drop constraint mises_montant_borne;
-alter table public.mises add  constraint mises_montant_borne check (montant >= 500) not valid;
-alter table public.mises validate constraint mises_montant_borne;
+alter table public.mises add  constraint mises_montant_borne check (montant >= 500);
 
 /* -------------------------- Garde-fou ------------------------------------ */
 
