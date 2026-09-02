@@ -20,6 +20,7 @@
     "verifier:bundles": "node scripts/verifier-bundles.mjs",
     "verifier:dns": "node scripts/verifier-dns.mjs",
     "verifier:en-ligne": "node scripts/verifier-en-ligne.mjs",
+  "verifier:migrations": "node scripts/verifier-migrations.mjs",
     "generer:theme": "node scripts/generer-theme.mjs",
     "verifier:theme": "node scripts/generer-theme.mjs --verifier",
     "generer:marque": "node scripts/generer-marque.mjs",

@@ -56,9 +56,10 @@ npx supabase link --project-ref <ref-du-projet>
 npx supabase db push
 ```
 
-Les sept migrations s'appliquent dans l'ordre. Les trois dernières portent
-chacune un bloc de contrôle qui fait échouer la migration plutôt que de laisser
-passer :
+Les migrations s'appliquent dans l'ordre — sept le jour où cette page a été
+écrite, quarante et une au 2026-09-02 ; c'est `ls supabase/migrations` qui fait
+foi, pas ce paragraphe. Trois d'entre elles portent un bloc de contrôle qui fait
+échouer la migration plutôt que de laisser passer :
 
 - `..._socle_revoquer_privileges_implicites` échoue si `TRUNCATE`, `REFERENCES`
   ou `TRIGGER` restent accordés à `anon` ou `authenticated` ;
@@ -881,6 +882,87 @@ vrai compte.
 
 ---
 
+## 6. Déployer une évolution
+
+Les cinq sections précédentes décrivent le **premier** déploiement : créer,
+lier, durcir, constater. Ce qu'on refait à chaque livraison est plus court et
+plus dangereux, parce qu'il s'exécute sur une base qui contient déjà l'argent
+des clients.
+
+### 6.1 D'abord, savoir où en est la base
+
+```
+npm run verifier:migrations
+```
+
+Le script interroge le projet lié et nomme les migrations versionnées qui n'y
+sont pas appliquées. Sortie non nulle dès qu'il en reste une.
+
+Ce contrôle est né d'un manquement. Le 2026-09-02, un collecteur a vu « Le
+serveur refuse ce montant » en ouvrant une carte à 25 000 FCFA : l'application
+était juste, le message était juste, et la base servait encore
+`check (mise between 500 and 10000)` — sept migrations en retard. Rien ne
+l'avait dit. Le canal de découverte a été un collecteur en tournée.
+
+Ce n'était pas la première fois : `verifier-en-ligne.mjs` porte en tête le
+récit du 2026-08-21, trois sites servant une construction vieille de deux jours
+pendant qu'un script répondait « conforme ». La fraîcheur du front est mesurée
+depuis ce jour-là. Celle du schéma l'est depuis celui-ci.
+
+### 6.2 Ensuite, les questions que la livraison pose à la production
+
+Une migration qui **resserre** une règle change le sort de lignes qui existent
+déjà. Il faut compter avant, pas après. Exemple réel, pour
+`20260902110000_abonnement_ouvre_droit` :
+
+```sql
+select abonnement_statut, count(*) from collecteurs group by 1;
+```
+
+Chaque collecteur non `actif` perd l'ajout de client et l'ouverture de carte à
+la seconde où la migration passe. Il garde l'encaissement sur les cartes
+ouvertes, et l'application lui dit désormais pourquoi. Si le compte n'est pas
+zéro, ce sont des gens à prévenir avant le `push`, pas à découvrir après.
+
+La règle générale : avant de pousser une migration qui referme quelque chose,
+écrire la requête qui compte qui est concerné, et la lancer.
+
+### 6.3 Puis l'ordre, qui n'est pas indifférent
+
+```bash
+npx supabase db push                              # 1. le schéma
+npx supabase functions deploy <fonction>          # 2. les Edge Functions
+                                                  # 3. les sites (git push)
+```
+
+**Le schéma d'abord, toujours.** Une Edge Function qui écrit une colonne
+déployée avant sa migration échoue sur chaque appel :
+`collecteur-cloturer-carte` écrit `restitue_par`, et sans la colonne, *toute
+clôture de carte* rend `PGRST204`. L'ordre inverse est sûr : les déclencheurs
+remplissent les colonnes neuves, et l'ancien code ne les voit simplement pas.
+
+Même raisonnement pour les applications, qui viennent en dernier : Netlify
+publie sur `git push`, donc pousser la branche avant d'avoir fait `db push`
+met en ligne une application qui demande à la base ce qu'elle n'a pas encore.
+
+**Regarder ce que fait la migration avant de choisir l'heure.**
+`20260902120000_encaisse_par` désactive les déclencheurs d'immuabilité le temps
+d'un `update` complet sur `mises` et `retraits` : c'est un verrou exclusif sur
+les deux tables où entre l'argent. À passer à une heure creuse, pas à midi.
+
+### 6.4 Enfin, constater
+
+```
+npm run verifier:migrations   # doit être muet
+npm run verifier:en-ligne     # les trois sites servent bien la construction du jour
+```
+
+Puis le geste que rien n'automatise : refaire dans l'application le chemin
+exact qui a motivé la livraison. Le 2026-09-02, c'était d'ouvrir une carte à
+25 000 FCFA.
+
+---
+
 ## Ce que le déploiement ne fait pas
 
 Il ne rend pas le produit vendable. Un collecteur qui ouvre l'application y
@@ -904,4 +986,4 @@ une opération routinière plutôt qu'un événement redouté en fin de projet.
 ---
 
 *Kolek — procédure de déploiement · 2026-08-16, révisée le 2026-08-17
-(troisième site, dépôt GitHub).*
+(troisième site, dépôt GitHub) et le 2026-09-02 (§6, déployer une évolution).*
