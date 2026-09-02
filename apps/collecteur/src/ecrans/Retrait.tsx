@@ -7,6 +7,7 @@ import { useDonnees } from '../cache';
 import { cloturerCarte } from '../ecritures-ecrans';
 import { chargerCartesCloturables, type CarteCloturable } from '../lectures-ecrans';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
+import { useEstCollaborateur } from './commission';
 import { ActiverCarte } from './ActiverCarte';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 
@@ -63,6 +64,7 @@ export function Retrait({
   /** Retire le filtre. Absent quand aucun filtre n'est posé. */
   onToutesLesCartes?: () => void;
 }) {
+  const estCollaborateur = useEstCollaborateur();
   const [aConfirmer, setAConfirmer] = useState<CarteCloturable | null>(null);
   // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit.
   const premier = usePremierRendu();
@@ -248,7 +250,11 @@ export function Retrait({
                     </p>
                     <p className="text-xs font-body text-muted-foreground mt-1">
                       {carte.misesEncaissees > 0
-                        ? `${carte.misesEncaissees} mises encaissées, moins la première qui est ta commission (${formatMontant(carte.mise)} FCFA).`
+                        ? `${carte.misesEncaissees} mises encaissées, moins la première, ${
+                            estCollaborateur
+                              ? 'qui revient à ton titulaire'
+                              : 'qui est ta commission'
+                          } (${formatMontant(carte.mise)} FCFA).`
                         : 'Aucune mise encaissée : rien à rendre, rien à garder.'}
                     </p>
                   </div>

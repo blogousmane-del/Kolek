@@ -44,8 +44,28 @@ vi.mock('../ecritures-ecrans', () => ({
   cloturerCarte: (...args: unknown[]) => cloturerCarte(...args),
 }));
 
+/**
+ * `useEstCollaborateur` lit le profil : depuis les collaborateurs, ces écrans
+ * en dépendent. Un collecteur seul par défaut — c'est ce que ces suites
+ * testaient déjà, sans avoir eu à le dire.
+ */
+const chargerProfil = vi.fn(() =>
+  Promise.resolve({
+    nom: 'Collecteur',
+    telephone: '+2250700000000',
+    zone: null,
+    palier: 'pro',
+    abonnementStatut: 'actif',
+    abonnementEcheance: null,
+    clients: 0,
+    cartesActives: 0,
+    titulaireId: null,
+  }),
+);
+
 vi.mock('../lectures-ecrans', () => ({
   chargerCartesCloturables: vi.fn(),
+  chargerProfil: () => chargerProfil(),
 }));
 
 vi.mock('../ecritures', () => ({

@@ -6,6 +6,7 @@ import { useDonnees } from '../cache';
 import { chargerRecus } from '../lectures-ecrans';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
+import { useEstCollaborateur } from './commission';
 
 /**
  * Les reçus : la preuve de ce qui a été encaissé.
@@ -25,6 +26,7 @@ import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
  * a passé la journée à retirer d'ici.
  */
 export function Recus({ onRetour, revision }: { onRetour: () => void; revision: number }) {
+  const estCollaborateur = useEstCollaborateur();
   const { donnees: recus, erreur } = useDonnees('recus', () => chargerRecus(), {
     revision,
     messageErreur: 'Reçus indisponibles. Vérifie le réseau.',
@@ -103,7 +105,9 @@ export function Recus({ onRetour, revision }: { onRetour: () => void; revision: 
                         {formatMontant(recu.montant)}
                       </p>
                       {recu.estCommission && (
-                        <p className="text-xs font-body text-positive font-medium">commission</p>
+                        <p className="text-xs font-body text-positive font-medium">
+                          {estCollaborateur ? 'commission titulaire' : 'commission'}
+                        </p>
                       )}
                     </div>
                     <Icone

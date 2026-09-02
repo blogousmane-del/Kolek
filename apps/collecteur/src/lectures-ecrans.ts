@@ -410,13 +410,24 @@ export interface Profil {
   abonnementEcheance: string | null;
   clients: number;
   cartesActives: number;
+  /**
+   * L’identifiant du titulaire, ou `null` pour un titulaire comme pour un
+   * collecteur seul — les deux sont le même état.
+   *
+   * C’est ce qui décide à qui revient la commission de la première mise, et donc
+   * ce que quatre écrans annoncent au collecteur. La colonne est lisible parce
+   * que la migration `20260902100000` l’a explicitement accordée : `collecteurs`
+   * est en GRANT de colonne, et une colonne neuve n’y est lisible par personne
+   * tant qu’on ne l’ajoute pas.
+   */
+  titulaireId: string | null;
 }
 
 export async function chargerProfil(): Promise<Profil> {
   const [rCollecteur, rClients, rCartes] = await Promise.all([
     supabase
       .from('collecteurs')
-      .select('nom, telephone, zone, palier, abonnement_statut, abonnement_echeance')
+      .select('nom, telephone, zone, palier, abonnement_statut, abonnement_echeance, titulaire_id')
       .maybeSingle(),
     supabase.from('clients').select('id'),
     supabase.from('cartes').select('id, statut'),
@@ -431,6 +442,7 @@ export async function chargerProfil(): Promise<Profil> {
     palier: c.palier ?? 'essai',
     abonnementStatut: c.abonnement_statut ?? 'actif',
     abonnementEcheance: c.abonnement_echeance ?? null,
+    titulaireId: c.titulaire_id ?? null,
     clients: (rClients.data ?? []).length,
     cartesActives: ((rCartes.data ?? []) as Array<{ statut: string }>).filter(
       (x) => x.statut === 'active',
