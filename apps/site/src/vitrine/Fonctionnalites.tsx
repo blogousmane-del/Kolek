@@ -1,5 +1,5 @@
 import { MISES_PAR_CYCLE } from '@kolek/core';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useMouvementAccepte } from './animation';
 
@@ -100,16 +100,34 @@ const JOURNAL = [
   '18:32  écart  0 F  ✓ juste',
 ] as const;
 
+/** Nombre de lignes déjà tapées que la fenêtre garde à l'écran. */
+const LIGNES_VISIBLES = 5;
+
+/**
+ * ## Pourquoi cette animation n'est pas dans l'état React
+ *
+ * Elle y était jusqu'au 2026-09-02 : `setCourante` toutes les 34 ms, soit une
+ * trentaine de rendus React complets par seconde, en continu, tant que la carte
+ * est montée. Le téléphone d'entrée de gamme qui est la cible déclarée du produit
+ * payait ce prix pour afficher un caractère de plus.
+ *
+ * Le texte est donc écrit directement dans le DOM. La règle qui rend la chose
+ * sûre : **React ne rend jamais d'enfant dans les nœuds que ce code écrit.** Le
+ * journal animé et le journal statique sont deux conteneurs distincts, jamais
+ * montés en même temps, et le nettoyage de l'effet vide celui qu'il a rempli.
+ *
+ * Le rendu visible est identique à celui d'avant, au pixel près.
+ */
 function MachineTelemetrie() {
   const anime = useMouvementAccepte();
-  // Sans mouvement, le journal est montré fini : la carte doit rester
-  // informative, pas devenir vide. C'est la règle de toute la vitrine — on
-  // retire l'animation, jamais le contenu.
-  const [lignes, setLignes] = useState<string[]>(anime ? [] : [...JOURNAL].slice(-5));
-  const [courante, setCourante] = useState('');
+  const journal = useRef<HTMLDivElement>(null);
+  const enCours = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    if (!anime) return;
+    const zone = journal.current;
+    const curseur = enCours.current;
+    if (!anime || !zone || !curseur) return;
+
     let ligne = 0;
     let caractere = 0;
     const minuterie = setInterval(() => {
@@ -118,20 +136,30 @@ function MachineTelemetrie() {
         // Fin du journal : on repart, comme un vrai flux.
         ligne = 0;
         caractere = 0;
-        setLignes([]);
-        setCourante('');
+        zone.replaceChildren();
+        curseur.textContent = '';
         return;
       }
       caractere += 1;
-      setCourante(texte.slice(0, caractere));
+      curseur.textContent = texte.slice(0, caractere);
       if (caractere >= texte.length) {
-        setLignes((prec) => [...prec.slice(-4), texte]);
-        setCourante('');
+        const rendue = document.createElement('p');
+        rendue.textContent = texte;
+        if (texte.includes('✓')) rendue.className = 'text-chart-mint';
+        zone.append(rendue);
+        while (zone.childElementCount > LIGNES_VISIBLES) zone.firstElementChild?.remove();
+        curseur.textContent = '';
         ligne += 1;
         caractere = 0;
       }
     }, 34);
-    return () => clearInterval(minuterie);
+
+    return () => {
+      clearInterval(minuterie);
+      // Si le visiteur active « mouvement réduit » en cours de route, React
+      // monte le journal statique ; celui-ci doit repartir vide.
+      zone.replaceChildren();
+    };
   }, [anime]);
 
   return (
@@ -143,14 +171,22 @@ function MachineTelemetrie() {
         FLUX EN DIRECT · CAISSE DU SOIR
       </p>
       <div className="flex-1 overflow-hidden font-mono text-[11px] leading-6 text-white/70 xs:text-xs">
-        {lignes.map((l) => (
-          <p key={l} className={l.includes('✓') ? 'text-chart-mint' : undefined}>
-            {l}
-          </p>
-        ))}
+        {/* Écrit par l'effet, jamais par React : voir le commentaire du composant. */}
+        <div ref={journal} />
+
+        {/* Sans mouvement, le journal est montré fini : la carte doit rester
+            informative, pas devenir vide. C'est la règle de toute la vitrine — on
+            retire l'animation, jamais le contenu. */}
+        {!anime &&
+          JOURNAL.slice(-LIGNES_VISIBLES).map((l) => (
+            <p key={l} className={l.includes('✓') ? 'text-chart-mint' : undefined}>
+              {l}
+            </p>
+          ))}
+
         {anime && (
           <p className="text-white">
-            {courante}
+            <span ref={enCours} />
             {/* Un vrai curseur de terminal : `steps(1)`, pas le fondu
                 d'`animate-pulse`. Voir `styles.css`. */}
             <span className="curseur ml-0.5 inline-block h-3.5 w-1.5 bg-or align-middle" />
