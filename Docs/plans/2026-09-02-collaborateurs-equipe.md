@@ -73,17 +73,34 @@ Elles s'appliquent à **toutes** les tâches, sans être répétées dans chacun
    mais leur exécution locale est attendue en échec : le rapporter comme **NON
    VÉRIFIÉ**, jamais comme un succès. Le SQL, lui, se vérifie directement :
    `docker exec supabase_db_Kolek psql -U postgres -d postgres -c "…"`.
-10. **Vitest 4 sans `globals`.** `describe/it/expect/vi` s'importent depuis
+10. **Les téléphones de test doivent être uniques entre deux exécutions.**
+    `collecteurs.telephone` est unique, et une collision ne se présente pas
+    comme une collision : le déclencheur `creer_collecteur_apres_signup` échoue
+    et GoTrue rend « Database error creating new user ». Un compteur seul repart
+    à 1 à chaque exécution et heurte les lignes de la précédente ; l'horloge
+    seule donne deux fois le même numéro dans la même milliseconde. Tout fichier
+    de test qui appelle `creerCollecteur` porte donc ce helper :
+
+    ```ts
+    const SERIE = String(Date.now()).slice(-7);
+    let compteur = 0;
+    function telephone(): string {
+      compteur += 1;
+      return `+225${SERIE}${String(compteur).padStart(2, '0')}`;
+    }
+    ```
+
+11. **Vitest 4 sans `globals`.** `describe/it/expect/vi` s'importent depuis
     `'vitest'`. Dans les tests de composants, `afterEach(cleanup)` est
     manuel. **`@testing-library/jest-dom` n'est pas installé** : utiliser
     `.textContent` + `toContain`, `toBeTruthy()`, et `queryBy… → toBeNull()`.
     `getByText` normalise les espaces — pour une assertion sensible aux suites
     d'espaces, lire `document.body.textContent`.
-11. **Un commit par tâche**, message en français, préfixe conventionnel
+12. **Un commit par tâche**, message en français, préfixe conventionnel
     (`feat:`, `fix:`, `test:`, `docs:`), corps expliquant le *pourquoi*. Chaque
     message se termine par :
     `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`
-12. **Branche de travail : `collaborateurs-equipe`**, déjà créée, tête
+13. **Branche de travail : `collaborateurs-equipe`**, déjà créée, tête
     `d75b047`. Ne pas travailler sur `main`.
 
 ---
@@ -843,12 +860,35 @@ tests. Les suites qui créent un collecteur par `creerCollecteur` le laissent en
 Le vérifier plutôt que le supposer :
 
 ```
-npm run db:env && npx vitest run --config supabase/tests/vitest.config.ts supabase/tests/isolation.test.ts supabase/tests/rls.test.ts supabase/tests/search-path.test.ts
+npm run db:env && npx vitest run --config supabase/tests/vitest.config.ts \
+  supabase/tests/isolation.test.ts supabase/tests/search-path.test.ts \
+  supabase/tests/mises.test.ts supabase/tests/bornes.test.ts \
+  supabase/tests/cartes-multiples.test.ts supabase/tests/ecritures-collecteur.test.ts \
+  supabase/tests/operations.test.ts supabase/tests/plancher.test.ts
 ```
 
-Attendu : tout vert. Si `rls.test.ts` n'existe pas sous ce nom, lancer
-`npm run test:db` et ne retenir que les échecs qui ne sont **pas** dus au
-runtime Edge Functions local (contrainte globale 9).
+Attendu : 92 tests verts. Ce sont les huit suites qui insèrent des clients et
+des cartes, donc les seules que ce resserrement peut casser.
+
+Puis la suite complète, pour comparer à la base de référence :
+
+```
+npm run db:env && npx vitest run --config supabase/tests/vitest.config.ts
+```
+
+Attendu : **40 échecs, tous dans six fichiers** — `accord-demande`,
+`demander-ouverture`, `mot-de-passe-oublie`, `mrr-remises`,
+`super-admin-fonctions`, `super-admin-journal-route`. Ce sont les six suites qui
+appellent des Edge Functions par HTTP, et le runtime local ne sert pas
+(contrainte globale 9). Le vérifier plutôt que le supposer :
+
+```
+curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+  http://127.0.0.1:54321/functions/v1/admin-vue-globale -H "Content-Type: application/json" -d '{}'
+```
+
+Attendu : `500` ou `503`. Un septième fichier en échec, ou un échec hors de ces
+six, est une régression — s'arrêter et la traiter.
 
 - [ ] **Étape 6 : commit**
 

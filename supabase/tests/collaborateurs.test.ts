@@ -18,12 +18,24 @@ afterAll(nettoyer);
  * le prouve — aucune policy n'a été élargie pour cette fonctionnalité.
  */
 
-/** Un compteur, et pas `Date.now()` : deux appels dans la même milliseconde
-    fabriqueraient deux fois le même téléphone, qui est unique en base. */
+/**
+ * Un téléphone unique, dans cette exécution comme entre deux exécutions.
+ *
+ * `collecteurs.telephone` est unique en base, et une collision ne se présente
+ * pas comme une collision : le déclencheur `creer_collecteur_apres_signup`
+ * échoue, et GoTrue rend « Database error creating new user » — un message qui
+ * n'aide personne à trouver la cause.
+ *
+ * Un compteur seul repart à 1 à chaque exécution et heurte les lignes de la
+ * précédente tant que `db:reset` n'a pas tourné. L'horloge seule ne suffit pas
+ * non plus : deux appels dans la même milliseconde donnent le même numéro. Les
+ * deux ensemble, donc.
+ */
+const SERIE = String(Date.now()).slice(-7);
 let compteur = 0;
 function telephone(): string {
   compteur += 1;
-  return `+2250${String(compteur).padStart(9, '0')}`;
+  return `+225${SERIE}${String(compteur).padStart(2, '0')}`;
 }
 
 /** Passe un collecteur en titulaire Illimité actif, sous clé de service. */
@@ -160,5 +172,99 @@ describe('le rattachement', () => {
       .eq('id', malin.id)
       .single();
     expect(data?.titulaire_id).toBeNull();
+  });
+});
+
+describe('la suspension', () => {
+  it('descend du titulaire sur ses collaborateurs', async () => {
+    const patron = await creerCollecteur('Patron Susp', telephone());
+    const awa = await creerCollecteur('Awa Susp', telephone());
+    await rendreTitulaire(patron.id);
+    expect((await rattacher(awa.id, patron.id)).error).toBeNull();
+
+    await admin.from('collecteurs').update({ abonnement_statut: 'suspendu' }).eq('id', patron.id);
+
+    const { data } = await admin
+      .from('collecteurs')
+      .select('abonnement_statut, titulaire_id')
+      .eq('id', awa.id)
+      .single();
+    expect(data?.abonnement_statut).toBe('suspendu');
+    // Le rattachement reste : un retour à Illimité doit réactiver sans recréer,
+    // et l'administration doit voir ce qui s'est passé.
+    expect(data?.titulaire_id).toBe(patron.id);
+  });
+
+  it('descend aussi quand le titulaire quitte Illimité', async () => {
+    const patron = await creerCollecteur('Patron Decl', telephone());
+    const awa = await creerCollecteur('Awa Decl', telephone());
+    await rendreTitulaire(patron.id);
+    expect((await rattacher(awa.id, patron.id)).error).toBeNull();
+
+    await admin.from('collecteurs').update({ palier: 'pro' }).eq('id', patron.id);
+
+    const { data } = await admin
+      .from('collecteurs')
+      .select('abonnement_statut')
+      .eq('id', awa.id)
+      .single();
+    expect(data?.abonnement_statut).toBe('suspendu');
+  });
+
+  it('interdit d’ajouter un client et d’ouvrir une carte, jamais d’encaisser', async () => {
+    const actif = await creerCollecteur('Actif', telephone());
+
+    // Un client et une carte, tant que l'abonnement est actif.
+    const clientId = crypto.randomUUID();
+    const carteId = crypto.randomUUID();
+    expect(
+      (
+        await actif.client
+          .from('clients')
+          .insert({ id: clientId, collecteur_id: actif.id, nom: 'Cliente' })
+      ).error,
+    ).toBeNull();
+    expect(
+      (
+        await actif.client
+          .from('cartes')
+          .insert({ id: carteId, collecteur_id: actif.id, client_id: clientId, mise: 1000 })
+      ).error,
+    ).toBeNull();
+
+    await admin.from('collecteurs').update({ abonnement_statut: 'expire' }).eq('id', actif.id);
+
+    // Interdit : un client de plus.
+    expect(
+      (
+        await actif.client
+          .from('clients')
+          .insert({ id: crypto.randomUUID(), collecteur_id: actif.id, nom: 'Trop tard' })
+      ).error,
+    ).not.toBeNull();
+
+    // Interdit : une carte de plus.
+    expect(
+      (
+        await actif.client.from('cartes').insert({
+          id: crypto.randomUUID(),
+          collecteur_id: actif.id,
+          client_id: clientId,
+          mise: 1000,
+        })
+      ).error,
+    ).not.toBeNull();
+
+    // Autorisé : encaisser sur la carte déjà ouverte. Une carte ouverte est une
+    // promesse à une cliente qui paie tous les jours ; la couper au milieu du
+    // cycle punit la cliente, pas le collecteur.
+    const { error } = await actif.client.from('mises').insert({
+      id: crypto.randomUUID(),
+      collecteur_id: actif.id,
+      carte_id: carteId,
+      montant: 1000,
+      encaisse_le: new Date().toISOString(),
+    });
+    expect(error).toBeNull();
   });
 });
