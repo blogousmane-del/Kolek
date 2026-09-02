@@ -487,13 +487,20 @@ Ajouter la valeur dans les quatre entrées de `PALIERS` — après `limiteClient
 `collaborateursInclus: 0,` pour `essai`, `standard` et `pro` ;
 `collaborateursInclus: COLLABORATEURS_MAX,` pour `illimite`.
 
-Et, dans les `fonctions` d'`illimite`, remplacer
-`{ libelle: 'Manager dédié', incluse: true },` par :
+Ajouter enfin la ligne aux `fonctions` des **quatre** paliers, juste avant
+`Manager dédié` — `incluse: true` sur `illimite`, `incluse: false` sur les trois
+autres :
 
 ```ts
-      { libelle: '3 collaborateurs', incluse: true },
-      { libelle: 'Manager dédié', incluse: true },
+      { libelle: '3 collaborateurs', incluse: false },
+      { libelle: 'Manager dédié', incluse: false },
 ```
+
+Les quatre, et pas seulement `illimite` : `paliers.test.ts:28` exige que tous
+les paliers décrivent **les mêmes fonctions dans le même ordre**, parce que la
+grille tarifaire est une matrice et qu'une colonne plus longue ferait s'aligner
+des lignes qui ne parlent pas de la même chose. Une fonction absente se barre,
+elle ne se retire pas — c'est ce que fait déjà `Manager dédié`.
 
 - [ ] **Étape 6 : faire traverser le chiffre vers Deno**
 
