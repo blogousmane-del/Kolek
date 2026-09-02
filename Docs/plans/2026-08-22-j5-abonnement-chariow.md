@@ -11,6 +11,43 @@
 **Spécification de référence :** `Docs/specs/2026-08-22-j5-abonnement-chariow-design.md`
 **Contrat du fournisseur :** `Docs/Chariow.md`
 
+## Mise à jour du 2026-09-02
+
+Ce plan a été écrit le 2026-08-22 et n'a jamais été exécuté. Onze jours de
+travail se sont intercalés — les codes promo le 30 août, les collaborateurs du
+forfait Illimité le 2 septembre — et trois points du plan ne tiennent plus. Ils
+sont corrigés ici, dans le corps des tâches concernées, et résumés une fois :
+
+**Les deux migrations sont renumérotées** en `20260902160000` et
+`20260902170000`. Les horodatages d'origine (`20260822…`) sont désormais
+antérieurs à trente-quatre migrations déjà appliquées en production : poussées
+telles quelles, elles arriveraient hors ordre, ce que `supabase db push`
+refuse.
+
+**Un collaborateur ne s'abonne pas** — tâches 5 et 11. Depuis
+`20260902100000`, un collecteur peut porter un `titulaire_id`. Il hérite alors
+du palier de son titulaire, qui paie pour lui, et `admin_vue_globale` ne compte
+pas son abonnement (`titulaire_id is null`, migration `20260902140000`). Lui
+vendre un forfait lui ferait payer ce qu'il a déjà. La fonction de checkout le
+refuse, et l'écran ne lui est pas proposé.
+
+**La remise interne devient un `discount_code` Chariow** — tâche 5, et une
+tâche 14 neuve. Depuis `20260830100000`, un collecteur porte `promo_code`,
+`remise_pct` et `remise_fin`, et le chiffre d'affaires compte déjà la remise
+en fraction d'abonnement offerte. La documentation Chariow est formelle
+(§3.1) : `discount_code` est le **seul** moyen de réduire un prix. Le checkout
+envoie donc le code du collecteur, et le même code doit exister à l'identique
+dans le tableau de bord Chariow.
+
+C'est une source de vérité dupliquée, et elle porte le risque que l'en-tête de
+`packages/core/src/paliers.ts` nomme déjà : « un prix qui diverge entre la page
+de vente et l'écran d'administration n'est pas un défaut d'affichage, c'est un
+litige commercial ». D'où la tâche 14 : `npm run verifier:promos` compare les
+codes internes à ceux de Chariow et échoue sur toute divergence de pourcentage
+ou toute absence.
+
+---
+
 ## Global Constraints
 
 - **Langue :** interface, libellés et messages d'erreur destinés à l'utilisateur en français. Codes d'erreur techniques en majuscules sans accents (`TELEPHONE_INVALIDE`), destinés au code, traduits une seule fois côté application.
@@ -45,8 +82,8 @@ Le remplacement est une table d'indicatifs explicite, et il coûte quelque chose
 | `supabase/functions/abonnement-payer/index.ts` | **Créer.** Crée la vente, rend `checkoutUrl`. |
 | `supabase/functions/abonnement-verifier/index.ts` | **Créer.** Réconcilie les paiements de l'appelant. |
 | `supabase/functions/chariow-webhook/index.ts` | **Créer.** Point d'entrée public, secret en URL, ne crédite rien lui-même. |
-| `supabase/migrations/20260822090000_abonnements_paiements.sql` | **Créer.** Table, RLS, privilèges, immuabilité, journal, `crediter_abonnement`, garde-fous. |
-| `supabase/migrations/20260822093000_admin_paiements.sql` | **Créer.** `admin_paiements_recents()` pour l'administration. |
+| `supabase/migrations/20260902160000_abonnements_paiements.sql` | **Créer.** Table, RLS, privilèges, immuabilité, journal, `crediter_abonnement`, garde-fous. |
+| `supabase/migrations/20260902170000_admin_paiements.sql` | **Créer.** `admin_paiements_recents()` pour l'administration. |
 | `supabase/config.toml` | **Modifier.** Première section `[functions]` : `verify_jwt = false` sur le seul webhook. |
 | `supabase/functions/admin-supprimer-collecteur/index.ts:152-177` | **Modifier.** Compter les paiements avant de supprimer. |
 | `supabase/functions/admin-vue-globale/index.ts:146-173` | **Modifier.** Joindre le bloc `paiements` à la réponse. |
@@ -481,7 +518,7 @@ git commit -m "feat(abonnement): le contrat Chariow, et le piège de « unpaid �
 ## Task 2: Le registre des paiements et la fonction de crédit
 
 **Files:**
-- Create: `supabase/migrations/20260822090000_abonnements_paiements.sql`
+- Create: `supabase/migrations/20260902160000_abonnements_paiements.sql`
 - Test: `supabase/tests/abonnement.test.ts`
 
 **Interfaces:**
@@ -744,7 +781,7 @@ Expected: FAIL — `relation "public.paiements_abonnement" does not exist`.
 
 - [ ] **Step 3: Écrire la migration**
 
-Créer `supabase/migrations/20260822090000_abonnements_paiements.sql` :
+Créer `supabase/migrations/20260902160000_abonnements_paiements.sql` :
 
 ```sql
 -- Kolek — J5 : le registre des paiements d'abonnement
@@ -778,6 +815,12 @@ create table public.paiements_abonnement (
   montant        numeric(12,2) not null check (montant >= 0),
   -- Jamais figée à 'XOF'. Piège n°2 de Docs/Chariow.md, et un incident réel.
   devise         text not null check (devise ~ '^[A-Z]{3}$'),
+  -- La remise appliquée au moment de l'achat, en points de pourcentage. Elle
+  -- est ici et non déduite de `collecteurs.remise_pct` parce qu'une remise
+  -- expire : six mois plus tard, la fiche du collecteur ne dira plus ce qui a
+  -- été accordé ce jour-là, et le contrôle de grille accuserait la boutique
+  -- d'avoir débité un mauvais montant.
+  remise_pct     smallint not null default 0 check (remise_pct between 0 and 100),
   echeance_avant date not null,
   echeance_apres date,
   regle_le       timestamptz,
@@ -1010,7 +1053,7 @@ Expected: PASS — 157 tests d'avant, plus les 14 nouveaux et les 20 de la tâch
 - [ ] **Step 6: Commit**
 
 ```bash
-git add supabase/migrations/20260822090000_abonnements_paiements.sql supabase/tests/abonnement.test.ts
+git add supabase/migrations/20260902160000_abonnements_paiements.sql supabase/tests/abonnement.test.ts
 git commit -m "feat(abonnement): le registre des paiements, et la seule fonction qui crédite"
 ```
 
@@ -1286,11 +1329,22 @@ export async function reconcilier(
     // débit serait le punir d'une erreur de configuration de GTCS.
     if (vente.devise === 'XOF') {
       try {
-        const attendu = tarifParCle(paiement.palier).prix;
+        // Le prix de la grille, diminué de la remise **portée par le paiement**
+        // — pas de celle que la fiche porte aujourd'hui. Sans ce calcul, chaque
+        // paiement remisé écrirait une anomalie de grille parfaitement normale,
+        // et le jour où la boutique Chariow divergerait vraiment, la ligne se
+        // perdrait dans le bruit qu'on aurait appris à ignorer.
+        //
+        // `Math.round` : Chariow applique un pourcentage sur un entier en FCFA
+        // et arrondit ; 15 000 à -20 % fait 12 000, mais 15 000 à -33 % fait
+        // 10 050 chez eux et 10 050,0000001 ici si on ne borne pas.
+        const plein = tarifParCle(paiement.palier).prix;
+        const attendu = Math.round((plein * (100 - paiement.remise_pct)) / 100);
         if (vente.montant !== attendu) {
           depot.journaliser(
             `GRILLE — le produit ${paiement.palier} a débité ${vente.montant} XOF ` +
-              `au lieu de ${attendu} XOF. Aligner la boutique Chariow sur la grille.`,
+              `au lieu de ${attendu} XOF (grille ${plein}, remise ${paiement.remise_pct} %). ` +
+              `Aligner la boutique Chariow sur la grille.`,
           );
         }
       } catch {
@@ -1709,7 +1763,7 @@ Deno.serve(async (requete) => {
   // qui prouve qu'il lit la sienne.
   const { data: fiche, error: erreurFiche } = await clientAppelant
     .from('collecteurs')
-    .select('nom, abonnement_echeance')
+    .select('nom, abonnement_echeance, titulaire_id, promo_code, remise_pct, remise_fin')
     .eq('id', collecteurId)
     .maybeSingle();
 
@@ -1717,6 +1771,35 @@ Deno.serve(async (requete) => {
     console.error('[Abonnement] lecture fiche :', erreurFiche?.message);
     return reponse({ erreur: 'FICHE_INTROUVABLE' }, 404, requete);
   }
+
+  // Un collaborateur ne s'abonne pas. Son palier vient de son titulaire, qui
+  // paie pour lui, et `admin_vue_globale` ne compte pas son abonnement depuis
+  // `20260902140000`. Encaisser ici lui vendrait ce qu'il a déjà, et la somme
+  // n'apparaîtrait même pas au chiffre d'affaires.
+  //
+  // Le refus est un 403 nommé, pas un 404 : le collaborateur existe, sa
+  // demande est légitime, elle n'a simplement pas d'objet. L'écran ne lui est
+  // pas proposé (tâche 11) — ceci est la barrière serveur.
+  if (fiche.titulaire_id !== null) {
+    return reponse({ erreur: 'ABONNEMENT_DU_TITULAIRE' }, 403, requete);
+  }
+
+  // La remise interne devient un `discount_code` chez Chariow : c'est le seul
+  // moyen que l'API offre de réduire un prix (Docs/Chariow.md §3.1). Le code
+  // n'est envoyé que s'il est encore valide — `remise_fin` est une date, et un
+  // code périmé fait répondre 422 à Chariow, que le collecteur lirait comme
+  // « saisie refusée » alors que sa saisie est irréprochable.
+  //
+  // Comparaison de dates en ISO, sur des chaînes : `remise_fin` arrive de
+  // PostgREST en `YYYY-MM-DD`, et l'ordre lexicographique y est l'ordre
+  // chronologique. Fabriquer deux `Date` introduirait un fuseau là où il n'y
+  // en a pas.
+  const aujourdHui = new Date().toISOString().slice(0, 10);
+  const remiseActive =
+    typeof fiche.promo_code === 'string' &&
+    fiche.promo_code.length > 0 &&
+    typeof fiche.remise_fin === 'string' &&
+    fiche.remise_fin >= aujourdHui;
 
   // Chariow exige un prénom **et** un nom. Une fiche Kolek ne porte qu'un nom
   // complet : on le coupe, avec un repli plutôt qu'un refus — un collecteur
@@ -1770,11 +1853,20 @@ Deno.serve(async (requete) => {
         first_name: prenom,
         last_name: nomFamille,
         phone: telephone,
+        // Absent plutôt que `null` quand il n'y a pas de remise : Chariow
+        // valide la présence de la clé, pas seulement sa valeur.
+        ...(remiseActive ? { discount_code: fiche.promo_code } : {}),
         redirect_url: `${retour}/?paiement=retour`,
         custom_metadata: {
           collecteurId,
           palier,
           echeanceAvant: fiche.abonnement_echeance,
+          // Ce que Kolek croyait accorder, au moment de l'achat. La
+          // réconciliation compare le montant réellement encaissé au prix du
+          // palier ; sans cette trace, une divergence entre les deux
+          // catalogues de codes serait indémêlable six mois plus tard.
+          remisePct: remiseActive ? fiche.remise_pct : null,
+          promoCode: remiseActive ? fiche.promo_code : null,
         },
       }),
     });
@@ -1827,6 +1919,8 @@ Deno.serve(async (requete) => {
       vente_id: vente.id as string,
       montant,
       devise,
+      // Ce qui a été demandé à Chariow, et non ce que la fiche portera demain.
+      remise_pct: remiseActive ? Number(fiche.remise_pct) : 0,
       echeance_avant: fiche.abonnement_echeance,
     })
     .select('id')
@@ -2578,6 +2672,8 @@ const MESSAGES: Record<string, string> = {
   TELEPHONE_INVALIDE: 'Ce numéro n’est pas utilisable. Vérifie le pays et le numéro.',
   SAISIE_REFUSEE: 'Le service de paiement a refusé ces informations. Vérifie ton numéro.',
   FICHE_INTROUVABLE: 'Ta fiche est introuvable. Contacte GTCS.',
+  ABONNEMENT_DU_TITULAIRE:
+    'Ton abonnement est payé par ton titulaire. Tu n’as rien à régler.',
   CHECKOUT_IMPOSSIBLE: 'Le service de paiement ne répond pas. Réessaie dans un moment.',
   CHECKOUT_INCOMPLET: 'Le service de paiement a répondu incomplètement. Réessaie.',
   ENREGISTREMENT_IMPOSSIBLE:
@@ -2992,12 +3088,58 @@ export function Plus({ onRetour, onDeconnexion, onAbonnement }: {
 Et, juste après la carte qui affiche le palier (repérable par l'usage de la variable `tarif`), insérer :
 
 ```tsx
-            <Bouton pleineLargeur icone="credit-card" onClick={onAbonnement}>
-              Renouveler mon abonnement
-            </Bouton>
+            {estCollaborateur ? (
+              <p className="font-body text-sm text-muted-foreground">
+                Ton abonnement est payé par ton titulaire. Tu n’as rien à régler.
+              </p>
+            ) : (
+              <Bouton pleineLargeur icone="credit-card" onClick={onAbonnement}>
+                Renouveler mon abonnement
+              </Bouton>
+            )}
 ```
 
+avec, en tête du composant :
+
+```tsx
+  const estCollaborateur = useEstCollaborateur();
+```
+
+et l'import correspondant :
+
+```tsx
+import { useEstCollaborateur } from './commission';
+```
+
+**Pourquoi une phrase et non rien.** Un collaborateur qui ne voit aucun bouton
+d'abonnement, sur un écran qui affiche son palier Illimité juste au-dessus, se
+demande où il paie — et finit par appeler GTCS. La phrase répond à la question
+avant qu'elle ne se pose. Elle dit aussi quelque chose de vrai qu'il ignore
+peut-être : ce n'est pas lui qui paie.
+
+`useEstCollaborateur` existe déjà dans `apps/collecteur/src/ecrans/commission.ts`
+(2026-09-02) : c'est le même hook qui retire à quatre écrans la promesse d'une
+commission qui ne lui revient pas. Il lit la clé de cache `'profil'`, celle que
+`Plus` alimente déjà — aucune requête de plus.
+
 `credit-card` figure déjà dans `packages/ui/src/Icone.tsx` — rien à y ajouter.
+
+**Le test à ajouter** dans `apps/collecteur/src/ecrans/Plus.test.tsx` — ou le
+créer s'il n'existe pas :
+
+```tsx
+it('ne propose pas de payer à un collaborateur', async () => {
+  chargerProfil.mockResolvedValue({ ...PROFIL, palier: 'illimite', titulaireId: 'patron-1' });
+  render(<Plus onRetour={() => {}} onDeconnexion={() => {}} onAbonnement={() => {}} />);
+
+  expect(await screen.findByText(/payé par ton titulaire/)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: /Renouveler/ })).toBeNull();
+});
+```
+
+Ne pas oublier `viderCache()` dans le `afterEach` : le cache de `useDonnees`
+est au niveau du module et survit à `cleanup()` — un test qui suit lirait le
+profil du précédent et passerait en mesurant autre chose.
 
 - [ ] **Step 4: Câbler la coquille**
 
@@ -3126,7 +3268,7 @@ git commit -m "feat(collecteur): régler son abonnement depuis le carnet"
 ## Task 12: L'argent visible côté administration
 
 **Files:**
-- Create: `supabase/migrations/20260822093000_admin_paiements.sql`
+- Create: `supabase/migrations/20260902170000_admin_paiements.sql`
 - Modify: `supabase/functions/admin-vue-globale/index.ts:146-173`
 - Modify: `apps/admin/src/donnees.ts`
 - Modify: `apps/admin/src/ecrans/Abonnements.tsx`
@@ -3137,7 +3279,7 @@ git commit -m "feat(collecteur): régler son abonnement depuis le carnet"
 
 - [ ] **Step 1: Écrire la migration**
 
-Créer `supabase/migrations/20260822093000_admin_paiements.sql` :
+Créer `supabase/migrations/20260902170000_admin_paiements.sql` :
 
 ```sql
 -- Kolek — J5 : ce que l'administration doit voir de l'argent encaissé
@@ -3292,7 +3434,7 @@ Expected: PASS partout, construction sans erreur.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add supabase/migrations/20260822093000_admin_paiements.sql supabase/functions/admin-vue-globale/index.ts apps/admin/src/donnees.ts apps/admin/src/ecrans/Abonnements.tsx
+git add supabase/migrations/20260902170000_admin_paiements.sql supabase/functions/admin-vue-globale/index.ts apps/admin/src/donnees.ts apps/admin/src/ecrans/Abonnements.tsx
 git commit -m "feat(admin): voir l'argent des abonnements arriver"
 ```
 
@@ -3399,6 +3541,237 @@ d'applications, tests de scripts, tests de base, construction, contrôle des paq
 ```bash
 git add Docs/deploiement.md
 git commit -m "docs(deploiement): les secrets Chariow, et le seul --no-verify-jwt du projet"
+```
+
+---
+
+## Task 14: Les deux catalogues de codes ne doivent pas diverger
+
+**Ajoutée le 2026-09-02.** Le checkout envoie `discount_code` (tâche 5), et
+Chariow applique la remise de **son** catalogue, pas du nôtre. Deux sources de
+vérité pour un même pourcentage : `codes_promo` chez nous, les Offres chez eux.
+Rien ne les tient ensemble, et l'écart ne se voit pas — il se lit sur la
+facture du collecteur.
+
+C'est le risque que l'en-tête de `packages/core/src/paliers.ts` nomme déjà :
+« un prix qui diverge entre la page de vente et l'écran d'administration n'est
+pas un défaut d'affichage, c'est un litige commercial ». Ici, c'est pire : la
+divergence est entre ce que Kolek promet et ce que le collecteur paie
+réellement.
+
+**Fichiers**
+- Créer : `scripts/verifier-promos.mjs`
+- Créer : `scripts/verifier-promos.test.mjs`
+- Modifier : `package.json` — un script `verifier:promos`
+- Modifier : `Docs/deploiement.md` §6.4 — le contrôle rejoint la liste d'après-déploiement
+
+**Interfaces**
+- Consomme : `codes_promo` (migration `20260830100000`), `GET /discounts?status=active`
+  (Docs/Chariow.md §3.4).
+- Produit : `comparer(internes, distants): Divergence[]` · type
+  `Divergence = { code: string; genre: 'absent' | 'divergent' | 'inconnu'; interne?: number; distant?: number }`
+
+- [ ] **Étape 1 : le test qui échoue**
+
+Créer `scripts/verifier-promos.test.mjs` :
+
+```js
+import { describe, expect, it } from 'vitest';
+
+import { comparer } from './verifier-promos.mjs';
+
+/**
+ * Deux catalogues de codes, un seul pourcentage vrai.
+ *
+ * `comparer` est pure : elle ne parle ni à la base ni à Chariow. C'est ce qui
+ * permet de la tester sans clé d'API — et un contrôle qui exige la production
+ * pour être vérifié n'est vérifié par personne.
+ */
+
+describe('comparaison des catalogues de remises', () => {
+  it('se tait quand les deux côtés disent la même chose', () => {
+    expect(
+      comparer([{ code: 'LANCEMENT20', remise_pct: 20 }], [{ code: 'LANCEMENT20', percent: 20 }]),
+    ).toEqual([]);
+  });
+
+  it('signale un code que Kolek promet et que Chariow ignore', () => {
+    // Le cas qui coûte le plus cher : le collecteur voit -20 % dans
+    // l'application, et Chariow lui débite le prix plein.
+    expect(comparer([{ code: 'PILOTE50', remise_pct: 50 }], [])).toEqual([
+      { code: 'PILOTE50', genre: 'absent', interne: 50 },
+    ]);
+  });
+
+  it('signale un pourcentage qui ne correspond pas', () => {
+    expect(
+      comparer([{ code: 'PILOTE50', remise_pct: 50 }], [{ code: 'PILOTE50', percent: 40 }]),
+    ).toEqual([{ code: 'PILOTE50', genre: 'divergent', interne: 50, distant: 40 }]);
+  });
+
+  it('signale un code qui n’existe que chez Chariow', () => {
+    // Kolek ne l'enverra jamais, mais la page de paiement est hébergée : un
+    // code qui traîne chez eux réduit un prix que personne ici n'a consenti.
+    expect(comparer([], [{ code: 'VIEUXCODE', percent: 90 }])).toEqual([
+      { code: 'VIEUXCODE', genre: 'inconnu', distant: 90 },
+    ]);
+  });
+
+  it('ne se laisse pas troubler par la casse ni par l’ordre', () => {
+    // `codes_promo_code_check` impose des majuscules côté Kolek ; rien ne
+    // l'impose chez Chariow.
+    expect(
+      comparer(
+        [{ code: 'B', remise_pct: 10 }, { code: 'A', remise_pct: 20 }],
+        [{ code: 'a', percent: 20 }, { code: 'b', percent: 10 }],
+      ),
+    ).toEqual([]);
+  });
+});
+```
+
+- [ ] **Étape 2 : le lancer**
+
+Run: `npx vitest run --dir scripts verifier-promos`
+Expected: ÉCHEC — `Cannot find module './verifier-promos.mjs'`.
+
+- [ ] **Étape 3 : le script**
+
+Créer `scripts/verifier-promos.mjs` :
+
+```js
+// Les deux catalogues de codes de remise disent-ils la même chose ?
+//
+//   node scripts/verifier-promos.mjs        (npm run verifier:promos)
+//
+// Kolek garde ses codes dans `codes_promo` ; Chariow garde les siens dans sa
+// boutique, et c'est LUI qui applique la remise au moment de payer. Le checkout
+// se contente d'envoyer le code. Si les deux pourcentages divergent, le
+// collecteur lit -20 % dans l'application et se fait débiter autre chose.
+//
+// Sortie non nulle à la première divergence. À lancer après chaque changement
+// de code, des deux côtés.
+
+const CHARIOW_API_URL = process.env.CHARIOW_API_URL ?? 'https://api.chariow.com/v1';
+
+/**
+ * La comparaison, séparée des deux lectures pour être testable sans clé d'API.
+ *
+ * Les codes sont comparés en majuscules : `codes_promo_code_check` les impose
+ * chez nous, rien ne les impose chez Chariow, et une divergence de casse serait
+ * une fausse alerte — le pire résultat possible pour un contrôle qu'on veut
+ * voir tourner à chaque déploiement.
+ */
+export function comparer(internes, distants) {
+  const parCode = new Map(distants.map((d) => [String(d.code).toUpperCase(), Number(d.percent)]));
+  const vus = new Set();
+  const divergences = [];
+
+  for (const { code, remise_pct } of internes) {
+    const cle = String(code).toUpperCase();
+    vus.add(cle);
+    const distant = parCode.get(cle);
+
+    if (distant === undefined) {
+      divergences.push({ code: cle, genre: 'absent', interne: Number(remise_pct) });
+    } else if (distant !== Number(remise_pct)) {
+      divergences.push({
+        code: cle,
+        genre: 'divergent',
+        interne: Number(remise_pct),
+        distant,
+      });
+    }
+  }
+
+  for (const [cle, distant] of parCode) {
+    if (!vus.has(cle)) divergences.push({ code: cle, genre: 'inconnu', distant });
+  }
+
+  return divergences;
+}
+
+async function lireInternes(url, cleService) {
+  const reponse = await fetch(
+    `${url}/rest/v1/codes_promo?select=code,remise_pct,valide_au&valide_au=gte.${new Date().toISOString().slice(0, 10)}`,
+    { headers: { apikey: cleService, Authorization: `Bearer ${cleService}` } },
+  );
+  if (!reponse.ok) throw new Error(`Kolek a répondu ${reponse.status}`);
+  return reponse.json();
+}
+
+async function lireDistants(cleApi) {
+  const reponse = await fetch(`${CHARIOW_API_URL}/discounts?status=active`, {
+    headers: { Authorization: `Bearer ${cleApi}`, Accept: 'application/json' },
+  });
+  if (!reponse.ok) throw new Error(`Chariow a répondu ${reponse.status}`);
+  const corps = await reponse.json();
+  return corps.data ?? [];
+}
+
+if (import.meta.url === `file://${process.argv[1]}`.replace(/\\/g, '/')) {
+  const url = process.env.SUPABASE_URL;
+  const cleService = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const cleApi = process.env.CHARIOW_API_KEY;
+
+  if (!url || !cleService || !cleApi) {
+    console.error(
+      'Il manque SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY ou CHARIOW_API_KEY. ' +
+        'Ce contrôle interroge les deux catalogues : sans les deux clés, il ne peut rien affirmer.',
+    );
+    process.exit(1);
+  }
+
+  const [internes, distants] = await Promise.all([
+    lireInternes(url, cleService),
+    lireDistants(cleApi),
+  ]);
+  const divergences = comparer(internes, distants);
+
+  if (divergences.length === 0) {
+    console.log(`Les ${internes.length} code(s) de Kolek correspondent à ceux de Chariow.`);
+    process.exit(0);
+  }
+
+  console.error(`${divergences.length} divergence(s) entre les deux catalogues de remises :`);
+  for (const d of divergences) {
+    if (d.genre === 'absent') {
+      console.error(`  - ${d.code} : Kolek promet -${d.interne} %, Chariow ne connaît pas ce code.`);
+    } else if (d.genre === 'divergent') {
+      console.error(`  - ${d.code} : Kolek -${d.interne} %, Chariow -${d.distant} %.`);
+    } else {
+      console.error(`  - ${d.code} : -${d.distant} % chez Chariow, inconnu de Kolek.`);
+    }
+  }
+  process.exit(1);
+}
+```
+
+- [ ] **Étape 4 : relancer**
+
+Run: `npx vitest run --dir scripts verifier-promos`
+Expected: PASS — cinq cas.
+
+- [ ] **Étape 5 : le déclarer**
+
+Dans `package.json`, à côté de `verifier:migrations` :
+
+```json
+  "verifier:promos": "node scripts/verifier-promos.mjs",
+```
+
+**Hors de `npm run verifier`**, comme `verifier:migrations` et
+`verifier:en-ligne` : il exige deux clés et le réseau, et la chaîne locale doit
+tourner sans ni l'un ni l'autre.
+
+Ajouter la ligne à `Docs/deploiement.md`, §6.4, à côté des deux autres
+contrôles d'après-déploiement.
+
+- [ ] **Étape 6 : commit**
+
+```bash
+git add scripts/verifier-promos.mjs scripts/verifier-promos.test.mjs package.json Docs/deploiement.md
+git commit -m "feat(scripts): comparer les codes de remise de Kolek a ceux de Chariow"
 ```
 
 ---
