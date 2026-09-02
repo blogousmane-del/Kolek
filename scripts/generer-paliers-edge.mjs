@@ -58,9 +58,28 @@ export function contenuAttendu() {
   );
 }
 
+/** Les fins de ligne ne sont pas du contenu. Ce fichier est engendré en `\n` et
+    `core.autocrlf` le rend en `\r\n` sur Windows : sans cette normalisation, le
+    contrôle de fraîcheur échoue sur tout dépôt fraîchement cloné, en annonçant
+    une divergence de prix qui n'existe pas. Même idiome que `generer-theme.mjs`,
+    qui porte cette normalisation depuis toujours. */
+function normaliser(texte) {
+  return texte.replace(/\r\n/g, '\n');
+}
+
+/**
+ * Le fichier engendré correspond-il à la grille ?
+ *
+ * Séparée de `estAJour` pour être testable sans toucher au disque : la lecture
+ * du fichier est un détail, la comparaison est la règle.
+ */
+export function correspond(texte) {
+  return normaliser(texte) === normaliser(contenuAttendu());
+}
+
 export function estAJour() {
   try {
-    return readFileSync(CIBLE, 'utf8') === contenuAttendu();
+    return correspond(readFileSync(CIBLE, 'utf8'));
   } catch {
     return false;
   }
