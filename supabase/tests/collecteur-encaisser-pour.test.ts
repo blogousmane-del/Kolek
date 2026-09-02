@@ -83,8 +83,12 @@ function corpsPour(carteId: string, montant = 1000) {
 describe('collecteur-encaisser-pour', () => {
   it('refuse sans jeton', async () => {
     const reponse = await appeler(null, corpsPour(crypto.randomUUID()));
+    // Le statut seul, comme dans `super-admin-fonctions` et
+    // `super-admin-journal-route` : `verify_jwt` est actif sur cette route, donc
+    // c'est la passerelle qui répond, et son corps n'est pas le nôtre. La
+    // branche `JETON_ABSENT` de la fonction reste une seconde barrière, jamais
+    // atteinte tant que la passerelle est devant.
     expect(reponse.status).toBe(401);
-    expect((await reponse.json()).erreur).toBe('JETON_ABSENT');
   });
 
   it('rend 404 sur une carte hors équipe, exactement comme sur une carte absente', async () => {

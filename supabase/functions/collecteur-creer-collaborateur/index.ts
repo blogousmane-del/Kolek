@@ -1,7 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import { ORIGINES_COLLECTEUR, entetesCors, listerOrigines } from '../_shared/cors.ts';
-import { empreinteRequete } from '../_shared/debit.ts';
 import { verifierFuite } from '../_shared/hibp.ts';
 import { tarifParCle } from '../_shared/paliers.ts';
 import { validerCollecteur } from '../_shared/valider-collecteur.ts';
@@ -34,8 +33,8 @@ const ORIGINES_AUTORISEES = listerOrigines(
   ORIGINES_COLLECTEUR,
 );
 
-/** Trois créations par heure. Le plafond de l'équipe étant de trois, c'est large
-    pour un usage légitime et étroit pour un abus. */
+/** Trois créations par heure et par titulaire. Le plafond de l'équipe étant de
+    trois, c'est exactement une équipe complète en une fois, et rien de plus. */
 const PLAFOND = 3;
 const FENETRE_SECONDES = 3600;
 
@@ -125,17 +124,6 @@ Deno.serve(async (requete) => {
   // tenir.
   if (!autorise) return reponse({ erreur: 'ACCES_RESERVE' }, 403, requete);
 
-  // --- La borne d'abus ---
-
-  const { data: dansLePlafond } = await clientService.rpc('consommer_debit', {
-    cle: empreinteRequete('collecteur-creer-collaborateur', requete.headers),
-    plafond: PLAFOND,
-    fenetre_secondes: FENETRE_SECONDES,
-  });
-  if (dansLePlafond === false) {
-    return reponse({ erreur: 'TROP_DE_TENTATIVES' }, 429, requete);
-  }
-
   // --- Validation avant toute écriture ---
 
   let saisie: unknown;
@@ -154,6 +142,27 @@ Deno.serve(async (requete) => {
   });
   if (!controle.ok) return reponse({ erreur: controle.erreur }, 400, requete);
   const { email, motDePasse, nom, telephone, zone } = controle.valeurs;
+
+  // --- La borne d'abus ---
+  //
+  // La clé est le titulaire, pas son adresse. `empreinteRequete` sert les routes
+  // publiques, où l'appelant n'a pas de nom ; ici il en a un, et il est vérifié.
+  // Borner par adresse ferait partager un même quota à plusieurs titulaires
+  // derrière un même relais — un cybercafé, une 4G partagée — et le premier à
+  // constituer son équipe fermerait la porte aux autres pour une heure.
+  //
+  // Consommée après la validation, et non avant : sinon trois saisies fautives —
+  // une adresse mal tapée — coûtent une heure d'attente sans qu'aucun compte
+  // n'ait été créé. Ce que cette borne protège est plus bas : l'appel à HIBP et
+  // l'écriture dans `auth.users`.
+  const { data: dansLePlafond } = await clientService.rpc('consommer_debit', {
+    cle: `collecteur-creer-collaborateur:${titulaireId}`,
+    plafond: PLAFOND,
+    fenetre_secondes: FENETRE_SECONDES,
+  });
+  if (dansLePlafond === false) {
+    return reponse({ erreur: 'TROP_DE_TENTATIVES' }, 429, requete);
+  }
 
   // --- Mot de passe divulgué ---
   //

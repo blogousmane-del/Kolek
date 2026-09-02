@@ -68,8 +68,12 @@ async function titulaire(nom: string): Promise<CollecteurTest> {
 describe('collecteur-creer-collaborateur', () => {
   it('refuse sans jeton', async () => {
     const reponse = await appeler(null, saisie());
+    // Le statut seul, comme dans `super-admin-fonctions` et
+    // `super-admin-journal-route` : `verify_jwt` est actif sur cette route, donc
+    // c'est la passerelle qui répond, et son corps n'est pas le nôtre. La
+    // branche `JETON_ABSENT` de la fonction reste une seconde barrière, jamais
+    // atteinte tant que la passerelle est devant.
     expect(reponse.status).toBe(401);
-    expect((await reponse.json()).erreur).toBe('JETON_ABSENT');
   });
 
   it('refuse un collecteur qui n’est pas Illimité actif', async () => {
