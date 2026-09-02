@@ -62,9 +62,9 @@ export function Navbar() {
 
   return (
     <>
-    // `max-w` et `whitespace-nowrap` : sans eux, « Se connecter » passait sur
-    // deux lignes sous 360 px, doublant la hauteur de la pilule — qui venait
-    // alors couvrir le titre de la carte défilant dessous.
+      {/* `max-w` et `whitespace-nowrap` : sans eux, « Se connecter » passait sur
+          deux lignes sous 360 px, doublant la hauteur de la pilule — qui venait
+          alors couvrir le titre de la carte défilant dessous. */}
       <nav
         className={`fixed left-1/2 top-3 z-40 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-1 rounded-pill py-1.5 pl-3 pr-1.5 transition-all duration-500 sm:top-4 sm:py-2 sm:pl-5 sm:pr-2 ${
           surLeHero
