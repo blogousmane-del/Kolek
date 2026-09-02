@@ -1,7 +1,7 @@
-import { MISES_PAR_CYCLE } from "@kolek/core";
-import { useEffect, useState } from "react";
+import { MISES_PAR_CYCLE } from '@kolek/core';
+import { useEffect, useState } from 'react';
 
-import { useMouvementAccepte } from "./animation";
+import { useMouvementAccepte } from './animation';
 
 /**
  * Trois artefacts fonctionnels — pas trois cartes marketing.
@@ -22,9 +22,9 @@ interface CarteDemo {
 }
 
 const CARTES_INITIALES: CarteDemo[] = [
-  { nom: "Mariam K.", mise: 500, jour: 18 },
-  { nom: "Adama T.", mise: 1000, jour: 7 },
-  { nom: "Fatou D.", mise: 300, jour: 26 },
+  { nom: 'Mariam K.', mise: 500, jour: 18 },
+  { nom: 'Adama T.', mise: 1000, jour: 7 },
+  { nom: 'Fatou D.', mise: 300, jour: 26 },
 ];
 
 function MelangeurCartes() {
@@ -58,9 +58,7 @@ function MelangeurCartes() {
           }}
         >
           <div className="mb-3 flex items-baseline justify-between">
-            <p className="font-headings text-base font-bold text-ink">
-              {carte.nom}
-            </p>
+            <p className="font-headings text-base font-bold text-ink">{carte.nom}</p>
             <p className="font-mono text-xs text-muted-foreground">
               {carte.jour}/{MISES_PAR_CYCLE}
             </p>
@@ -70,12 +68,12 @@ function MelangeurCartes() {
             {Array.from({ length: MISES_PAR_CYCLE }, (_, c) => (
               <div
                 key={c}
-                className={`h-2 rounded-[2px] ${c < carte.jour ? "bg-primary" : "bg-muted"}`}
+                className={`h-2 rounded-[2px] ${c < carte.jour ? 'bg-primary' : 'bg-muted'}`}
               />
             ))}
           </div>
           <p className="font-mono text-sm font-medium text-primary tabular-nums">
-            {carte.mise.toLocaleString("fr-FR")} FCFA / jour
+            {carte.mise.toLocaleString('fr-FR')} FCFA / jour
           </p>
         </div>
       ))}
@@ -94,12 +92,12 @@ function MelangeurCartes() {
  * montant — la seule information de la ligne — disparaissait le premier.
  */
 const JOURNAL = [
-  "18:02  mise      500 F  #7F3A",
-  "18:04  mise    1 000 F  #91CE",
-  "18:09  mise      300 F  #04B7",
-  "18:31  attendu  12 500 F",
-  "18:32  déclaré  12 500 F",
-  "18:32  écart  0 F  ✓ juste",
+  '18:02  mise      500 F  #7F3A',
+  '18:04  mise    1 000 F  #91CE',
+  '18:09  mise      300 F  #04B7',
+  '18:31  attendu  12 500 F',
+  '18:32  déclaré  12 500 F',
+  '18:32  écart  0 F  ✓ juste',
 ] as const;
 
 function MachineTelemetrie() {
@@ -107,10 +105,8 @@ function MachineTelemetrie() {
   // Sans mouvement, le journal est montré fini : la carte doit rester
   // informative, pas devenir vide. C'est la règle de toute la vitrine — on
   // retire l'animation, jamais le contenu.
-  const [lignes, setLignes] = useState<string[]>(
-    anime ? [] : [...JOURNAL].slice(-5),
-  );
-  const [courante, setCourante] = useState("");
+  const [lignes, setLignes] = useState<string[]>(anime ? [] : [...JOURNAL].slice(-5));
+  const [courante, setCourante] = useState('');
 
   useEffect(() => {
     if (!anime) return;
@@ -123,14 +119,14 @@ function MachineTelemetrie() {
         ligne = 0;
         caractere = 0;
         setLignes([]);
-        setCourante("");
+        setCourante('');
         return;
       }
       caractere += 1;
       setCourante(texte.slice(0, caractere));
       if (caractere >= texte.length) {
         setLignes((prec) => [...prec.slice(-4), texte]);
-        setCourante("");
+        setCourante('');
         ligne += 1;
         caractere = 0;
       }
@@ -141,21 +137,22 @@ function MachineTelemetrie() {
   return (
     <div className="flex h-56 flex-col rounded-[1.25rem] border border-hairline bg-dark-canvas p-4">
       <p className="mb-3 flex items-center gap-2 font-mono text-[10px] tracking-widest text-or">
+        {/* Fixe : le journal qui défile dit déjà qu'il se passe quelque chose.
+            Un point qui bat par-dessus n'ajoute rien qu'un tic. */}
         <span className="inline-block h-1.5 w-1.5 rounded-pill bg-or" />
         FLUX EN DIRECT · CAISSE DU SOIR
       </p>
       <div className="flex-1 overflow-hidden font-mono text-[11px] leading-6 text-white/70 xs:text-xs">
         {lignes.map((l) => (
-          <p
-            key={l}
-            className={l.includes("✓") ? "text-chart-mint" : undefined}
-          >
+          <p key={l} className={l.includes('✓') ? 'text-chart-mint' : undefined}>
             {l}
           </p>
         ))}
         {anime && (
           <p className="text-white">
             {courante}
+            {/* Un vrai curseur de terminal : `steps(1)`, pas le fondu
+                d'`animate-pulse`. Voir `styles.css`. */}
             <span className="curseur ml-0.5 inline-block h-3.5 w-1.5 bg-or align-middle" />
           </p>
         )}
@@ -166,22 +163,22 @@ function MachineTelemetrie() {
 
 /* ----------------------- 3. Le planificateur à curseur -------------------- */
 
-const JOURS = ["L", "M", "M", "J", "V", "S", "D"] as const;
+const JOURS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'] as const;
 
 /** Étapes de la chorégraphie : position du curseur, jour actif, pression. */
 type Etape =
-  | { type: "repos" }
-  | { type: "survol"; jour: number }
-  | { type: "clic"; jour: number }
-  | { type: "sauvegarde" };
+  | { type: 'repos' }
+  | { type: 'survol'; jour: number }
+  | { type: 'clic'; jour: number }
+  | { type: 'sauvegarde' };
 
 const CHOREGRAPHIE: Etape[] = [
-  { type: "repos" },
-  { type: "survol", jour: 2 },
-  { type: "clic", jour: 2 },
-  { type: "survol", jour: 5 },
-  { type: "clic", jour: 5 },
-  { type: "sauvegarde" },
+  { type: 'repos' },
+  { type: 'survol', jour: 2 },
+  { type: 'clic', jour: 2 },
+  { type: 'survol', jour: 5 },
+  { type: 'clic', jour: 5 },
+  { type: 'sauvegarde' },
 ];
 
 function PlanificateurTournee() {
@@ -197,7 +194,7 @@ function PlanificateurTournee() {
         const suivant = (p + 1) % CHOREGRAPHIE.length;
         const etape = CHOREGRAPHIE[suivant];
         if (suivant === 0) setActifs([]);
-        else if (etape.type === "clic") setActifs((a) => [...a, etape.jour]);
+        else if (etape.type === 'clic') setActifs((a) => [...a, etape.jour]);
         return suivant;
       });
     }, 1400);
@@ -205,9 +202,8 @@ function PlanificateurTournee() {
   }, [anime]);
 
   const etape = CHOREGRAPHIE[pas];
-  const jourVise =
-    etape.type === "survol" || etape.type === "clic" ? etape.jour : null;
-  const surSauvegarde = etape.type === "sauvegarde";
+  const jourVise = etape.type === 'survol' || etape.type === 'clic' ? etape.jour : null;
+  const surSauvegarde = etape.type === 'sauvegarde';
 
   return (
     <div className="relative flex h-56 flex-col justify-between rounded-[1.25rem] border border-hairline bg-surface p-4">
@@ -220,9 +216,9 @@ function PlanificateurTournee() {
             key={i}
             className={`flex h-12 items-center justify-center rounded-md border font-mono text-sm transition-all duration-300 ${
               actifs.includes(i)
-                ? "border-or bg-or/15 font-bold text-primary"
-                : "border-hairline text-muted-foreground"
-            } ${jourVise === i && etape.type === "clic" ? "scale-95" : ""}`}
+                ? 'border-or bg-or/15 font-bold text-primary'
+                : 'border-hairline text-muted-foreground'
+            } ${jourVise === i && etape.type === 'clic' ? 'scale-95' : ''}`}
           >
             {jour}
           </div>
@@ -233,9 +229,7 @@ function PlanificateurTournee() {
         tabIndex={-1}
         aria-hidden
         className={`self-end rounded-pill px-4 py-2 font-body text-sm font-semibold transition-all duration-300 ${
-          surSauvegarde
-            ? "scale-95 bg-primary text-primary-foreground"
-            : "bg-muted text-muted-foreground"
+          surSauvegarde ? 'scale-95 bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
         }`}
       >
         Sauvegarder
@@ -246,15 +240,10 @@ function PlanificateurTournee() {
         viewBox="0 0 24 24"
         className="absolute z-10 h-5 w-5 text-ink drop-shadow-md transition-all duration-500 ease-out"
         style={{
-          left: surSauvegarde
-            ? "78%"
-            : jourVise !== null
-              ? `${8 + jourVise * 12.5}%`
-              : "45%",
-          top: surSauvegarde ? "74%" : jourVise !== null ? "48%" : "30%",
-          opacity: !anime || etape.type === "repos" ? 0 : 1,
-          transform:
-            etape.type === "clic" || surSauvegarde ? "scale(0.85)" : "scale(1)",
+          left: surSauvegarde ? '78%' : jourVise !== null ? `${8 + jourVise * 12.5}%` : '45%',
+          top: surSauvegarde ? '74%' : jourVise !== null ? '48%' : '30%',
+          opacity: !anime || etape.type === 'repos' ? 0 : 1,
+          transform: etape.type === 'clic' || surSauvegarde ? 'scale(0.85)' : 'scale(1)',
         }}
       >
         <path fill="currentColor" d="M5.5 3.2 19 10.4l-6 1.6-3.2 5.4z" />
@@ -267,55 +256,48 @@ function PlanificateurTournee() {
 
 const ARTEFACTS = [
   {
-    titre: "Le carnet, sans le papier",
+    titre: 'Le carnet, sans le papier',
     detail:
-      "La carte de 31 cases que tes clients connaissent : digitale, impossible à perdre, impossible à raturer.",
+      'La carte de 31 cases que tes clients connaissent : digitale, impossible à perdre, impossible à raturer.',
     rendu: <MelangeurCartes />,
   },
   {
-    titre: "La caisse, rapprochée chaque soir",
+    titre: 'La caisse, rapprochée chaque soir',
     detail:
-      "Le serveur calcule ce que tu dois avoir en main. Tu comptes, tu déclares, l’écart est nommé avant qu’il grossisse.",
+      'Le serveur calcule ce que tu dois avoir en main. Tu comptes, tu déclares, l’écart est nommé avant qu’il grossisse.',
     rendu: <MachineTelemetrie />,
   },
   {
-    titre: "L’argent reste dans ta main",
+    titre: 'L’argent reste dans ta main',
     detail:
-      "Kolek compte, il ne touche pas. Aucun franc de tes clients ne transite par la plateforme : c’est écrit dans son code.",
+      'Kolek compte, il ne touche pas. Aucun franc de tes clients ne transite par la plateforme : c’est écrit dans son code.',
     rendu: <PlanificateurTournee />,
   },
 ] as const;
 
 export function Fonctionnalites() {
   return (
-    <section
-      id="produit"
-      className="bg-canvas px-5 py-20 sm:px-12 sm:py-24 lg:px-20"
-    >
-      <p className="mb-3 font-mono text-xs tracking-widest text-primary">
-        LE PRODUIT
-      </p>
+    <section id="produit" className="bg-canvas px-5 py-20 sm:px-12 sm:py-24 lg:px-20">
+      <p className="mb-3 font-mono text-xs tracking-widest text-primary">LE PRODUIT</p>
       <h2 className="mb-12 max-w-2xl font-headings text-3xl font-bold text-ink sm:text-4xl">
         Trois instruments, un métier
       </h2>
-      {/* `items-start` et un décalage sur la carte du milieu. Trois cartes
-          de largeur, de hauteur et de position identiques sont le gabarit que
-          produit n'importe quelle page engendrée ; les trois instruments
-          restent trois, c'est la grille qui cesse d'être un moule. Le décalage
-          ne s'applique qu'à partir de `lg`, là où les cartes sont côte à côte
-          — empilées, il ne ferait qu'un blanc de plus. */}
+      {/* `items-start` et un décalage sur la carte du milieu. Trois cartes de
+          largeur, de hauteur et de position identiques sont le gabarit que produit
+          n'importe quelle page engendrée ; les trois instruments restent trois,
+          c'est la grille qui cesse d'être un moule. Le décalage ne joue qu'à partir
+          de `lg`, là où les cartes sont côte à côte — empilées, il ne ferait qu'un
+          blanc de plus. */}
       <div className="grid items-start gap-6 lg:grid-cols-3">
         {ARTEFACTS.map((artefact, i) => (
           <article
             key={artefact.titre}
             className={`rounded-[2rem] border border-hairline bg-paper p-6 shadow-sm transition-transform duration-300 hover:-translate-y-1 ${
-              i === 1 ? "lg:mt-14" : ""
+              i === 1 ? 'lg:mt-14' : ''
             }`}
           >
             {artefact.rendu}
-            <h3 className="mb-2 mt-5 font-headings text-xl font-bold text-ink">
-              {artefact.titre}
-            </h3>
+            <h3 className="mb-2 mt-5 font-headings text-xl font-bold text-ink">{artefact.titre}</h3>
             <p className="font-body text-sm leading-relaxed text-muted-foreground">
               {artefact.detail}
             </p>
