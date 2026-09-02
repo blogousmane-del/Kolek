@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { admin, creerCollecteur, nettoyer } from './harnais';
+import { admin, anonyme, creerCollecteur, nettoyer } from './harnais';
 
 afterAll(nettoyer);
 
@@ -266,5 +266,145 @@ describe('la suspension', () => {
       encaisse_le: new Date().toISOString(),
     });
     expect(error).toBeNull();
+  });
+});
+
+describe('la vue d’équipe', () => {
+  it('rend un tableau vide à qui n’a pas d’équipe', async () => {
+    const seul = await creerCollecteur('Sans équipe', telephone());
+
+    const { data, error } = await seul.client.rpc('equipe_vue');
+    expect(error).toBeNull();
+    // Ne pas avoir d'équipe est un état normal, pas une panne.
+    expect(data).toEqual([]);
+  });
+
+  it('ne rend que son équipe à un titulaire', async () => {
+    const patron = await creerCollecteur('Patron Vue', telephone());
+    const awa = await creerCollecteur('Awa Vue', telephone());
+    const voisin = await creerCollecteur('Voisin Vue', telephone());
+    const sonAwa = await creerCollecteur('Awa Voisine', telephone());
+    await rendreTitulaire(patron.id);
+    await rendreTitulaire(voisin.id);
+    expect((await rattacher(awa.id, patron.id)).error).toBeNull();
+    expect((await rattacher(sonAwa.id, voisin.id)).error).toBeNull();
+
+    const { data, error } = await patron.client.rpc('equipe_vue');
+    expect(error).toBeNull();
+    const equipe = data as Array<{ id: string; nom: string }>;
+    expect(equipe.map((m) => m.id)).toEqual([awa.id]);
+  });
+
+  it('rend les chiffres du collaborateur, pas ceux du titulaire', async () => {
+    const patron = await creerCollecteur('Patron Chiffres', telephone());
+    const awa = await creerCollecteur('Awa Chiffres', telephone());
+    await rendreTitulaire(patron.id);
+    expect((await rattacher(awa.id, patron.id)).error).toBeNull();
+
+    const clientId = crypto.randomUUID();
+    const carteId = crypto.randomUUID();
+    await awa.client.from('clients').insert({ id: clientId, collecteur_id: awa.id, nom: 'Aya' });
+    await awa.client
+      .from('cartes')
+      .insert({ id: carteId, collecteur_id: awa.id, client_id: clientId, mise: 1000 });
+    // Deux mises : la première est la commission, la seconde est due au client.
+    for (let i = 0; i < 2; i += 1) {
+      await awa.client.from('mises').insert({
+        id: crypto.randomUUID(),
+        collecteur_id: awa.id,
+        carte_id: carteId,
+        montant: 1000,
+        encaisse_le: new Date().toISOString(),
+      });
+    }
+
+    const { data } = await patron.client.rpc('equipe_vue');
+    const membre = (data as Array<Record<string, number>>)[0]!;
+    expect(membre.clients).toBe(1);
+    expect(membre.cartes_actives).toBe(1);
+    // La commission revient au titulaire : c'est pour cela qu'elle figure ici.
+    expect(membre.commissions).toBe(1000);
+    expect(membre.encours).toBe(1000);
+  });
+
+  it('est refusée à anon', async () => {
+    const { error } = await anonyme.rpc('equipe_vue');
+    expect(error).not.toBeNull();
+  });
+});
+
+describe('les clients d’un coéquipier', () => {
+  it('rend vide pour un identifiant qui existe mais n’est pas de l’équipe', async () => {
+    const patron = await creerCollecteur('Patron Cli', telephone());
+    const etranger = await creerCollecteur('Étranger', telephone());
+    await rendreTitulaire(patron.id);
+    await etranger.client.from('clients').insert({
+      id: crypto.randomUUID(),
+      collecteur_id: etranger.id,
+      nom: 'Cliente de l’étranger',
+    });
+
+    // Le cas qui compte : l'identifiant existe bel et bien. Une erreur dirait
+    // qu'il existe ; un tableau vide ne dit rien.
+    const { data, error } = await patron.client.rpc('equipe_clients', {
+      p_collaborateur: etranger.id,
+    });
+    expect(error).toBeNull();
+    expect(data).toEqual([]);
+  });
+
+  it('rend les clients d’un vrai collaborateur, avec ses cartes actives', async () => {
+    const patron = await creerCollecteur('Patron Cli2', telephone());
+    const awa = await creerCollecteur('Awa Cli2', telephone());
+    await rendreTitulaire(patron.id);
+    expect((await rattacher(awa.id, patron.id)).error).toBeNull();
+
+    const clientId = crypto.randomUUID();
+    const carteId = crypto.randomUUID();
+    await awa.client.from('clients').insert({ id: clientId, collecteur_id: awa.id, nom: 'Aya' });
+    await awa.client
+      .from('cartes')
+      .insert({ id: carteId, collecteur_id: awa.id, client_id: clientId, mise: 2000 });
+    await awa.client.from('mises').insert({
+      id: crypto.randomUUID(),
+      collecteur_id: awa.id,
+      carte_id: carteId,
+      montant: 2000,
+      encaisse_le: new Date().toISOString(),
+    });
+
+    const { data, error } = await patron.client.rpc('equipe_clients', { p_collaborateur: awa.id });
+    expect(error).toBeNull();
+    const clients = data as Array<{
+      id: string;
+      nom: string;
+      cartes: Array<{ id: string; mise: number; mises_encaissees: number; solde_restituable: number }>;
+    }>;
+    expect(clients).toHaveLength(1);
+    expect(clients[0]?.nom).toBe('Aya');
+    expect(clients[0]?.cartes).toHaveLength(1);
+    expect(clients[0]?.cartes[0]?.mise).toBe(2000);
+    expect(clients[0]?.cartes[0]?.mises_encaissees).toBe(1);
+    // Une seule mise encaissée : elle est la commission, rien n'est dû au client.
+    expect(clients[0]?.cartes[0]?.solde_restituable).toBe(0);
+  });
+
+  it('laisse l’appelant demander sa propre tournée', async () => {
+    const seul = await creerCollecteur('Seul Cli', telephone());
+    const clientId = crypto.randomUUID();
+    await seul.client.from('clients').insert({ id: clientId, collecteur_id: seul.id, nom: 'Sien' });
+
+    // L'écran d'encaissement du titulaire s'en sert pour sa propre tournée,
+    // sans ouvrir un second chemin de lecture.
+    const { data, error } = await seul.client.rpc('equipe_clients', { p_collaborateur: seul.id });
+    expect(error).toBeNull();
+    expect((data as Array<{ nom: string }>).map((c) => c.nom)).toEqual(['Sien']);
+  });
+
+  it('est refusée à anon', async () => {
+    const { error } = await anonyme.rpc('equipe_clients', {
+      p_collaborateur: '00000000-0000-4000-8000-000000000000',
+    });
+    expect(error).not.toBeNull();
   });
 });
