@@ -1,10 +1,10 @@
-import { PALIERS, formatMontant, type Palier } from '@kolek/core';
-import { Onde, Rosace } from '@kolek/ui';
-import { useState } from 'react';
+import { PALIERS, formatMontant, type Palier } from "@kolek/core";
+import { Onde, Rosace } from "@kolek/ui";
+import { useState } from "react";
 
-import { entree, useAnimations } from './animation';
-import { envoyerDemande, palierDepuisAdresse } from './demande';
-import { APP_COLLECTEUR, CONTACT_DEMO } from './liens';
+import { entree, useAnimations } from "./animation";
+import { envoyerDemande, palierDepuisAdresse } from "./demande";
+import { APP_COLLECTEUR, CONTACT_DEMO } from "./liens";
 
 /**
  * Le formulaire d'ouverture de compte.
@@ -30,22 +30,31 @@ import { APP_COLLECTEUR, CONTACT_DEMO } from './liens';
  */
 
 const CHAMP_SOMBRE =
-  'w-full min-h-11 rounded-md border-[1.5px] border-white/15 bg-white/5 px-3.5 font-body text-base text-white outline-none placeholder:text-white/25 focus:border-or';
+  "w-full min-h-11 rounded-md border-[1.5px] border-white/15 bg-white/5 px-3.5 font-body text-base text-white outline-none placeholder:text-white/25 focus:border-or";
 
-function Etiquette({ pour, children }: { pour: string; children: React.ReactNode }) {
+function Etiquette({
+  pour,
+  children,
+}: {
+  pour: string;
+  children: React.ReactNode;
+}) {
   return (
-    <label htmlFor={pour} className="mb-1.5 block font-body text-sm font-semibold text-white/70">
+    <label
+      htmlFor={pour}
+      className="mb-1.5 block font-body text-sm font-semibold text-white/70"
+    >
       {children}
     </label>
   );
 }
 
 export function Inscription() {
-  const [nom, setNom] = useState('');
-  const [telephone, setTelephone] = useState('');
-  const [email, setEmail] = useState('');
-  const [zone, setZone] = useState('');
-  const [message, setMessage] = useState('');
+  const [nom, setNom] = useState("");
+  const [telephone, setTelephone] = useState("");
+  const [email, setEmail] = useState("");
+  const [zone, setZone] = useState("");
+  const [message, setMessage] = useState("");
   const [palier, setPalier] = useState<Palier>(() =>
     palierDepuisAdresse(window.location.search),
   );
@@ -55,7 +64,7 @@ export function Inscription() {
   const [envoyee, setEnvoyee] = useState(false);
 
   const ref = useAnimations<HTMLElement>(() => {
-    entree('[data-entree]', { delay: 0.1 });
+    entree("[data-entree]", { delay: 0.1 });
   });
 
   async function soumettre(evenement: React.FormEvent) {
@@ -65,7 +74,14 @@ export function Inscription() {
     setEnvoi(true);
     setErreur(null);
 
-    const resultat = await envoyerDemande({ nom, telephone, email, zone, palier, message });
+    const resultat = await envoyerDemande({
+      nom,
+      telephone,
+      email,
+      zone,
+      palier,
+      message,
+    });
 
     setEnvoi(false);
     if (resultat.ok) {
@@ -107,16 +123,22 @@ export function Inscription() {
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-pill bg-or">
               <span className="text-2xl text-dark-canvas">✓</span>
             </div>
-            <h1 className="mb-3 font-headings text-3xl font-bold text-white">Demande enregistrée</h1>
+            <h1 className="mb-3 font-headings text-3xl font-bold text-white">
+              Demande enregistrée
+            </h1>
             <p className="mb-6 font-body text-base leading-relaxed text-white/60">
-              GTCS te rappelle sur le <strong className="text-white">{telephone}</strong> pour
-              ouvrir ton compte et te montrer l’application. Ton accès partira ensuite sur{' '}
-              <strong className="text-white">{email}</strong> — garde ton téléphone à portée et
-              surveille tes courriels.
+              GTCS te rappelle sur le{" "}
+              <strong className="text-white">{telephone}</strong> pour ouvrir
+              ton compte et te montrer l’application. Ton accès partira ensuite
+              sur <strong className="text-white">{email}</strong>. Garde ton
+              téléphone à portée et surveille tes courriels.
             </p>
             <p className="font-body text-sm text-white/40">
-              Tu as déjà un compte ?{' '}
-              <a href={APP_COLLECTEUR} className="font-semibold text-or underline underline-offset-2">
+              Tu as déjà un compte ?{" "}
+              <a
+                href={APP_COLLECTEUR}
+                className="font-semibold text-or underline underline-offset-2"
+              >
                 Connecte-toi
               </a>
               .
@@ -124,7 +146,10 @@ export function Inscription() {
           </div>
         ) : (
           <>
-            <p data-entree className="mb-3 font-mono text-xs tracking-widest text-or">
+            <p
+              data-entree
+              className="mb-3 font-mono text-xs tracking-widest text-or"
+            >
               OUVRIR UN COMPTE
             </p>
             <h1
@@ -136,10 +161,13 @@ export function Inscription() {
             {/* Dire le fonctionnement ici, pas après l'envoi. Un formulaire qui
                 laisse croire à un accès immédiat se dément à la seconde
                 suivante, quand rien ne s'ouvre. */}
-            <p data-entree className="mb-8 font-body text-base leading-relaxed text-white/60">
-              Les comptes Kolek sont ouverts par l’équipe GTCS, après un appel. Remplis ce
-              formulaire : on te rappelle, on ouvre ton compte, et tu encaisses dès le lendemain.
-              Le premier mois est un essai.
+            <p
+              data-entree
+              className="mb-8 font-body text-base leading-relaxed text-white/60"
+            >
+              Les comptes Kolek sont ouverts par l’équipe GTCS, après un appel.
+              Remplis ce formulaire : on te rappelle, on ouvre ton compte, et tu
+              encaisses dès le lendemain. Le premier mois est un essai.
             </p>
 
             <form
@@ -198,7 +226,8 @@ export function Inscription() {
                     formulaire qui réclame une adresse sans expliquer pourquoi
                     fait hésiter, et l'hésitation coûte des demandes. */}
                 <p className="mt-1.5 font-body text-xs text-white/30">
-                  C’est là que tu recevras ton accès quand GTCS aura ouvert ton compte.
+                  C’est là que tu recevras ton accès quand GTCS aura ouvert ton
+                  compte.
                 </p>
               </div>
 
@@ -227,26 +256,32 @@ export function Inscription() {
                       onClick={() => setPalier(p.cle)}
                       className={`cursor-pointer rounded-md border px-3 py-2.5 text-left font-body transition-colors ${
                         p.cle === palier
-                          ? 'border-or bg-or/15 text-white'
-                          : 'border-white/10 text-white/50 hover:border-white/25'
+                          ? "border-or bg-or/15 text-white"
+                          : "border-white/10 text-white/50 hover:border-white/25"
                       }`}
                     >
-                      <span className="block text-sm font-semibold">{p.nom}</span>
+                      <span className="block text-sm font-semibold">
+                        {p.nom}
+                      </span>
                       <span className="block font-mono text-xs tabular-nums text-white/40">
-                        {p.prix === 0 ? 'Gratuit' : `${formatMontant(p.prix)} F/${p.periode}`}
+                        {p.prix === 0
+                          ? "Gratuit"
+                          : `${formatMontant(p.prix)} F/${p.periode}`}
                       </span>
                     </button>
                   ))}
                 </div>
                 {choisi && (
                   <p className="mt-2 font-body text-xs text-white/40">
-                    {choisi.limite} — {choisi.accroche}
+                    {choisi.limite} · {choisi.accroche}
                   </p>
                 )}
               </fieldset>
 
               <div className="mb-5">
-                <Etiquette pour="message">Un mot sur ton activité (facultatif)</Etiquette>
+                <Etiquette pour="message">
+                  Un mot sur ton activité (facultatif)
+                </Etiquette>
                 <textarea
                   id="message"
                   value={message}
@@ -273,7 +308,7 @@ export function Inscription() {
                 className="magnetique w-full overflow-hidden rounded-pill bg-or py-3.5 font-body text-base font-semibold text-dark-canvas disabled:opacity-60"
               >
                 <span className="relative z-10">
-                  {envoi ? 'Envoi…' : 'Envoyer ma demande'}
+                  {envoi ? "Envoi…" : "Envoyer ma demande"}
                 </span>
                 <span aria-hidden className="voile-or" />
               </button>
@@ -287,8 +322,8 @@ export function Inscription() {
                   une promesse devenue fausse est pire qu'une promesse absente,
                   surtout sur une page qui collecte des données personnelles. */}
               <p className="mt-4 text-center font-body text-xs text-white/30">
-                Nom, numéro, adresse e-mail et zone. Aucun mot de passe, aucun paiement à cette
-                étape.
+                Nom, numéro, adresse e-mail et zone. Aucun mot de passe, aucun
+                paiement à cette étape.
               </p>
 
               {/* Le repli, toujours visible. Un formulaire est un point unique
@@ -297,15 +332,21 @@ export function Inscription() {
                   qu'à la place — coûte une ligne et garantit qu'aucun visiteur
                   ne se retrouve devant une impasse. */}
               <p className="mt-3 text-center font-body text-xs text-white/30">
-                Tu préfères écrire ?{' '}
-                <a href={CONTACT_DEMO} className="text-or/70 underline underline-offset-2">
+                Tu préfères écrire ?{" "}
+                <a
+                  href={CONTACT_DEMO}
+                  className="text-or/70 underline underline-offset-2"
+                >
                   Envoyer un courriel à GTCS
                 </a>
               </p>
             </form>
 
-            <p data-entree className="mt-6 text-center font-body text-sm text-white/40">
-              Tu as déjà un compte ?{' '}
+            <p
+              data-entree
+              className="mt-6 text-center font-body text-sm text-white/40"
+            >
+              Tu as déjà un compte ?{" "}
               <a
                 href={APP_COLLECTEUR}
                 className="font-semibold text-or underline underline-offset-2"

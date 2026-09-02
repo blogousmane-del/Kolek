@@ -1,5 +1,5 @@
-import { Inscription } from './vitrine/Inscription';
-import { Vitrine } from './vitrine/Vitrine';
+import { Inscription } from "./vitrine/Inscription";
+import { Vitrine } from "./vitrine/Vitrine";
 
 /**
  * Le routage du site public.
@@ -17,8 +17,8 @@ import { Vitrine } from './vitrine/Vitrine';
  * `/inscription` servable : sans elle, Netlify chercherait un fichier de ce nom.
  */
 export default function App() {
-  const chemin = window.location.pathname.replace(/\/+$/, '');
+  const chemin = window.location.pathname.replace(/\/+$/, "");
 
-  if (chemin === '/inscription') return <Inscription />;
+  if (chemin === "/inscription") return <Inscription />;
   return <Vitrine />;
 }

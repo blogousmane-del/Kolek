@@ -75,7 +75,7 @@ export function Navbar() {
         <a
           href="#"
           className="mr-1.5 flex shrink-0 items-center gap-2 sm:mr-3"
-          aria-label="Kolek — haut de page"
+          aria-label="Kolek, haut de page"
         >
           {/* Le mot disparaît sous 380 px : la pièce suffit à identifier la page,
             et les pixels rendus valent mieux pour la seule commande qui compte.

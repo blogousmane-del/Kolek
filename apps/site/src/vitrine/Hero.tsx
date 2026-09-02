@@ -108,17 +108,13 @@ export function Hero() {
           de la hauteur du titre. */}
       <div
         data-parallaxe-hero
-        className="relative z-10 grid items-end gap-12 px-5 pb-20 pt-32 sm:px-12 sm:pb-24 sm:pt-40 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-16 lg:px-20"
+        className="relative z-10 grid items-end gap-12 px-5 pb-20 pt-32 sm:px-12 sm:pb-24 sm:pt-32 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-16 lg:px-20"
       >
         <div>
-          <p
-            data-entree
-            className="mb-5 inline-flex items-center gap-2 rounded-pill border border-or/30 px-4 py-1.5 font-mono text-xs tracking-widest text-or"
-          >
-            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-pill bg-or" />
-            ABIDJAN · CÔTE D’IVOIRE
-          </p>
-
+          {/* Il y avait ici un sur-titre — « ABIDJAN · CÔTE D'IVOIRE » en
+              monospace espacé, avec un point qui clignotait. Retiré le
+              2026-09-02 : il n'annonçait aucune section, le point ne signalait
+              aucun état, et le pied de page dit déjà où Kolek est construit. */}
           <h1 className="max-w-4xl">
             <span
               data-entree
@@ -146,16 +142,23 @@ export function Hero() {
             data-entree
             className="mt-5 max-w-xl font-body text-base leading-relaxed text-white/70 sm:mt-6 sm:text-lg"
           >
-            Kolek remplace le carnet du banquier ambulant par un téléphone :
-            chaque mise comptée, chaque caisse rapprochée le soir, chaque franc
+            Chaque mise comptée, chaque caisse rapprochée le soir, chaque franc
             tracé. L’argent, lui, ne quitte jamais ta main.
           </p>
 
-          {/* Le geste principal mène **dans le produit**, pas dans une boîte
-            aux tres. Avant le 2026-08-23 ces deux boutons pointaient sur un
-            `mailto:` : sur une machine sans client de messagerie configuré,
-            cliquer ne produisait rien de visible — et un bouton qui ne produit
-            rien de visible est un bouton cassé, quoi qu'en dise le code. */}
+          {/* Aucun des deux ne mène à une boîte aux lettres. Avant le
+            2026-08-23 ils pointaient sur un `mailto:` : sur une machine sans
+            client de messagerie configuré, cliquer ne produisait rien de
+            visible, et un bouton qui ne produit rien de visible est un bouton
+            cassé, quoi qu'en dise le code.
+
+            Le 2026-09-02, les rôles ont été échangés. « Ouvrir mon espace
+            collecteur » était le bouton principal d'ici **et**, sous le nom
+            « Se connecter », le bouton plein de la barre de navigation : deux
+            poids, deux libellés, une seule destination, visibles ensemble. Une
+            surface, un travail. La barre suit le visiteur partout et porte donc
+            la connexion ; le hero ne se voit qu'une fois, à l'arrivée, et porte
+            l'ouverture de compte. */}
           {/* Empilés et pleine largeur sur téléphone, côte à côte ensuite. Deux
             pilules de largeurs différentes posées l'une sous l'autre se lisent
             comme un défaut d'alignement ; à `w-full` elles forment une colonne
@@ -165,19 +168,17 @@ export function Hero() {
             className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:gap-4"
           >
             <a
-              href={APP_COLLECTEUR}
+              href={INSCRIPTION}
               className="magnetique overflow-hidden rounded-pill bg-or px-7 py-3.5 text-center font-body text-base font-semibold text-dark-canvas"
             >
-              <span className="relative z-10">
-                Ouvrir mon espace collecteur
-              </span>
+              <span className="relative z-10">Ouvrir un compte</span>
               <span aria-hidden className="voile-or" />
             </a>
             <a
-              href={INSCRIPTION}
+              href={APP_COLLECTEUR}
               className="rounded-pill border border-white/20 px-7 py-3.5 text-center font-body text-base font-medium text-white/80 transition-transform duration-300 hover:-translate-y-px hover:text-white"
             >
-              Ouvrir un compte
+              J’ai déjà un compte
             </a>
           </div>
         </div>

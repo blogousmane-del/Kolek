@@ -1,6 +1,6 @@
-@import 'tailwindcss';
-@import '@kolek/core/theme.css';
-@import '@kolek/core/base.css';
+@import "tailwindcss";
+@import "@kolek/core/theme.css";
+@import "@kolek/core/base.css";
 
 /* Tailwind n'explore que le répertoire du build. Les composants partagés vivent
    hors de `apps/site` : sans cette ligne, leurs classes n'existeraient dans
@@ -11,8 +11,8 @@
    les applications n'ont ni emphase dramatique ni flux monospace, et les y
    mettre inviterait à s'en servir. */
 @theme {
-  --font-drama: 'Bodoni Moda', 'Times New Roman', Georgia, serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-drama: "Bodoni Moda", "Times New Roman", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 /* Le fond du sur-défilement : la vitrine ouvre sombre (hero) et ferme sombre
@@ -79,6 +79,25 @@ body {
   }
 }
 
+/* Le curseur de la machine à écrire. `steps(1)` et non un fondu : un curseur
+   de terminal s'éteint, il ne s'estompe pas. C'est aussi la raison pour
+   laquelle ce n'est plus `animate-pulse` — la classe utilitaire produit
+   exactement le battement mou qu'on reconnaît sur les pages engendrées, et elle
+   était ici posée sur trois points décoratifs qui ne signalaient aucun état. */
+@keyframes curseur-clignote {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.curseur {
+  animation: curseur-clignote 1.06s steps(1, end) infinite;
+}
+
 /* `rosace-rotation` vit dans `@kolek/core/base.css` avec le composant qu'elle
    anime — les trois cibles s'en servent maintenant. */
 
@@ -86,6 +105,11 @@ body {
   .magnetique,
   .voile-or {
     transition: none;
+  }
+  /* Le curseur ne clignote pas. Il n'est de toute façon pas rendu dans ce
+     mode — la ceinture en plus de la bretelle, si la règle JS change. */
+  .curseur {
+    animation: none;
   }
   /* Le reflet ne joue pas : le mot reste or, plein. */
   .reflet-or {
