@@ -42,7 +42,8 @@ L'image fournie est la **maquette de représentation de notre Dashboard Admin** 
 **Ce qu'on concrétise pour Kolek** (la maquette reste la cible ; on remplace seulement le placeholder)
 - Le **`$` devient FCFA** (et on retire les centimes — le franc CFA n'a pas de sous-unité).
 - Contenu réel : **nos données** (collecteurs, clients, cartes, mises) et **le français**, à la place des noms, marques et montants de démonstration.
-- **Aucun or dans l'interface** : on colle strictement à la maquette (vert profond, neutres, vert/corail sémantiques, pastels de graphique). Décision actée.
+- **Aucun or dans les applications** : l'admin et le collecteur collent strictement à la maquette (vert profond, neutres, vert/corail sémantiques, pastels de graphique). Décision actée.
+- **L'or est une couleur de marque, pas une couleur d'interface.** `--color-or` et `--color-or-doux` n'existent que pour le logo, le favicon, l'image Open Graph et la vitrine — les surfaces qui *vendent* Kolek. Les surfaces qui *manipulent l'argent* n'en portent pas une trace. La distinction n'est pas cosmétique : sur un écran d'encaissement, l'or désignerait une valeur, et aucune valeur de ce produit n'est or.
 
 ---
 
@@ -53,7 +54,7 @@ L'image fournie est la **maquette de représentation de notre Dashboard Admin** 
 3. **Hors-ligne d'abord.** Chaque écran doit rester lisible et utilisable sans réseau ; un état de synchro est toujours visible.
 4. **Densité maîtrisée.** Aéré côté admin ; compact et à grandes cibles tactiles côté terrain.
 5. **Cohérence absolue.** Les deux applications partagent tokens et composants. Ce qui change, c'est la disposition, pas le langage visuel.
-6. **Palette resserrée.** Vert, neutres, vert/corail sémantiques, pastels de graphique — rien d'autre. La discipline fait la cohérence.
+6. **Palette resserrée.** Vert, neutres, vert/corail sémantiques, pastels de graphique — rien d'autre dans les applications. L'or est réservé à la marque et à la vitrine (§ 1). La discipline fait la cohérence.
 7. **Ne jamais afficher un chiffre qu'on ne sait pas.** Un écran branché sur la base ne montre que ce que la base établit. Un compteur inventé pour remplir une case coûte la confiance de celui qui le lit.
 
 ---
@@ -133,6 +134,9 @@ Deux conséquences pratiques.
 
 - **Police UI :** `Plus Jakarta Sans` (repli `Inter`, puis `system-ui`) → `--font-body`, classe `font-body`.
 - **Police display / marque :** `Sora` → `--font-headings`, classe `font-headings`.
+- **Police dramatique — vitrine uniquement :** `Bodoni Moda` → `--font-drama`, classe `font-drama`, déclarée dans `apps/site/src/styles.css` et nulle part ailleurs. Un Didone gravé, c'est-à-dire la typographie des coupures de banque : la vitrine traite le produit comme un billet, et cette police est la seule chose de la page qui vienne littéralement du sujet. Elle a remplacé `Instrument Serif` le 2026-09-02 — celle-ci n'était choisie que pour « faire premium », ce qui n'est pas une raison.
+  - **Jamais deux familles dans un même titre pour l'emphase.** Un mot mis en valeur l'est par l'italique ou la graisse de sa propre famille. Le seul titre qui mélange Sora et Bodoni est le `h1` du hero, où la coupure typographique *est* le sujet ; partout ailleurs c'est un défaut.
+  - **Jambages.** Bodoni Moda italique descend bas. En display, `leading` ≥ 1,1 et une réserve (`pb-*`) sur le bloc porteur, sinon le `p` de « précision » et le `j` de « juste » sont rognés.
 - **Distribution :** paquets `@fontsource`, **sous-ensemble latin uniquement**. Pas de Google Fonts : la CSP interdit `font-src` distant, et un collecteur en 3G ne doit pas attendre un serveur tiers pour lire un montant.
 - **Chiffres :** toujours **tabulaires** (classe `tabular-nums`) pour aligner les FCFA.
 
