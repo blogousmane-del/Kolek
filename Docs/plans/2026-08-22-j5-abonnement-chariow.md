@@ -3852,9 +3852,15 @@ describe('l’état du paiement', () => {
   it('nomme les paliers dont le produit manque', () => {
     // Un produit manquant ne se voit pas avant qu'un collecteur choisisse ce
     // palier — et il choisit celui qu'on n'a pas déclaré, forcément un jour.
+    //
+    // `lireProduits` (tâche 1) **lève** dans ce cas, et c'est juste pour un
+    // checkout : mieux vaut refuser au démarrage que vendre un palier sans
+    // produit. Mais un écran de diagnostic qui lève n'affiche rien — il doit
+    // au contraire savoir décrire une configuration incomplète. D'où une
+    // lecture tolérante, propre à ce module.
     const etat = etatPaiement({
       cle: CLE,
-      produits: 'standard:prod_1,illimite:prod_3',
+      produits: '{"standard":"prod_1","illimite":"prod_3"}',
       secretWebhook: '',
     });
 
@@ -3863,6 +3869,13 @@ describe('l’état du paiement', () => {
       { palier: 'pro', configure: false },
       { palier: 'illimite', configure: true },
     ]);
+  });
+
+  it('ne se casse pas sur un CHARIOW_PRODUITS illisible', () => {
+    // Le cas d'une variable mal collée. L'écran doit le dire, pas tomber.
+    const etat = etatPaiement({ cle: CLE, produits: 'pas du json', secretWebhook: '' });
+
+    expect(etat.produits.every((p) => !p.configure)).toBe(true);
   });
 
   it('refuse un secret de webhook trop court', () => {
@@ -3889,7 +3902,7 @@ Créer `supabase/functions/_shared/etat-paiement.ts` — **aucune API Deno**, co
 `chariow.ts`, pour que Vitest puisse le charger :
 
 ```ts
-import { PALIERS_PAYANTS, lireProduits } from './chariow.ts';
+import { PALIERS_PAYANTS } from './chariow.ts';
 
 export interface EtatPaiement {
   cleConfiguree: boolean;
@@ -3904,13 +3917,37 @@ export interface EtatPaiement {
     de passe qui se promène, et il se traite comme tel. */
 const SECRET_MIN = 32;
 
+/**
+ * La même variable que `lireProduits`, lue sans jamais lever.
+ *
+ * `lireProduits` lève sur une configuration incomplète, et c'est le bon
+ * comportement pour un checkout : vendre un palier sans produit est pire que
+ * refuser. Ici, l'incomplétude est précisément ce qu'on vient afficher — un
+ * écran de diagnostic qui lève n'affiche rien, et l'administrateur reste devant
+ * une page vide au moment où il cherche ce qui manque.
+ */
+function produitsDeclares(brut: string | undefined): Record<string, string> {
+  if (!brut) return {};
+  try {
+    const lu = JSON.parse(brut) as unknown;
+    if (!lu || typeof lu !== 'object' || Array.isArray(lu)) return {};
+    const table: Record<string, string> = {};
+    for (const [cle, valeur] of Object.entries(lu as Record<string, unknown>)) {
+      if (typeof valeur === 'string' && valeur.trim()) table[cle] = valeur.trim();
+    }
+    return table;
+  } catch {
+    return {};
+  }
+}
+
 export function etatPaiement(env: {
   cle: string | undefined;
   produits: string | undefined;
   secretWebhook: string | undefined;
 }): EtatPaiement {
   const cle = env.cle ?? '';
-  const produits = lireProduits(env.produits);
+  const produits = produitsDeclares(env.produits);
 
   return {
     cleConfiguree: cle.length > 0,
@@ -4045,7 +4082,7 @@ function SectionPaiement({ paiement }: { paiement: EtatPaiement | null }) {
       </p>
       <pre className="mt-2 overflow-x-auto rounded-md bg-canvas p-3 font-mono text-xs">
 {`npx supabase secrets set CHARIOW_API_KEY=…
-npx supabase secrets set CHARIOW_PRODUITS=standard:prod_…,pro:prod_…,illimite:prod_…
+npx supabase secrets set CHARIOW_PRODUITS='{"standard":"prod_…","pro":"prod_…","illimite":"prod_…"}'
 npx supabase secrets set CHARIOW_WEBHOOK_SECRET=$(openssl rand -hex 24)`}
       </pre>
     </Section>
