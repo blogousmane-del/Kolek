@@ -397,3 +397,97 @@ describe('liste blanche de privilèges — audit du distant, 2026-08-17', () => 
     }
   });
 });
+
+/**
+ * L'équipe ne perce pas l'isolation.
+ *
+ * C'est la décision structurante de la conception des collaborateurs : aucune
+ * policy n'a été élargie. Un titulaire voit son équipe par `equipe_vue()` et
+ * `equipe_clients()`, deux portes dédiées ; par PostgREST, il ne voit rien de
+ * plus qu'avant. Ces trois cas sont là pour rester rouges au sens du produit :
+ * si l'un devient vert, la conception a été trahie, pas améliorée.
+ */
+describe('le rattachement n’ouvre aucune porte', () => {
+  const SERIE = String(Date.now()).slice(-7);
+  let compteur = 0;
+  const telephone = () => `+225${SERIE}${String((compteur += 1)).padStart(2, '0')}`;
+
+  async function equipe() {
+    const patron = await creerCollecteur('Patron Iso', telephone());
+    const awa = await creerCollecteur('Awa Iso', telephone());
+    await admin
+      .from('collecteurs')
+      .update({ palier: 'illimite', abonnement_statut: 'actif' })
+      .eq('id', patron.id);
+    await admin.from('collecteurs').update({ titulaire_id: patron.id }).eq('id', awa.id);
+    await admin
+      .from('clients')
+      .insert({ id: crypto.randomUUID(), collecteur_id: awa.id, nom: 'Cliente d’Awa' });
+    return { patron, awa };
+  }
+
+  it('un titulaire ne lit pas les clients de son collaborateur', async () => {
+    const { patron } = await equipe();
+
+    // La policy n'a pas bougé, et c'est exactement ce qu'on vérifie.
+    const { data } = await patron.client.from('clients').select('id, nom');
+    expect(data).toEqual([]);
+  });
+
+  it('un collaborateur ne lit pas les données d’un autre collaborateur', async () => {
+    const { patron } = await equipe();
+    const kofi = await creerCollecteur('Kofi Iso', telephone());
+    await admin.from('collecteurs').update({ titulaire_id: patron.id }).eq('id', kofi.id);
+
+    // Être frère d'équipe ne donne aucun droit : seul le titulaire a une porte,
+    // et elle ne descend que d'un étage.
+    const { data } = await kofi.client.from('clients').select('id');
+    expect(data).toEqual([]);
+  });
+
+  it('écrase encaisse_par par l’identité de la session', async () => {
+    const auteur = await creerCollecteur('Auteur', telephone());
+    const autre = await creerCollecteur('Autre', telephone());
+
+    const clientId = crypto.randomUUID();
+    const carteId = crypto.randomUUID();
+    await auteur.client
+      .from('clients')
+      .insert({ id: clientId, collecteur_id: auteur.id, nom: 'Cliente' });
+    await auteur.client
+      .from('cartes')
+      .insert({ id: carteId, collecteur_id: auteur.id, client_id: clientId, mise: 1000 });
+
+    // 1. Nommer `encaisse_par` est refusé net par le GRANT de colonne : il n'est
+    //    pas dans `grant insert (id, collecteur_id, carte_id, montant,
+    //    encaisse_le)`. PostgreSQL barre avant que le déclencheur s'exécute.
+    const forge = crypto.randomUUID();
+    const { error: refus } = await auteur.client.from('mises').insert({
+      id: forge,
+      collecteur_id: auteur.id,
+      carte_id: carteId,
+      montant: 1000,
+      encaisse_le: new Date().toISOString(),
+      encaisse_par: autre.id,
+    });
+    expect(refus?.code, 'nommer encaisse_par doit être refusé, pas ignoré').toBe('42501');
+
+    const { data: rien } = await admin.from('mises').select('id').eq('id', forge).maybeSingle();
+    expect(rien, 'la ligne forgée ne doit pas exister').toBeNull();
+
+    // 2. Une insertion légitime se voit poser `encaisse_par` par le serveur,
+    //    depuis `auth.uid()` — jamais depuis le corps de la requête.
+    const miseId = crypto.randomUUID();
+    const { error } = await auteur.client.from('mises').insert({
+      id: miseId,
+      collecteur_id: auteur.id,
+      carte_id: carteId,
+      montant: 1000,
+      encaisse_le: new Date().toISOString(),
+    });
+    expect(error).toBeNull();
+
+    const { data } = await admin.from('mises').select('encaisse_par').eq('id', miseId).maybeSingle();
+    expect(data?.encaisse_par).toBe(auteur.id);
+  });
+});

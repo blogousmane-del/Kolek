@@ -1152,6 +1152,38 @@ end;
 $fn$;
 
 -- ---------------------------------------------------------------------------
+-- Qui pose restitue_par
+-- ---------------------------------------------------------------------------
+-- Symétrique du précédent, et nécessaire pour la même raison : sans lui, toute
+-- écriture de `retraits` qui ne nomme pas la colonne échoue en `23502`. La
+-- laisser à la charge de l'appelant aurait fait de chaque chemin d'écriture un
+-- endroit où l'oublier — et `retraits` en a plusieurs : l'Edge Function de
+-- clôture, les corrections d'administration, les jeux d'essai.
+--
+-- La bascule est plus courte que celle des mises, et c'est délibéré :
+-- `auth.uid()` n'y figure pas. `retraits` n'accorde aucun `insert` à
+-- `authenticated` — la table ne s'écrit que sous clé de service, où `auth.uid()`
+-- est nul. L'y mettre serait une branche morte qui ressemblerait à une garde.
+create or replace function public.retraits_avant_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+begin
+  new.restitue_par := coalesce(new.restitue_par, new.collecteur_id);
+  return new;
+end;
+$fn$;
+
+revoke all on function public.retraits_avant_insert() from public, anon, authenticated;
+
+drop trigger if exists retraits_avant_insert on public.retraits;
+create trigger retraits_avant_insert
+  before insert on public.retraits
+  for each row execute function public.retraits_avant_insert();
+
+-- ---------------------------------------------------------------------------
 -- La caisse compte la main, plus le propriétaire
 -- ---------------------------------------------------------------------------
 create or replace function public.cash_attendu_du_jour(p_collecteur uuid, p_date date)
@@ -1257,14 +1289,26 @@ begin
   ) then
     raise exception 'GARDE_FOU : retraits_immuables est resté désarmé.';
   end if;
+
+  if exists (select 1 from public.mises where encaisse_par <> collecteur_id) then
+    raise exception 'GARDE_FOU : la reprise a inventé un encaisseur.';
+  end if;
+
+  if not exists (
+    select 1 from pg_trigger
+     where tgrelid = 'public.retraits'::regclass and tgname = 'retraits_avant_insert'
+  ) then
+    raise exception 'GARDE_FOU : restitue_par n''est posé par personne, et la clôture échouera en 23502.';
+  end if;
 end;
 $garde$;
 ```
 
-- [ ] **Étape 4 : la clôture doit poser `restitue_par`**
+- [ ] **Étape 4 : la clôture nomme explicitement `restitue_par`**
 
-`retraits.restitue_par` est `not null` et aucun défaut ne le remplit :
-`collecteur-cloturer-carte` échouerait à chaque appel. Dans
+Le déclencheur ci-dessus suffit à ce que la clôture ne casse pas. Cette étape ne
+répare donc rien : elle rend explicite, à l'endroit où l'argent sort, ce que le
+repli ferait en silence — et prépare la divergence de la tâche 8. Dans
 `supabase/functions/collecteur-cloturer-carte/index.ts`, remplacer :
 
 ```ts

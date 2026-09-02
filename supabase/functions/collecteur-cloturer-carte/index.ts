@@ -148,6 +148,10 @@ Deno.serve(async (requete) => {
 
   const { error: erreurRetrait } = await clientService.from('retraits').insert({
     collecteur_id: collecteurId,
+    // Qui sort l'argent de sa sacoche. Identique à `collecteur_id` tant que la
+    // carte lue est la sienne — ce que RLS garantit ici. Clôturer pour un
+    // coéquipier fera diverger les deux.
+    restitue_par: collecteurId,
     carte_id: carte.id,
     montant_restitue: partage.montantRestitue,
     commission: partage.commission,
