@@ -22,6 +22,10 @@ export interface LigneCollecteur {
   nom: string;
   telephone: string;
   zone: string | null;
+  // Le rattachement à un titulaire. Nul pour la très grande majorité des
+  // collecteurs — seul le forfait Illimité ouvre droit à une équipe.
+  titulaire_id: string | null;
+  titulaire_nom: string | null;
   palier: string;
   abonnement_statut: 'actif' | 'suspendu' | 'expire';
   abonnement_echeance: string;

@@ -450,3 +450,26 @@ describe('le chiffre d’affaires', () => {
     expect(apres.abonnements.collecteurs_actifs).toBe(comptesAvant + 4);
   });
 });
+
+describe('la vue d’administration', () => {
+  it('montre à qui un collaborateur est rattaché', async () => {
+    const patron = await creerCollecteur('Patron Admin', telephone());
+    const awa = await creerCollecteur('Awa Admin', telephone());
+    await rendreTitulaire(patron.id);
+    expect((await rattacher(awa.id, patron.id)).error).toBeNull();
+
+    const vue = (await admin.rpc('admin_vue_globale')).data as {
+      collecteurs: Array<{ id: string; titulaire_id: string | null; titulaire_nom: string | null }>;
+    };
+
+    const ligne = vue.collecteurs.find((c) => c.id === awa.id);
+    expect(ligne?.titulaire_id).toBe(patron.id);
+    expect(ligne?.titulaire_nom).toBe('Patron Admin');
+
+    // Et l'inverse : un titulaire n'est le collaborateur de personne. Sans
+    // cette ligne, une jointure qui rendrait le collecteur lui-même passerait.
+    const lignePatron = vue.collecteurs.find((c) => c.id === patron.id);
+    expect(lignePatron?.titulaire_id).toBeNull();
+    expect(lignePatron?.titulaire_nom).toBeNull();
+  });
+});

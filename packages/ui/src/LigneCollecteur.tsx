@@ -5,6 +5,8 @@ import { Icone } from './Icone';
 interface Props {
   nom: string;
   zone: string;
+  /** Le nom du titulaire, quand ce collecteur est un collaborateur. */
+  titulaire?: string;
   clients: number;
   encaisse: string;
   statut: Statut;
@@ -15,6 +17,7 @@ interface Props {
 export function LigneCollecteur({
   nom,
   zone,
+  titulaire,
   clients,
   encaisse,
   statut,
@@ -28,7 +31,12 @@ export function LigneCollecteur({
       <Avatar nom={nom} className="w-10 h-10 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-base font-body font-semibold text-ink truncate">{nom}</p>
-        <p className="text-sm font-body text-muted-foreground truncate">{zone}</p>
+        {/* Sur la ligne de la zone, et non sur une troisième : une ligne de
+            plus ne pousserait que les collaborateurs, et la liste cesserait
+            d'aligner ses colonnes avec ses en-têtes. */}
+        <p className="text-sm font-body text-muted-foreground truncate">
+          {titulaire ? `${zone} · Collaborateur de ${titulaire}` : zone}
+        </p>
       </div>
       <div className="w-20 text-right">
         <p className="text-base font-body font-medium text-ink tabular-nums">{clients}</p>

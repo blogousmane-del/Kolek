@@ -287,6 +287,7 @@ export function Collecteurs({
                     key={c.id}
                     nom={c.nom}
                     zone={c.zone ?? 'Sans zone'}
+                    titulaire={c.titulaire_nom ?? undefined}
                     clients={c.clients}
                     encaisse={formatMontant(c.encaisse)}
                     statut={statutDe(c)}
