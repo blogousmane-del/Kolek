@@ -57,7 +57,30 @@ describe('traduction des refus du serveur', () => {
   });
 
   it('reconnaît une borne de longueur à son SQLSTATE', () => {
+    expect(
+      codeDErreur({
+        code: '23514',
+        message: 'new row for relation "clients" violates check constraint "clients_nom_borne"',
+      }),
+    ).toBe('BORNE');
+    // Sans nom de contrainte, rien ne permet d'affirmer mieux que « une borne ».
     expect(codeDErreur({ code: '23514', message: 'violates check constraint' })).toBe('BORNE');
+  });
+
+  it('distingue une borne de montant d’une borne de longueur', () => {
+    // Le 2026-09-02, ouvrir une carte à 15 000 FCFA sur un serveur dont la
+    // contrainte plafonnait encore à 10 000 affichait « Une des informations
+    // saisies est trop longue. » L'écran d'ouverture n'envoie aucun texte : sur
+    // ce chemin, un 23514 ne peut désigner que le montant. Le collecteur
+    // cherchait une faute de frappe dans le nom du client.
+    for (const contrainte of ['cartes_mise_check', 'mises_montant_borne', 'mises_montant_check']) {
+      expect(
+        codeDErreur({
+          code: '23514',
+          message: `new row for relation "cartes" violates check constraint "${contrainte}"`,
+        }),
+      ).toBe('BORNE_MONTANT');
+    }
   });
 
   it('reconnaît un refus de droit', () => {

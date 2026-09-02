@@ -44,11 +44,23 @@ const PHRASES: Record<string, string> = {
   CYCLE_COMPLET: 'Le cycle de 31 mises est complet. Il faut clôturer la carte.',
   MONTANT_INVALIDE: 'Le montant doit être égal à la mise de la carte.',
   BORNE: 'Une des informations saisies est trop longue.',
+  BORNE_MONTANT: 'Le serveur refuse ce montant. Choisis un des montants proposés.',
   DROIT_REFUSE: 'Tu n’as pas le droit d’écrire cette ligne.',
   RIEN_ECRIT: 'Le serveur n’a rien changé. Reconnecte-toi et réessaie.',
   RESEAU: 'Pas de réseau. Réessaie une fois connecté.',
   INCONNU: 'Enregistrement impossible. Réessaie.',
 };
+
+/**
+ * Les contraintes CHECK qui portent sur un montant, et non sur une longueur.
+ *
+ * La liste est écrite en dur parce qu'elle est courte et qu'aucune convention
+ * de nommage ne la sépare de l'autre famille : `mises_montant_borne` et
+ * `clients_nom_borne` finissent tous deux par `_borne`. Si une borne de montant
+ * s'ajoute un jour, elle s'ajoute ici — sinon elle sera annoncée comme une
+ * longueur, ce qui est le défaut que cette liste corrige.
+ */
+const CONTRAINTES_DE_MONTANT = ['cartes_mise_check', 'mises_montant_borne', 'mises_montant_check'];
 
 /**
  * Traduit une erreur PostgREST en code court.
@@ -71,9 +83,18 @@ export function codeDErreur(erreur: { code?: string; message?: string } | null):
     if (message.includes(cle)) return cle;
   }
 
-  // 23514 : une contrainte CHECK. Sur les tables que le collecteur écrit, ce
-  // sont les bornes de longueur et les bornes de montant.
-  if (erreur.code === '23514') return 'BORNE';
+  // 23514 : une contrainte CHECK. Deux familles se cachent derrière ce seul
+  // code sur les tables que le collecteur écrit — les bornes de longueur du
+  // texte et les bornes de montant — et Postgres ne les distingue que par le
+  // nom de la contrainte, qu'il place dans le message.
+  //
+  // Les confondre a un coût réel : l'écran d'ouverture de carte n'envoie que
+  // `mise`, donc un 23514 y désigne forcément le montant, et le collecteur
+  // lisait « Une des informations saisies est trop longue. » — une phrase qui
+  // l'envoie relire un nom de client qui n'est pas en cause.
+  if (erreur.code === '23514') {
+    return CONTRAINTES_DE_MONTANT.some((nom) => message.includes(nom)) ? 'BORNE_MONTANT' : 'BORNE';
+  }
   // 23505 : clé primaire violée — un rejeu que le déclencheur n'a pas intercepté.
   if (erreur.code === '23505') return 'DOUBLON';
   // 42501 : RLS ou liste blanche de colonnes. Un collecteur ne devrait jamais
