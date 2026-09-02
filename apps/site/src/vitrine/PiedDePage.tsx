@@ -44,9 +44,10 @@ export function PiedDePage() {
 
         {COLONNES.map((colonne) => (
           <nav key={colonne.titre} aria-label={colonne.titre}>
-            <p className="mb-3 font-mono text-xs tracking-widest text-white/40">
-              {colonne.titre.toUpperCase()}
-            </p>
+            {/* En typographie de texte, pas en monospace majuscule espacé : c'est
+                un intitulé de colonne de pied de page, la structure la plus
+                ordinaire qui soit, et rien n'y demandait d'insister. */}
+            <p className="mb-3 font-body text-sm font-semibold text-white/50">{colonne.titre}</p>
             <ul className="flex flex-col gap-2">
               {colonne.liens.map((lien) => (
                 <li key={lien.libelle}>
@@ -65,11 +66,15 @@ export function PiedDePage() {
 
       <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-white/8 pt-6">
         <p className="font-body text-xs text-white/30">
-          © {new Date().getFullYear()} GTCS — Kolek. Aucun flux d’épargne ne transite par cette
+          © {new Date().getFullYear()} GTCS · Kolek. Aucun flux d’épargne ne transite par cette
           page.
         </p>
         <p className="flex items-center gap-2 font-mono text-xs text-white/40">
-          <span className="inline-block h-2 w-2 animate-pulse rounded-pill bg-positive" />
+          {/* Fixe, et non `animate-pulse`. Le point ne mesure rien : il dit que la
+              page est servie. Le faire battre lui prêtait une surveillance qui
+              n'existe pas — la CSP de cette page interdit tout appel sortant, donc
+              aucune sonde ne peut le démentir. */}
+          <span className="inline-block h-2 w-2 rounded-pill bg-positive" />
           SYSTÈME OPÉRATIONNEL
         </p>
       </div>

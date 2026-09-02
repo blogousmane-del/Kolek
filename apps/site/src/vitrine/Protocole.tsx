@@ -26,7 +26,7 @@ const ETAPES = [
     numero: '02',
     titre: 'Rapprocher',
     detail:
-      'Le soir, le serveur calcule le cash attendu depuis les mises du jour. Tu comptes ce que tu as en main, tu déclares — l’écart est nommé, expliqué, daté.',
+      'Le soir, le serveur calcule le cash attendu depuis les mises du jour. Tu comptes ce que tu as en main, tu déclares, et l’écart est nommé, expliqué, daté.',
     animation: 'balayage',
   },
   {

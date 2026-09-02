@@ -77,12 +77,15 @@ export function Acces() {
       />
 
       <div className="relative z-10">
-        <p className="mb-3 font-mono text-xs tracking-widest text-or">ACCÈS</p>
+        {/* Sans sur-titre. « ACCÈS » en monospace espacé au-dessus de « Ouvre ta
+            tournée » disait deux fois la même chose, et c'était le quatrième de la
+            page. Trois suffisent à marquer un argumentaire ; au-delà, l'étiquette
+            cesse d'être une structure et devient un tic. */}
         <h2 className="mb-3 max-w-2xl font-headings text-3xl font-bold text-white sm:text-4xl">
           Ouvre ta tournée
         </h2>
         <p className="mb-12 max-w-xl font-body text-base text-white/50">
-          Ton compte t’attend. Encaisse tes clients, rapproche ta caisse, clôture tes cartes —
+          Ton compte t’attend. Encaisse tes clients, rapproche ta caisse, clôture tes cartes,
           depuis le téléphone que tu as déjà dans la poche.
         </p>
 
@@ -95,8 +98,12 @@ export function Acces() {
             className="group flex flex-col justify-between rounded-[2rem] bg-or p-7 text-dark-canvas shadow-lg transition-transform duration-300 hover:-translate-y-1 lg:col-span-2"
           >
             <div>
-              <p className="mb-2 font-mono text-xs tracking-widest text-dark-canvas/60">
-                J’AI DÉJÀ UN COMPTE
+              {/* Les trois étiquettes de cette section étaient en monospace
+                  majuscule espacé. Trois d'affilée, c'est le tic ; ce qu'elles
+                  portent — à qui chaque porte s'adresse — est réel et reste, en
+                  typographie de texte. */}
+              <p className="mb-2 font-body text-sm font-semibold text-dark-canvas/60">
+                J’ai déjà un compte
               </p>
               <h3 className="mb-3 font-headings text-3xl font-bold sm:text-4xl">
                 Ouvrir mon espace collecteur
@@ -124,8 +131,8 @@ export function Acces() {
               href={INSCRIPTION}
               className="group flex-1 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 transition-transform duration-300 hover:-translate-y-1"
             >
-              <p className="mb-2 font-mono text-xs tracking-widest text-white/40">
-                PAS ENCORE DE COMPTE
+              <p className="mb-2 font-body text-sm font-semibold text-white/40">
+                Pas encore de compte
               </p>
               <h3 className="mb-2 font-headings text-xl font-bold text-white">
                 Ouvrir un compte
@@ -149,7 +156,7 @@ export function Acces() {
               href={APP_ADMIN}
               className="group rounded-[2rem] border border-white/10 bg-white/[0.02] p-6 transition-transform duration-300 hover:-translate-y-1"
             >
-              <p className="mb-2 font-mono text-xs tracking-widest text-white/30">ÉQUIPE GTCS</p>
+              <p className="mb-2 font-body text-sm font-semibold text-white/30">Équipe GTCS</p>
               <span className="inline-flex items-center gap-2 font-body text-sm font-medium text-white/60">
                 Administration
                 <FlecheEntrante />

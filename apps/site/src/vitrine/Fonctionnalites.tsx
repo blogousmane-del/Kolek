@@ -1,5 +1,5 @@
 import { MISES_PAR_CYCLE } from '@kolek/core';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useMouvementAccepte } from './animation';
 
@@ -100,16 +100,34 @@ const JOURNAL = [
   '18:32  écart  0 F  ✓ juste',
 ] as const;
 
+/** Nombre de lignes déjà tapées que la fenêtre garde à l'écran. */
+const LIGNES_VISIBLES = 5;
+
+/**
+ * ## Pourquoi cette animation n'est pas dans l'état React
+ *
+ * Elle y était jusqu'au 2026-09-02 : `setCourante` toutes les 34 ms, soit une
+ * trentaine de rendus React complets par seconde, en continu, tant que la carte
+ * est montée. Le téléphone d'entrée de gamme qui est la cible déclarée du produit
+ * payait ce prix pour afficher un caractère de plus.
+ *
+ * Le texte est donc écrit directement dans le DOM. La règle qui rend la chose
+ * sûre : **React ne rend jamais d'enfant dans les nœuds que ce code écrit.** Le
+ * journal animé et le journal statique sont deux conteneurs distincts, jamais
+ * montés en même temps, et le nettoyage de l'effet vide celui qu'il a rempli.
+ *
+ * Le rendu visible est identique à celui d'avant, au pixel près.
+ */
 function MachineTelemetrie() {
   const anime = useMouvementAccepte();
-  // Sans mouvement, le journal est montré fini : la carte doit rester
-  // informative, pas devenir vide. C'est la règle de toute la vitrine — on
-  // retire l'animation, jamais le contenu.
-  const [lignes, setLignes] = useState<string[]>(anime ? [] : [...JOURNAL].slice(-5));
-  const [courante, setCourante] = useState('');
+  const journal = useRef<HTMLDivElement>(null);
+  const enCours = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    if (!anime) return;
+    const zone = journal.current;
+    const curseur = enCours.current;
+    if (!anime || !zone || !curseur) return;
+
     let ligne = 0;
     let caractere = 0;
     const minuterie = setInterval(() => {
@@ -118,38 +136,60 @@ function MachineTelemetrie() {
         // Fin du journal : on repart, comme un vrai flux.
         ligne = 0;
         caractere = 0;
-        setLignes([]);
-        setCourante('');
+        zone.replaceChildren();
+        curseur.textContent = '';
         return;
       }
       caractere += 1;
-      setCourante(texte.slice(0, caractere));
+      curseur.textContent = texte.slice(0, caractere);
       if (caractere >= texte.length) {
-        setLignes((prec) => [...prec.slice(-4), texte]);
-        setCourante('');
+        const rendue = document.createElement('p');
+        rendue.textContent = texte;
+        if (texte.includes('✓')) rendue.className = 'text-chart-mint';
+        zone.append(rendue);
+        while (zone.childElementCount > LIGNES_VISIBLES) zone.firstElementChild?.remove();
+        curseur.textContent = '';
         ligne += 1;
         caractere = 0;
       }
     }, 34);
-    return () => clearInterval(minuterie);
+
+    return () => {
+      clearInterval(minuterie);
+      // Si le visiteur active « mouvement réduit » en cours de route, React
+      // monte le journal statique ; celui-ci doit repartir vide.
+      zone.replaceChildren();
+    };
   }, [anime]);
 
   return (
     <div className="flex h-56 flex-col rounded-[1.25rem] border border-hairline bg-dark-canvas p-4">
       <p className="mb-3 flex items-center gap-2 font-mono text-[10px] tracking-widest text-or">
-        <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-pill bg-or" />
-        FLUX EN DIRECT — CAISSE DU SOIR
+        {/* Fixe : le journal qui défile dit déjà qu'il se passe quelque chose.
+            Un point qui bat par-dessus n'ajoute rien qu'un tic. */}
+        <span className="inline-block h-1.5 w-1.5 rounded-pill bg-or" />
+        FLUX EN DIRECT · CAISSE DU SOIR
       </p>
       <div className="flex-1 overflow-hidden font-mono text-[11px] leading-6 text-white/70 xs:text-xs">
-        {lignes.map((l) => (
-          <p key={l} className={l.includes('✓') ? 'text-chart-mint' : undefined}>
-            {l}
-          </p>
-        ))}
+        {/* Écrit par l'effet, jamais par React : voir le commentaire du composant. */}
+        <div ref={journal} />
+
+        {/* Sans mouvement, le journal est montré fini : la carte doit rester
+            informative, pas devenir vide. C'est la règle de toute la vitrine — on
+            retire l'animation, jamais le contenu. */}
+        {!anime &&
+          JOURNAL.slice(-LIGNES_VISIBLES).map((l) => (
+            <p key={l} className={l.includes('✓') ? 'text-chart-mint' : undefined}>
+              {l}
+            </p>
+          ))}
+
         {anime && (
           <p className="text-white">
-            {courante}
-            <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-or align-middle" />
+            <span ref={enCours} />
+            {/* Un vrai curseur de terminal : `steps(1)`, pas le fondu
+                d'`animate-pulse`. Voir `styles.css`. */}
+            <span className="curseur ml-0.5 inline-block h-3.5 w-1.5 bg-or align-middle" />
           </p>
         )}
       </div>
@@ -204,7 +244,7 @@ function PlanificateurTournee() {
   return (
     <div className="relative flex h-56 flex-col justify-between rounded-[1.25rem] border border-hairline bg-surface p-4">
       <p className="font-mono text-[10px] tracking-widest text-muted-foreground">
-        TA TOURNÉE — JOURS DE CLÔTURE
+        TA TOURNÉE · JOURS DE CLÔTURE
       </p>
       <div className="grid grid-cols-7 gap-1.5">
         {JOURS.map((jour, i) => (
@@ -254,7 +294,7 @@ const ARTEFACTS = [
   {
     titre: 'Le carnet, sans le papier',
     detail:
-      'La carte de 31 cases que tes clients connaissent — digitale, impossible à perdre, impossible à raturer.',
+      'La carte de 31 cases que tes clients connaissent : digitale, impossible à perdre, impossible à raturer.',
     rendu: <MelangeurCartes />,
   },
   {
@@ -266,7 +306,7 @@ const ARTEFACTS = [
   {
     titre: 'L’argent reste dans ta main',
     detail:
-      'Kolek compte, il ne touche pas. Aucun franc de tes clients ne transite par la plateforme — c’est écrit dans son code.',
+      'Kolek compte, il ne touche pas. Aucun franc de tes clients ne transite par la plateforme : c’est écrit dans son code.',
     rendu: <PlanificateurTournee />,
   },
 ] as const;
@@ -278,11 +318,19 @@ export function Fonctionnalites() {
       <h2 className="mb-12 max-w-2xl font-headings text-3xl font-bold text-ink sm:text-4xl">
         Trois instruments, un métier
       </h2>
-      <div className="grid gap-6 lg:grid-cols-3">
-        {ARTEFACTS.map((artefact) => (
+      {/* `items-start` et un décalage sur la carte du milieu. Trois cartes de
+          largeur, de hauteur et de position identiques sont le gabarit que produit
+          n'importe quelle page engendrée ; les trois instruments restent trois,
+          c'est la grille qui cesse d'être un moule. Le décalage ne joue qu'à partir
+          de `lg`, là où les cartes sont côte à côte — empilées, il ne ferait qu'un
+          blanc de plus. */}
+      <div className="grid items-start gap-6 lg:grid-cols-3">
+        {ARTEFACTS.map((artefact, i) => (
           <article
             key={artefact.titre}
-            className="rounded-[2rem] border border-hairline bg-paper p-6 shadow-sm transition-transform duration-300 hover:-translate-y-1"
+            className={`rounded-[2rem] border border-hairline bg-paper p-6 shadow-sm transition-transform duration-300 hover:-translate-y-1 ${
+              i === 1 ? 'lg:mt-14' : ''
+            }`}
           >
             {artefact.rendu}
             <h3 className="mb-2 mt-5 font-headings text-xl font-bold text-ink">{artefact.titre}</h3>

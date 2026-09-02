@@ -58,7 +58,9 @@ export function Philosophie() {
         <p className="mb-10 font-body text-lg text-white/50 sm:text-xl">
           <EnMots texte={NEUTRE} />
         </p>
-        <p className="font-drama text-5xl italic leading-[1.05] text-white sm:text-7xl">
+        {/* Même réserve que dans le hero : le `j` de « juste » touchait le bas
+            de sa ligne. Voir § 3.2 du système de design. */}
+        <p className="pb-2 font-drama text-5xl italic leading-[1.15] text-white sm:text-7xl">
           <span data-mot className="inline-block">
             {NOTRE[0]}&nbsp;
           </span>
@@ -73,7 +75,7 @@ export function Philosophie() {
         <p data-mot className="mt-12 max-w-2xl font-body text-base leading-relaxed text-white/60">
           Un banquier ambulant gère l’épargne de dizaines de familles avec un carnet et une
           mémoire. Le jour où l’un des deux flanche, c’est la confiance de tout un marché qui
-          part avec. Kolek ne déplace pas cet argent — il le rend incontestable.
+          part avec. Kolek ne déplace pas cet argent : il le rend incontestable.
         </p>
       </div>
     </section>

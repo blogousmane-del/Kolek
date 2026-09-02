@@ -21,7 +21,12 @@ export function Tarification() {
   });
 
   return (
-    <section id="tarifs" ref={ref} className="bg-paper px-5 py-20 sm:px-12 sm:py-24 lg:px-20">
+    /* `bg-canvas` et non `bg-paper` : `Protocole`, juste au-dessus, est en
+       `canvas` (#F4F5F2, froid), et `paper` (#FBFAF6, chaud) le jouxtait sans
+       trancher — assez proche pour passer pour un défaut de rendu, assez loin
+       pour se voir. Les deux sections claires forment maintenant un seul bloc
+       entre deux sections sombres. */
+    <section id="tarifs" ref={ref} className="bg-canvas px-5 py-20 sm:px-12 sm:py-24 lg:px-20">
       <p className="mb-3 font-mono text-xs tracking-widest text-primary">ADHÉSION</p>
       <h2 className="mb-4 max-w-2xl font-headings text-3xl font-bold text-ink sm:text-4xl">
         Un abonnement de collecteur, pas une commission sur l’épargne
@@ -121,7 +126,7 @@ export function Tarification() {
       </div>
 
       <p className="mt-8 font-body text-sm text-muted-foreground">
-        Les comptes sont ouverts par l’équipe GTCS après un premier échange — le premier mois est
+        Les comptes sont ouverts par l’équipe GTCS après un premier échange : le premier mois est
         un essai, sans engagement.{' '}
         <a href={APP_COLLECTEUR} className="font-semibold text-primary underline underline-offset-2">
           Déjà client ? Connecte-toi.

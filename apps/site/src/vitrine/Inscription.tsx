@@ -111,8 +111,8 @@ export function Inscription() {
             <p className="mb-6 font-body text-base leading-relaxed text-white/60">
               GTCS te rappelle sur le <strong className="text-white">{telephone}</strong> pour
               ouvrir ton compte et te montrer l’application. Ton accès partira ensuite sur{' '}
-              <strong className="text-white">{email}</strong> — garde ton téléphone à portée et
-              surveille tes courriels.
+              <strong className="text-white">{email}</strong>. Garde ton téléphone à portée
+              et surveille tes courriels.
             </p>
             <p className="font-body text-sm text-white/40">
               Tu as déjà un compte ?{' '}
@@ -240,7 +240,7 @@ export function Inscription() {
                 </div>
                 {choisi && (
                   <p className="mt-2 font-body text-xs text-white/40">
-                    {choisi.limite} — {choisi.accroche}
+                    {choisi.limite} · {choisi.accroche}
                   </p>
                 )}
               </fieldset>
