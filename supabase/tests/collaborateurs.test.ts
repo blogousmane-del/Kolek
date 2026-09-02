@@ -408,3 +408,45 @@ describe('les clients d’un coéquipier', () => {
     expect(error).not.toBeNull();
   });
 });
+
+describe('le chiffre d’affaires', () => {
+  it('compte un abonnement pour quatre comptes actifs', async () => {
+    const lire = async () => {
+      const { data } = await admin.rpc('admin_vue_globale');
+      const vue = data as {
+        par_palier: Array<{ palier: string; total: number; actifs: number }>;
+        abonnements: { collecteurs_total: number; collecteurs_actifs: number };
+      };
+      return {
+        illimite: vue.par_palier.find((p) => p.palier === 'illimite'),
+        abonnements: vue.abonnements,
+      };
+    };
+
+    // Le relevé précède TOUTE création, patron compris : c'est l'équipe
+    // entière — un titulaire et ses trois collaborateurs — dont on mesure
+    // l'effet sur le chiffre d'affaires.
+    const avant = await lire();
+    const actifsAvant = avant.illimite?.actifs ?? 0;
+    const totalAvant = avant.illimite?.total ?? 0;
+    const comptesAvant = avant.abonnements.collecteurs_actifs;
+
+    const patron = await creerCollecteur('Patron MRR', telephone());
+    await rendreTitulaire(patron.id);
+
+    for (let i = 0; i < 3; i += 1) {
+      const membre = await creerCollecteur(`MRR ${i}`, telephone());
+      await admin.from('collecteurs').update({ palier: 'illimite' }).eq('id', membre.id);
+      expect((await rattacher(membre.id, patron.id)).error).toBeNull();
+    }
+
+    const apres = await lire();
+
+    // UN abonnement facture : le titulaire paie pour son equipe.
+    expect(apres.illimite?.actifs).toBe(actifsAvant + 1);
+    // QUATRE comptes qui existent. Confondre les deux est justement l'erreur
+    // qu'on corrige — et les compteurs de population ne doivent pas l'attraper.
+    expect(apres.illimite?.total).toBe(totalAvant + 4);
+    expect(apres.abonnements.collecteurs_actifs).toBe(comptesAvant + 4);
+  });
+});

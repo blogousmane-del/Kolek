@@ -1693,9 +1693,10 @@ Ajouter à `supabase/tests/collaborateurs.test.ts` :
 ```ts
 describe('le chiffre d’affaires', () => {
   it('compte un abonnement pour quatre comptes actifs', async () => {
-    const patron = await creerCollecteur('Patron MRR', `+2250770${Date.now() % 100000}`);
-    await rendreTitulaire(patron.id);
-
+    // Le relevé précède TOUTE création, patron compris : c'est l'équipe
+    // entière — un titulaire et ses trois collaborateurs — dont on mesure
+    // l'effet. Le prendre après avoir passé le patron en Illimité compterait
+    // son abonnement dans le « avant », et l'assertion deviendrait fausse.
     const avant = (await admin.rpc('admin_vue_globale')).data as {
       par_palier: Array<{ palier: string; total: number; actifs: number }>;
       abonnements: { collecteurs_total: number };
@@ -1703,6 +1704,9 @@ describe('le chiffre d’affaires', () => {
     const illimiteAvant = avant.par_palier.find((p) => p.palier === 'illimite');
     const actifsAvant = illimiteAvant?.actifs ?? 0;
     const totalAvant = illimiteAvant?.total ?? 0;
+
+    const patron = await creerCollecteur('Patron MRR', telephone());
+    await rendreTitulaire(patron.id);
 
     for (let i = 0; i < 3; i += 1) {
       const membre = await creerCollecteur(`MRR ${i}`, `+22507${80 + i}${Date.now() % 10000}`);
@@ -1819,10 +1823,25 @@ begin
   if position('titulaire_id is null' in corps) = 0 then
     raise exception 'GARDE_FOU : le MRR compte encore les collaborateurs.';
   end if;
+
   -- Deux occurrences attendues : `actifs` et `offerts`. Une seule voudrait dire
   -- qu'une remise de collaborateur est déduite d'un abonnement qui n'existe pas.
-  if (length(corps) - length(replace(corps, 'titulaire_id is null', ''))) / 20 < 2 then
+  if (length(corps) - length(replace(corps, 'titulaire_id is null', ''))) / 20 <> 2 then
     raise exception 'GARDE_FOU : offerts ne suit pas le même filtre qu''actifs.';
+  end if;
+
+  -- La recopie n'a rien perdu. Nommer les clés plutôt que les compter : un
+  -- compte dit qu'il en manque une, la liste dit laquelle — et c'est ce qu'on
+  -- veut lire six mois plus tard, devant 251 lignes recopiées. Elles sont NEUF,
+  -- pas huit : `cartes_total_lignes` accompagne `cartes`.
+  if exists (
+    select 1 from unnest(array[
+      'genere_le', 'par_palier', 'abonnements', 'totaux', 'zones',
+      'collecteurs', 'cartes', 'cartes_total_lignes', 'mouvements'
+    ]) as attendue
+     where attendue not in (select jsonb_object_keys(public.admin_vue_globale()))
+  ) then
+    raise exception 'GARDE_FOU : la recopie a perdu une clé de la vue.';
   end if;
 end;
 $garde$;
