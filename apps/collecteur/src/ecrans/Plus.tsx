@@ -89,6 +89,16 @@ export function Plus({ onRetour, onDeconnexion }: {
                   <p className="font-headings font-bold text-base text-ink mb-3">Mon abonnement</p>
                   <dl className="text-sm font-body space-y-2">
                     <Ligne terme="Formule" valeur={tarif?.nom ?? profil.palier} />
+                    {/* Un collaborateur doit pouvoir constater pourquoi sa
+                        commission n’apparaît nulle part. Sans cette ligne, la
+                        règle est appliquée sur quatre écrans et énoncée sur
+                        aucun. */}
+                    {profil.titulaireId && (
+                      <Ligne
+                        terme="Équipe"
+                        valeur="Collaborateur — la commission revient à ton titulaire"
+                      />
+                    )}
                     {tarif && (
                       <Ligne
                         terme="Tarif"

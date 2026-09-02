@@ -51,11 +51,24 @@ export function ChoixMise({
   mise,
   onChoisir,
   identifiant,
+  estCollaborateur = false,
 }: {
   mise: number | null;
   onChoisir: (montant: number | null) => void;
   /** Préfixe des `id` : deux `ChoixMise` peuvent coexister dans un même document. */
   identifiant: string;
+  /**
+   * La commission de la première mise revient au titulaire, pas à l'encaisseur.
+   *
+   * Par propriété et non par `useEstCollaborateur()` : ce composant est un
+   * morceau de formulaire rendu dans trois écrans, et une lecture ici en ferait
+   * trois — dont deux dans des formulaires déjà ouverts, où une phrase qui
+   * change en cours de saisie se lit comme un bug.
+   *
+   * Optionnelle et fausse par défaut : les douze appels de `ChoixMise.test.tsx`
+   * restent valides sans être touchés.
+   */
+  estCollaborateur?: boolean;
 }) {
   const surUnPalier = mise !== null && (MISES_USUELLES as readonly number[]).includes(mise);
   const [libre, setLibre] = useState(!surUnPalier);
@@ -180,7 +193,10 @@ export function ChoixMise({
       {montantAffiche !== null && validerMise(montantAffiche) && (
         <p className="text-xs font-body text-muted-foreground mt-2">
           31 jours · le client verse {formatMontant(montantAffiche * 31)} FCFA, tu lui rends{' '}
-          {formatMontant(montantAffiche * 30)} FCFA. La première mise est ta commission.
+          {formatMontant(montantAffiche * 30)} FCFA.{' '}
+          {estCollaborateur
+            ? 'La première mise revient à ton titulaire.'
+            : 'La première mise est ta commission.'}
         </p>
       )}
 

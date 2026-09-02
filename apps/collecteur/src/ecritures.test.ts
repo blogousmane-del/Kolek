@@ -87,6 +87,38 @@ describe('traduction des refus du serveur', () => {
     expect(codeDErreur({ code: '42501', message: 'permission denied' })).toBe('DROIT_REFUSE');
   });
 
+  it('nomme l’abonnement quand c’est lui qui ferme la porte', () => {
+    // Depuis `20260902110000`, `clients_insert` et `cartes_insert` exigent
+    // `abonnement_ouvre_droit`. L'autre condition de ces deux policies,
+    // `collecteur_id = auth.uid()`, est posée par l'application depuis la
+    // session : elle ne peut pas être fausse ici. Un refus RLS sur ces deux
+    // tables désigne donc l'abonnement, et le collecteur lisait « Tu n'as pas le
+    // droit d'écrire cette ligne » — une phrase qui l'envoie chercher un défaut
+    // là où il n'y a qu'une facture.
+    for (const table of ['clients', 'cartes']) {
+      expect(
+        codeDErreur({
+          code: '42501',
+          message: `new row violates row-level security policy for table "${table}"`,
+        }),
+      ).toBe('ABONNEMENT_INACTIF');
+    }
+  });
+
+  it('ne met pas l’encaissement sur le compte de l’abonnement', () => {
+    // `mises_insert` n'a délibérément pas reçu la condition : un abonnement
+    // suspendu n'empêche pas d'encaisser une carte déjà ouverte, et
+    // `abonnement-ouvre-droit.test.ts` le vérifie côté base. Annoncer ici un
+    // abonnement inactif sur un refus qui vient d'ailleurs enverrait le
+    // collecteur payer une facture qui ne débloquerait rien.
+    expect(
+      codeDErreur({
+        code: '42501',
+        message: 'new row violates row-level security policy for table "mises"',
+      }),
+    ).toBe('DROIT_REFUSE');
+  });
+
   it('range ce qu’il ne connaît pas plutôt que de deviner', () => {
     expect(codeDErreur({ code: '08006', message: 'connection failure' })).toBe('INCONNU');
     expect(codeDErreur(null)).toBe('INCONNU');

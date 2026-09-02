@@ -19,6 +19,7 @@ import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { supabase } from '../supabase';
 import { ChoixMise } from './ChoixMise';
+import { useEstCollaborateur } from './commission';
 import { FicheClient } from './FicheClient';
 
 /** « 1 août » : assez pour distinguer deux cartes, assez court pour une ligne. */
@@ -741,6 +742,7 @@ function FormulaireClient({
   onAnnuler: () => void;
   onCree: () => void;
 }) {
+  const estCollaborateur = useEstCollaborateur();
   const [nom, setNom] = useState('');
   const [telephone, setTelephone] = useState('');
   const [marche, setMarche] = useState('');
@@ -834,7 +836,12 @@ function FormulaireClient({
       />
 
       <div className="mb-3">
-        <ChoixMise mise={mise} onChoisir={setMise} identifiant="nouveau" />
+        <ChoixMise
+          mise={mise}
+          onChoisir={setMise}
+          identifiant="nouveau"
+          estCollaborateur={estCollaborateur}
+        />
       </div>
 
       {/* Le consentement se demande au moment où l'on prend le numéro, pas

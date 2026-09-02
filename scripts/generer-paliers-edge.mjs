@@ -22,13 +22,16 @@ const ENTETE = `// Fichier engendré par scripts/generer-paliers-edge.mjs — ne
 `;
 
 /**
- * Seuls la clé, le nom et le prix traversent. Les couleurs, accroches et listes
- * de fonctions sont de l'affichage : les emporter côté serveur inviterait à
- * fabriquer des écrans depuis l'Edge Function, ce qui n'est pas son travail.
+ * Seuls la clé, le nom, le prix et les deux plafonds traversent. Les couleurs,
+ * accroches et listes de fonctions sont de l'affichage : les emporter côté
+ * serveur inviterait à fabriquer des écrans depuis l'Edge Function, ce qui n'est
+ * pas son travail. `collaborateursInclus` traverse parce que c'est une règle
+ * appliquée côté serveur, pas un libellé.
  */
 export function contenuAttendu() {
   const lignes = PALIERS.map(
-    (p) => `  { cle: '${p.cle}', nom: '${p.nom}', prix: ${p.prix}, limiteClients: ${p.limiteClients} },`,
+    (p) =>
+      `  { cle: '${p.cle}', nom: '${p.nom}', prix: ${p.prix}, limiteClients: ${p.limiteClients}, collaborateursInclus: ${p.collaborateursInclus} },`,
   ).join('\n');
 
   return (
@@ -41,6 +44,8 @@ export function contenuAttendu() {
     `  prix: number;\n` +
     `  /** Plafond de clients ; \`null\` vaut « aucun plafond ». */\n` +
     `  limiteClients: number | null;\n` +
+    `  /** Collaborateurs inclus dans le forfait. */\n` +
+    `  collaborateursInclus: number;\n` +
     `}\n\n` +
     `export const TARIFS: readonly TarifPalier[] = [\n${lignes}\n];\n\n` +
     `const PAR_CLE = new Map(TARIFS.map((t) => [t.cle, t]));\n\n` +

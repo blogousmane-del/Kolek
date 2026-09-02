@@ -19,13 +19,15 @@ export interface TarifPalier {
   prix: number;
   /** Plafond de clients ; `null` vaut « aucun plafond ». */
   limiteClients: number | null;
+  /** Collaborateurs inclus dans le forfait. */
+  collaborateursInclus: number;
 }
 
 export const TARIFS: readonly TarifPalier[] = [
-  { cle: 'essai', nom: 'Essai', prix: 0, limiteClients: 20 },
-  { cle: 'standard', nom: 'Standard', prix: 2500, limiteClients: 50 },
-  { cle: 'pro', nom: 'Pro', prix: 5000, limiteClients: 150 },
-  { cle: 'illimite', nom: 'Illimité', prix: 10000, limiteClients: null },
+  { cle: 'essai', nom: 'Essai', prix: 0, limiteClients: 20, collaborateursInclus: 0 },
+  { cle: 'standard', nom: 'Standard', prix: 2500, limiteClients: 50, collaborateursInclus: 0 },
+  { cle: 'pro', nom: 'Pro', prix: 5000, limiteClients: 150, collaborateursInclus: 0 },
+  { cle: 'illimite', nom: 'Illimité', prix: 10000, limiteClients: null, collaborateursInclus: 3 },
 ];
 
 const PAR_CLE = new Map(TARIFS.map((t) => [t.cle, t]));

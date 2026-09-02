@@ -1,4 +1,4 @@
-import { type EchecEcriture, codeDErreur } from './ecritures';
+import { type EchecEcriture, codeDErreur, phraseEcriture } from './ecritures';
 import { supabase } from './supabase';
 
 /**
@@ -142,4 +142,126 @@ export async function cloturerCarte(carteId: string): Promise<ResultatCloture> {
     montantRestitue: corps.montantRestitue ?? 0,
     commission: corps.commission ?? 0,
   };
+}
+
+/* ------------------------------- L'équipe -------------------------------- */
+
+export interface SaisieCollaborateur {
+  email: string;
+  motDePasse: string;
+  nom: string;
+  telephone: string;
+  zone?: string;
+}
+
+export type ResultatCollaborateur =
+  | { ok: true; collaborateurId: string }
+  | { ok: false; echec: EchecEcriture };
+
+/** Les refus de `collecteur-creer-collaborateur`, en phrases. */
+const PHRASES_COLLABORATEUR: Record<string, string> = {
+  ACCES_RESERVE:
+    'Réservé au forfait Illimité, et à trois collaborateurs au plus. Vérifie ton abonnement.',
+  EMAIL_DEJA_PRIS: 'Cette adresse est déjà utilisée par un autre compte.',
+  MOT_DE_PASSE_COMPROMIS: 'Ce mot de passe figure dans des fuites connues. Choisis-en un autre.',
+  TROP_DE_TENTATIVES: 'Trop de créations en peu de temps. Réessaie dans une heure.',
+  EMAIL_INVALIDE: 'Cette adresse ne ressemble pas à une adresse.',
+  MOT_DE_PASSE_TROP_COURT: 'Le mot de passe doit faire au moins 10 caractères.',
+  NOM_VIDE: 'Le nom du collaborateur est obligatoire.',
+  // Le compte existe : le dire, et le nommer. Un auth.users orphelin qu'on ne
+  // sait pas nommer est pire qu'un compte à rattacher à la main.
+  RATTACHEMENT_REFUSE:
+    'Le compte est créé mais n’a pas pu être rattaché à ton équipe. Donne son adresse au support.',
+};
+
+/**
+ * Crée un collaborateur et le rattache.
+ *
+ * Passe par une Edge Function parce que créer un compte exige la clé de service.
+ * La conséquence est la même que pour l'encaissement d'équipe : **ce geste exige
+ * le réseau**, et l'écran doit le dire plutôt que de laisser un bouton échouer.
+ */
+export async function creerCollaborateur(
+  saisie: SaisieCollaborateur,
+): Promise<ResultatCollaborateur> {
+  const { data, error } = await supabase.functions.invoke('collecteur-creer-collaborateur', {
+    body: saisie,
+  });
+
+  if (error) {
+    // Même lecture que `cloturerCarte` : `invoke` range le corps de la réponse
+    // dans `context` quand le statut n'est pas 2xx. Sans elle, tout refus
+    // deviendrait « impossible, réessaie » — y compris « adresse déjà prise »,
+    // le seul que le titulaire peut corriger seul.
+    let code = 'CREATION_IMPOSSIBLE';
+    try {
+      const contexte = (error as { context?: Response }).context;
+      if (contexte && typeof contexte.json === 'function') {
+        code = ((await contexte.json()) as { erreur?: string }).erreur ?? code;
+      }
+    } catch {
+      code = 'RESEAU';
+    }
+    return {
+      ok: false,
+      echec: {
+        code,
+        message: PHRASES_COLLABORATEUR[code] ?? PHRASES[code] ?? 'Création impossible. Réessaie.',
+      },
+    };
+  }
+
+  const collaborateurId = (data as { collaborateurId?: string } | null)?.collaborateurId;
+  if (!collaborateurId) {
+    return {
+      ok: false,
+      echec: { code: 'CREATION_IMPOSSIBLE', message: 'Création impossible. Réessaie.' },
+    };
+  }
+  return { ok: true, collaborateurId };
+}
+
+export type ResultatEncaissementPour =
+  | { ok: true; miseId: string }
+  | { ok: false; echec: EchecEcriture };
+
+/**
+ * Encaisse une mise sur la carte d'un coéquipier.
+ *
+ * Le passage par une Edge Function n'est pas un détail d'implémentation : c'est
+ * ce qui fait que ce geste **exige le réseau**, là où la tournée du collecteur
+ * reste hors ligne. Rien n'entre dans la file de synchro, donc rien ne partira
+ * à la reconnexion — l'écran doit le dire, pas laisser un bouton échouer.
+ *
+ * L'identifiant vient d'ici, comme pour `enregistrerMise` : c'est le mécanisme
+ * anti-double-comptage du produit. Un rejeu porte le même identifiant et sort en
+ * `DOUBLON` plutôt qu'en second encaissement.
+ */
+export async function encaisserPour(
+  carteId: string,
+  montant: number,
+  encaisseLe: Date = new Date(),
+): Promise<ResultatEncaissementPour> {
+  const miseId = crypto.randomUUID();
+  const { error } = await supabase.functions.invoke('collecteur-encaisser-pour', {
+    body: { miseId, carteId, montant, encaisseLe: encaisseLe.toISOString() },
+  });
+
+  if (error) {
+    let code = 'ENCAISSEMENT_IMPOSSIBLE';
+    try {
+      const contexte = (error as { context?: Response }).context;
+      if (contexte && typeof contexte.json === 'function') {
+        code = ((await contexte.json()) as { erreur?: string }).erreur ?? code;
+      }
+    } catch {
+      code = 'RESEAU';
+    }
+    // Les refus métier reprennent les phrases du chemin ordinaire, par
+    // `codeDErreur`/`PHRASES` d'`ecritures.ts` : deux libellés pour « le cycle
+    // est complet » seraient deux vérités concurrentes.
+    return { ok: false, echec: phraseEcriture(code) };
+  }
+
+  return { ok: true, miseId };
 }

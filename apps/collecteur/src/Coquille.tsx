@@ -1,4 +1,4 @@
-import { NavBureau, NavMobile, type CleNavCollecteur } from '@kolek/ui';
+import { NavBureau, NavMobile, useEnLigne, type CleNavCollecteur } from '@kolek/ui';
 import { useEffect, useState } from 'react';
 
 import { viderCache } from './cache';
@@ -8,6 +8,8 @@ import { Avis } from './ecrans/Avis';
 import { Bilan } from './ecrans/Bilan';
 import { Clients } from './ecrans/Clients';
 import { Encaisser } from './ecrans/Encaisser';
+import { Equipe } from './ecrans/Equipe';
+import { EquipeClients } from './ecrans/EquipeClients';
 import { Plus } from './ecrans/Plus';
 import { Rapprochement } from './ecrans/Rapprochement';
 import { Recus } from './ecrans/Recus';
@@ -22,7 +24,15 @@ import { supabase } from './supabase';
  * s'atteignent par la grille d'actions de l'accueil, et en sortent par la flèche
  * de leur en-tête.
  */
-type EcranSecondaire = 'retrait' | 'rapprochement' | 'recus' | 'alertes' | 'avis' | 'plus';
+type EcranSecondaire =
+  | 'retrait'
+  | 'rapprochement'
+  | 'recus'
+  | 'alertes'
+  | 'avis'
+  | 'plus'
+  | 'equipe'
+  | 'equipe-clients';
 
 export type Page = CleNavCollecteur | EcranSecondaire;
 
@@ -67,10 +77,17 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
   /** Le client dont la fiche s'ouvre à l'arrivée sur la liste. Posé par la
       commande « Fiche » de l'accueil, consommé par l'écran `Clients`. */
   const [clientPourFiche, setClientPourFiche] = useState<string | null>(null);
+  /** Le coéquipier dont on regarde la tournée. Le nom voyage avec l'identifiant :
+      l'écran suivant doit le porter dans son bandeau même quand la liste est
+      vide, et le redéduire coûterait une lecture de plus. */
+  const [coequipier, setCoequipier] = useState<{ id: string; nom: string } | null>(null);
   /** Incrémenté après chaque écriture : la liste des clients s'y abonne pour
       se relire. Sans ça, un client tout juste inscrit n'apparaît qu'au
       rechargement de la page. */
   const [revision, setRevision] = useState(0);
+  /** Porté par la coquille et non par l'écran : c'est ce qui rend
+      `EquipeClients` testable sans simuler `navigator`. */
+  const enLigne = useEnLigne();
 
   /**
    * Remonter en haut à chaque changement d'écran.
@@ -249,6 +266,25 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
           collecteurId={collecteurId}
           revision={revision}
           onRetour={() => naviguer('accueil')}
+        />
+      )}
+      {page === 'equipe' && (
+        <Equipe
+          revision={revision}
+          onRetour={() => naviguer('accueil')}
+          onOuvrir={(id, nom) => {
+            setCoequipier({ id, nom });
+            naviguer('equipe-clients');
+          }}
+        />
+      )}
+      {page === 'equipe-clients' && coequipier && (
+        <EquipeClients
+          collaborateur={coequipier}
+          enLigne={enLigne}
+          revision={revision}
+          onRetour={() => naviguer('equipe')}
+          onEcriture={() => setRevision((r) => r + 1)}
         />
       )}
       {page === 'recus' && <Recus revision={revision} onRetour={() => naviguer('accueil')} />}

@@ -13,6 +13,7 @@ import {
 import { chargerFicheClient, type CarteFiche, type FicheClient as Fiche } from '../lectures-ecrans';
 import { ActiverCarte } from './ActiverCarte';
 import { ChoixMise } from './ChoixMise';
+import { useEstCollaborateur } from './commission';
 
 /**
  * Ce que voit le collecteur quand plus aucune écriture ne peut partir.
@@ -753,6 +754,7 @@ function NouvelleCarte({
   premiere: boolean;
   onOuverte: () => void;
 }) {
+  const estCollaborateur = useEstCollaborateur();
   const [mise, setMise] = useState<number | null>(1000);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -781,7 +783,12 @@ function NouvelleCarte({
           : 'Sa carte précédente est clôturée. Il peut reprendre, au même montant ou à un autre.'}
       </p>
 
-      <ChoixMise mise={mise} onChoisir={setMise} identifiant={`carte-${clientId}`} />
+      <ChoixMise
+        mise={mise}
+        onChoisir={setMise}
+        identifiant={`carte-${clientId}`}
+        estCollaborateur={estCollaborateur}
+      />
 
       {erreur && (
         <p role="alert" className="font-body text-sm text-negative mt-3">

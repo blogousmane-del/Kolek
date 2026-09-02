@@ -51,6 +51,15 @@ export interface DescriptionPalier {
    * cassera l'analyse sans casser l'écran. Le chiffre vit donc à part.
    */
   limiteClients: number | null;
+  /**
+   * Le nombre de collaborateurs inclus. `0` partout sauf sur Illimité.
+   *
+   * Dans le même fichier que le prix, et pour la même raison : la grille
+   * tarifaire de la vitrine et le contrôle d'accès de la création d'un
+   * collaborateur doivent lire le même chiffre, sinon on vend trois places et on
+   * en accorde deux.
+   */
+  collaborateursInclus: number;
   /** Couleur d'accent du palier. Reprise du jeu data-viz du Design System. */
   teinte: string;
   fond: string;
@@ -58,6 +67,16 @@ export interface DescriptionPalier {
   /** `false` marque une fonction absente du palier, barrée à l'affichage. */
   fonctions: Array<{ libelle: string; incluse: boolean }>;
 }
+
+/**
+ * Le nombre de collaborateurs qu'un titulaire Illimité peut activer.
+ *
+ * Le déclencheur `collecteurs_valider_rattachement` porte la même valeur en dur
+ * — la base ne lit pas le TypeScript. Les deux se déplacent ensemble ou pas du
+ * tout, et le commentaire du déclencheur nomme cette constante pour que le
+ * second point de modification se trouve.
+ */
+export const COLLABORATEURS_MAX = 3;
 
 export const PALIERS: readonly DescriptionPalier[] = [
   {
@@ -68,6 +87,7 @@ export const PALIERS: readonly DescriptionPalier[] = [
     periode: '30 jours',
     limite: '20 clients',
     limiteClients: 20,
+    collaborateursInclus: 0,
     teinte: '#AEB7D6',
     fond: '#F0F1F8',
     texte: '#5A6380',
@@ -77,6 +97,7 @@ export const PALIERS: readonly DescriptionPalier[] = [
       { libelle: 'Rapports basiques', incluse: true },
       { libelle: 'Exports CSV', incluse: false },
       { libelle: 'Support prioritaire', incluse: false },
+      { libelle: '3 collaborateurs', incluse: false },
       { libelle: 'Manager dédié', incluse: false },
     ],
   },
@@ -88,6 +109,7 @@ export const PALIERS: readonly DescriptionPalier[] = [
     periode: 'mois',
     limite: '50 clients',
     limiteClients: 50,
+    collaborateursInclus: 0,
     teinte: '#7FB6A6',
     fond: '#EDF5F3',
     texte: '#2E6557',
@@ -97,6 +119,7 @@ export const PALIERS: readonly DescriptionPalier[] = [
       { libelle: 'Rapports avancés', incluse: true },
       { libelle: 'Exports CSV', incluse: false },
       { libelle: 'Support prioritaire', incluse: true },
+      { libelle: '3 collaborateurs', incluse: false },
       { libelle: 'Manager dédié', incluse: false },
     ],
   },
@@ -108,6 +131,7 @@ export const PALIERS: readonly DescriptionPalier[] = [
     periode: 'mois',
     limite: '150 clients',
     limiteClients: 150,
+    collaborateursInclus: 0,
     teinte: '#1C7A4B',
     fond: '#E6F3EC',
     texte: '#1C7A4B',
@@ -117,6 +141,7 @@ export const PALIERS: readonly DescriptionPalier[] = [
       { libelle: 'Rapports avancés', incluse: true },
       { libelle: 'Exports CSV', incluse: true },
       { libelle: 'Support prioritaire', incluse: true },
+      { libelle: '3 collaborateurs', incluse: false },
       { libelle: 'Manager dédié', incluse: false },
     ],
   },
@@ -128,6 +153,7 @@ export const PALIERS: readonly DescriptionPalier[] = [
     periode: 'mois',
     limite: 'Clients illimités',
     limiteClients: null,
+    collaborateursInclus: COLLABORATEURS_MAX,
     teinte: '#14402C',
     fond: '#E8F0EA',
     texte: '#14402C',
@@ -137,6 +163,7 @@ export const PALIERS: readonly DescriptionPalier[] = [
       { libelle: 'Rapports avancés', incluse: true },
       { libelle: 'Exports CSV', incluse: true },
       { libelle: 'Support dédié 24/7', incluse: true },
+      { libelle: '3 collaborateurs', incluse: true },
       { libelle: 'Manager dédié', incluse: true },
     ],
   },

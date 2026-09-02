@@ -5,6 +5,7 @@ import { useDonnees } from '../cache';
 import { chargerBilan } from '../lectures-ecrans';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
+import { useEstCollaborateur } from './commission';
 
 /**
  * Le bilan du collecteur.
@@ -19,6 +20,7 @@ import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
  * ses clients sans s'en rendre compte.
  */
 export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: number }) {
+  const estCollaborateur = useEstCollaborateur();
   const { donnees, erreur } = useDonnees('bilan', chargerBilan, {
     revision,
     messageErreur: 'Chiffres indisponibles. Vérifie le réseau.',
@@ -130,16 +132,24 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
                     </span>
                   </div>
 
-                  {/* La ligne qui compte : ce qui reste au collecteur. */}
-                  <div className="flex items-baseline justify-between gap-2 mb-4 p-2.5 rounded-xl bg-positive-tint/80 border border-positive/20">
-                    <span className="font-body text-xs text-positive font-bold shrink-0">
-                      Ta commission
-                    </span>
-                    <span className="font-headings font-bold text-base xs:text-lg text-positive tabular-nums text-right min-w-0">
-                      +{formatMontant(tranche.commissions)}{' '}
-                      <span className="text-xs font-body font-semibold">FCFA</span>
-                    </span>
-                  </div>
+                  {/* La ligne qui compte : ce qui reste au collecteur.
+
+                      Elle n'existe pas pour un collaborateur. Sa commission
+                      revient à son titulaire, donc ce montant vaudrait zéro tous
+                      les soirs — et un « +0 FCFA » quotidien pendant qu'il
+                      encaisse est pire qu'une absence : il ressemble à une
+                      erreur de calcul, pas à une règle. */}
+                  {!estCollaborateur && (
+                    <div className="flex items-baseline justify-between gap-2 mb-4 p-2.5 rounded-xl bg-positive-tint/80 border border-positive/20">
+                      <span className="font-body text-xs text-positive font-bold shrink-0">
+                        Ta commission
+                      </span>
+                      <span className="font-headings font-bold text-base xs:text-lg text-positive tabular-nums text-right min-w-0">
+                        +{formatMontant(tranche.commissions)}{' '}
+                        <span className="text-xs font-body font-semibold">FCFA</span>
+                      </span>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-2 text-center p-2 rounded-xl bg-muted/40 border border-hairline/60">
                     <div>
