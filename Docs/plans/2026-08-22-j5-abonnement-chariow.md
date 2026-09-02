@@ -3776,6 +3776,303 @@ git commit -m "feat(scripts): comparer les codes de remise de Kolek a ceux de Ch
 
 ---
 
+## Task 15: L'état du paiement, visible depuis les réglages
+
+**Ajoutée le 2026-09-02**, après la question : « il n'y a pas de place pour la
+clé API Chariow dans les réglages ».
+
+**Il ne doit pas y en avoir, et c'est le sujet de cette tâche.** Un champ de
+saisie pour cette clé impose trois choses, toutes mauvaises : la clé traverse
+le navigateur d'un administrateur, elle se pose quelque part en base, et elle
+revient à l'écran chaque fois qu'on rouvre la page. Une clé qui encaisse de
+l'argent ne doit vivre que dans l'environnement des Edge Functions — c'est déjà
+la contrainte globale de ce plan, et celle qu'applique `verifier-bundles.mjs`
+en refusant tout artefact qui en porterait la trace.
+
+Ce qui manque n'est donc pas un champ, c'est une **réponse à la question que
+l'administrateur se pose vraiment** : *le paiement est-il configuré, et est-ce
+que ça marche ?* Aujourd'hui, la seule façon de le savoir est qu'un collecteur
+échoue à payer.
+
+L'écran gagne une section « Paiement » qui dit trois choses, sans jamais rendre
+la clé : elle est posée ou non (avec ses quatre derniers caractères, assez pour
+distinguer deux clés, pas assez pour en fabriquer une), les trois produits sont
+déclarés ou non, et **la boutique répond ou non** — un appel réel à Chariow, qui
+transforme « une clé est présente » en « cette clé fonctionne ». C'est la
+différence entre une case cochée et un contrôle.
+
+**Fichiers**
+- Modifier : `supabase/functions/admin-reglages/index.ts`
+- Modifier : `apps/admin/src/reglages.ts` — le type et rien d'autre
+- Modifier : `apps/admin/src/ecrans/Reglages.tsx` — une section
+- Test : `supabase/tests/admin-reglages-paiement.test.ts`
+
+**Interfaces**
+- Consomme : `lireProduits` et `PALIERS_PAYANTS` de `_shared/chariow.ts` (tâche 1).
+- Produit : la clé `paiement` dans la réponse d'`admin-reglages`, de type
+  `EtatPaiement`.
+
+- [ ] **Étape 1 : le test qui échoue**
+
+Créer `supabase/tests/admin-reglages-paiement.test.ts` :
+
+```ts
+import { describe, expect, it } from 'vitest';
+
+import { etatPaiement } from '../functions/_shared/etat-paiement';
+
+/**
+ * Ce que les réglages disent du paiement — et ce qu'ils ne disent jamais.
+ *
+ * La fonction est pure et prend son environnement en argument : c'est ce qui
+ * permet de vérifier, par un test et non par une relecture, que la clé ne sort
+ * pas. Un contrôle de fuite qui repose sur la vigilance du prochain lecteur
+ * n'est pas un contrôle.
+ */
+
+const CLE = 'chariow_sk_live_ABCDEFGHIJKLMNOP';
+
+describe('l’état du paiement', () => {
+  it('ne rend jamais la clé, seulement ses quatre derniers caractères', () => {
+    const etat = etatPaiement({ cle: CLE, produits: '', secretWebhook: '' });
+
+    expect(JSON.stringify(etat)).not.toContain(CLE);
+    expect(JSON.stringify(etat)).not.toContain('ABCDEFGHIJKLMNOP');
+    expect(etat.cleIndice).toBe('MNOP');
+    expect(etat.cleConfiguree).toBe(true);
+  });
+
+  it('dit qu’il n’y a pas de clé plutôt que d’en inventer une vide', () => {
+    const etat = etatPaiement({ cle: '', produits: '', secretWebhook: '' });
+
+    expect(etat.cleConfiguree).toBe(false);
+    expect(etat.cleIndice).toBeNull();
+  });
+
+  it('nomme les paliers dont le produit manque', () => {
+    // Un produit manquant ne se voit pas avant qu'un collecteur choisisse ce
+    // palier — et il choisit celui qu'on n'a pas déclaré, forcément un jour.
+    const etat = etatPaiement({
+      cle: CLE,
+      produits: 'standard:prod_1,illimite:prod_3',
+      secretWebhook: '',
+    });
+
+    expect(etat.produits).toEqual([
+      { palier: 'standard', configure: true },
+      { palier: 'pro', configure: false },
+      { palier: 'illimite', configure: true },
+    ]);
+  });
+
+  it('refuse un secret de webhook trop court', () => {
+    // Le secret voyage dans l'URL du webhook. Court, il se devine ; et un
+    // webhook qui se devine crédite des abonnements que personne n'a payés.
+    expect(etatPaiement({ cle: CLE, produits: '', secretWebhook: 'court' }).webhookConfigure).toBe(
+      false,
+    );
+    expect(
+      etatPaiement({ cle: CLE, produits: '', secretWebhook: 'x'.repeat(32) }).webhookConfigure,
+    ).toBe(true);
+  });
+});
+```
+
+- [ ] **Étape 2 : le lancer**
+
+Run: `npx vitest run --config supabase/tests/vitest.config.ts supabase/tests/admin-reglages-paiement.test.ts`
+Expected: ÉCHEC — module introuvable.
+
+- [ ] **Étape 3 : le module**
+
+Créer `supabase/functions/_shared/etat-paiement.ts` — **aucune API Deno**, comme
+`chariow.ts`, pour que Vitest puisse le charger :
+
+```ts
+import { PALIERS_PAYANTS, lireProduits } from './chariow.ts';
+
+export interface EtatPaiement {
+  cleConfiguree: boolean;
+  /** Les quatre derniers caractères, ou `null`. Assez pour distinguer deux
+      clés au téléphone, pas assez pour en reconstituer une. */
+  cleIndice: string | null;
+  webhookConfigure: boolean;
+  produits: Array<{ palier: string; configure: boolean }>;
+}
+
+/** Longueur minimale du secret de webhook. Il voyage dans l'URL : c'est un mot
+    de passe qui se promène, et il se traite comme tel. */
+const SECRET_MIN = 32;
+
+export function etatPaiement(env: {
+  cle: string | undefined;
+  produits: string | undefined;
+  secretWebhook: string | undefined;
+}): EtatPaiement {
+  const cle = env.cle ?? '';
+  const produits = lireProduits(env.produits);
+
+  return {
+    cleConfiguree: cle.length > 0,
+    cleIndice: cle.length >= 4 ? cle.slice(-4) : null,
+    webhookConfigure: (env.secretWebhook ?? '').length >= SECRET_MIN,
+    produits: PALIERS_PAYANTS.map((palier) => ({
+      palier,
+      configure: Boolean(produits[palier]),
+    })),
+  };
+}
+```
+
+- [ ] **Étape 4 : relancer**
+
+Run: `npx vitest run --config supabase/tests/vitest.config.ts supabase/tests/admin-reglages-paiement.test.ts`
+Expected: PASS — quatre cas.
+
+- [ ] **Étape 5 : la boutique répond-elle ?**
+
+Dans `supabase/functions/admin-reglages/index.ts`, après la lecture de
+`admin_reglages` et avant la réponse :
+
+```ts
+  // L'état statique : ce que l'environnement déclare.
+  const paiement = etatPaiement({
+    cle: Deno.env.get('CHARIOW_API_KEY'),
+    produits: Deno.env.get('CHARIOW_PRODUITS'),
+    secretWebhook: Deno.env.get('CHARIOW_WEBHOOK_SECRET'),
+  });
+
+  // Puis l'état vivant : la clé fonctionne-t-elle ? Une clé présente et fausse
+  // se comporte exactement comme une clé absente le jour du premier paiement,
+  // et personne ne l'apprend avant. `GET /products` est la lecture la plus
+  // inoffensive du contrat (Docs/Chariow.md §3.4).
+  //
+  // Trois secondes, et un échec qui ne fait pas échouer l'écran : les réglages
+  // doivent s'afficher même quand Chariow est en panne — c'est justement le
+  // moment où on vient les regarder.
+  let boutique: 'joignable' | 'refusee' | 'injoignable' | 'non_configuree' = 'non_configuree';
+  if (paiement.cleConfiguree) {
+    try {
+      const racine = Deno.env.get('CHARIOW_API_URL') ?? 'https://api.chariow.com/v1';
+      const appel = await fetch(`${racine}/products`, {
+        headers: {
+          Authorization: `Bearer ${Deno.env.get('CHARIOW_API_KEY')}`,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(3000),
+      });
+      // 401 et 403 disent « la clé est mauvaise », le reste dit « le service
+      // ne va pas ». Les confondre enverrait GTCS regénérer une clé correcte.
+      boutique = appel.ok ? 'joignable' : appel.status === 401 || appel.status === 403 ? 'refusee' : 'injoignable';
+    } catch {
+      boutique = 'injoignable';
+    }
+  }
+```
+
+et ajouter `paiement: { ...paiement, boutique }` à l'objet rendu.
+
+- [ ] **Étape 6 : le type côté administration**
+
+Dans `apps/admin/src/reglages.ts`, ajouter à `EtatPlateforme` :
+
+```ts
+export interface EtatPaiement {
+  cleConfiguree: boolean;
+  cleIndice: string | null;
+  webhookConfigure: boolean;
+  produits: Array<{ palier: string; configure: boolean }>;
+  boutique: 'joignable' | 'refusee' | 'injoignable' | 'non_configuree';
+}
+```
+
+et `paiement: EtatPaiement;` dans `EtatPlateforme`.
+
+- [ ] **Étape 7 : la section**
+
+Dans `apps/admin/src/ecrans/Reglages.tsx`, une section sur le modèle exact de
+`SectionAuth` — mêmes composants `Section`, `LigneEtat`, `LigneReglage`,
+aucun style nouveau :
+
+```tsx
+function SectionPaiement({ paiement }: { paiement: EtatPaiement | null }) {
+  if (!paiement) return null;
+
+  const MOTS = {
+    joignable: 'la boutique répond',
+    refusee: 'la clé est refusée',
+    injoignable: 'la boutique ne répond pas',
+    non_configuree: 'aucune clé posée',
+  } as const;
+
+  return (
+    <Section titre="Paiement" icone="credit-card">
+      <LigneEtat
+        terme="Clé Chariow"
+        actif={paiement.cleConfiguree}
+        vrai={paiement.cleIndice ? `posée (…${paiement.cleIndice})` : 'posée'}
+        faux="absente"
+      />
+      <LigneEtat
+        terme="Boutique"
+        actif={paiement.boutique === 'joignable'}
+        vrai={MOTS.joignable}
+        faux={MOTS[paiement.boutique]}
+      />
+      <LigneEtat
+        terme="Secret du webhook"
+        actif={paiement.webhookConfigure}
+        vrai="posé"
+        faux="absent ou trop court"
+      />
+      {paiement.produits.map((p) => (
+        <LigneEtat
+          key={p.palier}
+          terme={`Produit ${p.palier}`}
+          actif={p.configure}
+          vrai="déclaré"
+          faux="manquant"
+        />
+      ))}
+
+      {/* La clé ne se saisit pas ici, et l'écran le dit — sans quoi le
+          prochain administrateur cherchera le champ, puis demandera qu'on
+          l'ajoute. La commande est donnée : c'est ce dont il a besoin. */}
+      <p className="mt-4 font-body text-sm text-muted-foreground">
+        Ces valeurs ne se modifient pas depuis cet écran : une clé qui encaisse
+        ne doit pas traverser un navigateur. Elles se posent en ligne de
+        commande, une fois :
+      </p>
+      <pre className="mt-2 overflow-x-auto rounded-md bg-canvas p-3 font-mono text-xs">
+{`npx supabase secrets set CHARIOW_API_KEY=…
+npx supabase secrets set CHARIOW_PRODUITS=standard:prod_…,pro:prod_…,illimite:prod_…
+npx supabase secrets set CHARIOW_WEBHOOK_SECRET=$(openssl rand -hex 24)`}
+      </pre>
+    </Section>
+  );
+}
+```
+
+et l'appeler dans `Reglages`, après `SectionAuth`.
+
+- [ ] **Étape 8 : vérifier**
+
+```
+npm test --workspace @kolek/admin
+npx tsc -b apps/admin
+npx oxlint apps/admin/src supabase/functions
+```
+
+- [ ] **Étape 9 : commit**
+
+```bash
+git add supabase/functions/_shared/etat-paiement.ts supabase/functions/admin-reglages/index.ts \
+        supabase/tests/admin-reglages-paiement.test.ts apps/admin/src
+git commit -m "feat(admin): les reglages disent si le paiement est configure, sans jamais rendre la cle"
+```
+
+---
+
 ## Ce que ce plan ne fait pas
 
 À dire à la livraison, pour que personne ne le découvre en production :
