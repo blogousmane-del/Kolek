@@ -7,6 +7,11 @@
 -- pas faire, c'est garder la trace de ce qui l'a payé. Cette migration ajoute ce
 -- registre, et la seule fonction autorisée à le transformer en abonnement.
 --
+-- Amendement « payer vaut accord » (2026-09-02) : un paiement peut naître avant
+-- son compte, quand il règle une demande d'ouverture. Il porte alors
+-- `demande_id` et pas `collecteur_id`, et le second se pose à la création du
+-- compte, une seule fois.
+--
 -- Écart avec le plan, assumé : les deux fonctions `security definer` déclarent
 -- `search_path = public, pg_temp` là où le plan écrivait `public` seul. Le plan
 -- date du 2026-08-22 ; le durcissement `20260830131000` est postérieur, et
@@ -20,7 +25,13 @@ create table public.paiements_abonnement (
   -- supprimant un compte. `admin-supprimer-collecteur` compte cette table avant
   -- de supprimer, pour nommer ce qui bloque plutôt que de laisser remonter une
   -- violation de clé étrangère que personne ne sait lire.
-  collecteur_id  uuid not null references public.collecteurs(id) on delete restrict,
+  -- Nullable depuis l'amendement « payer vaut accord » : un prospect paie avant
+  -- que son compte n'existe. La colonne se remplit à la création du compte, et
+  -- `paiements_immuables` n'autorise ce remplissage qu'une fois.
+  collecteur_id  uuid references public.collecteurs(id) on delete restrict,
+  -- L'autre rattachement possible. `restrict` pour la même raison : une demande
+  -- payée ne s'efface pas, sinon le règlement n'appartient plus à rien.
+  demande_id     uuid references public.demandes_ouverture(id) on delete restrict,
   palier         text not null check (palier in ('standard','pro','illimite')),
   statut         text not null default 'en_attente'
                    check (statut in ('en_attente','regle','echoue','abandonne')),
@@ -47,6 +58,17 @@ create table public.paiements_abonnement (
   regle_le       timestamptz,
   cree_le        timestamptz not null default now(),
   constraint paiements_vente_unique unique (fournisseur, vente_id),
+  -- Un paiement appartient toujours à quelque chose. Sans cette contrainte, un
+  -- paiement orphelin ne se voit qu'au moment où quelqu'un cherche pourquoi une
+  -- somme est entrée.
+  --
+  -- « Au moins un » et non « exactement un » : une demande servie porte les
+  -- deux, la demande d'origine et le compte qu'elle a fait naître. L'exclusivité
+  -- ne vaut qu'à la naissance, et une contrainte de table ne sait pas
+  -- distinguer une insertion d'une mise à jour — c'est `paiements_naissance`
+  -- qui la porte.
+  constraint paiements_rattachement
+    check (collecteur_id is not null or demande_id is not null),
   -- Un paiement réglé sans date ni échéance posée est une ligne à moitié
   -- écrite. On refuse l'état intermédiaire plutôt qu'un rapport le rencontre
   -- six mois plus tard.
@@ -61,6 +83,8 @@ create index paiements_collecteur_idx
   on public.paiements_abonnement(collecteur_id, cree_le desc);
 create index paiements_en_attente_idx
   on public.paiements_abonnement(statut) where statut = 'en_attente';
+create index paiements_demande_idx
+  on public.paiements_abonnement(demande_id) where demande_id is not null;
 
 -- ---------------------------------------------------------------------------
 -- Row Level Security — lecture seule, sur ses propres lignes
@@ -97,11 +121,25 @@ begin
     raise exception 'PAIEMENT_TERMINAL';
   end if;
 
+  -- Le compte se pose une fois, et une seule : `null` vers une valeur est le
+  -- geste normal d'une demande qui devient un compte ; tout autre changement de
+  -- `collecteur_id` déplacerait un règlement d'un collecteur à un autre.
+  if old.collecteur_id is not null and new.collecteur_id is distinct from old.collecteur_id then
+    raise exception 'PAIEMENT_IDENTITE_FIGEE';
+  end if;
+  if new.collecteur_id is null and old.collecteur_id is not null then
+    raise exception 'PAIEMENT_IDENTITE_FIGEE';
+  end if;
+
+  -- La demande d'origine, elle, ne bouge pas du tout.
+  if new.demande_id is distinct from old.demande_id then
+    raise exception 'PAIEMENT_IDENTITE_FIGEE';
+  end if;
+
   -- Ce qui identifie la vente ne bouge jamais. `montant` et `devise` restent
   -- modifiables : Chariow est la source de vérité du montant réellement débité,
   -- et la réconciliation le relit.
-  if new.collecteur_id  <> old.collecteur_id
-     or new.vente_id    <> old.vente_id
+  if new.vente_id    <> old.vente_id
      or new.fournisseur <> old.fournisseur
      or new.palier      <> old.palier
      or new.cree_le     <> old.cree_le
@@ -116,6 +154,31 @@ $$;
 create trigger paiements_immuables
   before update or delete on public.paiements_abonnement
   for each row execute function public.paiements_immuables();
+
+-- ---------------------------------------------------------------------------
+-- La naissance — un paiement règle un renouvellement OU une demande
+-- ---------------------------------------------------------------------------
+-- Les deux à la fois n'a pas de sens au moment de la création : soit un
+-- collecteur existant renouvelle, soit un prospect ouvre son compte. Les deux
+-- ensemble signalent un appelant qui s'est trompé de chemin, et il vaut mieux
+-- le lui dire que d'encaisser une somme dont on ne saura pas qui la doit.
+create or replace function public.paiements_naissance()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $naissance$
+begin
+  if new.collecteur_id is not null and new.demande_id is not null then
+    raise exception 'PAIEMENT_RATTACHEMENT_DOUBLE';
+  end if;
+  return new;
+end;
+$naissance$;
+
+create trigger paiements_naissance
+  before insert on public.paiements_abonnement
+  for each row execute function public.paiements_naissance();
 
 -- `journaliser()` lit `new.collecteur_id`, que cette table porte : la fonction
 -- existante convient, sans la variante `journaliser_collecteur()`. Elle lit `old`
@@ -139,10 +202,15 @@ create trigger paiements_journal
 -- `collecteur-cloturer-carte`, qui a dû accepter un état partiel. Ici un état
 -- partiel signifierait un collecteur qui a payé sans être servi.
 create or replace function public.crediter_abonnement(
-  p_paiement uuid,
-  p_regle_le timestamptz,
-  p_montant  numeric,
-  p_devise   text
+  p_paiement   uuid,
+  p_regle_le   timestamptz,
+  p_montant    numeric,
+  p_devise     text,
+  -- Le compte fraîchement créé, pour un paiement rattaché à une demande. La
+  -- ligne `auth.users` ne se fabrique pas en SQL : l'Edge Function la crée,
+  -- puis nomme ici le compte à servir. Absent pour un renouvellement, où le
+  -- paiement porte déjà son collecteur.
+  p_collecteur uuid default null
 )
 returns table (credite boolean, echeance date)
 language plpgsql
@@ -164,6 +232,30 @@ begin
   if not found then
     return query select false, null::date;
     return;
+  end if;
+
+  -- Un paiement de demande doit recevoir son compte ici, et une seule fois. Le
+  -- refus est bruyant : créditer un abonnement sans savoir à qui reviendrait à
+  -- encaisser sans servir.
+  if v_paiement.collecteur_id is null then
+    if p_collecteur is null then
+      raise exception 'PAIEMENT_SANS_COMPTE';
+    end if;
+
+    update public.paiements_abonnement
+       set collecteur_id = p_collecteur
+     where id = p_paiement;
+
+    -- La demande est servie. `nouvelle` seulement : une demande déjà traitée
+    -- ne se réécrit pas, et `refusee` reste `refusee` — c'est le cas de fraude,
+    -- dont le remboursement se fait à la main.
+    update public.demandes_ouverture
+       set statut    = 'ouverte',
+           traite_le = now()
+     where id = v_paiement.demande_id
+       and statut = 'nouvelle';
+
+    v_paiement.collecteur_id := p_collecteur;
   end if;
 
   -- Payer en avance prolonge ; payer en retard repart d'aujourd'hui. Sans le
@@ -198,9 +290,9 @@ comment on function public.crediter_abonnement is
 
 -- `create or replace function` réattribue EXECUTE à PUBLIC sans rien dire.
 -- Même paire que la migration de la vue globale, pour la même raison.
-revoke all on function public.crediter_abonnement(uuid, timestamptz, numeric, text)
+revoke all on function public.crediter_abonnement(uuid, timestamptz, numeric, text, uuid)
   from public, anon, authenticated;
-grant execute on function public.crediter_abonnement(uuid, timestamptz, numeric, text)
+grant execute on function public.crediter_abonnement(uuid, timestamptz, numeric, text, uuid)
   to service_role;
 
 -- ---------------------------------------------------------------------------
@@ -251,7 +343,7 @@ declare manquants text; ouverte boolean;
 begin
   select string_agg(attendu, ', ')
     into manquants
-    from (values ('paiements_immuables'), ('paiements_journal')) as t(attendu)
+    from (values ('paiements_immuables'), ('paiements_journal'), ('paiements_naissance')) as t(attendu)
    where not exists (
      select 1 from pg_trigger where tgname = t.attendu and not tgisinternal
    );
@@ -260,7 +352,7 @@ begin
     raise exception 'GARDE_FOU : déclencheurs absents : %', manquants;
   end if;
 
-  select has_function_privilege('authenticated', 'public.crediter_abonnement(uuid, timestamptz, numeric, text)', 'EXECUTE')
+  select has_function_privilege('authenticated', 'public.crediter_abonnement(uuid, timestamptz, numeric, text, uuid)', 'EXECUTE')
     into ouverte;
 
   if ouverte then

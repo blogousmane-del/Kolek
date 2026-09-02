@@ -102,6 +102,87 @@ Tests : `supabase/tests/chariow.test.ts` (pur), `supabase/tests/reconciliation.t
 
 ---
 
+## Amendement du 2026-09-02 — payer vaut accord
+
+Décision de l'exploitant, prise après la tâche 2 : **le paiement se fait au
+moment de la demande d'ouverture, et il tient lieu d'accord.** Le compte naît
+tout seul quand la réconciliation confirme le règlement ; plus d'étape humaine
+entre le formulaire et le premier client encaissé.
+
+Ce que cela change, et ce que cela coûte, écrit une fois ici plutôt que dispersé
+dans les tâches.
+
+### Le paiement précède le compte
+
+`paiements_abonnement.collecteur_id` est `not null` et référence
+`collecteurs`. Un prospect n'a pas de ligne. La migration
+`20260902160000` est donc reprise : `collecteur_id` devient nullable, une
+colonne `demande_id` la double, et une contrainte impose **exactement l'un des
+deux**. Un paiement appartient à un compte ou à une demande, jamais aux deux,
+jamais à aucun.
+
+La migration n'est ni déployée ni poussée : elle se corrige sur place plutôt que
+par une migration de rattrapage. Une migration de correction qui suit sa propre
+migration de la veille est une dette qu'on lit six mois plus tard sans
+comprendre pourquoi deux fichiers disent la même chose.
+
+### Le compte naît de la réconciliation, pas d'un administrateur
+
+Quand un paiement rattaché à une demande passe à `regle`, la même transaction
+crée le compte et bascule la demande en `ouverte`. C'est `crediter_abonnement`
+qui le fait, parce que c'est déjà elle qui fait tenir ensemble les deux écritures
+que PostgREST ne sait pas rendre atomiques — et un état partiel signifierait ici
+quelqu'un qui a payé et qui n'a pas de compte.
+
+Le compte `auth.users` ne se crée pas en SQL : c'est l'Edge Function de
+réconciliation qui appelle `auth.admin.createUser`, puis `crediter_abonnement`.
+L'ordre importe — un compte sans abonnement se répare, un abonnement sans compte
+ne se rattache à rien.
+
+### Le mot de passe est choisi au formulaire
+
+Le prospect n'a pas d'administrateur pour lui remettre des identifiants. Il
+choisit donc son mot de passe dans le formulaire, **avant de payer**, et il est
+validé là : `validerCollecteur` pour la forme, `verifierFuite` pour les fuites
+connues. Refuser un mot de passe après l'encaissement serait le pire moment
+possible.
+
+Conséquence : **l'adresse électronique devient obligatoire** pour une demande
+payante. Elle est facultative aujourd'hui (`demandes_ouverture.email` est
+nullable) et le reste pour une demande d'essai.
+
+### L'essai ne change pas
+
+`essai` vaut zéro franc : il n'y a rien à encaisser. Une demande d'essai suit
+le chemin d'aujourd'hui — elle attend un accord humain. Seuls les paliers
+payants se règlent au formulaire. C'est aussi ce qui garde une porte d'entrée
+pour qui n'a pas de moyen de paiement en ligne.
+
+### Ce que GTCS perd, et ce qui le remplace
+
+L'examen préalable. Un compte payant se crée désormais sans qu'un humain l'ait
+regardé. `refusee` demeure, pour la fraude uniquement, et son coût est réel :
+le remboursement est un geste manuel dans le tableau de bord Chariow, sans API.
+À écrire dans `Docs/deploiement.md` §6 plutôt qu'à découvrir le jour où le cas
+se présente.
+
+Les garde-fous qui restent : l'unicité du téléphone sur les demandes en attente,
+l'unicité de l'adresse en base d'authentification, le contrôle de mot de passe
+divulgué, et la borne d'abus par empreinte de requête — cette dernière est ici
+correctement clavetée sur l'adresse IP, puisque l'appelant est anonyme, à
+l'inverse de `collecteur-creer-collaborateur` où elle a été corrigée ce matin.
+
+### Les tâches touchées
+
+| Tâche | Ce qui change |
+|---|---|
+| 2 | `collecteur_id` nullable, `demande_id` ajoutée, contrainte d'exclusivité, et `crediter_abonnement` sait basculer une demande |
+| 5 | `abonnement-payer` reste pour le renouvellement ; `demander-ouverture` reçoit son propre chemin de checkout |
+| 6 | le webhook et la réconciliation créent le compte avant de créditer |
+| 11 | l'écran de demande d'ouverture du site vitrine gagne le choix du palier, le mot de passe et le départ vers Chariow |
+
+---
+
 ## Task 1: Le contrat Chariow, sans dépendance
 
 **Files:**

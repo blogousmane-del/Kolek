@@ -256,3 +256,136 @@ describe('contraintes', () => {
     expect(data?.length).toBeGreaterThan(0);
   });
 });
+
+describe('un paiement de demande d’ouverture', () => {
+  /** Une demande en attente, comme le formulaire du site en pose une. */
+  async function poserDemande(nom: string) {
+    const { data, error } = await admin
+      .from('demandes_ouverture')
+      .insert({ nom, telephone: telephone(), palier: 'pro', email: `${crypto.randomUUID()}@kolek.test` })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return data.id as string;
+  }
+
+  it('refuse un paiement rattaché à rien', async () => {
+    // Le cas qui ne se voit pas : une somme entrée qui n'appartient à personne.
+    const { error } = await admin.from('paiements_abonnement').insert({
+      palier: 'pro',
+      vente_id: `vente-orphelin-${crypto.randomUUID()}`,
+      montant: 5000,
+      devise: 'XOF',
+      echeance_avant: '2026-01-01',
+    });
+    expect(error?.code).toBe('23514');
+  });
+
+  it('refuse un paiement qui naît rattaché aux deux', async () => {
+    // À la naissance seulement : une demande servie porte bien les deux, la
+    // demande d'origine et le compte qu'elle a fait naître. Ce que ce refus
+    // attrape est un appelant qui s'est trompé de chemin.
+    const demande = await poserDemande('Deux Rattachements');
+    const { error } = await admin.from('paiements_abonnement').insert({
+      collecteur_id: alice.id,
+      demande_id: demande,
+      palier: 'pro',
+      vente_id: `vente-deux-${crypto.randomUUID()}`,
+      montant: 5000,
+      devise: 'XOF',
+      echeance_avant: '2026-01-01',
+    });
+    expect(error?.message).toContain('PAIEMENT_RATTACHEMENT_DOUBLE');
+  });
+
+  it('refuse de créditer sans nommer le compte à servir', async () => {
+    // Créditer un abonnement sans savoir à qui reviendrait à encaisser sans
+    // servir. Le refus est bruyant, pas silencieux.
+    const demande = await poserDemande('Sans Compte');
+    const { data: pose } = await admin
+      .from('paiements_abonnement')
+      .insert({
+        demande_id: demande,
+        palier: 'pro',
+        vente_id: `vente-sanscompte-${crypto.randomUUID()}`,
+        montant: 5000,
+        devise: 'XOF',
+        echeance_avant: '2026-01-01',
+      })
+      .select('id')
+      .single();
+
+    const { error } = await admin.rpc('crediter_abonnement', {
+      p_paiement: pose!.id,
+      p_regle_le: '2026-08-22T10:00:00Z',
+      p_montant: 5000,
+      p_devise: 'XOF',
+    });
+    expect(error?.message).toContain('PAIEMENT_SANS_COMPTE');
+  });
+
+  it('ouvre la demande et rattache le compte, en une fois', async () => {
+    const demande = await poserDemande('Prospect Payant');
+    const { data: pose } = await admin
+      .from('paiements_abonnement')
+      .insert({
+        demande_id: demande,
+        palier: 'pro',
+        vente_id: `vente-prospect-${crypto.randomUUID()}`,
+        montant: 5000,
+        devise: 'XOF',
+        echeance_avant: '2026-01-01',
+      })
+      .select('id')
+      .single();
+
+    // Le compte que l'Edge Function vient de créer : `auth.users` ne se
+    // fabrique pas en SQL, la fonction ne fait que le rattacher.
+    const nouveau = await creerCollecteur('Prospect Servi', telephone());
+
+    const { data, error } = await admin.rpc('crediter_abonnement', {
+      p_paiement: pose!.id,
+      p_regle_le: '2026-08-22T10:00:00Z',
+      p_montant: 5000,
+      p_devise: 'XOF',
+      p_collecteur: nouveau.id,
+    });
+
+    expect(error).toBeNull();
+    expect(data?.[0]?.credite).toBe(true);
+
+    const { data: ligne } = await admin
+      .from('paiements_abonnement')
+      .select('collecteur_id, statut')
+      .eq('id', pose!.id)
+      .single();
+    expect(ligne?.collecteur_id).toBe(nouveau.id);
+    expect(ligne?.statut).toBe('regle');
+
+    const { data: suite } = await admin
+      .from('demandes_ouverture')
+      .select('statut')
+      .eq('id', demande)
+      .single();
+    expect(suite?.statut).toBe('ouverte');
+
+    const { data: compte } = await admin
+      .from('collecteurs')
+      .select('palier, abonnement_statut')
+      .eq('id', nouveau.id)
+      .single();
+    expect(compte?.palier).toBe('pro');
+    expect(compte?.abonnement_statut).toBe('actif');
+  });
+
+  it('ne déplace jamais un règlement d’un collecteur à un autre', async () => {
+    // Le compte se pose une fois. Sans ce refus, une seconde réconciliation
+    // mal appelée rattacherait le paiement à quelqu'un d'autre.
+    const id = await poserPaiement(alice.id, `vente-deplace-${crypto.randomUUID()}`);
+    const { error } = await admin
+      .from('paiements_abonnement')
+      .update({ collecteur_id: bob.id })
+      .eq('id', id);
+    expect(error?.message).toContain('PAIEMENT_IDENTITE_FIGEE');
+  });
+});
