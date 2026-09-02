@@ -104,9 +104,22 @@ export function codeDErreur(erreur: { code?: string; message?: string } | null):
   return 'INCONNU';
 }
 
-function echec(erreur: { code?: string; message?: string } | null): EchecEcriture {
-  const code = codeDErreur(erreur);
+/**
+ * La phrase associée à un code court.
+ *
+ * Exportée pour `encaisserPour`, qui reçoit les mêmes refus — `DOUBLON`,
+ * `CARTE_CLOTUREE`, `CYCLE_COMPLET`, `MONTANT_INVALIDE` — par HTTP plutôt que
+ * par PostgREST. Une seconde table de phrases divergerait de celle-ci, et le
+ * collecteur lirait deux vérités concurrentes pour un même refus.
+ *
+ * `PHRASES` reste privée : c'est la traduction qui est partagée, pas la table.
+ */
+export function phraseEcriture(code: string): EchecEcriture {
   return { code, message: PHRASES[code] ?? PHRASES.INCONNU! };
+}
+
+function echec(erreur: { code?: string; message?: string } | null): EchecEcriture {
+  return phraseEcriture(codeDErreur(erreur));
 }
 
 export interface NouveauClient {

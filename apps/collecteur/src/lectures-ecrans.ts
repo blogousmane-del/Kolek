@@ -689,3 +689,101 @@ export async function chargerFicheClient(clientId: string): Promise<FicheClient 
     mises,
   };
 }
+
+/* ---------------------------- L'équipe (titulaire) ----------------------- */
+
+export interface MembreEquipe {
+  id: string;
+  nom: string;
+  telephone: string | null;
+  clients: number;
+  cartesActives: number;
+  /** Ce que ses clients ont versé et qui leur est encore dû. */
+  encours: number;
+  /** Les commissions de ses cartes. Elles reviennent au titulaire : c'est pour
+      cela qu'elles figurent ici, et qu'elles ont disparu du Bilan du
+      collaborateur. */
+  commissions: number;
+  /** `null` tant qu'il n'a pas déclaré sa caisse aujourd'hui. Un zéro à la
+      place serait un chiffre inventé, que le titulaire lirait comme « tout va
+      bien ». */
+  cashAttendu: number | null;
+  cashDeclare: number | null;
+  ecart: number | null;
+  derniereDeclaration: string | null;
+}
+
+/**
+ * L'équipe de l'utilisateur, ou un tableau vide.
+ *
+ * Passe par `equipe_vue()`, une fonction `security definer` **sans paramètre** :
+ * l'identité vient de `auth.uid()` côté serveur, donc il n'existe aucune manière
+ * de demander l'équipe de quelqu'un d'autre.
+ *
+ * Aucune policy RLS n'a été élargie pour cet écran, et c'est délibéré : les 35
+ * autres lectures de ce fichier gardent leur sens exact. Quand l'une d'elles
+ * somme les mises du jour, elle somme toujours **les miennes**.
+ */
+export async function chargerEquipe(): Promise<MembreEquipe[]> {
+  const { data, error } = await supabase.rpc('equipe_vue');
+  if (error) throw error;
+
+  const lignes = (data ?? []) as Array<Record<string, unknown>>;
+  return lignes.map((l) => ({
+    id: String(l.id),
+    nom: String(l.nom ?? 'Collaborateur'),
+    telephone: (l.telephone as string | null) ?? null,
+    clients: Number(l.clients ?? 0),
+    cartesActives: Number(l.cartes_actives ?? 0),
+    encours: Number(l.encours ?? 0),
+    commissions: Number(l.commissions ?? 0),
+    cashAttendu: l.cash_attendu == null ? null : Number(l.cash_attendu),
+    cashDeclare: l.cash_declare == null ? null : Number(l.cash_declare),
+    ecart: l.ecart == null ? null : Number(l.ecart),
+    derniereDeclaration: (l.derniere_declaration as string | null) ?? null,
+  }));
+}
+
+export interface CarteCoequipier {
+  id: string;
+  mise: number;
+  misesEncaissees: number;
+  soldeRestituable: number;
+}
+
+export interface ClientCoequipier {
+  id: string;
+  nom: string;
+  telephone: string | null;
+  cartes: CarteCoequipier[];
+}
+
+/**
+ * Les clients d'un coéquipier, avec leurs cartes actives.
+ *
+ * `equipe_clients` vérifie son paramètre côté serveur et rend un tableau vide
+ * pour tout identifiant hors équipe — y compris un identifiant qui existe bel et
+ * bien ailleurs. Cet appel ne doit donc rien vérifier de son côté : refaire ici
+ * le contrôle fabriquerait une seconde règle, et deux règles divergent.
+ */
+export async function chargerClientsCollaborateur(
+  collaborateurId: string,
+): Promise<ClientCoequipier[]> {
+  const { data, error } = await supabase.rpc('equipe_clients', {
+    p_collaborateur: collaborateurId,
+  });
+  if (error) throw error;
+
+  const lignes = (data ?? []) as Array<Record<string, unknown>>;
+  return lignes.map((l) => ({
+    id: String(l.id),
+    nom: String(l.nom ?? 'Client'),
+    telephone: (l.telephone as string | null) ?? null,
+    cartes: ((l.cartes ?? []) as Array<Record<string, unknown>>).map((c) => ({
+      id: String(c.id),
+      mise: Number(c.mise ?? 0),
+      misesEncaissees: Number(c.mises_encaissees ?? 0),
+      soldeRestituable: Number(c.solde_restituable ?? 0),
+    })),
+  }));
+}

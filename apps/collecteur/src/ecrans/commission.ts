@@ -32,3 +32,24 @@ export function useEstCollaborateur(): boolean {
   // titulaire » serait une coïncidence, pas une intention.
   return donnees?.titulaireId != null;
 }
+
+/**
+ * Vrai si l'utilisateur peut avoir une équipe.
+ *
+ * Deux conditions, et il faut les deux : le forfait Illimité — c'est lui qui
+ * inclut les trois places — et l'absence de titulaire, parce qu'un
+ * collaborateur ne recrute pas. Un collaborateur peut très bien porter le palier
+ * Illimité (il l'hérite de son titulaire à la création) ; le tester seul
+ * ouvrirait « Mon équipe » à quelqu'un qui n'y verrait jamais personne.
+ *
+ * L'écran n'est pas la sécurité : `equipe_vue()` rend un tableau vide à qui
+ * n'est pas titulaire, et `collecteur-creer-collaborateur` refuse en 403. Ce
+ * hook évite de montrer une porte qui ne mène nulle part, rien de plus.
+ */
+export function useEstTitulaire(): boolean {
+  const { donnees } = useDonnees('profil', chargerProfil, {
+    messageErreur: 'Fiche indisponible. Vérifie le réseau.',
+  });
+
+  return donnees?.palier === 'illimite' && donnees.titulaireId == null;
+}

@@ -22,6 +22,7 @@ import { useDonnees } from '../cache';
 import type { CarteChoisie, Page } from '../Coquille';
 import { chargerTableauCollecteur } from '../lectures';
 import { usePremierRendu } from '../premier-rendu';
+import { useEstTitulaire } from './commission';
 
 /**
  * Écran d'accueil du collecteur.
@@ -59,6 +60,7 @@ export function Accueil({
   onDeconnexion: () => void;
 }) {
   const enLigne = useEnLigne();
+  const estTitulaire = useEstTitulaire();
   const { donnees: tableau, erreur } = useDonnees('accueil', chargerTableauCollecteur, {
     revision,
     messageErreur: 'Chiffres indisponibles. Vérifie le réseau.',
@@ -83,6 +85,18 @@ export function Accueil({
     { icone: 'receipt', libelle: 'Reçus', onActiver: () => onNaviguer('recus') },
     { icone: 'bell', libelle: 'Alertes', onActiver: () => onNaviguer('alertes') },
     { icone: 'message-square', libelle: 'Avis', onActiver: () => onNaviguer('avis') },
+    // Seulement pour un titulaire. Montrer la porte à un collaborateur le
+    // mènerait sur un écran définitivement vide — `equipe_vue()` ne lui rendra
+    // jamais rien — et lui ferait croire à une panne.
+    ...(estTitulaire
+      ? [
+          {
+            icone: 'users' as const,
+            libelle: 'Équipe',
+            onActiver: () => onNaviguer('equipe'),
+          },
+        ]
+      : []),
     { icone: 'more-horizontal', libelle: 'Plus', onActiver: () => onNaviguer('plus') },
   ];
 
