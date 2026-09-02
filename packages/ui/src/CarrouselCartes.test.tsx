@@ -35,9 +35,9 @@ describe('CarrouselCartes', () => {
 
     const points = screen.getAllByRole('button', { name: /^Carte / });
     expect(points).toHaveLength(3);
-    expect(points[1].getAttribute('aria-label')).toBe('Carte 2 sur 3');
-    expect(points[1].getAttribute('aria-current')).toBe('true');
-    expect(points[0].getAttribute('aria-current')).toBe('false');
+    expect(points[1]!.getAttribute('aria-label')).toBe('Carte 2 sur 3');
+    expect(points[1]!.getAttribute('aria-current')).toBe('true');
+    expect(points[0]!.getAttribute('aria-current')).toBe('false');
   });
 
   it('remonte la carte choisie au clic sur son point', () => {
@@ -72,7 +72,7 @@ describe('CarrouselCartes', () => {
   it('nomme chaque carte par son rang, pour la lecture à voix haute', () => {
     render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={vi.fn()} />);
 
-    expect(screen.getAllByRole('listitem')[2].getAttribute('aria-label')).toBe('Carte 3 sur 3');
+    expect(screen.getAllByRole('listitem')[2]!.getAttribute('aria-label')).toBe('Carte 3 sur 3');
     expect(screen.getByRole('group').getAttribute('aria-label')).toBe('3 cartes en cours');
   });
 });
@@ -187,7 +187,7 @@ describe('CarrouselCartes — déplacer les cartes', () => {
  */
 describe('CarrouselCartes — la taille des cartes', () => {
   function classesDe(rang: number): string {
-    return screen.getAllByRole('listitem')[rang].className;
+    return screen.getAllByRole('listitem')[rang]!.className;
   }
 
   it('ne propose aucune taille pour une carte seule', () => {
@@ -251,7 +251,7 @@ describe('CarrouselCartes — choisir la carte que le bouton servira', () => {
     const onVisible = vi.fn();
     render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={onVisible} />);
 
-    fireEvent.click(screen.getAllByRole('listitem')[2]);
+    fireEvent.click(screen.getAllByRole('listitem')[2]!);
     expect(onVisible).toHaveBeenCalledWith('c');
   });
 
@@ -259,9 +259,9 @@ describe('CarrouselCartes — choisir la carte que le bouton servira', () => {
     render(<CarrouselCartes cartes={TROIS} visibleId="b" onVisible={vi.fn()} />);
 
     const cartes = screen.getAllByRole('listitem');
-    expect(cartes[1].getAttribute('aria-current')).toBe('true');
-    expect(cartes[1].className).toMatch(/ring-primary/);
-    expect(cartes[0].className).not.toMatch(/ring-primary/);
+    expect(cartes[1]!.getAttribute('aria-current')).toBe('true');
+    expect(cartes[1]!.className).toMatch(/ring-primary/);
+    expect(cartes[0]!.className).not.toMatch(/ring-primary/);
   });
 
   it('ne choisit pas la carte qu’on vient de ranger', () => {
@@ -272,7 +272,7 @@ describe('CarrouselCartes — choisir la carte que le bouton servira', () => {
       const onVisible = vi.fn();
       render(<CarrouselCartes cartes={TROIS} visibleId="a" onVisible={onVisible} />);
 
-      const troisieme = screen.getAllByRole('listitem')[2];
+      const troisieme = screen.getAllByRole('listitem')[2]!;
       fireEvent.pointerDown(troisieme, { clientX: 100, pointerId: 1 });
       act(() => {
         vi.advanceTimersByTime(400);
@@ -385,7 +385,7 @@ describe('CarrouselCartes — la fente d’action', () => {
       <CarrouselCartes cartes={TROIS} visibleId="b" onVisible={vi.fn()} rendreAction={fente} />,
     );
 
-    const carteB = screen.getAllByRole('listitem')[1];
+    const carteB = screen.getAllByRole('listitem')[1]!;
     fireEvent.pointerDown(screen.getByRole('button', { name: 'agir sur b' }));
     act(() => {
       vi.advanceTimersByTime(400);
