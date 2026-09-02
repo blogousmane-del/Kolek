@@ -24,13 +24,18 @@ import { partager } from '../_shared/restitution.ts';
  *
  * ## Contrôle d'accès
  *
- * La carte est lue **avec le jeton de l'appelant**, donc sous RLS
- * (`cartes_select : collecteur_id = auth.uid()`). Une carte qui n'appartient pas
- * au demandeur est introuvable, et la réponse est la même que pour une carte
- * inexistante — le collecteur d'à côté n'apprend pas qui existe.
+ * La carte est lue **sous clé de service**, et l'appartenance est vérifiée ici :
+ * la carte est celle de l'appelant, ou celle d'un collaborateur dont il est le
+ * titulaire.
  *
- * La clé de service ne sort qu'après, et seulement pour écrire ce que la lecture
- * a déjà autorisé.
+ * Une lecture sous RLS ne conviendrait plus. Les policies ne bougent pas —
+ * `cartes_select : collecteur_id = auth.uid()` reste vrai mot pour mot — donc le
+ * titulaire ne verrait tout simplement pas la carte d'Awa, et ne pourrait pas la
+ * clôturer. C'est le prix de n'avoir élargi aucune policy, et il se paie ici :
+ * la preuve de propriété n'est plus rendue par la base, elle est écrite.
+ *
+ * Une carte hors périmètre est introuvable, et la réponse est la même que pour
+ * une carte inexistante — le collecteur d'à côté n'apprend pas qui existe.
  *
  * ## Idempotence
  *
@@ -94,7 +99,7 @@ Deno.serve(async (requete) => {
     return reponse({ erreur: 'CARTE_INTROUVABLE' }, 404, requete);
   }
 
-  // --- Lecture sous l'identité de l'appelant : c'est RLS qui prouve la propriété ---
+  // --- L'identité vient du jeton ; la propriété se vérifie plus bas ---
 
   const clientAppelant = createClient(url, cleAnon, {
     global: { headers: { Authorization: autorisation } },
@@ -107,9 +112,13 @@ Deno.serve(async (requete) => {
   }
   const collecteurId = utilisateur.user.id;
 
-  const { data: carteBrute, error: erreurCarte } = await clientAppelant
+  const clientService = createClient(url, cleService, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data: carteBrute, error: erreurCarte } = await clientService
     .from('cartes')
-    .select('id, mise, statut, mises_encaissees')
+    .select('id, mise, statut, mises_encaissees, collecteur_id')
     .eq('id', carteId)
     .maybeSingle();
 
@@ -123,11 +132,31 @@ Deno.serve(async (requete) => {
     mise: number;
     statut: 'active' | 'cloturee';
     mises_encaissees: number;
+    collecteur_id: string;
   } | null;
 
-  // Carte absente, ou carte d'un autre collecteur que RLS a masquée : même
-  // réponse. Distinguer les deux dirait à qui demande si la carte existe.
+  // Carte absente : même réponse que carte hors périmètre, ci-dessous.
+  // Distinguer les deux dirait à qui demande si la carte existe.
   if (!carte) return reponse({ erreur: 'CARTE_INTROUVABLE' }, 404, requete);
+
+  // La propriété n'est plus prouvée par RLS : elle se vérifie ici. Sans ce bloc,
+  // n'importe quel collecteur connecté clôture n'importe quelle carte du produit
+  // et se fait verser son solde.
+  let autorise = carte.collecteur_id === collecteurId;
+  if (!autorise) {
+    const { data: membre, error: erreurMembre } = await clientService
+      .from('collecteurs')
+      .select('titulaire_id')
+      .eq('id', carte.collecteur_id)
+      .maybeSingle();
+
+    if (erreurMembre) {
+      console.error('lecture propriétaire :', erreurMembre.message);
+      return reponse({ erreur: 'CLOTURE_IMPOSSIBLE' }, 500, requete);
+    }
+    autorise = membre?.titulaire_id === collecteurId;
+  }
+  if (!autorise) return reponse({ erreur: 'CARTE_INTROUVABLE' }, 404, requete);
   if (carte.statut === 'cloturee') {
     return reponse({ erreur: 'CARTE_DEJA_CLOTUREE' }, 409, requete);
   }
@@ -140,17 +169,16 @@ Deno.serve(async (requete) => {
     return reponse({ erreur: 'CLOTURE_IMPOSSIBLE' }, 500, requete);
   }
 
-  // --- Passé ce point seulement, la clé de service sort ---
-
-  const clientService = createClient(url, cleService, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  // --- L'écriture ---
 
   const { error: erreurRetrait } = await clientService.from('retraits').insert({
-    collecteur_id: collecteurId,
-    // Qui sort l'argent de sa sacoche. Identique à `collecteur_id` tant que la
-    // carte lue est la sienne — ce que RLS garantit ici. Clôturer pour un
-    // coéquipier fera diverger les deux.
+    // Le propriétaire de la carte, et non l'appelant. Les deux coïncident quand
+    // un collecteur clôture chez lui ; avec une équipe ils divergent, et
+    // `retraits.collecteur_id` doit désigner le propriétaire pour rester
+    // cohérent avec `mises.collecteur_id`.
+    collecteur_id: carte.collecteur_id,
+    // Celui qui sort l'argent de sa sacoche. C'est lui que la caisse du soir
+    // attend, et lui seul.
     restitue_par: collecteurId,
     carte_id: carte.id,
     montant_restitue: partage.montantRestitue,
