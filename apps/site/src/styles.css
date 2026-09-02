@@ -11,7 +11,7 @@
    les applications n'ont ni emphase dramatique ni flux monospace, et les y
    mettre inviterait à s'en servir. */
 @theme {
-  --font-drama: 'Instrument Serif', Georgia, serif;
+  --font-drama: 'Bodoni Moda', 'Times New Roman', Georgia, serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
 

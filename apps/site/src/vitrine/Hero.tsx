@@ -10,7 +10,13 @@ import { APP_COLLECTEUR, INSCRIPTION } from './liens';
  * guillochée en or à droite — là où un billet met son filigrane — et le titre
  * poussé au tiers inférieur gauche. Le contraste typographique fait le
  * travail : « L'épargne du marché rencontre » en Sora, « la précision. » en
- * serif italique massif, or.
+ * Bodoni Moda italique, or.
+ *
+ * C'est le seul titre de tout le produit qui mélange deux familles, et le
+ * mélange y est le sujet : un Didone gravé est la typographie des coupures de
+ * banque, comme la rosace en est la gravure et le 31 la valeur faciale.
+ * Partout ailleurs, un mot s'emphase dans sa propre famille — voir § 3.2 du
+ * système de design.
  *
  * Le chiffre 31 en fond n'est pas décoratif : c'est la valeur faciale du
  * produit — les 31 cases de la carte de collecte, la règle que tout le
@@ -100,10 +106,13 @@ export function Hero() {
               (`background-clip: text`), pas par un calque au-dessus : un calque
               en `mix-blend-mode` coûte une couche de composition permanente, et
               cette page tourne sur des téléphones d'entrée de gamme. */}
+          {/* `leading-[1.12]` et `pb-2`, pas `leading-[0.95]` : l'italique de
+              Bodoni descend bas, et le `p` de « précision » — le mot que la
+              marque revendique — était rogné par sa propre ligne de base. */}
           <span
             data-entree
             data-reflet
-            className="reflet-or mt-1 block font-drama text-7xl italic leading-[0.95] sm:text-[9rem]"
+            className="reflet-or mt-1 block pb-2 font-drama text-7xl italic leading-[1.12] sm:text-[9rem]"
           >
             la précision.
           </span>
