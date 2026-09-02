@@ -46,6 +46,8 @@ const PHRASES: Record<string, string> = {
   BORNE: 'Une des informations saisies est trop longue.',
   BORNE_MONTANT: 'Le serveur refuse ce montant. Choisis un des montants proposés.',
   DROIT_REFUSE: 'Tu n’as pas le droit d’écrire cette ligne.',
+  ABONNEMENT_INACTIF:
+    'Ton abonnement n’est plus actif. Tu peux encaisser sur les cartes déjà ouvertes, mais pas ajouter de client ni ouvrir de carte. Contacte GTCS.',
   RIEN_ECRIT: 'Le serveur n’a rien changé. Reconnecte-toi et réessaie.',
   RESEAU: 'Pas de réseau. Réessaie une fois connecté.',
   INCONNU: 'Enregistrement impossible. Réessaie.',
@@ -61,6 +63,16 @@ const PHRASES: Record<string, string> = {
  * longueur, ce qui est le défaut que cette liste corrige.
  */
 const CONTRAINTES_DE_MONTANT = ['cartes_mise_check', 'mises_montant_borne', 'mises_montant_check'];
+
+/**
+ * Les deux portes d'entrée que `abonnement_ouvre_droit` referme.
+ *
+ * `mises` n'y est pas, et c'est le fond de la règle : un abonnement suspendu
+ * ferme l'ajout de client et l'ouverture de carte, jamais l'encaissement d'une
+ * carte déjà ouverte. Prendre les clients en otage d'un impayé qui n'est pas le
+ * leur serait une autre décision, que personne n'a prise.
+ */
+const RLS_PORTES_D_ENTREE = /row-level security policy for table "(clients|cartes)"/;
 
 /**
  * Traduit une erreur PostgREST en code court.
@@ -97,9 +109,19 @@ export function codeDErreur(erreur: { code?: string; message?: string } | null):
   }
   // 23505 : clé primaire violée — un rejeu que le déclencheur n'a pas intercepté.
   if (erreur.code === '23505') return 'DOUBLON';
-  // 42501 : RLS ou liste blanche de colonnes. Un collecteur ne devrait jamais
-  // le voir ; s'il le voit, c'est un défaut de l'application, pas de sa saisie.
-  if (erreur.code === '42501') return 'DROIT_REFUSE';
+  // 42501 : RLS ou liste blanche de colonnes. Deux causes très différentes se
+  // cachent derrière ce code depuis `20260902110000`.
+  if (erreur.code === '42501') {
+    // Un refus de policy sur `clients` ou `cartes` : la seule condition qui
+    // puisse être fausse là est l'abonnement — l'autre, `collecteur_id =
+    // auth.uid()`, est posée par l'application depuis la session. C'est un état
+    // ordinaire, celui d'une facture impayée, et non un défaut.
+    if (RLS_PORTES_D_ENTREE.test(message)) return 'ABONNEMENT_INACTIF';
+    // Tout le reste : liste blanche de colonnes, policy d'une autre table. Là,
+    // le collecteur ne devrait jamais rien voir ; s'il voit ceci, c'est un
+    // défaut de l'application, pas de sa saisie.
+    return 'DROIT_REFUSE';
+  }
 
   return 'INCONNU';
 }
