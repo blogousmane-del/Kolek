@@ -1,5 +1,5 @@
 import { PALIERS, formatMontant, type Palier } from '@kolek/core';
-import { Onde, Rosace } from '@kolek/ui';
+import { Onde, PAYS_TELEPHONE, Rosace, lireTelephone } from '@kolek/ui';
 import { useState } from 'react';
 
 import { entree, useAnimations } from './animation';
@@ -27,6 +27,28 @@ import { APP_COLLECTEUR, CONTACT_DEMO } from './liens';
  * Il arrive par l'adresse (`/inscription?palier=pro`) quand on vient de la
  * grille tarifaire, et reste modifiable ici. Le serveur revalide : un palier
  * inconnu est refusé, jamais ramené en silence à une valeur par défaut.
+ *
+ * ## Ce que l'amendement « payer vaut accord » change ici
+ *
+ * Depuis le 2026-09-03, un palier **payant** ne mène plus à un rappel : il mène
+ * au paiement, et le règlement confirmé ouvre le compte tout seul. Le visiteur
+ * choisit donc son mot de passe **avant** de payer — refuser un mot de passe
+ * après l'encaissement serait le pire moment possible — et le formulaire part
+ * vers la page du fournisseur au lieu d'afficher « on te rappelle ».
+ *
+ * **L'essai n'a pas changé.** Il vaut zéro franc, il n'y a rien à encaisser, et
+ * il attend l'accord d'un humain comme avant. C'est aussi ce qui garde une porte
+ * d'entrée pour qui n'a pas de moyen de paiement en ligne — d'où deux textes
+ * d'écran, et non un seul qui mentirait à la moitié des visiteurs.
+ *
+ * ## Le téléphone en deux morceaux
+ *
+ * Le fournisseur de paiement veut un pays et un numéro national **séparés** :
+ * un E.164 brut lui revient en « 400 Invalid phone number ». Le champ n'emprunte
+ * pas `ChampTelephone` — dessiné pour l'application, clair, il jurerait au
+ * milieu de ce formulaire vitré — mais il emprunte sa **règle**,
+ * `lireTelephone`, pour que le seuil qui décide qu'un numéro est complet reste
+ * unique.
  */
 
 const CHAMP_SOMBRE =
@@ -42,7 +64,11 @@ function Etiquette({ pour, children }: { pour: string; children: React.ReactNode
 
 export function Inscription() {
   const [nom, setNom] = useState('');
-  const [telephone, setTelephone] = useState('');
+  // Le pays du pilote par défaut. Le visiteur d'un autre pays le change ; celui
+  // de Côte d'Ivoire, qui est la quasi-totalité, n'a rien à faire.
+  const [paysTelephone, setPaysTelephone] = useState('CI');
+  const [telephoneLocal, setTelephoneLocal] = useState('');
+  const [motDePasse, setMotDePasse] = useState('');
   const [email, setEmail] = useState('');
   const [zone, setZone] = useState('');
   const [message, setMessage] = useState('');
@@ -58,6 +84,10 @@ export function Inscription() {
     entree('[data-entree]', { delay: 0.1 });
   });
 
+  const choisi = PALIERS.find((p) => p.cle === palier);
+  const payant = (choisi?.prix ?? 0) > 0;
+  const telephone = lireTelephone(paysTelephone, telephoneLocal);
+
   async function soumettre(evenement: React.FormEvent) {
     evenement.preventDefault();
     if (envoi) return;
@@ -65,18 +95,37 @@ export function Inscription() {
     setEnvoi(true);
     setErreur(null);
 
-    const resultat = await envoyerDemande({ nom, telephone, email, zone, palier, message });
+    const resultat = await envoyerDemande({
+      nom,
+      telephone: telephone.e164,
+      paysTelephone,
+      telephoneLocal,
+      email,
+      zone,
+      palier,
+      message,
+      // Vide pour un essai : le serveur n'en veut pas, et `validerDemande` ne
+      // retient rien d'un mot de passe qui n'ouvrira aucun compte.
+      motDePasse: payant ? motDePasse : '',
+    });
 
-    setEnvoi(false);
     if (resultat.ok) {
+      // Navigation de premier niveau, et non `fetch` : la page de paiement est
+      // hébergée par le fournisseur, et la CSP ne l'autoriserait pas en
+      // `connect-src`. `envoi` reste vrai — le bouton doit rester désarmé
+      // pendant que le navigateur s'en va.
+      if (resultat.checkoutUrl) {
+        window.location.assign(resultat.checkoutUrl);
+        return;
+      }
+      setEnvoi(false);
       setEnvoyee(true);
       window.scrollTo(0, 0);
       return;
     }
+    setEnvoi(false);
     setErreur(resultat.message);
   }
-
-  const choisi = PALIERS.find((p) => p.cle === palier);
 
   return (
     <main
@@ -109,7 +158,7 @@ export function Inscription() {
             </div>
             <h1 className="mb-3 font-headings text-3xl font-bold text-white">Demande enregistrée</h1>
             <p className="mb-6 font-body text-base leading-relaxed text-white/60">
-              GTCS te rappelle sur le <strong className="text-white">{telephone}</strong> pour
+              GTCS te rappelle sur le <strong className="text-white">{telephone.e164}</strong> pour
               ouvrir ton compte et te montrer l’application. Ton accès partira ensuite sur{' '}
               <strong className="text-white">{email}</strong>. Garde ton téléphone à portée
               et surveille tes courriels.
@@ -137,9 +186,9 @@ export function Inscription() {
                 laisse croire à un accès immédiat se dément à la seconde
                 suivante, quand rien ne s'ouvre. */}
             <p data-entree className="mb-8 font-body text-base leading-relaxed text-white/60">
-              Les comptes Kolek sont ouverts par l’équipe GTCS, après un appel. Remplis ce
-              formulaire : on te rappelle, on ouvre ton compte, et tu encaisses dès le lendemain.
-              Le premier mois est un essai.
+              {payant
+                ? 'Choisis ta formule, règle par Mobile Money, et ton compte s’ouvre dès le paiement confirmé — sans attendre de rappel.'
+                : 'L’essai est gratuit et se demande ici : GTCS te rappelle, ouvre ton compte, et tu encaisses dès le lendemain.'}
             </p>
 
             <form
@@ -163,21 +212,42 @@ export function Inscription() {
 
               <div className="mb-4">
                 <Etiquette pour="telephone">Ton numéro</Etiquette>
-                {/* `tel` : sur un téléphone, il ouvre le pavé numérique sans les
-                    flèches d'incrément, que personne ne veut sur un numéro. */}
-                <input
-                  id="telephone"
-                  type="tel"
-                  value={telephone}
-                  onChange={(e) => setTelephone(e.target.value)}
-                  required
-                  maxLength={64}
-                  autoComplete="tel"
-                  placeholder="+225 07 01 02 03 04"
-                  className={CHAMP_SOMBRE}
-                />
+                {/* Deux contrôles et non un : le fournisseur de paiement veut le
+                    pays et le numéro national séparés — un E.164 brut lui revient
+                    en « 400 Invalid phone number ». Le serveur reçoit les deux
+                    formes et tranche lui-même. */}
+                <div className="flex gap-2">
+                  <select
+                    aria-label="Pays"
+                    value={paysTelephone}
+                    onChange={(e) => setPaysTelephone(e.target.value)}
+                    className={`${CHAMP_SOMBRE} w-32 shrink-0`}
+                  >
+                    {PAYS_TELEPHONE.map((p) => (
+                      <option key={p.code} value={p.code} className="text-dark-canvas">
+                        {p.code} +{p.indicatif}
+                      </option>
+                    ))}
+                  </select>
+                  {/* `tel` : sur un téléphone, il ouvre le pavé numérique sans
+                      les flèches d'incrément, que personne ne veut sur un
+                      numéro. */}
+                  <input
+                    id="telephone"
+                    type="tel"
+                    value={telephoneLocal}
+                    onChange={(e) => setTelephoneLocal(e.target.value)}
+                    required
+                    maxLength={24}
+                    autoComplete="tel-national"
+                    placeholder="07 01 02 03 04"
+                    className={CHAMP_SOMBRE}
+                  />
+                </div>
                 <p className="mt-1.5 font-body text-xs text-white/30">
-                  C’est le numéro sur lequel GTCS te rappelle.
+                  {payant
+                    ? 'C’est le numéro qui règle l’abonnement.'
+                    : 'C’est le numéro sur lequel GTCS te rappelle.'}
                 </p>
               </div>
 
@@ -245,6 +315,36 @@ export function Inscription() {
                 )}
               </fieldset>
 
+              {/* Sous le choix du palier, et non plus haut : c'est ce choix qui
+                  le fait apparaître, et un champ qui surgit au-dessus de ce
+                  qu'on vient de cliquer se remarque mal.
+
+                  Il n'existe que pour un palier payant. Un essai attend l'accord
+                  d'un humain : aucun compte ne naîtra de la demande seule, et
+                  garder une empreinte dont personne ne se servira serait un
+                  secret gardé pour rien. */}
+              {payant && (
+                <div className="mb-5">
+                  <Etiquette pour="motDePasse">Ton mot de passe</Etiquette>
+                  <input
+                    id="motDePasse"
+                    type="password"
+                    value={motDePasse}
+                    onChange={(e) => setMotDePasse(e.target.value)}
+                    required
+                    minLength={10}
+                    maxLength={200}
+                    autoComplete="new-password"
+                    placeholder="Au moins 10 caractères"
+                    className={CHAMP_SOMBRE}
+                  />
+                  <p className="mt-1.5 font-body text-xs text-white/30">
+                    C’est celui avec lequel tu ouvriras l’application. Ton compte se crée dès le
+                    paiement confirmé — personne ne te rappellera pour te donner un accès.
+                  </p>
+                </div>
+              )}
+
               <div className="mb-5">
                 <Etiquette pour="message">Un mot sur ton activité (facultatif)</Etiquette>
                 <textarea
@@ -273,7 +373,13 @@ export function Inscription() {
                 className="magnetique w-full overflow-hidden rounded-pill bg-or py-3.5 font-body text-base font-semibold text-dark-canvas disabled:opacity-60"
               >
                 <span className="relative z-10">
-                  {envoi ? 'Envoi…' : 'Envoyer ma demande'}
+                  {envoi
+                    ? payant
+                      ? 'Ouverture du paiement…'
+                      : 'Envoi…'
+                    : payant
+                      ? 'Payer et ouvrir mon compte'
+                      : 'Envoyer ma demande'}
                 </span>
                 <span aria-hidden className="voile-or" />
               </button>
@@ -286,9 +392,15 @@ export function Inscription() {
                   est apparu. Elle disait « Nom, numéro et zone uniquement » —
                   une promesse devenue fausse est pire qu'une promesse absente,
                   surtout sur une page qui collecte des données personnelles. */}
+              {/* Une promesse devenue fausse est pire qu'une promesse absente,
+                  et celle-ci l'est devenue le 2026-09-03 pour un palier payant :
+                  il y a désormais un mot de passe, et un paiement. La corriger
+                  pour les deux cas plutôt que de la retirer — un formulaire qui
+                  demande un numéro et une adresse doit dire ce qu'il en fait. */}
               <p className="mt-4 text-center font-body text-xs text-white/30">
-                Nom, numéro, adresse e-mail et zone. Aucun mot de passe, aucun paiement à cette
-                étape.
+                {payant
+                  ? 'Ton mot de passe ne nous parvient jamais en clair : il est transformé avant d’être rangé, et le paiement se fait sur la page sécurisée de notre encaisseur.'
+                  : 'Nom, numéro, adresse e-mail et zone. Aucun mot de passe, aucun paiement à cette étape.'}
               </p>
 
               {/* Le repli, toujours visible. Un formulaire est un point unique

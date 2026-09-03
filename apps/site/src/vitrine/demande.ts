@@ -22,7 +22,16 @@ const CLE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 export interface Demande {
   nom: string;
+  /** L'E.164 composé, qui sert au stockage et à l'unicité côté serveur. */
   telephone: string;
+  /** Le pays et le numéro national, séparés — ce que le fournisseur de paiement
+      exige, et que `resoudreTelephone` ne peut pas retrouver seul depuis un
+      E.164 dont l'indicatif lui serait inconnu. Envoyés même pour un essai :
+      le serveur les ignore quand il n'y a rien à encaisser, et un formulaire
+      qui n'enverrait pas la même chose selon le palier aurait deux chemins de
+      saisie à tenir. */
+  paysTelephone: string;
+  telephoneLocal: string;
   /** Obligatoire depuis le 2026-08-27 : c'est par elle que l'accès arrive une
       fois la demande accordée. Sans elle, la demande n'a pas de suite possible
       autre qu'un appel. */
@@ -30,9 +39,20 @@ export interface Demande {
   zone: string;
   palier: Palier;
   message: string;
+  /** Choisi au formulaire, **avant** de payer, et seulement pour un palier
+      payant. Le compte naîtra du règlement confirmé, sans qu'un humain remette
+      d'identifiants ; sans mot de passe, ce compte serait inatteignable.
+      Refuser un mot de passe après l'encaissement serait le pire moment
+      possible, d'où le contrôle ici et non plus tard. */
+  motDePasse: string;
 }
 
-export type Envoi = { ok: true } | { ok: false; message: string; champ?: string };
+export type Envoi =
+  /** `checkoutUrl` n'est présent que pour un palier payant : c'est la page du
+      fournisseur, où le visiteur part régler. Absent, la demande attend l'accord
+      d'un humain — le chemin d'avant l'amendement, et celui de l'essai. */
+  | { ok: true; checkoutUrl?: string }
+  | { ok: false; message: string; champ?: string };
 
 /**
  * Les refus, traduits une fois.
@@ -52,6 +72,17 @@ const MESSAGES: Record<string, string> = {
   ZONE_TROP_LONGUE: 'Le nom de la zone est trop long.',
   MESSAGE_TROP_LONG: 'Ton message dépasse 500 caractères.',
   PALIER_INCONNU: 'Cette offre n’existe pas. Choisis-en une dans la liste.',
+  MOT_DE_PASSE_REQUIS:
+    'Choisis un mot de passe : c’est celui avec lequel tu ouvriras l’application.',
+  MOT_DE_PASSE_COURT: 'Choisis un mot de passe d’au moins 10 caractères.',
+  MOT_DE_PASSE_COMPROMIS:
+    'Ce mot de passe figure dans une fuite connue. Choisis-en un autre — celui-ci protège ta caisse.',
+  TELEPHONE_INVALIDE: 'Ce numéro n’est pas utilisable pour le paiement. Vérifie le pays et le numéro.',
+  PAIEMENT_INDISPONIBLE:
+    'Le paiement en ligne est indisponible pour le moment. Réessaie plus tard, ou écris à GTCS.',
+  CHECKOUT_IMPOSSIBLE: 'Le service de paiement ne répond pas. Ta demande est enregistrée — réessaie dans un moment.',
+  CHECKOUT_INCOMPLET: 'Le service de paiement a répondu incomplètement. Ta demande est enregistrée — réessaie.',
+  METHODE_NON_AUTORISEE: 'La demande n’a pas pu être lue. Réessaie.',
   DEMANDE_DEJA_EN_ATTENTE:
     'Une demande est déjà enregistrée pour ce numéro. GTCS te rappelle très vite — inutile de renvoyer.',
   TROP_DE_DEMANDES:
@@ -83,7 +114,21 @@ export async function envoyerDemande(demande: Demande): Promise<Envoi> {
     return { ok: false, message: 'Pas de connexion. Vérifie ton réseau et réessaie.' };
   }
 
-  if (reponse.ok) return { ok: true };
+  if (reponse.ok) {
+    // Un palier payant rend un lien de paiement. Le lire dans une réponse
+    // réussie, jamais deviner : une demande d'essai n'en porte pas, et
+    // rediriger sur `undefined` enverrait le visiteur sur une page vide juste
+    // après avoir cru s'inscrire.
+    let corpsOk: { checkoutUrl?: unknown } = {};
+    try {
+      corpsOk = (await reponse.json()) as typeof corpsOk;
+    } catch {
+      // Corps illisible sur un succès : la demande est passée, c'est tout ce
+      // qu'on avait besoin de savoir.
+    }
+    const lien = corpsOk.checkoutUrl;
+    return typeof lien === 'string' && lien ? { ok: true, checkoutUrl: lien } : { ok: true };
+  }
 
   let corps: { erreur?: string; champ?: string } = {};
   try {

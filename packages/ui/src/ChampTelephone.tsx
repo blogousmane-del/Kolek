@@ -115,19 +115,34 @@ interface Props {
   className?: string;
 }
 
+/**
+ * Les trois formes d'un numéro, à partir d'un pays et d'un numéro national.
+ *
+ * Sortie du composant pour que la vitrine s'en serve sans lui : son formulaire
+ * est sombre et vitré, et y poser un champ dessiné pour l'application donnerait
+ * un bloc clair au milieu. Ce qui doit être partagé n'est pas l'apparence,
+ * c'est **la règle** — l'E.164 composé, et le seuil qui décide qu'un numéro est
+ * complet. Recopiée, cette règle aurait deux valeurs le jour où l'une des deux
+ * bougerait, et le formulaire le moins strict laisserait passer ce que l'autre
+ * refuse.
+ */
+export function lireTelephone(pays: string, local: string): ValeurTelephone {
+  const national = sansZeroDeTete(chiffres(local));
+  return {
+    pays,
+    local,
+    e164: composerE164(pays, local),
+    valide: national.length >= LONGUEUR_MIN && national.length <= LONGUEUR_MAX,
+  };
+}
+
 export function ChampTelephone({ libelle, valeur, onChange, className = '' }: Props) {
   // `useId` plutôt qu'un identifiant passé en propriété : deux formulaires sur
   // un même écran ne peuvent pas se voler leur étiquette par accident.
   const idPays = useId();
 
   function remonter(pays: string, local: string) {
-    const national = sansZeroDeTete(chiffres(local));
-    onChange({
-      pays,
-      local,
-      e164: composerE164(pays, local),
-      valide: national.length >= LONGUEUR_MIN && national.length <= LONGUEUR_MAX,
-    });
+    onChange(lireTelephone(pays, local));
   }
 
   return (
