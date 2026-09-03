@@ -1142,13 +1142,26 @@ git commit -m "feat(abonnement): le registre des paiements, et la seule fonction
 
 ## Task 3: La réconciliation — le cœur du fulfilment
 
+> **Repris le 2026-09-03, à l'exécution.** Deux écarts avec le texte d'origine,
+> tous deux corrigés ci-dessous plutôt que laissés à découvrir :
+>
+> - `remise_pct` était lu par le contrôle de grille sans figurer dans
+>   `PaiementEnCours` — le module ne compilait pas ;
+> - l'amendement « payer vaut accord » fait naître le compte **ici**. Le dépôt
+>   gagne donc `ouvrirCompte`, `crediter` reçoit le compte en cinquième
+>   argument, et `PaiementEnCours` porte les deux rattachements possibles.
+>
+> L'ordre est le sujet : vente reconnue réglée et cohérente, **puis** compte
+> ouvert, **puis** crédit. Un compte sans abonnement se répare à la main ; un
+> abonnement crédité sans compte ne se rattache à rien.
+
 **Files:**
 - Create: `supabase/functions/_shared/reconciliation.ts`
 - Test: `supabase/tests/reconciliation.test.ts`
 
 **Interfaces:**
 - Consumes: `mapperStatut`, `montantCoherent` de `_shared/chariow.ts` ; `TARIFS` de `_shared/paliers.ts`.
-- Produces: `type PaiementEnCours = { id: string; palier: string; vente_id: string; montant: number; devise: string; cree_le: string }` · `type Depot` (les deux opérations dont la réconciliation a besoin, injectées pour les tests) · `reconcilier(paiements: PaiementEnCours[], depot: Depot): Promise<ResultatReconciliation>` · `type ResultatReconciliation = { credites: number; enAttente: number; echeance: string | null }`.
+- Produces: `type PaiementEnCours = { id: string; palier: string; vente_id: string; montant: number; devise: string; remise_pct: number; collecteur_id: string | null; demande_id: string | null; cree_le: string }` · `type Depot` (les quatre opérations dont la réconciliation a besoin — `lireVente`, `ouvrirCompte`, `crediter`, `marquer` — plus `journaliser`, toutes injectées pour les tests) · `reconcilier(paiements: PaiementEnCours[], depot: Depot): Promise<ResultatReconciliation>` · `type ResultatReconciliation = { credites: number; enAttente: number; echeance: string | null }`.
 
 - [ ] **Step 1: Écrire les tests qui échouent**
 
@@ -1160,15 +1173,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { reconcilier, type Depot, type PaiementEnCours } from '../functions/_shared/reconciliation';
 
 /**
- * Ce module décide de créditer ou non. Il est écrit avec ses deux effets de
- * bord injectés — lire une vente, créditer — pour que ces décisions soient
- * testables sans réseau et sans base.
+ * Ce module décide de créditer ou non. Il est écrit avec ses effets de bord
+ * injectés — lire une vente, ouvrir un compte, créditer — pour que ces
+ * décisions soient testables sans réseau et sans base.
  *
  * Les trois cas qui comptent, et qui viennent tous d'incidents réels
  * documentés dans `Docs/Chariow.md` §10 :
  *   1. un statut non réglé ne crédite jamais ;
  *   2. un montant qui a bougé ne crédite pas, et se journalise ;
  *   3. la date de règlement vient du fournisseur, jamais de l'horloge locale.
+ *
+ * S'y ajoute depuis l'amendement « payer vaut accord » du 2026-09-02 : un
+ * paiement peut arriver ici **sans compte**, parce qu'il règle une demande
+ * d'ouverture. C'est alors la réconciliation qui fait naître le compte, et
+ * l'ordre est le sujet — un compte sans abonnement se répare, un abonnement
+ * sans compte ne se rattache à rien.
  */
 
 function paiement(sur: Partial<PaiementEnCours> = {}): PaiementEnCours {
@@ -1178,9 +1197,17 @@ function paiement(sur: Partial<PaiementEnCours> = {}): PaiementEnCours {
     vente_id: 'vente-1',
     montant: 5000,
     devise: 'XOF',
+    remise_pct: 0,
+    collecteur_id: 'c1',
+    demande_id: null,
     cree_le: '2026-08-20T08:00:00Z',
     ...sur,
   };
+}
+
+/** Le même paiement, mais né d'une demande d'ouverture : pas encore de compte. */
+function prospect(sur: Partial<PaiementEnCours> = {}): PaiementEnCours {
+  return paiement({ collecteur_id: null, demande_id: 'd1', ...sur });
 }
 
 function depot(sur: Partial<Depot> = {}): Depot {
@@ -1191,6 +1218,7 @@ function depot(sur: Partial<Depot> = {}): Depot {
       devise: 'XOF',
       regleLe: '2026-08-21T20:04:00Z',
     })),
+    ouvrirCompte: vi.fn(async () => 'compte-neuf'),
     crediter: vi.fn(async () => ({ credite: true, echeance: '2026-09-21' })),
     marquer: vi.fn(async () => {}),
     journaliser: vi.fn(),
@@ -1205,7 +1233,7 @@ describe('reconcilier', () => {
 
     expect(resultat.credites).toBe(1);
     expect(resultat.echeance).toBe('2026-09-21');
-    expect(d.crediter).toHaveBeenCalledWith('p1', '2026-08-21T20:04:00Z', 5000, 'XOF');
+    expect(d.crediter).toHaveBeenCalledWith('p1', '2026-08-21T20:04:00Z', 5000, 'XOF', null);
   });
 
   it('retombe sur la date de création quand le fournisseur n’en donne pas', async () => {
@@ -1220,12 +1248,17 @@ describe('reconcilier', () => {
     await reconcilier([paiement()], d);
 
     // Jamais `now()` : un rattrapage inscrirait la recette au mauvais jour.
-    expect(d.crediter).toHaveBeenCalledWith('p1', '2026-08-20T08:00:00Z', 5000, 'XOF');
+    expect(d.crediter).toHaveBeenCalledWith('p1', '2026-08-20T08:00:00Z', 5000, 'XOF', null);
   });
 
   it('ne crédite pas une vente encore impayée', async () => {
     const d = depot({
-      lireVente: vi.fn(async () => ({ statut: 'unpaid', montant: 5000, devise: 'XOF', regleLe: null })),
+      lireVente: vi.fn(async () => ({
+        statut: 'unpaid',
+        montant: 5000,
+        devise: 'XOF',
+        regleLe: null,
+      })),
     });
     const resultat = await reconcilier([paiement()], d);
 
@@ -1236,7 +1269,12 @@ describe('reconcilier', () => {
 
   it('marque un échec sans créditer', async () => {
     const d = depot({
-      lireVente: vi.fn(async () => ({ statut: 'failed', montant: 5000, devise: 'XOF', regleLe: null })),
+      lireVente: vi.fn(async () => ({
+        statut: 'failed',
+        montant: 5000,
+        devise: 'XOF',
+        regleLe: null,
+      })),
     });
     const resultat = await reconcilier([paiement()], d);
 
@@ -1262,6 +1300,7 @@ describe('reconcilier', () => {
   });
 
   it('avertit sans bloquer quand le montant s’écarte de la grille en FCFA', async () => {
+    // 4900 contre 5000 stocké : dans la tolérance. Mais la grille dit 5000.
     const d = depot({
       lireVente: vi.fn(async () => ({
         statut: 'settled',
@@ -1269,12 +1308,29 @@ describe('reconcilier', () => {
         devise: 'XOF',
         regleLe: '2026-08-21T20:04:00Z',
       })),
-      // 4900 contre 5000 stocké : dans la tolérance. Mais la grille dit 5000.
     });
     const resultat = await reconcilier([paiement()], d);
 
     expect(resultat.credites).toBe(1);
     expect(d.journaliser).toHaveBeenCalledWith(expect.stringContaining('GRILLE'));
+  });
+
+  it('ne crie pas à la grille quand la remise explique l’écart', async () => {
+    // Sans ce calcul, chaque paiement remisé écrirait une anomalie parfaitement
+    // normale — et le jour où la boutique divergerait vraiment, la ligne se
+    // perdrait dans le bruit qu'on aurait appris à ignorer.
+    const d = depot({
+      lireVente: vi.fn(async () => ({
+        statut: 'settled',
+        montant: 4000,
+        devise: 'XOF',
+        regleLe: '2026-08-21T20:04:00Z',
+      })),
+    });
+    const resultat = await reconcilier([paiement({ montant: 4000, remise_pct: 20 })], d);
+
+    expect(resultat.credites).toBe(1);
+    expect(d.journaliser).not.toHaveBeenCalled();
   });
 
   it('ne compte pas deux fois un paiement que la base a déjà crédité', async () => {
@@ -1296,6 +1352,95 @@ describe('reconcilier', () => {
     expect(resultat.credites).toBe(1);
     expect(resultat.enAttente).toBe(1);
   });
+
+  describe('payer vaut accord — le compte naît ici', () => {
+    it('ouvre le compte, puis crédite en le nommant', async () => {
+      const d = depot();
+      const resultat = await reconcilier([prospect()], d);
+
+      expect(d.ouvrirCompte).toHaveBeenCalledTimes(1);
+      expect(resultat.credites).toBe(1);
+      expect(d.crediter).toHaveBeenCalledWith(
+        'p1',
+        '2026-08-21T20:04:00Z',
+        5000,
+        'XOF',
+        'compte-neuf',
+      );
+    });
+
+    it('ne crédite pas quand l’ouverture du compte échoue', async () => {
+      // L'ordre est le sujet. Un compte sans abonnement se répare à la main ;
+      // un abonnement crédité sans compte ne se rattache à rien, et la somme
+      // encaissée n'appartient plus à personne.
+      const d = depot({
+        ouvrirCompte: vi.fn(async () => {
+          throw new Error('adresse déjà prise');
+        }),
+      });
+      const resultat = await reconcilier([prospect()], d);
+
+      expect(resultat.credites).toBe(0);
+      expect(resultat.enAttente).toBe(1);
+      expect(d.crediter).not.toHaveBeenCalled();
+      expect(d.journaliser).toHaveBeenCalledWith(expect.stringContaining('OUVERTURE'));
+    });
+
+    it('n’ouvre pas de second compte pour un paiement déjà rattaché', async () => {
+      // Une demande servie porte les deux : sa demande d'origine et le compte
+      // qu'elle a fait naître. Une seconde réconciliation ne doit pas relire
+      // « demande_id présent » comme « compte à créer ».
+      const d = depot();
+      await reconcilier([paiement({ demande_id: 'd1' })], d);
+
+      expect(d.ouvrirCompte).not.toHaveBeenCalled();
+      expect(d.crediter).toHaveBeenCalledWith('p1', '2026-08-21T20:04:00Z', 5000, 'XOF', null);
+    });
+
+    it('n’ouvre aucun compte pour une vente qui n’est pas réglée', async () => {
+      // Le contrôle du règlement précède la création : personne ne reçoit de
+      // compte pour un paiement qui n'a pas abouti.
+      const d = depot({
+        lireVente: vi.fn(async () => ({
+          statut: 'unpaid',
+          montant: 5000,
+          devise: 'XOF',
+          regleLe: null,
+        })),
+      });
+      await reconcilier([prospect()], d);
+
+      expect(d.ouvrirCompte).not.toHaveBeenCalled();
+    });
+
+    it('n’ouvre aucun compte quand le montant relu a bougé', async () => {
+      const d = depot({
+        lireVente: vi.fn(async () => ({
+          statut: 'settled',
+          montant: 500,
+          devise: 'XOF',
+          regleLe: '2026-08-21T20:04:00Z',
+        })),
+      });
+      await reconcilier([prospect()], d);
+
+      expect(d.ouvrirCompte).not.toHaveBeenCalled();
+      expect(d.crediter).not.toHaveBeenCalled();
+    });
+
+    it('refuse un paiement qui n’est rattaché à rien', async () => {
+      // La contrainte `paiements_rattachement` l'interdit en base. Si une ligne
+      // pareille arrive quand même ici, la traiter reviendrait à créditer un
+      // abonnement sans savoir à qui.
+      const d = depot();
+      const resultat = await reconcilier([paiement({ collecteur_id: null, demande_id: null })], d);
+
+      expect(resultat.credites).toBe(0);
+      expect(d.ouvrirCompte).not.toHaveBeenCalled();
+      expect(d.crediter).not.toHaveBeenCalled();
+      expect(d.journaliser).toHaveBeenCalledWith(expect.stringContaining('ORPHELIN'));
+    });
+  });
 });
 ```
 
@@ -1316,11 +1461,20 @@ import { tarifParCle } from './paliers.ts';
  * Le cœur du fulfilment, appelé par les trois chemins : le retour de paiement,
  * le webhook, et l'ouverture de l'application.
  *
- * Ses deux effets de bord sont **injectés** — lire une vente chez le
- * fournisseur, créditer en base. C'est ce qui rend testables sans réseau les
- * seules décisions qui comptent : créditer ou non, avec quelle date, à quel
- * montant. La leçon vient du défaut CORS du 2026-08-20 : ce qui n'est pas
- * testable finit par être faux.
+ * Ses effets de bord sont **injectés** — lire une vente chez le fournisseur,
+ * ouvrir un compte, créditer en base. C'est ce qui rend testables sans réseau
+ * les seules décisions qui comptent : créditer ou non, avec quelle date, à quel
+ * montant, au profit de qui. La leçon vient du défaut CORS du 2026-08-20 : ce
+ * qui n'est pas testable finit par être faux.
+ *
+ * ## Ce que l'amendement « payer vaut accord » ajoute ici
+ *
+ * Un paiement peut arriver **sans compte**, parce qu'il règle une demande
+ * d'ouverture. C'est alors ce module qui fait naître le compte, et l'ordre est
+ * le sujet : la vente est d'abord reconnue réglée et cohérente, le compte
+ * ouvert ensuite, le crédit en dernier. Un compte sans abonnement se répare à
+ * la main ; un abonnement crédité sans compte ne se rattache à rien, et la
+ * somme encaissée n'appartient plus à personne.
  */
 
 export interface PaiementEnCours {
@@ -1329,6 +1483,12 @@ export interface PaiementEnCours {
   vente_id: string;
   montant: number;
   devise: string;
+  /** La remise portée par ce paiement, pas celle que la fiche porte aujourd'hui. */
+  remise_pct: number;
+  /** Nul tant que le compte n'existe pas — cas d'une demande d'ouverture. */
+  collecteur_id: string | null;
+  /** La demande d'origine, quand ce paiement en règle une. */
+  demande_id: string | null;
   /** Sert de date de règlement de repli. Jamais `now()`. */
   cree_le: string;
 }
@@ -1343,11 +1503,20 @@ export interface VenteDistante {
 
 export interface Depot {
   lireVente: (venteId: string) => Promise<VenteDistante>;
+  /**
+   * Crée le compte d'un prospect qui vient de payer, et rend son identifiant.
+   *
+   * La ligne `auth.users` ne se fabrique pas en SQL : c'est l'appelant qui la
+   * crée, à partir de la demande d'ouverture, puis nomme le compte au crédit.
+   */
+  ouvrirCompte: (paiement: PaiementEnCours) => Promise<string>;
   crediter: (
     paiementId: string,
     regleLe: string,
     montant: number,
     devise: string,
+    /** Le compte fraîchement ouvert ; nul pour un renouvellement. */
+    collecteur: string | null,
   ) => Promise<{ credite: boolean; echeance: string | null }>;
   marquer: (paiementId: string, statut: StatutPaiement) => Promise<void>;
   journaliser: (message: string) => void;
@@ -1433,6 +1602,39 @@ export async function reconcilier(
       }
     }
 
+    // --- À qui ce règlement profite-t-il ? ---
+    //
+    // Trois états possibles, et le troisième ne devrait pas exister.
+    let compte: string | null = null;
+
+    if (paiement.collecteur_id === null) {
+      if (paiement.demande_id === null) {
+        // La contrainte `paiements_rattachement` interdit cet état en base.
+        // S'il arrive quand même ici, créditer reviendrait à encaisser sans
+        // savoir qui servir. On ne le compte ni comme crédité ni comme en
+        // attente : aucun passage suivant ne le résoudra, c'est une ligne à
+        // regarder à la main.
+        depot.journaliser(
+          `ORPHELIN — paiement ${paiement.id} rattaché ni à un compte ni à une demande, NON crédité`,
+        );
+        continue;
+      }
+
+      // Le prospect a payé : son compte naît maintenant. Avant le crédit, et
+      // seulement après que la vente a été reconnue réglée et cohérente —
+      // personne ne reçoit de compte pour un paiement qui n'a pas abouti.
+      try {
+        compte = await depot.ouvrirCompte(paiement);
+      } catch (cause) {
+        depot.journaliser(
+          `OUVERTURE — compte impossible pour la demande ${paiement.demande_id} : ` +
+            `${cause instanceof Error ? cause.message : 'inconnue'} — NON crédité`,
+        );
+        enAttente += 1;
+        continue;
+      }
+    }
+
     // La date vient du fournisseur, à défaut de la création du paiement.
     // Jamais `now()` : un rattrapage inscrirait la recette au mauvais jour.
     const regleLe = vente.regleLe ?? paiement.cree_le;
@@ -1442,6 +1644,7 @@ export async function reconcilier(
       regleLe,
       vente.montant,
       vente.devise,
+      compte,
     );
 
     if (credite) {
@@ -1457,7 +1660,7 @@ export async function reconcilier(
 - [ ] **Step 4: Lancer les tests pour vérifier qu'ils passent**
 
 Run: `npx vitest run --config supabase/tests/vitest.config.ts supabase/tests/reconciliation.test.ts`
-Expected: PASS — 8 tests.
+Expected: PASS — 15 tests.
 
 - [ ] **Step 5: Commit**
 
