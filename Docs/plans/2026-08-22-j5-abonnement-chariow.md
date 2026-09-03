@@ -11,6 +11,43 @@
 **Spécification de référence :** `Docs/specs/2026-08-22-j5-abonnement-chariow-design.md`
 **Contrat du fournisseur :** `Docs/Chariow.md`
 
+## État au 2026-09-03 — les quinze tâches sont écrites, aucune n'est en ligne
+
+Le plan est exécuté. Les quinze tâches existent dans le dépôt, couvertes par la
+suite de tests, et la chaîne complète passe : 699 tests de base, 532 tests
+d'application et de scripts, typecheck, construction, « Aucune fuite dans les
+artefacts ».
+
+**Rien n'encaisse pour autant**, et il ne faut pas le lire autrement. Deux
+choses manquent, et aucune des deux ne s'écrit dans le dépôt :
+
+1. **Quatre migrations ne sont pas appliquées** en production —
+   `20260902160000_abonnements_paiements`, `20260902170000_admin_paiements`,
+   `20260903120000_avis_drainage_ferme`, `20260903140000_demande_mot_de_passe`.
+2. **Aucune Edge Function n'est déployée, et aucun secret Chariow n'est posé.**
+   `Docs/deploiement.md` §7 dit lesquels, dans quel ordre, et pourquoi
+   `--no-verify-jwt` n'est pas optionnel sur le webhook.
+
+Le déploiement bute par ailleurs sur un jeton : `SUPABASE_ACCESS_TOKEN` date du
+2026-08-30 et se fait refuser en 401 ; le travail de déploiement du CI est rouge
+à chaque poussée depuis.
+
+### Les écarts avec le plan, et pourquoi
+
+Chacun est écrit dans la tâche concernée. Résumés une fois, parce qu'ils
+suivent tous la même règle — **un contrôle qui ne peut pas échouer pour la
+bonne raison n'est pas un contrôle** :
+
+| Tâche | Ce que le plan disait | Ce qui a été fait, et pourquoi |
+|---|---|---|
+| 5 | écrire la demande, puis ouvrir la vente | tout refuser **avant** la première écriture — une boutique mal configurée laissait sinon une demande orpheline et un numéro verrouillé par l'index d'unicité |
+| 5 | le bloc de checkout dans les deux routes | sorti dans `_shared` — deux copies auraient donné deux traitements d'une réponse incomplète, et l'une aurait fini par rediriger quand même |
+| 6 | `chargerPaiementsRattrapables(clientService, collecteurId)` | une cible discriminée — le filtre sur `collecteur_id` seul rendait le webhook aveugle à la moitié des règlements, celle qui fait naître les comptes |
+| 6 | rien | la reprise d'un compte déjà créé, et ses **deux** conditions : sans elle, un crédit interrompu ne repartait jamais ; sans la seconde, il partait au mauvais compte |
+| 11 | pré-remplir le champ avec `collecteurs.telephone` | `separerE164`, qui refuse de deviner — poser l'E.164 dans la partie « numéro national » recomposait un indicatif devant un numéro qui en portait déjà un, et le champ le déclarait valide |
+| 11 | passer la vitrine à `ChampTelephone` | lui passer `lireTelephone` — le composant est dessiné pour l'application et jurerait sur un formulaire vitré ; ce qui doit être partagé est la règle, pas l'apparence |
+| 14 | cinq cas de comparaison | sept — Chariow rend son pourcentage en chaîne selon les versions, et une exécution réelle ne trouve pas un défaut à la fois |
+
 ## Mise à jour du 2026-09-02
 
 Ce plan a été écrit le 2026-08-22 et n'a jamais été exécuté. Onze jours de
