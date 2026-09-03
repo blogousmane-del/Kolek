@@ -1672,6 +1672,38 @@ git commit -m "feat(abonnement): la réconciliation, avec ses effets de bord inj
 ---
 
 ## Task 4: L'adaptateur Chariow et la fonction de vérification
+> **Repris le 2026-09-03, à l'exécution.** Quatre écarts avec le texte
+> d'origine, écrit avant l'amendement « payer vaut accord » et avant que la
+> tâche 3 ne soit exécutée.
+>
+> - **`chargerPaiementsRattrapables` lisait six colonnes, il en faut neuf.**
+>   `remise_pct`, `collecteur_id` et `demande_id` manquaient. Sans le premier, le
+>   contrôle de grille de `reconcilier` écrit une anomalie à *chaque* paiement
+>   remisé, et la vraie divergence de boutique se perd dans un bruit qu'on aura
+>   appris à ignorer. Sans les deux autres, la réconciliation ne sait pas à qui
+>   le règlement profite.
+> - **`creerDepot` ne rendait pas un `Depot`.** Il manquait `ouvrirCompte`, et
+>   `crediter` prenait quatre arguments au lieu de cinq — le contrat a changé en
+>   tâche 3. L'ouverture de compte est **injectée** : `abonnement-verifier`
+>   n'ouvre aucun compte et reçoit donc la stratégie qui refuse, bruyamment ;
+>   le webhook de la tâche 6 passera la vraie.
+> - **La configuration du fournisseur se lit après l'identité, pas avant.** Le
+>   texte d'origine refusait `CONFIGURATION` avant `getUser` : un inconnu
+>   apprenait, par la seule différence entre 403 et 500, si le paiement est
+>   configuré. Ce placement rendait aussi le portillon **inobservable** partout
+>   où `CHARIOW_CLE_API` n'existe pas — c'est-à-dire en local et au CI.
+> - **L'étape 3 ne vérifiait rien.** « La suite entière passe ; les deux fichiers
+>   ajoutés ne sont pas importés par les tests » mesure l'absence d'effet de
+>   bord, pas le code écrit. Remplacée par quinze tests, chacun éprouvé en
+>   réintroduisant le défaut qu'il couvre.
+>
+> Ce qui n'est **pas** mesuré, et pourquoi c'est écrit plutôt que caché :
+> `verify_jwt` répond avant la fonction, donc `JETON_ABSENT` est inatteignable
+> tant que le drapeau est levé ; et le vol préalable `OPTIONS` est servi par la
+> passerelle, donc un test HTTP y mesurerait Kong. La clé publiable, elle, est un
+> JWT valide : elle traverse la plateforme et se fait refuser par nous. C'est le
+> seul jeton qu'un attaquant possède à coup sûr, et c'est le test qui compte.
+
 
 **Files:**
 - Create: `supabase/functions/_shared/depot-chariow.ts`
