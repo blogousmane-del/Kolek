@@ -1098,6 +1098,65 @@ ce qui s'est passé.
 
 ---
 
+## 8. Le drainage des avis (SMS aux clients)
+
+Rien à installer ici : l'horloge est en base (`pg_cron`, toutes les minutes) et
+les deux secrets sont déjà posés dans Vault depuis le 2026-08-28 —
+`kolek_url` et `kolek_cle_service`. Cette section n'existe que pour un symptôme
+neuf, apparu le 2026-09-03.
+
+### 8.1 Un porteur invalide ne rend plus 401, mais 403
+
+`envoyer-avis` contrôle désormais son appelant : le porteur doit être la clé de
+service, celle que `avis_declencher_drainage()` sort de Vault. Avant, la seule
+barrière était `verify_jwt`, que la **clé publiable franchit** — elle est servie
+dans le paquet JavaScript des trois sites. N'importe qui pouvait donc déclencher
+un drainage.
+
+Les deux refus se lisent différemment, et la distinction dit où chercher :
+
+```
+401  {"code":401,...}              → la plateforme : porteur absent ou illisible
+403  {"erreur":"ACCES_RESERVE"}    → nous : porteur lisible, mais ce n'est pas
+                                     la clé de service
+```
+
+Un **403** en production veut donc dire que `kolek_cle_service` ne contient plus
+la bonne clé — c'est exactement l'incident du 2026-08-28, où le secret a reçu le
+gabarit non remplacé puis la clé publiable. Le contrôle de plausibilité de
+`avis_declencher_drainage()` écarte ces deux valeurs-là avant même de partir, en
+rendant `SECRET_INVALIDE` ; un 403 signale ce qu'il ne peut pas voir : une clé
+bien formée mais périmée, par exemple après une rotation.
+
+```sql
+-- Ce que l'horloge répond, sans rien envoyer si la file est vide.
+select public.avis_declencher_drainage();
+--  FILE_VIDE | SECRETS_ABSENTS | SECRET_INVALIDE | ADRESSE_INVALIDE | DEMANDE
+```
+
+Après une rotation de la clé de service, reposer le secret :
+
+```sql
+select vault.update_secret(
+  (select id from vault.secrets where name = 'kolek_cle_service'),
+  '<la nouvelle clé>'
+);
+```
+
+### 8.2 L'ordre, pour cette livraison-là en particulier
+
+`20260903120000_avis_drainage_ferme` crée `avis_reserver_lot`, dont la nouvelle
+version d'`envoyer-avis` dépend entièrement. Déployer la fonction avant la
+migration arrête le drainage net — `LECTURE_IMPOSSIBLE` à chaque réveil, file
+qui grossit en silence. C'est la règle générale de la §6.3, et c'en est un cas
+franc : **`db push` d'abord**.
+
+L'inverse est sûr. Entre la migration et le déploiement de la fonction, l'ancien
+code continue de lire la file par son `select` ; il ne voit simplement pas la
+colonne `reserve_le` ni l'état `en_cours`, qu'aucune ligne ne porte encore.
+
+---
+
 ## Ce que le déploiement ne fait pas
 
 Il ne rend pas le produit vendable. Un collecteur qui ouvre l'application y
