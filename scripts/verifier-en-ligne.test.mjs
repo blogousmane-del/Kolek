@@ -4,10 +4,11 @@ import {
   analyserCsp,
   assetsDe,
   cleAnonyme,
-  comparerAssets,
+  comparerArtefacts,
   hstsSuffisant,
   manqueRedirection,
   manquesSeo,
+  normaliserArtefact,
 } from './verifier-en-ligne.mjs';
 
 // Le script parle au réseau : ce qui est testable ici, ce sont les deux
@@ -183,48 +184,104 @@ describe('assetsDe', () => {
   });
 });
 
-describe('comparerAssets — le contrôle de fraîcheur', () => {
+describe('normaliserArtefact', () => {
+  // Écrit le 2026-09-03. Tailwind convertit les couleurs en oklab en
+  // JavaScript, et `Math.cbrt` ne rend pas le dernier chiffre pareil sur le
+  // Linux de Netlify et sur le Windows du poste. Cinq caractères sur 48 702
+  // séparaient la feuille servie de la feuille locale — assez pour changer
+  // l'empreinte, assez pour que le contrôle de fraîcheur crie au loup à chaque
+  // exécution, et donc pour qu'il ne dise plus rien.
+
+  it('rapproche deux queues flottantes de même valeur', () => {
+    const netlify = 'oklab(53.2899% -.00165999 .0764043/.2)';
+    const local = 'oklab(53.2899% -.00165986 .0764042/.2)';
+    expect(normaliserArtefact(netlify)).toBe(normaliserArtefact(local));
+  });
+
+  it('laisse deux valeurs réellement différentes différentes', () => {
+    // La borne du contrôle : quatre décimales séparent le bruit d'un
+    // changement. Une couleur qu'on modifie bouge bien avant la cinquième.
+    expect(normaliserArtefact('oklab(53.2899% 0 0)')).not.toBe(
+      normaliserArtefact('oklab(54.2899% 0 0)'),
+    );
+  });
+
+  it('ne touche pas aux nombres courts', () => {
+    expect(normaliserArtefact('.mise{max:10000}.p{opacity:.2;top:1.5px}')).toBe(
+      '.mise{max:10000}.p{opacity:.2;top:1.5px}',
+    );
+  });
+});
+
+describe('comparerArtefacts — le contrôle de fraîcheur', () => {
   // Ajouté le 2026-08-21. Ce script a répondu « conforme » trois fois pendant
   // que les trois sites servaient une construction vieille de deux jours : six
   // écrans livrés, aucun en ligne. Rien ne comparait le contenu servi à celui
   // du dépôt — la phrase finale du script était une affirmation, pas une mesure.
+  //
+  // Réécrit le 2026-09-03. La première version comparait les **noms** des
+  // artefacts, en s'appuyant sur une phrase de `Docs/deploiement.md` : « une
+  // construction Netlify a produit une empreinte identique au bit près ». Ce
+  // n'est plus vrai, et l'empreinte diverge maintenant à chaque construction.
+  // On compare donc le contenu, en tolérant le bruit d'arrondi et rien d'autre.
 
-  it('accepte deux listes identiques', () => {
-    const a = ['/assets/index-aaa.js', '/assets/index-bbb.css'];
-    expect(comparerAssets(a, [...a]).identique).toBe(true);
+  it('accepte deux contenus identiques', () => {
+    const servis = [{ chemin: '/assets/index-aaa.js', contenu: 'const a=1' }];
+    const locaux = [{ chemin: '/assets/index-zzz.js', contenu: 'const a=1' }];
+    expect(comparerArtefacts(servis, locaux).identique).toBe(true);
   });
 
-  it("ne se laisse pas berner par l'ordre", () => {
-    // Vite n'ordonne pas ses balises comme on les lit. Un contrôle sensible à
-    // l'ordre échouerait sur une version parfaitement à jour, et on finirait
-    // par le désactiver.
-    const servis = ['/assets/index-bbb.css', '/assets/index-aaa.js'];
-    const locaux = ['/assets/index-aaa.js', '/assets/index-bbb.css'];
-    expect(comparerAssets(servis, locaux).identique).toBe(true);
+  it('accepte un écart qui ne tient qu’à un arrondi', () => {
+    // Le cas réel du 2026-09-03, celui qui rendait le contrôle inutilisable.
+    const servis = [{ chemin: '/a.css', contenu: 'a{color:oklab(53% -.00165999 .0764043)}' }];
+    const locaux = [{ chemin: '/b.css', contenu: 'a{color:oklab(53% -.00165986 .0764042)}' }];
+    expect(comparerArtefacts(servis, locaux).identique).toBe(true);
   });
 
-  it('signale une version périmée en nommant les deux empreintes', () => {
+  it('signale une version périmée en nommant les deux artefacts', () => {
     // Le cas réel du 2026-08-21. Nommer les deux côtés est ce qui permet de
     // conclure en une lecture : celle du dépôt n'est jamais arrivée.
-    const r = comparerAssets(['/assets/index-VIEUX.js'], ['/assets/index-NEUF.js']);
+    const servis = [{ chemin: '/assets/index-VIEUX.js', contenu: 'const a=1' }];
+    const locaux = [{ chemin: '/assets/index-NEUF.js', contenu: 'const a=2' }];
+    const r = comparerArtefacts(servis, locaux);
 
     expect(r.identique).toBe(false);
-    expect(r.manquants).toEqual(['/assets/index-NEUF.js']);
-    expect(r.inattendus).toEqual(['/assets/index-VIEUX.js']);
+    expect(r.ecarts.join(' ')).toContain('/assets/index-VIEUX.js');
+    expect(r.ecarts.join(' ')).toContain('/assets/index-NEUF.js');
   });
 
-  it('signale un artefact servi que le dépôt ne produit plus', () => {
-    const r = comparerAssets(['/assets/a.js', '/assets/orphelin.js'], ['/assets/a.js']);
+  it("ne se laisse pas berner par l'ordre des balises", () => {
+    // Vite n'ordonne pas ses balises comme on les lit. Un contrôle sensible à
+    // l'ordre échouerait sur une version parfaitement à jour, et on finirait
+    // par le désactiver. L'appariement se fait par extension.
+    const servis = [
+      { chemin: '/assets/s.css', contenu: 'a{color:red}' },
+      { chemin: '/assets/s.js', contenu: 'const a=1' },
+    ];
+    const locaux = [
+      { chemin: '/assets/l.js', contenu: 'const a=1' },
+      { chemin: '/assets/l.css', contenu: 'a{color:red}' },
+    ];
+    expect(comparerArtefacts(servis, locaux).identique).toBe(true);
+  });
+
+  it('signale un artefact que le dépôt ne produit plus', () => {
+    const servis = [
+      { chemin: '/assets/a.js', contenu: 'const a=1' },
+      { chemin: '/assets/orphelin.js', contenu: 'const b=2' },
+    ];
+    const locaux = [{ chemin: '/assets/a.js', contenu: 'const a=1' }];
+    const r = comparerArtefacts(servis, locaux);
 
     expect(r.identique).toBe(false);
-    expect(r.inattendus).toEqual(['/assets/orphelin.js']);
-    expect(r.manquants).toEqual([]);
+    expect(r.ecarts.join(' ')).toContain('.js');
   });
 
-  it('refuse une page servie sans aucun asset', () => {
+  it('refuse une page servie sans aucun artefact', () => {
     // Une construction ratée qui publie un index vide : le site répond 200 et
     // n'affiche rien.
-    expect(comparerAssets([], ['/assets/index-a.js']).identique).toBe(false);
+    const locaux = [{ chemin: '/assets/index-a.js', contenu: 'const a=1' }];
+    expect(comparerArtefacts([], locaux).identique).toBe(false);
   });
 });
 

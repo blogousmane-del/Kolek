@@ -361,10 +361,30 @@ un déploiement correct.
 > *« une divergence d'empreinte se lit comme une divergence de source »*. Il aura
 > fallu deux jours de production figée pour qu'il devienne un contrôle.
 
-Une observation utile au passage : la construction Netlify du site public a
-produit `index-BEeLuKI6.js`, empreinte identique au bit près à celle du build
-local. Deux machines, deux systèmes, même sortie. Une divergence d'empreinte,
-désormais, se lit comme une divergence de source — pas comme du bruit.
+Une observation faite au passage le 2026-08-21 : la construction Netlify du site
+public avait produit `index-BEeLuKI6.js`, empreinte identique au bit près à
+celle du build local. Deux machines, deux systèmes, même sortie — d'où la règle
+qui a suivi : une divergence d'empreinte se lit comme une divergence de source.
+
+**Cette règle est fausse, constaté le 2026-09-03.** Les trois sites étaient
+déclarés périmés alors que les trois bundles JavaScript servis étaient
+identiques **octet pour octet** à ceux du `dist/`. L'écart tenait à cinq
+caractères de feuille de style sur 48 702 :
+
+    en ligne : oklab(53.2899% -.00165999 .0764043/.2)
+    en local : oklab(53.2899% -.00165986 .0764042/.2)
+
+Tailwind convertit les couleurs en oklab en JavaScript, et `Math.cbrt` ne rend
+pas le dernier chiffre pareil sur le Linux de Netlify et sur le Windows du
+poste. Un CSS différent d'un chiffre porte une autre empreinte, et Rollup fait
+porter cette empreinte au chunk JavaScript qui le référence : les trois noms
+divergent, à chaque construction.
+
+Un filet qui hurle à chaque passage ne dit plus rien — un site réellement périmé
+serait passé inaperçu dans le bruit, ce qui est exactement le manquement du
+2026-08-21 revenu par une autre porte. `verifier:en-ligne` compare donc le
+**contenu** servi à celui du `dist/`, en tolérant l'arrondi au-delà de la
+quatrième décimale et rien d'autre. Ne pas revenir à la comparaison d'empreinte.
 
 **Déploiement à la main, depuis Windows.** Tant que les trois sites ne sont pas
 branchés sur GitHub, la publication passe par la CLI — et quatre pièges s'y

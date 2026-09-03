@@ -30,21 +30,92 @@ const PROJET = 'yfnwmokxkznejotgpfgf';
  * Le script contrôlait la posture de sécurité du déploiement, jamais son
  * contenu.
  *
- * Le remède était déjà écrit dans `Docs/deploiement.md`, sans être appliqué :
- * la construction Netlify du site public avait produit une empreinte identique
- * au bit près à celle du build local, d'où *« une divergence d'empreinte se lit
- * comme une divergence de source »*. On compare donc désormais les noms
- * d'artefacts servis à ceux du `dist/` local.
+ * Le remède tenait alors dans une phrase de `Docs/deploiement.md` : la
+ * construction Netlify avait produit une empreinte identique au bit près à
+ * celle du build local, d'où *« une divergence d'empreinte se lit comme une
+ * divergence de source »*. On comparait donc les **noms** d'artefacts servis à
+ * ceux du `dist/` local.
+ *
+ * ## Pourquoi ce contrôle a été réécrit le 2026-09-03
+ *
+ * Cette phrase a cessé d'être vraie, et le contrôle s'est mis à crier au loup à
+ * chaque exécution. Trois sites déclarés périmés, trois bundles JavaScript
+ * pourtant **identiques octet pour octet** ; l'écart tenait à cinq caractères
+ * de feuille de style sur 48 702 :
+ *
+ *     en ligne : oklab(53.2899% -.00165999 .0764043/.2)
+ *     en local : oklab(53.2899% -.00165986 .0764042/.2)
+ *
+ * Tailwind convertit les couleurs en oklab en JavaScript, et `Math.cbrt` ne
+ * rend pas le dernier chiffre pareil sur le Linux de Netlify et sur le Windows
+ * du poste. Un CSS différent d'un chiffre porte une autre empreinte, et Rollup
+ * fait porter cette empreinte au chunk JavaScript qui le référence : les trois
+ * noms divergent, définitivement.
+ *
+ * Un filet qui hurle à chaque passage ne dit plus rien — un vrai site périmé
+ * serait passé inaperçu dans le bruit. On compare donc le **contenu** servi à
+ * celui du `dist/`, en tolérant ce bruit d'arrondi et rien d'autre. Les corps
+ * étaient déjà téléchargés pour la chasse aux fuites : ce contrôle ne coûte pas
+ * une requête de plus.
  *
  * L'absence de `dist/` est un **échec**, pas un saut silencieux : c'est
  * exactement le genre de contrôle qu'on désactive sans le vouloir, et un
  * contrôle qui s'efface tout seul ne vaut rien.
  */
-export function comparerAssets(servis, locaux) {
-  const trier = (liste) => [...liste].sort();
-  const manquants = locaux.filter((a) => !servis.includes(a));
-  const inattendus = servis.filter((a) => !locaux.includes(a));
-  return { identique: manquants.length === 0 && inattendus.length === 0, manquants, inattendus, trier };
+
+/**
+ * Le texte, débarrassé du seul écart qu'on accepte.
+ *
+ * Quatre décimales : c'est la borne entre le bruit d'un `Math.cbrt` et un
+ * changement voulu. Une couleur qu'on modifie, une durée qu'on rallonge, un
+ * seuil qu'on déplace — tout cela bouge bien avant la cinquième décimale.
+ */
+export function normaliserArtefact(texte) {
+  return texte.replace(/\d*\.\d{5,}/g, (nombre) => Number(nombre).toFixed(4));
+}
+
+/**
+ * Le contenu servi est-il celui du dépôt ?
+ *
+ * `servis` et `locaux` sont des tableaux de `{ chemin, contenu }`. On apparie
+ * par extension et non par nom : le nom porte une empreinte qui diverge (voir
+ * la note ci-dessus), et l'ordre des balises dans le HTML n'est pas contractuel.
+ * Au sein d'une extension, l'ordre l'est — les deux HTML sortent du même
+ * gabarit.
+ */
+export function comparerArtefacts(servis, locaux) {
+  const parType = (liste) => {
+    const groupes = new Map();
+    for (const artefact of liste) {
+      const type = artefact.chemin.slice(artefact.chemin.lastIndexOf('.'));
+      if (!groupes.has(type)) groupes.set(type, []);
+      groupes.get(type).push(artefact);
+    }
+    return groupes;
+  };
+
+  const cotes = parType(servis);
+  const cotel = parType(locaux);
+  const types = [...new Set([...cotes.keys(), ...cotel.keys()])].sort();
+  const ecarts = [];
+
+  for (const type of types) {
+    const s = cotes.get(type) ?? [];
+    const l = cotel.get(type) ?? [];
+    if (s.length !== l.length) {
+      ecarts.push(
+        `${type} : ${s.length} artefact(s) servi(s), ${l.length} dans le dépôt`,
+      );
+      continue;
+    }
+    for (let i = 0; i < s.length; i++) {
+      if (normaliserArtefact(s[i].contenu) !== normaliserArtefact(l[i].contenu)) {
+        ecarts.push(`${s[i].chemin} servi ne vaut pas ${l[i].chemin} du dépôt`);
+      }
+    }
+  }
+
+  return { identique: ecarts.length === 0, ecarts };
 }
 
 /** Découpe une valeur de CSP en directive -> liste de sources. */
@@ -348,29 +419,10 @@ async function verifier(cible) {
   const assets = assetsDe(html);
   constat(assets.length > 0, 'aucun asset référencé dans le HTML');
 
-  // La fraîcheur. Voir la note en tête de fichier : c'est le contrôle dont
-  // l'absence a laissé trois sites périmés passer pour conformes pendant deux
-  // jours. Il vient avant tout le reste dans l'ordre d'importance — une CSP
-  // parfaite sur une version qui n'est pas la bonne ne protège rien d'utile.
-  try {
-    const htmlLocal = await readFile(`${cible.dist}/index.html`, 'utf8');
-    const locaux = assetsDe(htmlLocal);
-    const { identique, manquants, inattendus } = comparerAssets(assets, locaux);
-    if (!identique) {
-      echecs.push(
-        `le site en ligne ne sert pas la construction du dépôt — servi : ${
-          inattendus.join(', ') || '(rien de plus)'
-        } ; attendu : ${manquants.join(', ') || '(rien de plus)'}`,
-      );
-    }
-  } catch {
-    // Pas de `dist/` : on ne peut pas conclure, donc on ne conclut pas. Sauter
-    // en silence serait exactement la faute qu'on répare ici.
-    echecs.push(
-      `${cible.dist}/index.html introuvable — impossible de comparer. Lancer « npm run build » d'abord.`,
-    );
-  }
-
+  // Les corps servis, lus une fois. Trois contrôles s'en servent : la
+  // fraîcheur les compare au dépôt, la chasse aux fuites y cherche une clé de
+  // service, et la clé anonyme s'y trouve ou n'y est pas.
+  const servis = [];
   let voitSupabase = false;
   let cleServie = null;
   for (const chemin of assets) {
@@ -378,6 +430,7 @@ async function verifier(cible) {
     constat(reponse.ok, `${chemin} renvoie ${reponse.status}`);
     if (chemin.endsWith('.js') || chemin.endsWith('.css')) {
       const corps = await reponse.text();
+      servis.push({ chemin, contenu: corps });
       for (const fuite of chercherFuitesTexte(corps)) {
         echecs.push(`FUITE dans ${chemin} — ${fuite}`);
       }
@@ -386,6 +439,29 @@ async function verifier(cible) {
     }
     const cache = reponse.headers.get('cache-control') ?? '';
     constat(cache.includes('immutable'), `${chemin} sans cache immuable : ${cache}`);
+  }
+
+  // La fraîcheur. Voir la note en tête de fichier : c'est le contrôle dont
+  // l'absence a laissé trois sites périmés passer pour conformes pendant deux
+  // jours, puis dont le bruit a failli le rendre inutilisable. Une CSP parfaite
+  // sur une version qui n'est pas la bonne ne protège rien d'utile.
+  try {
+    const htmlLocal = await readFile(`${cible.dist}/index.html`, 'utf8');
+    const locaux = [];
+    for (const chemin of assetsDe(htmlLocal)) {
+      if (!chemin.endsWith('.js') && !chemin.endsWith('.css')) continue;
+      locaux.push({ chemin, contenu: await readFile(`${cible.dist}${chemin}`, 'utf8') });
+    }
+    const { identique, ecarts } = comparerArtefacts(servis, locaux);
+    if (!identique) {
+      echecs.push(`le site en ligne ne sert pas la construction du dépôt — ${ecarts.join(' ; ')}`);
+    }
+  } catch (cause) {
+    // Pas de `dist/` : on ne peut pas conclure, donc on ne conclut pas. Sauter
+    // en silence serait exactement la faute qu'on répare ici.
+    echecs.push(
+      `${cible.dist} illisible — impossible de comparer (${cause.message}). Lancer « npm run build » d'abord.`,
+    );
   }
   constat(
     voitSupabase === cible.supabase,
