@@ -14,6 +14,20 @@ export const MOTIFS = [
     regex: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]*(c2VydmljZV9yb2xl|cnZpY2Vfcm9s|ZXJ2aWNlX3Jv)/,
   },
   { nom: 'clé secrète Supabase', regex: /sb_secret_[A-Za-z0-9_-]{8,}/ },
+  // La forme du jeton Chariow n'est pas documentée, donc on ne la cherche pas :
+  // on cherche l'**usage** qui la ferait fuir. Le front n'appelle jamais
+  // Chariow — il passe par une Edge Function, qui seule détient la clé. Une
+  // adresse du fournisseur dans un artefact signifie qu'un appel part du
+  // navigateur, et un appel authentifié depuis le navigateur emporte la clé.
+  //
+  // L'hôte d'API et lui seul : la page de paiement hébergée, dont l'adresse
+  // vient de la réponse `checkout_url`, vit ailleurs, et un motif sur le nom du
+  // fournisseur refuserait un jour le seul chemin de paiement prévu.
+  { nom: 'appel direct à Chariow', regex: /api\.chariow\.com/ },
+  // Et le cas franc : quelqu'un a préfixé la clé d'un `VITE_`, ce qui la publie
+  // quel que soit le nom du fichier où elle est écrite. Les deux autres préfixes
+  // pour le jour où un écran serait porté sous Next ou Create React App.
+  { nom: 'clé Chariow exposée', regex: /(VITE|REACT_APP|NEXT_PUBLIC)_CHARIOW/ },
 ];
 
 /** Renvoie les noms des motifs de fuite trouvés dans un texte. */
@@ -66,9 +80,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const fuites = dossiers.flatMap(chercherFuites);
 
   if (fuites.length > 0) {
-    console.error('Clé de service détectée dans un artefact de build :');
+    console.error('Fuite détectée dans un artefact de build :');
     for (const f of fuites) console.error(`  ${f.chemin} — ${f.motif}`);
     process.exit(1);
   }
-  console.log('Aucune fuite de clé de service dans les artefacts.');
+  console.log('Aucune fuite dans les artefacts.');
 }

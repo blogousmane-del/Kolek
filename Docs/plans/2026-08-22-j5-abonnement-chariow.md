@@ -2517,10 +2517,14 @@ git commit -m "fix(admin): la suppression bute désormais sur les paiements en l
 
 - [ ] **Step 1: Écrire les tests qui échouent**
 
-Ajouter à `scripts/verifier-bundles.test.mjs` :
+Ajouter `chercherFuitesTexte` à l'import en tête de fichier, puis à la fin de
+`scripts/verifier-bundles.test.mjs` :
 
 ```js
 describe('motifs Chariow', () => {
+  // La forme du jeton Chariow n'est pas documentée : on ne peut pas la
+  // chercher. Ce qui se cherche, c'est l'**usage** qui la ferait fuir.
+
   it('signale un appel direct à Chariow depuis un artefact', () => {
     // Le front ne parle jamais à Chariow : il appelle une Edge Function, qui
     // détient la clé. Une adresse `api.chariow.com` dans un paquet signifie
@@ -2537,8 +2541,23 @@ describe('motifs Chariow', () => {
     );
   });
 
+  it('signale le préfixe public des autres outils de construction', () => {
+    // Un jour quelqu'un portera un écran sous Next : le motif ne doit pas
+    // s'arrêter au préfixe de Vite.
+    expect(chercherFuitesTexte('NEXT_PUBLIC_CHARIOW_TOKEN')).toContain('clé Chariow exposée');
+    expect(chercherFuitesTexte('REACT_APP_CHARIOW_TOKEN')).toContain('clé Chariow exposée');
+  });
+
   it('laisse passer un artefact ordinaire', () => {
     expect(chercherFuitesTexte('const url = "https://exemple.supabase.co"')).toEqual([]);
+  });
+
+  it('ne vise que l’hôte d’API, pas le nom du fournisseur', () => {
+    // Le motif nomme `api.chariow.com` et pas `chariow`. La page de paiement
+    // hébergée, dont l'adresse vient de la réponse `checkout_url`, se trouve
+    // sur un autre hôte que la documentation ne fixe pas — un motif sur le seul
+    // nom du fournisseur refuserait un jour le seul chemin de paiement prévu.
+    expect(chercherFuitesTexte('const marque = "Chariow"')).toEqual([]);
   });
 });
 ```
@@ -2546,7 +2565,7 @@ describe('motifs Chariow', () => {
 - [ ] **Step 2: Lancer les tests pour vérifier qu'ils échouent**
 
 Run: `npx vitest run scripts/verifier-bundles.test.mjs`
-Expected: FAIL — les deux premiers tests, `expected [] to include 'appel direct à Chariow'`.
+Expected: FAIL — trois tests, dont `expected [] to include 'appel direct à Chariow'`.
 
 - [ ] **Step 3: Ajouter les motifs**
 
@@ -2558,9 +2577,14 @@ Dans `scripts/verifier-bundles.mjs`, ajouter à la fin du tableau `MOTIFS` (apr�
   // Chariow — il passe par une Edge Function, qui seule détient la clé. Une
   // adresse du fournisseur dans un artefact signifie qu'un appel part du
   // navigateur, et un appel authentifié depuis le navigateur emporte la clé.
+  //
+  // L'hôte d'API et lui seul : la page de paiement hébergée, dont l'adresse
+  // vient de la réponse `checkout_url`, vit ailleurs, et un motif sur le nom du
+  // fournisseur refuserait un jour le seul chemin de paiement prévu.
   { nom: 'appel direct à Chariow', regex: /api\.chariow\.com/ },
   // Et le cas franc : quelqu'un a préfixé la clé d'un `VITE_`, ce qui la publie
-  // quel que soit le nom du fichier où elle est écrite.
+  // quel que soit le nom du fichier où elle est écrite. Les deux autres préfixes
+  // pour le jour où un écran serait porté sous Next ou Create React App.
   { nom: 'clé Chariow exposée', regex: /(VITE|REACT_APP|NEXT_PUBLIC)_CHARIOW/ },
 ```
 
