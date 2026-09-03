@@ -4259,6 +4259,21 @@ git commit -m "feat(admin): voir l'argent des abonnements arriver"
 
 ## Task 13: Le mode d'emploi du déploiement
 
+> **Repris le 2026-09-03, à l'exécution.** Trois écarts avec le texte d'origine.
+>
+> - `URL_RETOUR_COLLECTEUR` visait `kolek-collecteur.netlify.app`. Cette adresse
+>   rend un 301 vers `app.kolek.cash` depuis le 2026-08-27, et les listes CORS
+>   des Edge Functions ne nomment que l'origine canonique : le payeur serait
+>   revenu par une redirection, sur une origine que personne n'autorise.
+> - **L'étape 2 est sans objet.** Elle demandait de remplacer « les sept
+>   migrations » par « les quatorze » ; la phrase a été corrigée le 2026-09-02,
+>   et remplacée par un renvoi à `ls supabase/migrations` — un décompte figé
+>   dans une page se démode par construction, et « quatorze » serait déjà faux.
+> - Une section **7.6** s'ajoute : le remboursement d'une demande payée puis
+>   refusée. L'amendement « payer vaut accord » le devait, puisqu'il crée le cas
+>   — Chariow n'a pas d'API de remboursement, le geste est manuel, et rien dans
+>   Kolek ne le déclenche ni ne le constate.
+
 **Files:**
 - Modify: `Docs/deploiement.md`
 
@@ -4268,40 +4283,60 @@ git commit -m "feat(admin): voir l'argent des abonnements arriver"
 
 - [ ] **Step 1: Écrire la section**
 
-Ajouter à `Docs/deploiement.md`, avant la section des incidents connus :
+Ajouter à `Docs/deploiement.md`, juste avant « Ce que le déploiement ne fait
+pas » — donc après `## 6. Déployer une évolution`, dont elle est la suite
+naturelle :
 
 ````markdown
-## Le paiement d'abonnement (J5)
+## 7. Le paiement d'abonnement (J5)
 
-### Ce qui se fait à la main chez Chariow, une fois
+Cette section décrit un dispositif **qui n'est pas encore en ligne** : les
+fonctions `abonnement-payer`, `abonnement-verifier` et `chariow-webhook`
+n'existent pas au moment où ces lignes sont écrites. Elle est là pour que le
+jour où elles existent, personne n'ait à redécouvrir les six pièges ci-dessous.
+
+### 7.1 Ce qui se fait à la main chez Chariow, une fois
 
 1. Créer **trois produits** dans la boutique GTCS, aux prix exacts de la grille
-   (`packages/core/src/paliers.ts`) : Standard 2 500, Pro 5 000, Illimité 10 000 FCFA.
-   Aucun montant custom ne passe par l'API : Chariow débite le prix de son produit.
-   Un prix qui diverge de la grille est signalé au journal (`GRILLE — …`) sans bloquer
+   (`packages/core/src/paliers.ts`) : Standard 2 500, Pro 5 000, Illimité
+   10 000 FCFA. Aucun montant libre ne passe par l'API — Chariow débite le prix
+   de son produit, et un code de remise est le seul moyen de le réduire. Un prix
+   qui diverge de la grille est signalé au journal (`GRILLE — …`) sans bloquer
    le collecteur, qui n'y est pour rien.
 2. Relever la clé d'API dans le tableau de bord Chariow.
 3. Tirer un secret de webhook : `openssl rand -hex 32`.
 
-### Les secrets des Edge Functions
+### 7.2 Les secrets des Edge Functions
 
 ```bash
 npx supabase secrets set \
   CHARIOW_CLE_API="…" \
   CHARIOW_PRODUITS='{"standard":"prod_…","pro":"prod_…","illimite":"prod_…"}' \
   CHARIOW_SECRET_WEBHOOK="…" \
-  URL_RETOUR_COLLECTEUR="https://kolek-collecteur.netlify.app"
+  URL_RETOUR_COLLECTEUR="https://app.kolek.cash"
 ```
+
+**`URL_RETOUR_COLLECTEUR` prend l'adresse canonique**, pas
+`kolek-collecteur.netlify.app`. Cette dernière rend un 301 vers la première
+depuis le 2026-08-27 — le payeur reviendrait par une redirection, et surtout
+les listes CORS des Edge Functions ne nomment que l'origine canonique. Deux
+adresses qui servent la même application sont deux origines.
 
 `CHARIOW_API_URL` n'est à poser que pour viser un bac à sable ; le défaut est
 `https://api.chariow.com/v1`.
 
-`CHARIOW_PRODUITS` doit nommer **exactement** les trois paliers payants. Un palier
-manquant, ou `essai` en trop, fait répondre `CONFIGURATION` à la première tentative
-de paiement — la lecture lève au démarrage plutôt que de rendre une table incomplète
-qui ne se verrait qu'au premier collecteur choisissant ce palier-là.
+`CHARIOW_PRODUITS` doit nommer **exactement** les trois paliers payants. Un
+palier manquant, ou `essai` en trop, fait répondre `CONFIGURATION` à la
+première tentative de paiement : `lireProduits` lève au démarrage plutôt que de
+rendre une table incomplète, qui ne se verrait qu'au premier collecteur
+choisissant ce palier-là.
 
-### Le déploiement des fonctions
+La clé Chariow ne se saisit **jamais** depuis un écran, et n'entre dans aucun
+paquet d'application. `verifier:bundles` refuse depuis le 2026-09-03 tout
+artefact contenant `api.chariow.com` ou une variable `VITE_CHARIOW…` — le
+front n'appelle jamais le fournisseur, il passe par une Edge Function.
+
+### 7.3 Le déploiement des fonctions
 
 ```bash
 npx supabase functions deploy abonnement-payer
@@ -4309,20 +4344,21 @@ npx supabase functions deploy abonnement-verifier
 npx supabase functions deploy chariow-webhook --no-verify-jwt
 ```
 
-**`--no-verify-jwt` n'est pas optionnel sur la troisième**, et c'est le seul endroit
-du projet où il apparaît. Chariow ne signe pas ses webhooks et ne porte aucune
-identité Supabase ; sans ce drapeau, la passerelle refuse l'appel avant que la
-fonction ne le voie. Ce que le drapeau ouvre est le droit d'atteindre le code, pas
-celui d'obtenir quoi que ce soit : le secret d'URL est comparé en temps constant, et
-la fonction ne crédite jamais sur la foi du corps reçu.
+**`--no-verify-jwt` n'est pas optionnel sur la troisième**, et c'est le seul
+endroit du projet où ce drapeau apparaît. Chariow ne signe pas ses webhooks et
+ne porte aucune identité Supabase ; sans ce drapeau, la passerelle refuse
+l'appel avant que la fonction ne le voie. Ce que le drapeau ouvre est le droit
+d'atteindre le code, pas celui d'obtenir quoi que ce soit : le secret d'URL est
+comparé en temps constant, et la fonction ne crédite jamais sur la foi du corps
+reçu — elle relit la vente chez le fournisseur.
 
-### L'URL à coller chez Chariow
+### 7.4 L'URL à coller chez Chariow
 
 ```
 https://<référence-du-projet>.supabase.co/functions/v1/chariow-webhook?secret=<CHARIOW_SECRET_WEBHOOK>
 ```
 
-### Vérifier après déploiement
+### 7.5 Vérifier après déploiement
 
 ```bash
 # Sans secret : doit répondre 401.
@@ -4336,22 +4372,52 @@ for f in abonnement-payer abonnement-verifier; do
 done
 ```
 
-Puis une vente réelle de bout en bout sur le palier Standard, en vérifiant que la
-ligne de `paiements_abonnement` porte **la devise de la boutique** et non `XOF` écrit
-en dur.
+Puis une vente réelle de bout en bout sur le palier Standard, en vérifiant que
+la ligne de `paiements_abonnement` porte **la devise de la boutique** et non
+`XOF` écrit en dur.
+
+### 7.6 Rembourser une demande payée puis refusée
+
+Conséquence directe de l'amendement « payer vaut accord » du 2026-09-02 : un
+prospect règle **avant** que GTCS ait regardé son dossier. Le compte naît tout
+seul de la réconciliation ; `refusee` ne sert donc plus qu'à la fraude, et ce
+cas-là se termine par un remboursement.
+
+**Chariow n'a pas d'API de remboursement.** Le geste est manuel, dans leur
+tableau de bord, et rien dans Kolek ne le déclenche ni ne le constate. La marche
+à suivre :
+
+1. Relever `vente_id` sur la ligne de `paiements_abonnement` — c'est
+   l'identifiant de la vente chez eux.
+2. Rembourser depuis le tableau de bord Chariow.
+3. Suspendre l'abonnement du compte créé depuis l'écran **Collecteurs** de
+   l'administration. **Ne pas supprimer le compte** : `admin-supprimer-collecteur`
+   répond `COMPTE_A_PAYE` en 409, et il a raison — un compte qui a réglé porte
+   une écriture comptable, et `paiements_abonnement` le référence en
+   `on delete restrict`. On ne fait pas disparaître une facture en effaçant un
+   compte.
+
+Le paiement, lui, reste `regle` en base. C'est voulu : il a bien été encaissé,
+et le remboursement est un mouvement chez le fournisseur, pas une annulation de
+ce qui s'est passé.
 ````
 
-- [ ] **Step 2: Corriger le décompte des migrations**
+- [ ] ~~**Step 2: Corriger le décompte des migrations**~~ — **sans objet**
 
-Dans `Docs/deploiement.md`, remplacer « Les sept migrations s'appliquent dans l'ordre »
-par « Les quatorze migrations s'appliquent dans l'ordre » — le décompte datait de J1 et
-n'avait pas suivi.
+Fait le 2026-09-02, et mieux : la phrase ne porte plus de décompte du tout, elle
+renvoie à `ls supabase/migrations`. Un nombre écrit dans une page se démode par
+construction — « quatorze » serait déjà faux, il y en a quarante-trois.
 
 - [ ] **Step 3: Lancer la vérification complète**
 
 Run: `npm run verifier`
-Expected: PASS de bout en bout — reconstruction de base, thème, paliers, tests
-d'applications, tests de scripts, tests de base, construction, contrôle des paquets.
+Expected: PASS de bout en bout — reconstruction de base, thème, marque, paliers,
+typecheck, tests d'applications, tests de scripts, tests de base, construction,
+contrôle des paquets.
+
+Une Edge Function modifiée depuis le dernier redémarrage du runtime local fausse
+les tests de base sans le dire : `docker restart supabase_edge_runtime_Kolek`
+avant de lancer.
 
 - [ ] **Step 4: Commit**
 

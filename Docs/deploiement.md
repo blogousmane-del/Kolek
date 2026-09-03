@@ -983,6 +983,121 @@ exact qui a motivé la livraison. Le 2026-09-02, c'était d'ouvrir une carte à
 
 ---
 
+## 7. Le paiement d'abonnement (J5)
+
+Cette section décrit un dispositif **qui n'est pas encore en ligne** : les
+fonctions `abonnement-payer`, `abonnement-verifier` et `chariow-webhook`
+n'existent pas au moment où ces lignes sont écrites. Elle est là pour que le
+jour où elles existent, personne n'ait à redécouvrir les six pièges ci-dessous.
+
+### 7.1 Ce qui se fait à la main chez Chariow, une fois
+
+1. Créer **trois produits** dans la boutique GTCS, aux prix exacts de la grille
+   (`packages/core/src/paliers.ts`) : Standard 2 500, Pro 5 000, Illimité
+   10 000 FCFA. Aucun montant libre ne passe par l'API — Chariow débite le prix
+   de son produit, et un code de remise est le seul moyen de le réduire. Un prix
+   qui diverge de la grille est signalé au journal (`GRILLE — …`) sans bloquer
+   le collecteur, qui n'y est pour rien.
+2. Relever la clé d'API dans le tableau de bord Chariow.
+3. Tirer un secret de webhook : `openssl rand -hex 32`.
+
+### 7.2 Les secrets des Edge Functions
+
+```bash
+npx supabase secrets set \
+  CHARIOW_CLE_API="…" \
+  CHARIOW_PRODUITS='{"standard":"prod_…","pro":"prod_…","illimite":"prod_…"}' \
+  CHARIOW_SECRET_WEBHOOK="…" \
+  URL_RETOUR_COLLECTEUR="https://app.kolek.cash"
+```
+
+**`URL_RETOUR_COLLECTEUR` prend l'adresse canonique**, pas
+`kolek-collecteur.netlify.app`. Cette dernière rend un 301 vers la première
+depuis le 2026-08-27 — le payeur reviendrait par une redirection, et surtout
+les listes CORS des Edge Functions ne nomment que l'origine canonique. Deux
+adresses qui servent la même application sont deux origines.
+
+`CHARIOW_API_URL` n'est à poser que pour viser un bac à sable ; le défaut est
+`https://api.chariow.com/v1`.
+
+`CHARIOW_PRODUITS` doit nommer **exactement** les trois paliers payants. Un
+palier manquant, ou `essai` en trop, fait répondre `CONFIGURATION` à la
+première tentative de paiement : `lireProduits` lève au démarrage plutôt que de
+rendre une table incomplète, qui ne se verrait qu'au premier collecteur
+choisissant ce palier-là.
+
+La clé Chariow ne se saisit **jamais** depuis un écran, et n'entre dans aucun
+paquet d'application. `verifier:bundles` refuse depuis le 2026-09-03 tout
+artefact contenant `api.chariow.com` ou une variable `VITE_CHARIOW…` — le
+front n'appelle jamais le fournisseur, il passe par une Edge Function.
+
+### 7.3 Le déploiement des fonctions
+
+```bash
+npx supabase functions deploy abonnement-payer
+npx supabase functions deploy abonnement-verifier
+npx supabase functions deploy chariow-webhook --no-verify-jwt
+```
+
+**`--no-verify-jwt` n'est pas optionnel sur la troisième**, et c'est le seul
+endroit du projet où ce drapeau apparaît. Chariow ne signe pas ses webhooks et
+ne porte aucune identité Supabase ; sans ce drapeau, la passerelle refuse
+l'appel avant que la fonction ne le voie. Ce que le drapeau ouvre est le droit
+d'atteindre le code, pas celui d'obtenir quoi que ce soit : le secret d'URL est
+comparé en temps constant, et la fonction ne crédite jamais sur la foi du corps
+reçu — elle relit la vente chez le fournisseur.
+
+### 7.4 L'URL à coller chez Chariow
+
+```
+https://<référence-du-projet>.supabase.co/functions/v1/chariow-webhook?secret=<CHARIOW_SECRET_WEBHOOK>
+```
+
+### 7.5 Vérifier après déploiement
+
+```bash
+# Sans secret : doit répondre 401.
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  "https://<réf>.supabase.co/functions/v1/chariow-webhook" -d '{}'
+
+# Sans jeton : doivent répondre 401.
+for f in abonnement-payer abonnement-verifier; do
+  curl -s -o /dev/null -w "$f %{http_code}\n" -X POST \
+    "https://<réf>.supabase.co/functions/v1/$f" -H "apikey: <clé anon>" -d '{}'
+done
+```
+
+Puis une vente réelle de bout en bout sur le palier Standard, en vérifiant que
+la ligne de `paiements_abonnement` porte **la devise de la boutique** et non
+`XOF` écrit en dur.
+
+### 7.6 Rembourser une demande payée puis refusée
+
+Conséquence directe de l'amendement « payer vaut accord » du 2026-09-02 : un
+prospect règle **avant** que GTCS ait regardé son dossier. Le compte naît tout
+seul de la réconciliation ; `refusee` ne sert donc plus qu'à la fraude, et ce
+cas-là se termine par un remboursement.
+
+**Chariow n'a pas d'API de remboursement.** Le geste est manuel, dans leur
+tableau de bord, et rien dans Kolek ne le déclenche ni ne le constate. La marche
+à suivre :
+
+1. Relever `vente_id` sur la ligne de `paiements_abonnement` — c'est
+   l'identifiant de la vente chez eux.
+2. Rembourser depuis le tableau de bord Chariow.
+3. Suspendre l'abonnement du compte créé depuis l'écran **Collecteurs** de
+   l'administration. **Ne pas supprimer le compte** : `admin-supprimer-collecteur`
+   répond `COMPTE_A_PAYE` en 409, et il a raison — un compte qui a réglé porte
+   une écriture comptable, et `paiements_abonnement` le référence en
+   `on delete restrict`. On ne fait pas disparaître une facture en effaçant un
+   compte.
+
+Le paiement, lui, reste `regle` en base. C'est voulu : il a bien été encaissé,
+et le remboursement est un mouvement chez le fournisseur, pas une annulation de
+ce qui s'est passé.
+
+---
+
 ## Ce que le déploiement ne fait pas
 
 Il ne rend pas le produit vendable. Un collecteur qui ouvre l'application y
