@@ -151,6 +151,39 @@ Conséquence : **l'adresse électronique devient obligatoire** pour une demande
 payante. Elle est facultative aujourd'hui (`demandes_ouverture.email` est
 nullable) et le reste pour une demande d'essai.
 
+> **Tranché le 2026-09-03, à l'exécution de la tâche 4.** Le paragraphe
+> ci-dessus dit que le mot de passe est choisi au formulaire et que le compte
+> naît au règlement, mais **ne dit nulle part où ce mot de passe repose entre les
+> deux**. `demandes_ouverture` n'avait aucune colonne pour ça. Trancher au moment
+> d'écrire la fonction aurait fait décider d'un stockage d'identifiant par défaut
+> d'attention ; la question a donc été posée à l'exploitant, qui a retenu :
+>
+> **Une empreinte bcrypt, jamais le clair.** `demander-ouverture` reçoit le mot
+> de passe en clair par HTTPS, le valide (`validerCollecteur` pour la forme,
+> `verifierFuite` pour les fuites connues), en calcule l'empreinte, écrit
+> l'empreinte dans `demandes_ouverture.mot_de_passe_hash` et jette le clair. Au
+> règlement, `auth.admin.createUser({ password_hash })` reprend l'empreinte —
+> l'API l'accepte, vérifié sur la version installée.
+>
+> Ce qui repose est donc de la même nature que `auth.users.encrypted_password`.
+> Migration `20260903140000_demande_mot_de_passe`, qui ferme les trois sorties :
+>
+> - **par la table** — déjà révoquée à `anon` et `authenticated` depuis
+>   `20260823090000`, lecture comprise ;
+> - **par la console** — `admin_demandes()` nomme ses champs un à un ; un
+>   `select *` aurait emporté la colonne neuve ;
+> - **par le journal** — celle-ci était ouverte. `journaliser_demande()` écrivait
+>   `to_jsonb(new)`, donc toute la ligne, et `super-admin-journal` la rend à qui
+>   sait lire une page. L'empreinte en est retirée.
+>
+> Une contrainte impose la forme d'une empreinte bcrypt : le jour où quelqu'un
+> écrira ici la valeur reçue du formulaire, la base refusera au lieu de
+> conserver. Les deux options écartées, pour mémoire — créer le compte dès le
+> formulaire (des comptes non payés, et un essai de trente jours offert sans
+> accord) ; envoyer un lien par courriel après paiement (une boîte à consulter au
+> moment précis où l'on vient de payer, sur téléphone).
+
+
 ### L'essai ne change pas
 
 `essai` vaut zéro franc : il n'y a rien à encaisser. Une demande d'essai suit
@@ -1949,6 +1982,42 @@ git commit -m "feat(abonnement): la vérification, appelée par le retour et par
 ---
 
 ## Task 5: Créer la vente
+> **Repris le 2026-09-03, à l'exécution.** Cette tâche est livrée pour le
+> **renouvellement** seulement — un compte existe, il paie la période suivante.
+> Le chemin de checkout de `demander-ouverture`, que l'amendement lui ajoute,
+> reste à écrire : il n'a pas de jeton, pas de fiche, et il dépend du stockage
+> d'empreinte tranché plus haut.
+>
+> Trois écarts avec le texte d'origine, dont deux sur l'**ordre des contrôles** :
+>
+> - **La configuration du fournisseur se lit après l'identité.** Même écart
+>   qu'en tâche 4, au même endroit : un inconnu apprenait, par la seule
+>   différence entre 403 et 500, si le paiement est configuré chez nous et quels
+>   paliers ont un produit.
+> - **Le refus du collaborateur passe avant la configuration.** « Tu es
+>   collaborateur, tu n'as rien à payer » est vrai que la boutique soit
+>   configurée ou non. Placé après, ce refus devenait **inobservable partout où
+>   il est testé** — `CHARIOW_CLE_API` n'existe ni en local ni au CI, et la
+>   fonction s'arrêtait avant de l'atteindre. C'est pourtant la seule barrière
+>   serveur qui empêche de vendre à un collaborateur ce qu'il a déjà.
+>
+> - **Le repli de `URL_RETOUR_COLLECTEUR` était l'adresse Netlify.**
+>   `kolek-collecteur.netlify.app` rend un 301 vers l'adresse canonique depuis
+>   le 2026-08-27, et les listes CORS des Edge Functions ne nomment que la
+>   canonique : le payeur serait revenu par une redirection, vers une origine
+>   que rien n'autorise. `Docs/deploiement.md` §7.2 le disait déjà pour le
+>   secret ; le repli du code disait l'inverse. C'est `https://app.kolek.cash`.
+>
+> L'étape 2 du plan — « la suite entière passe » — ne mesurait rien de ce que
+> cette tâche écrit. Cinq tests la remplacent : le portillon, et les deux faces
+> du refus du collaborateur. La seconde face compte autant que la première : un
+> refus posé trop haut refuserait aussi celui qui doit payer, et un test qui ne
+> vérifie que le refus ne le verrait pas.
+>
+> Ce qui reste hors de portée d'ici, et c'est écrit plutôt que caché : la vente
+> elle-même, la remise en `discount_code`, et la supersession des tentatives
+> précédentes. Les trois vivent derrière `CHARIOW_CLE_API`.
+
 
 **Files:**
 - Create: `supabase/functions/abonnement-payer/index.ts`
@@ -2021,7 +2090,7 @@ Deno.serve(async (requete) => {
   const cleService = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const cleApi = Deno.env.get('CHARIOW_CLE_API');
   const racine = Deno.env.get('CHARIOW_API_URL') ?? 'https://api.chariow.com/v1';
-  const retour = Deno.env.get('URL_RETOUR_COLLECTEUR') ?? 'https://kolek-collecteur.netlify.app';
+  const retour = Deno.env.get('URL_RETOUR_COLLECTEUR') ?? 'https://app.kolek.cash';
 
   if (!url || !cleAnon || !cleService || !cleApi) {
     console.error('Configuration incomplète.');
