@@ -110,7 +110,7 @@ Deno.serve(async (requete) => {
   });
 
   try {
-    const paiements = await chargerPaiementsRattrapables(clientService, utilisateur.user.id);
+    const paiements = await chargerPaiementsRattrapables(clientService, { collecteur: utilisateur.user.id });
     const resultat = await reconcilier(paiements, creerDepot(clientService, { racine, cleApi }));
     return reponse(resultat, 200, requete);
   } catch (cause) {

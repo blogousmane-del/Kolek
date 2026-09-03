@@ -205,7 +205,7 @@ Deno.serve(async (requete) => {
   // abandonnées. Réconcilier **avant** de clore est la seule façon de ne pas
   // abandonner une vente qui vient d'être réglée.
   try {
-    const anciens = await chargerPaiementsRattrapables(clientService, collecteurId);
+    const anciens = await chargerPaiementsRattrapables(clientService, { collecteur: collecteurId });
     if (anciens.length > 0) {
       await reconcilier(anciens, creerDepot(clientService, { racine, cleApi }));
       await clientService

@@ -494,3 +494,20 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# ---------------------------------------------------------------------------
+# Edge Functions
+# ---------------------------------------------------------------------------
+# Première section [functions] du projet, et elle n'existe que pour une
+# fonction. Les autres exigent toutes un jeton ; celle-ci ne peut pas — Chariow
+# ne signe pas ses webhooks et ne porte aucune identité Supabase.
+#
+# Ce que `verify_jwt = false` ouvre exactement : le droit d'atteindre le code de
+# la fonction. Pas le droit d'obtenir quoi que ce soit — le secret d'URL est
+# comparé en temps constant, et la fonction ne crédite jamais sur la foi du
+# corps reçu : elle relit le statut chez Chariow avant toute décision.
+#
+# Au déploiement, la ligne de commande doit le redire :
+#   npx supabase functions deploy chariow-webhook --no-verify-jwt
+[functions.chariow-webhook]
+verify_jwt = false

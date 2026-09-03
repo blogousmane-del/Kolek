@@ -167,15 +167,24 @@ describe('chargerPaiementsRattrapables', () => {
     return (data as { id: string }).id;
   }
 
-  const charger = (id: string) =>
-    chargerPaiementsRattrapables(admin as never, id);
+  const charger = (id: string) => chargerPaiementsRattrapables(admin as never, { collecteur: id });
+
+  const demandesPosees: string[] = [];
 
   beforeAll(async () => {
     alice = await creerCollecteur('Alice Rattrapage', telephone());
     bob = await creerCollecteur('Bob Rattrapage', telephone());
   });
 
-  afterAll(nettoyer);
+  afterAll(async () => {
+    // `demande_id` est en `on delete restrict` : le paiement part d'abord. Et la
+    // demande n'appartient à aucun compte, donc `nettoyer` ne la voit pas.
+    for (const id of demandesPosees.splice(0)) {
+      await admin.from('paiements_abonnement').delete().eq('demande_id', id);
+      await admin.from('demandes_ouverture').delete().eq('id', id);
+    }
+    await nettoyer();
+  });
 
   it('rend en attente et échoué, jamais réglé ni abandonné', async () => {
     const attente = await poser(alice.id);
@@ -227,6 +236,32 @@ describe('chargerPaiementsRattrapables', () => {
     // La borne mord dans un sens seulement : sans cette seconde assertion, une
     // fenêtre réglée à zéro jour passerait ce test.
     expect(lot).toContain(recent);
+  });
+
+  it('sert aussi une demande, dont le paiement précède le compte', async () => {
+    // Le chemin du prospect : il paie avant d'avoir un compte, donc son paiement
+    // ne porte aucun `collecteur_id`. Filtrer sur cette seule colonne
+    // laisserait le webhook les yeux fermés sur la moitié des règlements — la
+    // moitié qui fait naître les comptes.
+    const { data: demande, error } = await admin
+      .from('demandes_ouverture')
+      .insert({ nom: 'Prospect Rattrapage', telephone: telephone(), email: 'prospect@example.ci', palier: 'pro' })
+      .select('id')
+      .single();
+    if (error) throw new Error(error.message);
+    const demandeId = (demande as { id: string }).id;
+    demandesPosees.push(demandeId);
+
+    const id = await poser(null as never, { demande_id: demandeId });
+
+    const lot = await chargerPaiementsRattrapables(admin as never, { demande: demandeId });
+
+    expect(lot.map((p) => p.id)).toEqual([id]);
+    expect(lot[0]).toMatchObject({ collecteur_id: null, demande_id: demandeId });
+    // Et il ne se laisse pas prendre pour un paiement de compte : une cible
+    // mal branchée qui filtrerait toujours sur `collecteur_id` rendrait ici la
+    // liste entière des paiements sans compte, pas celle-ci.
+    expect(await charger(alice.id)).not.toContainEqual(expect.objectContaining({ id }));
   });
 });
 

@@ -1036,8 +1036,20 @@ front n'appelle jamais le fournisseur, il passe par une Edge Function.
 ```bash
 npx supabase functions deploy abonnement-payer
 npx supabase functions deploy abonnement-verifier
+npx supabase functions deploy demander-ouverture
 npx supabase functions deploy chariow-webhook --no-verify-jwt
 ```
+
+`demander-ouverture` existait déjà : elle est dans cette liste parce que depuis
+l'amendement « payer vaut accord » du 2026-09-03 une demande à palier payant
+part payer au lieu d'attendre un rappel. Sans son redéploiement, le formulaire
+de la vitrine continue d'enregistrer des demandes que personne ne facture — ce
+qui ne se voit nulle part, sinon à l'absence de paiements.
+
+Le webhook, lui, **crée le compte** quand le règlement d'un prospect est
+confirmé : il reprend l'empreinte de mot de passe rangée à la demande et appelle
+`auth.admin.createUser`. C'est le seul chemin du produit qui le fasse sans
+qu'un humain l'ait décidé, et c'est ce que l'amendement a tranché.
 
 **`--no-verify-jwt` n'est pas optionnel sur la troisième**, et c'est le seul
 endroit du projet où ce drapeau apparaît. Chariow ne signe pas ses webhooks et

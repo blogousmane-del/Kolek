@@ -98,8 +98,23 @@ export async function lireVenteChariow(
 }
 
 /**
+ * À qui se rapportent les paiements qu'on veut relire.
+ *
+ * Un paiement appartient à un compte **ou** à une demande d'ouverture, jamais
+ * aux deux — c'est la contrainte `paiements_rattachement`. Les deux cas passent
+ * par la même requête plutôt que par deux fonctions jumelles : la fenêtre de
+ * rattrapage et la liste de colonnes sont ce qui compte ici, et deux copies
+ * finiraient par n'en garder qu'une à jour.
+ */
+export type Cible = { collecteur: string } | { demande: string };
+
+/**
  * Les paiements qu'il vaut la peine de relire : ceux en attente, et ceux
  * refusés depuis moins de quatorze jours.
+ *
+ * La cible peut être un compte — le renouvellement d'un collecteur — ou une
+ * demande d'ouverture, dont le paiement précède le compte et n'en porte donc
+ * aucun.
  *
  * `remise_pct`, `collecteur_id` et `demande_id` font partie de la sélection.
  * Sans le premier, le contrôle de grille de `reconcilier` écrirait une anomalie
@@ -109,14 +124,17 @@ export async function lireVenteChariow(
  */
 export async function chargerPaiementsRattrapables(
   clientService: SupabaseClient,
-  collecteurId: string,
+  cible: Cible,
 ): Promise<PaiementEnCours[]> {
   const depuis = new Date(Date.now() - JOURS_RATTRAPAGE * 86_400_000).toISOString();
+
+  const [colonne, valeur] =
+    'collecteur' in cible ? ['collecteur_id', cible.collecteur] : ['demande_id', cible.demande];
 
   const { data, error } = await clientService
     .from('paiements_abonnement')
     .select('id, palier, vente_id, montant, devise, remise_pct, collecteur_id, demande_id, cree_le')
-    .eq('collecteur_id', collecteurId)
+    .eq(colonne, valeur)
     .in('statut', ['en_attente', 'echoue'])
     .gte('cree_le', depuis)
     .order('cree_le', { ascending: true })

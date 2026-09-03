@@ -82,6 +82,7 @@ Le remplacement est une table d'indicatifs explicite, et il coûte quelque chose
 | `supabase/functions/abonnement-payer/index.ts` | **Créer.** Crée la vente, rend `checkoutUrl`. |
 | `supabase/functions/abonnement-verifier/index.ts` | **Créer.** Réconcilie les paiements de l'appelant. |
 | `supabase/functions/chariow-webhook/index.ts` | **Créer.** Point d'entrée public, secret en URL, ne crédite rien lui-même. |
+| `supabase/functions/_shared/ouvrir-compte.ts` | **Créer.** La naissance d'un compte au règlement : empreinte reprise, reprise idempotente, refus de deviner. Injecté par le seul webhook. |
 | `supabase/migrations/20260902160000_abonnements_paiements.sql` | **Créer.** Table, RLS, privilèges, immuabilité, journal, `crediter_abonnement`, garde-fous. |
 | `supabase/migrations/20260902170000_admin_paiements.sql` | **Créer.** `admin_paiements_recents()` pour l'administration. |
 | `supabase/config.toml` | **Modifier.** Première section `[functions]` : `verify_jwt = false` sur le seul webhook. |
@@ -2369,133 +2370,145 @@ git commit -m "feat(abonnement): créer la vente, sans jamais laisser le télép
 
 ---
 
-## Task 6: Le webhook, premier point d'entrée public
+## Task 6: Le webhook, premier point d'entrée public — et la naissance du compte
+
+> **Réécrite le 2026-09-03, à l'exécution.** Le texte d'origine précédait
+> l'amendement « payer vaut accord » ; le tableau de l'amendement le disait
+> lui-même : *« le webhook et la réconciliation créent le compte avant de
+> créditer »*. Trois choses ont changé, et la troisième n'était pas prévue.
+>
+> 1. **Le webhook est le seul chemin qui injecte une vraie ouverture de compte.**
+>    `abonnement-verifier` réconcilie les paiements du collecteur connecté : ils
+>    portent tous un compte. Le webhook reçoit les règlements de prospects, dont
+>    le paiement précède le compte.
+> 2. **`chargerPaiementsRattrapables` ne pouvait pas les voir.** Elle filtrait
+>    sur `collecteur_id`, qui est `null` pour un paiement de demande. Le webhook
+>    aurait donc réconcilié zéro ligne sur exactement la moitié des règlements —
+>    celle qui fait naître les comptes.
+> 3. **La reprise.** Entre `createUser` qui réussit et `crediter_abonnement` qui
+>    n'a pas encore tourné, il y a un appel réseau. Si elle se referme mal, le
+>    passage suivant retrouve un paiement en attente et une adresse déjà prise :
+>    sans reprise, ce paiement n'est **jamais** crédité. Quelqu'un aurait payé,
+>    aurait un compte, et pas l'abonnement. Rien dans le plan ne le prévoyait.
 
 **Files:**
+- Create: `supabase/functions/_shared/ouvrir-compte.ts`
 - Create: `supabase/functions/chariow-webhook/index.ts`
-- Modify: `supabase/config.toml` (ajouter la section `[functions.chariow-webhook]` en fin de fichier)
+- Modify: `supabase/functions/_shared/depot-chariow.ts` (la cible de `chargerPaiementsRattrapables`)
+- Modify: `supabase/functions/abonnement-verifier/index.ts`, `supabase/functions/abonnement-payer/index.ts` (le nouvel appel)
+- Modify: `supabase/config.toml` (section `[functions.chariow-webhook]` en fin de fichier)
+- Test: `supabase/tests/ouvrir-compte.test.ts`, `supabase/tests/chariow-webhook.test.ts`, `supabase/tests/depot-chariow.test.ts`
 
 **Interfaces:**
-- Consumes: `secretValide` de `_shared/chariow.ts` ; `creerDepot`, `chargerPaiementsRattrapables` ; `reconcilier`.
-- Produces: l'Edge Function `chariow-webhook`. Aucune interface consommée par une tâche suivante.
+- Consumes: `secretValide` de `_shared/secret.ts` (sorti de `chariow.ts` à la tâche du drainage) ; `chargerPaiementsRattrapables`, `creerDepot`, type `OuvrirCompte` de `_shared/depot-chariow.ts` ; `reconcilier` de `_shared/reconciliation.ts`.
+- Produces: `ouvrirCompteDepuisDemande(clientService): OuvrirCompte` · type `Cible = { collecteur: string } | { demande: string }` · l'Edge Function `chariow-webhook`.
 
-- [ ] **Step 1: Écrire la fonction**
+### Ce qui décide, et ce qui câble
 
-Créer `supabase/functions/chariow-webhook/index.ts` :
+`ouvrir-compte.ts` est le seul fichier de ce lot qui contienne du jugement, et
+c'est pour cela qu'il est à part et testé sans base :
+
+* **L'ordre.** `reconcilier` n'appelle l'ouverture qu'après avoir reconnu la
+  vente réglée et le montant cohérent. Puis le compte, puis le crédit. Un compte
+  sans abonnement se répare ; un abonnement crédité sans compte ne se rattache à
+  rien.
+* **Ce qui part chez GoTrue.** `password_hash`, jamais `password` : le clair
+  n'existe nulle part à ce stade. `email_confirm: true`, sans quoi le payeur
+  resterait dehors juste après avoir payé. `nom` et `telephone` par les
+  métadonnées, d'où `creer_collecteur_apres_signup` les lit — c'est le chemin
+  déjà en place, et en ouvrir un second créerait deux façons de naître pour un
+  collecteur.
+* **La reprise, et ses deux conditions.** Elle retrouve le compte par le numéro
+  — `collecteurs.telephone` est unique — **et** vérifie que ce compte porte
+  l'adresse de la demande. La première condition seule ferait créditer un
+  homonyme de numéro : cas rare, constructible, et que personne ne remarquerait.
+  Toute autre cause d'échec est refusée sans chercher — un « Database error
+  creating new user » signifie le plus souvent un numéro déjà porté, et
+  retrouver un compte par ce numéro reviendrait précisément à créditer un tiers.
+
+- [ ] **Step 1: Écrire les tests de l'ouverture de compte**
+
+`supabase/tests/ouvrir-compte.test.ts`, entièrement bouchonné — ni réseau, ni
+base. Dix-sept assertions réparties en cinq groupes : ce qui part chez GoTrue,
+la zone (posée après coup, et son échec n'empêche pas l'ouverture), les refus
+avant toute création (pas de demande, demande introuvable, pas d'empreinte, pas
+d'adresse), la reprise, et les autres échecs de création.
+
+Les deux tests qui portent la propriété de sécurité :
 
 ```ts
-import { createClient } from 'npm:@supabase/supabase-js@2';
-
-import { secretValide } from '../_shared/chariow.ts';
-import { chargerPaiementsRattrapables, creerDepot } from '../_shared/depot-chariow.ts';
-import { reconcilier } from '../_shared/reconciliation.ts';
-
-/**
- * Le webhook « Pulse » de Chariow.
- *
- * ## Le premier point d'entrée public du projet
- *
- * Les six autres Edge Functions exigent toutes un jeton ; celle-ci ne peut pas.
- * Chariow ne signe pas ses appels — `Docs/Chariow.md` §7 — et le seul secret
- * partagé voyage dans l'URL. `supabase/config.toml` porte donc, pour cette
- * fonction et pour elle seule, `verify_jwt = false`.
- *
- * Quatre garde-fous en contrepartie :
- *
- * 1. **Le secret est comparé en temps constant.** Une comparaison de chaînes
- *    s'arrête au premier caractère différent et fuit la longueur du préfixe
- *    correct.
- * 2. **La fonction ne crédite rien par elle-même.** Le corps du webhook n'est
- *    pas une preuve de paiement : il dit seulement *quelle* vente relire. La
- *    décision vient toujours d'un `GET /sales/{id}`. C'est ce qui rend le
- *    secret non critique — le connaître permet de déclencher une relecture,
- *    pas d'obtenir un abonnement.
- * 3. **Aucun en-tête CORS.** Aucun navigateur n'appelle cette adresse.
- * 4. **200 même sur un événement inconnu**, pour ne pas provoquer de vagues de
- *    réessais ; 401 sur secret invalide, sans autre détail.
- */
-
-const JSON_ENTETES = { 'Content-Type': 'application/json' };
-
-function reponse(corps: unknown, statut: number): Response {
-  return new Response(JSON.stringify(corps), { status: statut, headers: JSON_ENTETES });
-}
-
-Deno.serve(async (requete) => {
-  if (requete.method !== 'POST') {
-    return reponse({ erreur: 'METHODE_NON_AUTORISEE' }, 405);
-  }
-
-  const secretAttendu = Deno.env.get('CHARIOW_SECRET_WEBHOOK') ?? '';
-  const secretRecu = new URL(requete.url).searchParams.get('secret');
-
-  if (!(await secretValide(secretRecu, secretAttendu))) {
-    return reponse({ erreur: 'SECRET_INVALIDE' }, 401);
-  }
-
-  const url = Deno.env.get('SUPABASE_URL');
-  const cleService = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const cleApi = Deno.env.get('CHARIOW_CLE_API');
-  const racine = Deno.env.get('CHARIOW_API_URL') ?? 'https://api.chariow.com/v1';
-
-  if (!url || !cleService || !cleApi) {
-    console.error('Configuration incomplète.');
-    return reponse({ erreur: 'CONFIGURATION' }, 500);
-  }
-
-  let charge: Record<string, unknown>;
-  try {
-    charge = (await requete.json()) as Record<string, unknown>;
-  } catch {
-    // Corps illisible : on accuse réception sans rien faire. Réessayer
-    // n'améliorerait pas un corps mal formé.
-    return reponse({ recu: true }, 200);
-  }
-
-  const donnees = (charge.data ?? charge) as Record<string, unknown>;
-  const metadonnees = (donnees.custom_metadata ?? {}) as Record<string, unknown>;
-  const venteId = typeof donnees.id === 'string' ? donnees.id : null;
-
-  const clientService = createClient(url, cleService, {
-    auth: { persistSession: false, autoRefreshToken: false },
+it('refuse quand le compte trouvé ne porte pas l’adresse de la demande', async () => {
+  const { client } = clientFactice({
+    ...DOUBLON,
+    parTelephone: { data: { id: 'compte-d-un-tiers' }, error: null },
+    parId: { data: { user: { email: 'quelquun-dautre@example.ci' } } },
   });
 
-  // Identifier le collecteur : d'abord par les métadonnées de la vente, sinon
-  // en cherchant l'identifiant de vente dans notre registre.
-  let collecteurId =
-    typeof metadonnees.collecteurId === 'string' ? metadonnees.collecteurId : null;
+  await expect(ouvrirCompteDepuisDemande(client)(PAIEMENT as never)).rejects.toThrow(
+    'REPRISE_INCERTAINE',
+  );
+});
 
-  if (!collecteurId && venteId) {
-    const { data } = await clientService
-      .from('paiements_abonnement')
-      .select('collecteur_id')
-      .eq('vente_id', venteId)
-      .maybeSingle();
-    collecteurId = (data?.collecteur_id as string | undefined) ?? null;
-  }
+it('ne cherchent aucun compte : deviner créditerait un tiers', async () => {
+  const { client, journal } = clientFactice({
+    creation: { data: { user: null }, error: { message: 'Database error creating new user' } },
+  });
 
-  if (!collecteurId) {
-    // Événement qui ne nous concerne pas, ou vente inconnue. On accuse
-    // réception : provoquer des réessais sur un événement étranger n'aide
-    // personne.
-    console.error('[Abonnement] webhook sans collecteur identifiable');
-    return reponse({ recu: true }, 200);
-  }
-
-  try {
-    const paiements = await chargerPaiementsRattrapables(clientService, collecteurId);
-    const resultat = await reconcilier(paiements, creerDepot(clientService, { racine, cleApi }));
-    return reponse({ recu: true, credites: resultat.credites }, 200);
-  } catch (cause) {
-    console.error('[Abonnement] webhook :', cause instanceof Error ? cause.message : cause);
-    // 500 ici est utile : il fait réessayer Chariow, et une panne de notre côté
-    // mérite un réessai.
-    return reponse({ erreur: 'RECONCILIATION_IMPOSSIBLE' }, 500);
-  }
+  await expect(ouvrirCompteDepuisDemande(client)(PAIEMENT as never)).rejects.toThrow(
+    'COMPTE_IMPOSSIBLE',
+  );
+  expect(journal.telephonesCherches).toHaveLength(0);
 });
 ```
 
-- [ ] **Step 2: Ouvrir la fonction dans la configuration**
+- [ ] **Step 2: Écrire `_shared/ouvrir-compte.ts`**
+
+`ouvrirCompteDepuisDemande(clientService)` rend un `OuvrirCompte`. Il lit
+`demandes_ouverture` par `paiement.demande_id`, refuse une demande sans adresse
+ou sans empreinte — celles déposées avant l'amendement n'en portent pas —,
+appelle `auth.admin.createUser({ email, password_hash, email_confirm: true,
+user_metadata: { nom, telephone } })`, reprend le compte existant si et
+seulement si les deux conditions ci-dessus sont réunies, pose la zone sans
+faire dépendre l'ouverture de son succès, et rend l'identifiant.
+
+- [ ] **Step 3: Vérifier que le filet tombe**
+
+Neutraliser tour à tour la comparaison d'adresses et le filtre `DEJA_PRIS`, puis
+relancer. Attendu : `2 failed | 15 passed`. Un contrôle qui ne peut pas échouer
+pour la bonne raison n'est pas un contrôle.
+
+- [ ] **Step 4: Ouvrir `chargerPaiementsRattrapables` aux demandes**
+
+Une seule requête, une cible discriminée — et non deux fonctions jumelles : la
+fenêtre de rattrapage et la liste de colonnes sont ce qui compte ici, et deux
+copies finiraient par n'en garder qu'une à jour.
+
+```ts
+export type Cible = { collecteur: string } | { demande: string };
+
+const [colonne, valeur] =
+  'collecteur' in cible ? ['collecteur_id', cible.collecteur] : ['demande_id', cible.demande];
+```
+
+Les deux appelants existants deviennent `{ collecteur: … }`. Le test ajouté à
+`depot-chariow.test.ts` pose une demande, un paiement qui la règle, et mesure
+que `{ demande: … }` le trouve et que `{ collecteur: … }` ne le trouve pas.
+Nettoyage : `demande_id` est en `on delete restrict`, le paiement part d'abord.
+
+- [ ] **Step 5: Écrire la fonction**
+
+`supabase/functions/chariow-webhook/index.ts`. POST seul, secret d'URL comparé
+en temps constant, configuration, corps illisible accusé sans rien faire, puis
+la cible : métadonnées d'abord, notre registre par `vente_id` ensuite. Ni l'une
+ni l'autre ne décide de qui sera crédité — elles désignent des lignes, dont le
+rattachement est relu en base. Enfin :
+
+```ts
+const depot = creerDepot(clientService, { racine, cleApi }, ouvrirCompteDepuisDemande(clientService));
+const resultat = await reconcilier(paiements, depot);
+```
+
+- [ ] **Step 6: Ouvrir la fonction dans la configuration**
 
 Ajouter en fin de `supabase/config.toml` :
 
@@ -2504,11 +2517,11 @@ Ajouter en fin de `supabase/config.toml` :
 # Edge Functions
 # ---------------------------------------------------------------------------
 # Première section [functions] du projet, et elle n'existe que pour une
-# fonction. Les six autres exigent toutes un jeton ; celle-ci ne peut pas —
-# Chariow ne signe pas ses webhooks et ne porte aucune identité Supabase.
+# fonction. Les autres exigent toutes un jeton ; celle-ci ne peut pas — Chariow
+# ne signe pas ses webhooks et ne porte aucune identité Supabase.
 #
-# Ce que `verify_jwt = false` ouvre exactement : le droit d'atteindre le code
-# de la fonction. Pas le droit d'obtenir quoi que ce soit — le secret d'URL est
+# Ce que `verify_jwt = false` ouvre exactement : le droit d'atteindre le code de
+# la fonction. Pas le droit d'obtenir quoi que ce soit — le secret d'URL est
 # comparé en temps constant, et la fonction ne crédite jamais sur la foi du
 # corps reçu : elle relit le statut chez Chariow avant toute décision.
 #
@@ -2518,16 +2531,30 @@ Ajouter en fin de `supabase/config.toml` :
 verify_jwt = false
 ```
 
-- [ ] **Step 3: Vérifier que la configuration est lisible**
+- [ ] **Step 7: Écrire les tests de porte, et vérifier qu'ils mesurent quelque chose**
 
-Run: `npx supabase status -o json`
-Expected: la commande répond sans erreur d'analyse du fichier `config.toml`.
+`supabase/tests/chariow-webhook.test.ts`. Un refus de la plateforme et un refus
+de la fonction portent tous deux `401` : le statut seul ne dirait rien. Les
+assertions portent donc sur le **corps** — Kong rend son propre message, la
+fonction rend `SECRET_INVALIDE`.
 
-- [ ] **Step 4: Commit**
+`CHARIOW_SECRET_WEBHOOK` n'existant ni en local ni au CI, la fonction refuse
+tout, y compris la chaîne vide. C'est exactement la propriété qu'on veut au
+déploiement : une fonction partie avant son secret ne s'ouvre à personne.
+
+Une nouvelle fonction n'est pas servie par un simple `docker restart` du runtime
+— il faut `npx supabase stop` puis `npx supabase start -x studio,storage-api,…`.
+
+Vérification du filet : retirer la section de `config.toml`, redémarrer, relancer.
+Attendu : `3 failed | 2 passed`. Les deux qui tiennent sont ceux qui comparent
+deux refus entre eux — Kong refuse de façon cohérente lui aussi, et c'est
+précisément pourquoi les trois autres portent sur le corps.
+
+- [ ] **Step 8: Commit**
 
 ```bash
-git add supabase/functions/chariow-webhook/ supabase/config.toml
-git commit -m "feat(abonnement): le webhook Chariow, public mais incapable de créditer seul"
+git add supabase/functions/ supabase/tests/ supabase/config.toml Docs/plans/
+git commit -m "feat(abonnement): le webhook Chariow, public mais incapable de crediter seul"
 ```
 
 ---
