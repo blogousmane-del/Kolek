@@ -109,6 +109,18 @@ export interface VueGlobale {
   /** Bornée à 500 lignes côté serveur ; voir `cartes_total_lignes`. */
   cartes: LigneCarte[];
   cartes_total_lignes: number;
+  /** Ajouté en J5. `null` si l'agrégation des paiements a échoué — l'écran le
+      dit alors, plutôt que d'afficher un tiret qui se lirait « jamais payé ». */
+  paiements: {
+    total_30j: number;
+    nombre_30j: number;
+    par_collecteur: Array<{
+      collecteur_id: string;
+      dernier_le: string;
+      dernier_montant: number;
+      derniere_devise: string;
+    }>;
+  } | null;
 }
 
 export type EtatVue =

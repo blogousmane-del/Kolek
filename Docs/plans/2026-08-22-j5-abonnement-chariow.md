@@ -3780,9 +3780,25 @@ git commit -m "feat(collecteur): régler son abonnement depuis le carnet"
 
 ## Task 12: L'argent visible côté administration
 
+> **Repris le 2026-09-03, à l'exécution.** Trois écarts avec le texte d'origine.
+>
+> - `set search_path to 'public'` devient `= public, pg_temp`. Sans `pg_temp`
+>   en fin de chemin, un appelant qui crée une table temporaire du même nom que
+>   la cible la fait lire à sa place — mesuré le 2026-08-30, tenu depuis par
+>   `search-path.test.ts`, qui aurait refusé la migration telle qu'écrite.
+> - `collecteur_id is not null` s'ajoute au filtre : depuis « payer vaut
+>   accord », un règlement peut porter une demande et pas encore de compte, et
+>   une entrée à `collecteur_id` nul ne correspondrait à aucune ligne de
+>   l'écran.
+> - **Aucun test n'était prévu**, ni pour la fonction SQL ni pour l'écran. Deux
+>   fichiers les portent maintenant : les droits et la fenêtre de trente jours
+>   d'un côté, les trois états de la colonne de l'autre. `dernierPaiement` est
+>   exportée pour cela — c'est la seule décision de cet écran qui ne se voit pas
+>   à l'œil.
+
 **Files:**
-- Create: `supabase/migrations/20260902170000_admin_paiements.sql`
-- Modify: `supabase/functions/admin-vue-globale/index.ts:146-173`
+- Create: `supabase/migrations/20260902170000_admin_paiements.sql`, `supabase/tests/admin-paiements.test.ts`, `apps/admin/src/ecrans/Abonnements.test.tsx`
+- Modify: `supabase/functions/admin-vue-globale/index.ts` (le `return` final)
 - Modify: `apps/admin/src/donnees.ts`
 - Modify: `apps/admin/src/ecrans/Abonnements.tsx`
 
@@ -3802,18 +3818,31 @@ Créer `supabase/migrations/20260902170000_admin_paiements.sql` :
 -- qu'elle reçoit sans énumérer les clés. Deux appels coûtent un aller-retour de
 -- base ; réécrire une fonction de trois cents lignes pour y greffer un bloc
 -- coûte une revue entière.
+--
+-- Deux écarts avec le plan du 2026-08-22, assumés :
+--
+--   1. `set search_path = public, pg_temp`, et non `public` seul. Sans
+--      `pg_temp` en fin de chemin, un appelant qui crée une table temporaire du
+--      même nom que la cible la fait lire à sa place — mesuré le 2026-08-30, et
+--      tenu depuis par `search-path.test.ts`. Le plan est antérieur.
+--
+--   2. `collecteur_id is not null`. Depuis l'amendement « payer vaut accord »,
+--      un règlement peut porter une demande d'ouverture et pas encore de
+--      compte. Une entrée à `collecteur_id` nul ne correspondrait à aucune
+--      ligne de l'écran ; elle ne s'y verrait pas, elle s'y perdrait.
 
 create or replace function public.admin_paiements_recents()
 returns jsonb
 language sql
 stable
 security definer
-set search_path to 'public'
+set search_path = public, pg_temp
 as $$
   with regles as (
     select collecteur_id, montant, devise, regle_le
       from public.paiements_abonnement
      where statut = 'regle'
+       and collecteur_id is not null
   ),
   derniers as (
     select distinct on (collecteur_id)
@@ -3850,7 +3879,7 @@ grant execute on function public.admin_paiements_recents() to service_role;
 
 -- Garde-fou — le même que pour `admin_vue_globale`, et pour la même raison :
 -- `create or replace` réattribue EXECUTE à PUBLIC sans rien dire.
-do $$
+do $garde$
 declare ouverte boolean;
 begin
   select has_function_privilege('authenticated', 'public.admin_paiements_recents()', 'EXECUTE')
@@ -3858,12 +3887,210 @@ begin
   if ouverte then
     raise exception 'GARDE_FOU : admin_paiements_recents est exécutable par authenticated';
   end if;
-end $$;
+end $garde$;
 ```
+
+- [ ] **Step 1bis: Écrire les tests de la fonction**
+
+Créer `supabase/tests/admin-paiements.test.ts` :
+
+```ts
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { admin, anonyme, creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
+
+afterAll(nettoyer);
+
+/**
+ * `admin_paiements_recents()` — ce que l'administration voit de l'argent entré.
+ *
+ * Fonction séparée de `admin_vue_globale()`, qui fait déjà trois cents lignes.
+ * Elle traverse toutes les lignes de `paiements_abonnement`, ce qu'aucune
+ * politique RLS n'accorde : elle est donc `security definer`, et le seul
+ * garde-fou qui vaille est le retrait d'`EXECUTE` à `authenticated`.
+ *
+ * Les totaux de cette fonction sont **globaux**. Les autres fichiers de la
+ * suite laissent des règlements derrière eux, donc rien ici n'affirme une
+ * valeur absolue : on mesure un écart avant/après. `fileParallelism: false`
+ * rend cet écart déterministe.
+ */
+
+const SERIE = String(Date.now()).slice(-7);
+let compteur = 0;
+function telephone(): string {
+  compteur += 1;
+  return `+225${SERIE}${String(compteur).padStart(2, '0')}`;
+}
+
+interface Recents {
+  total_30j: number;
+  nombre_30j: number;
+  par_collecteur: Array<{
+    collecteur_id: string;
+    dernier_le: string;
+    dernier_montant: number;
+    derniere_devise: string;
+  }>;
+}
+
+async function lire(): Promise<Recents> {
+  const { data, error } = await admin.rpc('admin_paiements_recents');
+  if (error) throw error;
+  return data as Recents;
+}
+
+function ilYAJours(jours: number): string {
+  return new Date(Date.now() - jours * 24 * 3600 * 1000).toISOString();
+}
+
+/** Un règlement déjà crédité, posé directement : cette suite lit, elle ne crédite pas. */
+async function poserRegle(collecteurId: string, montant: number, regleLe: string) {
+  const { error } = await admin.from('paiements_abonnement').insert({
+    collecteur_id: collecteurId,
+    palier: 'pro',
+    vente_id: `vente-recents-${crypto.randomUUID()}`,
+    montant,
+    devise: 'XOF',
+    echeance_avant: '2026-01-01',
+    statut: 'regle',
+    regle_le: regleLe,
+    echeance_apres: '2026-02-01',
+  });
+  if (error) throw error;
+}
+
+let zoe: CollecteurTest;
+
+beforeAll(async () => {
+  zoe = await creerCollecteur('Zoe Paiements', telephone());
+});
+
+describe('admin_paiements_recents — les droits', () => {
+  it('refuse un collecteur authentifié', async () => {
+    // Sans le `revoke ... from public` de la migration, `authenticated`
+    // hériterait de l'exécution par défaut, et ce seul appel rendrait à
+    // n'importe quel collecteur les règlements de tous les autres.
+    const { error } = await zoe.client.rpc('admin_paiements_recents');
+
+    expect(error).not.toBeNull();
+    expect(error!.code).toBe('42501');
+  });
+
+  it('refuse le rôle anonyme', async () => {
+    const { error } = await anonyme.rpc('admin_paiements_recents');
+
+    expect(error).not.toBeNull();
+    expect(error!.code).toBe('42501');
+  });
+});
+
+describe('admin_paiements_recents — ce qu’elle compte', () => {
+  it('ajoute au total des trente jours un règlement récent', async () => {
+    const avant = await lire();
+    await poserRegle(zoe.id, 5000, ilYAJours(10));
+    const apres = await lire();
+
+    expect(Number(apres.total_30j) - Number(avant.total_30j)).toBe(5000);
+    expect(apres.nombre_30j - avant.nombre_30j).toBe(1);
+  });
+
+  it('laisse hors du total un règlement plus vieux que trente jours', async () => {
+    // La borne est la seule raison d'être du champ : un total « depuis
+    // toujours » ne dirait rien du mois en cours.
+    const vieux = await creerCollecteur('Vieux Reglement', telephone());
+    const avant = await lire();
+    await poserRegle(vieux.id, 7000, ilYAJours(40));
+    const apres = await lire();
+
+    expect(Number(apres.total_30j)).toBe(Number(avant.total_30j));
+    expect(apres.nombre_30j).toBe(avant.nombre_30j);
+  });
+
+  it('ne retient qu’un règlement par collecteur, le plus récent', async () => {
+    const client = await creerCollecteur('Deux Reglements', telephone());
+    await poserRegle(client.id, 5000, ilYAJours(60));
+    await poserRegle(client.id, 10000, ilYAJours(5));
+
+    const ligne = (await lire()).par_collecteur.find((p) => p.collecteur_id === client.id);
+
+    expect(ligne).toBeDefined();
+    expect(Number(ligne!.dernier_montant)).toBe(10000);
+    expect(ligne!.derniere_devise).toBe('XOF');
+  });
+
+  it('garde un collecteur dont le seul règlement est ancien', async () => {
+    // Hors du total des trente jours, mais toujours dans la colonne « dernier
+    // paiement » : « jamais payé » et « payé il y a six semaines » ne se
+    // traitent pas pareil.
+    const ancien = await creerCollecteur('Ancien Payeur', telephone());
+    await poserRegle(ancien.id, 2500, ilYAJours(45));
+
+    const ligne = (await lire()).par_collecteur.find((p) => p.collecteur_id === ancien.id);
+
+    expect(ligne).toBeDefined();
+    expect(Number(ligne!.dernier_montant)).toBe(2500);
+  });
+
+  it('ignore un paiement qui n’est pas réglé', async () => {
+    // Une intention de payer n'est pas un paiement. Sans ce filtre, un
+    // checkout abandonné apparaîtrait comme une facture honorée.
+    const attente = await creerCollecteur('En Attente', telephone());
+    const { error } = await admin.from('paiements_abonnement').insert({
+      collecteur_id: attente.id,
+      palier: 'pro',
+      vente_id: `vente-attente-${crypto.randomUUID()}`,
+      montant: 5000,
+      devise: 'XOF',
+      echeance_avant: '2026-01-01',
+    });
+    expect(error).toBeNull();
+
+    const ligne = (await lire()).par_collecteur.find((p) => p.collecteur_id === attente.id);
+    expect(ligne).toBeUndefined();
+  });
+
+  it('n’invente pas de ligne pour un paiement sans compte', async () => {
+    // Depuis « payer vaut accord », un règlement peut porter une demande et pas
+    // encore de collecteur. Une entrée à `collecteur_id` nul ne correspondrait
+    // à aucune ligne de l'écran.
+    const { data: demande, error: erreurDemande } = await admin
+      .from('demandes_ouverture')
+      .insert({
+        nom: 'Prospect Recents',
+        telephone: telephone(),
+        palier: 'pro',
+        email: `${crypto.randomUUID()}@kolek.test`,
+      })
+      .select('id')
+      .single();
+    expect(erreurDemande).toBeNull();
+
+    const { error } = await admin.from('paiements_abonnement').insert({
+      demande_id: demande!.id,
+      palier: 'pro',
+      vente_id: `vente-prospect-${crypto.randomUUID()}`,
+      montant: 5000,
+      devise: 'XOF',
+      echeance_avant: '2026-01-01',
+      statut: 'regle',
+      regle_le: ilYAJours(3),
+      echeance_apres: '2026-02-01',
+    });
+    expect(error).toBeNull();
+
+    const sansCompte = (await lire()).par_collecteur.filter((p) => p.collecteur_id === null);
+    expect(sansCompte).toEqual([]);
+  });
+});
+```
+
+Run : `npm run db:reset && npx vitest run --config supabase/tests/vitest.config.ts admin-paiements search-path`
+Expected : PASS — 8 tests ici, plus les 3 de `search-path` que la migration
+doit continuer de satisfaire.
 
 - [ ] **Step 2: Joindre le bloc à la vue globale**
 
-Dans `supabase/functions/admin-vue-globale/index.ts`, ne toucher ni à l'appel `admin_vue_globale`, ni au calcul du MRR. Insérer le bloc ci-dessous **juste avant** le `return` final (ligne 173), et remplacer ce `return` par le sien :
+Dans `supabase/functions/admin-vue-globale/index.ts`, ne toucher ni à l'appel `admin_vue_globale`, ni au calcul du MRR. Insérer le bloc ci-dessous **juste avant** le `return` final, et remplacer ce `return` par le sien :
 
 ```ts
   // Second appel, plutôt qu'un bloc de plus dans `admin_vue_globale()`. Un
@@ -3920,15 +4147,87 @@ Ajouter, à côté des autres fonctions d'affichage en tête de fichier :
  * ce collecteur n'a jamais payé, ou voici sa dernière facture. Rendre le
  * premier comme le deuxième ferait passer une panne pour un impayé.
  */
-function dernierPaiement(
+export function dernierPaiement(
   paiements: VueGlobale['paiements'],
   collecteurId: string,
 ): string {
   if (!paiements) return 'indisponible';
   const ligne = paiements.par_collecteur.find((p) => p.collecteur_id === collecteurId);
   if (!ligne) return 'jamais';
-  return `${dateLisible(ligne.dernier_le)} · ${formatMontant(Number(ligne.dernier_montant))} ${ligne.derniere_devise === 'XOF' ? 'FCFA' : ligne.derniere_devise}`;
+  const devise = ligne.derniere_devise === 'XOF' ? 'FCFA' : ligne.derniere_devise;
+  return `${dateLisible(ligne.dernier_le)} · ${formatMontant(Number(ligne.dernier_montant))} ${devise}`;
 }
+```
+
+Et les quatre cas qui la tiennent, dans `apps/admin/src/ecrans/Abonnements.test.tsx` :
+
+```tsx
+import { describe, expect, it } from 'vitest';
+
+import { dernierPaiement } from './Abonnements';
+import type { VueGlobale } from '../donnees';
+
+/**
+ * Trois états se ressemblent à l'écran et ne veulent pas dire la même chose :
+ * GTCS n'a pas pu lire les paiements, ce collecteur n'a jamais payé, ou voici
+ * sa dernière facture. Confondre les deux premiers ferait passer une panne
+ * d'agrégation pour un impayé — et personne ne va réclamer une somme déjà
+ * reçue.
+ */
+
+function paiements(
+  lignes: Array<{ collecteur_id: string; dernier_le: string; dernier_montant: number; derniere_devise: string }>,
+): VueGlobale['paiements'] {
+  return { total_30j: 0, nombre_30j: 0, par_collecteur: lignes };
+}
+
+describe('dernierPaiement', () => {
+  it('dit « indisponible » quand l’agrégation a échoué', () => {
+    expect(dernierPaiement(null, 'c1')).toBe('indisponible');
+  });
+
+  it('dit « jamais » pour un collecteur absent de la liste', () => {
+    expect(dernierPaiement(paiements([]), 'c1')).toBe('jamais');
+  });
+
+  it('rend la date et le montant du dernier règlement', () => {
+    const rendu = dernierPaiement(
+      paiements([
+        {
+          collecteur_id: 'c1',
+          dernier_le: '2026-08-21T20:04:00Z',
+          dernier_montant: 5000,
+          derniere_devise: 'XOF',
+        },
+      ]),
+      'c1',
+    );
+
+    expect(rendu).toContain('2026');
+    expect(rendu).toContain('FCFA');
+    // `formatMontant` sépare les milliers par une espace insécable — comparer
+    // sur « 5 000 » avec une espace ordinaire ferait échouer sans rien dire.
+    expect(rendu).toContain('5 000');
+  });
+
+  it('laisse passer une devise que la grille ne connaît pas', () => {
+    // `XOF` s'écrit « FCFA » pour le lecteur. Toute autre devise se rend telle
+    // quelle plutôt que d'être tue : un montant sans unité ne se vérifie pas.
+    const rendu = dernierPaiement(
+      paiements([
+        {
+          collecteur_id: 'c1',
+          dernier_le: '2026-08-21T20:04:00Z',
+          dernier_montant: 12,
+          derniere_devise: 'EUR',
+        },
+      ]),
+      'c1',
+    );
+
+    expect(rendu).toContain('EUR');
+  });
+});
 ```
 
 Ajouter l'en-tête `Dernier paiement` à la ligne d'en-têtes du tableau, et dans chaque ligne de collecteur, une cellule :
@@ -3941,13 +4240,18 @@ Ajouter l'en-tête `Dernier paiement` à la ligne d'en-têtes du tableau, et dan
 
 - [ ] **Step 5: Vérifier**
 
-Run: `npm run db:reset && npm run db:env && npx vitest run --config supabase/tests/vitest.config.ts && npm test && npm run build`
-Expected: PASS partout, construction sans erreur.
+Run: `npm run test:db && npm test && npm run typecheck --workspaces --if-present && npm run build`
+Expected: PASS partout — 597 tests de base sur 54 fichiers, construction sans
+erreur.
+
+Rappel de la pile locale : la migration est **nouvelle**, donc `db:reset` ; et
+`admin-vue-globale` est **modifiée**, donc `docker restart
+supabase_edge_runtime_Kolek` avant de mesurer quoi que ce soit.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add supabase/migrations/20260902170000_admin_paiements.sql supabase/functions/admin-vue-globale/index.ts apps/admin/src/donnees.ts apps/admin/src/ecrans/Abonnements.tsx
+git add supabase/migrations/20260902170000_admin_paiements.sql supabase/tests/admin-paiements.test.ts supabase/functions/admin-vue-globale/index.ts apps/admin/src/donnees.ts apps/admin/src/ecrans/Abonnements.tsx apps/admin/src/ecrans/Abonnements.test.tsx
 git commit -m "feat(admin): voir l'argent des abonnements arriver"
 ```
 

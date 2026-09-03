@@ -199,5 +199,19 @@ Deno.serve(async (requete) => {
   // « Encours & Soldes » et la fiche d'un collecteur — tombaient sur
   // `undefined`. Transmettre l'ensemble supprime la classe de défaut : la vue
   // SQL décide de ce qu'elle rend, et rien ne se perd en chemin.
-  return reponse({ ...brut, genereLe: brut.genere_le, abonnements }, 200, requete);
+  // Second appel, plutôt qu'un bloc de plus dans `admin_vue_globale()`. Un
+  // échec ici ne doit pas priver l'administration de tout le tableau de bord :
+  // les paiements sont une colonne en plus, pas le cœur de l'écran. `null`
+  // voyage donc jusqu'à l'écran, qui affiche « indisponible » plutôt qu'un
+  // tiret — un tiret se lirait « jamais payé », et une panne passerait pour un
+  // impayé.
+  let paiements: unknown = null;
+  const { data: lus, error: erreurPaiements } = await clientService.rpc('admin_paiements_recents');
+  if (erreurPaiements) {
+    console.error('admin_paiements_recents a échoué :', erreurPaiements.message);
+  } else {
+    paiements = lus;
+  }
+
+  return reponse({ ...brut, genereLe: brut.genere_le, abonnements, paiements }, 200, requete);
 });

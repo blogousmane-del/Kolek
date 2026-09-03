@@ -35,8 +35,8 @@ import { dateDuJour, telechargerCsv, versCsv } from '../exporter';
  * même produit, c'est deux endroits où ajouter chaque future entrée.
  */
 
-const COLONNES = '1fr 140px 110px 120px 130px 130px';
-const LARGEUR_MINIMALE = 'min-w-[960px]';
+const COLONNES = '1fr 140px 110px 120px 130px 130px 150px';
+const LARGEUR_MINIMALE = 'min-w-[1110px]';
 
 /** Un MRR nul se lit « — » et non « 0 FCFA » : le collecteur est en essai, il ne
     paie pas encore ; zéro laisserait croire à un impayé. */
@@ -50,6 +50,28 @@ function dateLisible(iso: string): string {
     month: 'short',
     year: 'numeric',
   });
+}
+
+/**
+ * Le dernier règlement d'un collecteur.
+ *
+ * Trois cas, et il faut les distinguer : GTCS n'a pas pu lire les paiements, ce
+ * collecteur n'a jamais payé, ou voici sa dernière facture. Rendre le premier
+ * comme le deuxième ferait passer une panne pour un impayé — et personne ne va
+ * réclamer une somme déjà reçue.
+ *
+ * Exportée pour ses tests : c'est la seule décision de cet écran qui ne se voit
+ * pas à l'œil.
+ */
+export function dernierPaiement(
+  paiements: VueGlobale['paiements'],
+  collecteurId: string,
+): string {
+  if (!paiements) return 'indisponible';
+  const ligne = paiements.par_collecteur.find((p) => p.collecteur_id === collecteurId);
+  if (!ligne) return 'jamais';
+  const devise = ligne.derniere_devise === 'XOF' ? 'FCFA' : ligne.derniere_devise;
+  return `${dateLisible(ligne.dernier_le)} · ${formatMontant(Number(ligne.dernier_montant))} ${devise}`;
 }
 
 function PastillePalier({ palier }: { palier: string }) {
@@ -278,6 +300,7 @@ export function Abonnements({ vue }: { vue: VueGlobale }) {
                   <span className="text-right">MRR</span>
                   <span className="text-right">Échéance</span>
                   <span className="text-right">Statut</span>
+                  <span className="text-right">Dernier paiement</span>
                 </div>
 
                 {collecteurs.map((c, i) => (
@@ -314,6 +337,9 @@ export function Abonnements({ vue }: { vue: VueGlobale }) {
                     <div className="flex justify-end">
                       <PastilleStatut c={c} />
                     </div>
+                    <span className="text-right text-sm font-body text-muted-foreground truncate">
+                      {dernierPaiement(vue.paiements, c.id)}
+                    </span>
                   </div>
                 ))}
               </div>
