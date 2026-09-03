@@ -177,11 +177,20 @@ describe('chargerPaiementsRattrapables', () => {
   });
 
   afterAll(async () => {
-    // `demande_id` est en `on delete restrict` : le paiement part d'abord. Et la
-    // demande n'appartient à aucun compte, donc `nettoyer` ne la voit pas.
+    // Ni le paiement ni la demande ne se suppriment : `paiements_immuables`
+    // refuse tout DELETE, et `demande_id` est en `on delete restrict`. C'est le
+    // régime voulu en production — un règlement ne s'efface pas — et le harnais
+    // vit déjà avec pour les collecteurs qui ont encaissé.
+    //
+    // Ce qui se fait, en revanche, c'est classer la demande : elle libère alors
+    // les deux index uniques partiels, qui ne portent que sur les demandes en
+    // attente. Sans cela, chaque exécution laisserait derrière elle un numéro et
+    // une adresse verrouillés.
     for (const id of demandesPosees.splice(0)) {
-      await admin.from('paiements_abonnement').delete().eq('demande_id', id);
-      await admin.from('demandes_ouverture').delete().eq('id', id);
+      await admin
+        .from('demandes_ouverture')
+        .update({ statut: 'refusee', traite_le: new Date().toISOString() })
+        .eq('id', id);
     }
     await nettoyer();
   });
@@ -245,7 +254,16 @@ describe('chargerPaiementsRattrapables', () => {
     // moitié qui fait naître les comptes.
     const { data: demande, error } = await admin
       .from('demandes_ouverture')
-      .insert({ nom: 'Prospect Rattrapage', telephone: telephone(), email: 'prospect@example.ci', palier: 'pro' })
+      .insert({
+        nom: 'Prospect Rattrapage',
+        telephone: telephone(),
+        // Unique par exécution, comme le numéro : `demandes_email_en_attente` est
+        // un index unique partiel sur les demandes en attente. Une adresse fixe
+        // passait au premier essai — base fraîchement remise à zéro — et refusait
+        // le second. Un test qui ne passe qu'une fois n'est pas un test.
+        email: `prospect-${SERIE}@example.ci`,
+        palier: 'pro',
+      })
       .select('id')
       .single();
     if (error) throw new Error(error.message);
