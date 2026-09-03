@@ -192,6 +192,26 @@ jobs:
         with:
           version: latest
 
+      # Présence n'est pas validité.
+      #
+      # Le 2026-09-03, ce job s'est exécuté pour la première fois — aucune
+      # poussée n'avait touché `supabase/functions` depuis qu'il existe, et les
+      # « ✓ en 7 secondes » des runs précédents ne déployaient rien. Le jeton,
+      # posé quatre jours plus tôt, était refusé. L'étape ci-dessus l'avait
+      # pourtant déclaré prêt : elle ne teste que la présence d'une chaîne.
+      #
+      # Le déploiement échouait alors sur « unexpected list functions status
+      # 401 », après le regroupement des treize fonctions, sans dire quoi faire.
+      # Un appel qui ne coûte rien tranche la question plus tôt et la nomme.
+      - name: Le jeton est-il accepté ?
+        if: steps.jeton.outputs.pret == 'oui'
+        run: |
+          if ! sortie=$(supabase projects list 2>&1); then
+            echo "$sortie"
+            echo "::error title=Jeton Supabase refusé::SUPABASE_ACCESS_TOKEN est posé mais Supabase le refuse. Régénérer un jeton personnel — il commence par « sbp_ » — sur https://supabase.com/dashboard/account/tokens, puis « gh secret set SUPABASE_ACCESS_TOKEN ». D'ici là, les fonctions modifiées restent à déployer à la main."
+            exit 1
+          fi
+
       # **Toutes** les fonctions, pas seulement celles dont le fichier a changé.
       #
       # Le regroupement se fait au déploiement : chaque fonction embarque une
