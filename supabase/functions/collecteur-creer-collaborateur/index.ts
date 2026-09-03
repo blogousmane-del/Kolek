@@ -112,17 +112,27 @@ Deno.serve(async (requete) => {
   }
 
   const places = tarifParCle('illimite').collaborateursInclus;
-  const autorise =
+
+  // Trois refus se confondent volontairement : distinguer « mauvais palier » de
+  // « équipe complète » n'aiderait personne que l'écran ne renseigne déjà — il
+  // connaît le palier, le rattachement et le compte de l'équipe — et
+  // multiplierait les chemins à tenir.
+  const titulaireAvecPlace =
     appelant?.palier === 'illimite' &&
-    appelant?.abonnement_statut === 'actif' &&
     appelant?.titulaire_id === null &&
     (dejaRattaches ?? 0) < places;
 
-  // Une seule réponse pour les quatre refus. Distinguer « mauvais palier » de
-  // « équipe complète » n'aiderait personne que l'écran ne renseigne déjà — il
-  // connaît le palier et le compte de l'équipe — et multiplierait les chemins à
-  // tenir.
-  if (!autorise) return reponse({ erreur: 'ACCES_RESERVE' }, 403, requete);
+  if (!titulaireAvecPlace) return reponse({ erreur: 'ACCES_RESERVE' }, 403, requete);
+
+  // Le quatrième, en revanche, se nomme. Ce raisonnement avait une faille, et
+  // elle s'est vue en production le 2026-09-03 : l'écran **ne connaît pas** le
+  // statut de l'abonnement, il ne le testait pas. Un titulaire Illimité
+  // suspendu voyait donc « Il te reste 3 places sur les 3 de ton forfait »,
+  // puis « Réservé au forfait Illimité, et à trois collaborateurs au plus » —
+  // un refus dont l'écran venait de démentir les deux motifs affichés.
+  if (appelant?.abonnement_statut !== 'actif') {
+    return reponse({ erreur: 'ABONNEMENT_INACTIF' }, 403, requete);
+  }
 
   // --- Validation avant toute écriture ---
 

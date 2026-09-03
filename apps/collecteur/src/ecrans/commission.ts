@@ -46,6 +46,27 @@ export function useEstCollaborateur(): boolean {
  * n'est pas titulaire, et `collecteur-creer-collaborateur` refuse en 403. Ce
  * hook évite de montrer une porte qui ne mène nulle part, rien de plus.
  */
+/**
+ * L'abonnement du compte est-il actif ?
+ *
+ * Même fiche que `useEstTitulaire`, donc aucun aller-retour de plus : le cache
+ * de `useDonnees` est tenu par clé, et `profil` est déjà chargé.
+ *
+ * Séparé de `useEstTitulaire` à dessein. Un titulaire suspendu garde son écran
+ * « Mon équipe » — ses collaborateurs existent, leurs tournées et leur caisse
+ * aussi, et les lui cacher ne réglerait rien. C'est **l'ajout** qui est fermé.
+ */
+export function useAbonnementActif(): boolean {
+  const { donnees } = useDonnees('profil', chargerProfil, {
+    messageErreur: 'Fiche indisponible. Vérifie le réseau.',
+  });
+
+  // Par défaut actif : `chargerProfil` rend déjà `'actif'` quand la fiche n'a
+  // pas pu être lue, et fermer le formulaire sur une panne de réseau ferait
+  // passer une coupure pour une suspension.
+  return (donnees?.abonnementStatut ?? 'actif') === 'actif';
+}
+
 export function useEstTitulaire(): boolean {
   const { donnees } = useDonnees('profil', chargerProfil, {
     messageErreur: 'Fiche indisponible. Vérifie le réseau.',

@@ -27,9 +27,14 @@ vi.mock('../supabase', () => ({
 }));
 
 const chargerEquipe = vi.fn();
+// La fiche du titulaire, dont l'écran ne lit qu'une chose : son abonnement
+// est-il actif ? Par défaut oui — les autres cas de ce fichier ne parlent pas
+// d'abonnement et ne doivent pas avoir à le dire.
+const chargerProfil = vi.fn(() => Promise.resolve({ abonnementStatut: 'actif' }));
 vi.mock('../lectures-ecrans', async (original) => ({
   ...((await original()) as object),
   chargerEquipe: () => chargerEquipe(),
+  chargerProfil: () => chargerProfil(),
 }));
 
 const { Equipe } = await import('./Equipe');
@@ -96,6 +101,28 @@ describe('l’écran Mon équipe', () => {
 
     expect(await screen.findByText('Ajouter un collaborateur')).toBeTruthy();
     expect(document.body.textContent).toContain('2 places');
+  });
+
+  it('ferme l’ajout quand l’abonnement n’est plus actif, et dit pourquoi', async () => {
+    // Le défaut du 2026-09-03 : la place existait, l'abonnement non, et
+    // l'écran promettait l'inverse de ce que le serveur allait répondre.
+    chargerProfil.mockResolvedValue({ abonnementStatut: 'suspendu' });
+    chargerEquipe.mockResolvedValue([membre('Awa', 'a1')]);
+    afficher();
+
+    expect(await screen.findByText('Awa')).toBeTruthy();
+    expect(screen.queryByText('Ajouter un collaborateur')).toBeNull();
+    expect(document.body.textContent).toContain('abonnement n’est plus actif');
+  });
+
+  it('laisse l’ajout ouvert quand la fiche est illisible', async () => {
+    // Une coupure réseau n'est pas une suspension. Fermer le formulaire sur une
+    // fiche qu'on n'a pas pu lire ferait passer la panne pour une sanction.
+    chargerProfil.mockRejectedValue(new Error('réseau'));
+    chargerEquipe.mockResolvedValue([membre('Awa', 'a1')]);
+    afficher();
+
+    expect(await screen.findByText('Ajouter un collaborateur')).toBeTruthy();
   });
 
   it('retire le bouton d’ajout à trois', async () => {

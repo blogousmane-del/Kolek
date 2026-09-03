@@ -85,6 +85,27 @@ describe('collecteur-creer-collaborateur', () => {
     expect((await reponse.json()).erreur).toBe('ACCES_RESERVE');
   });
 
+  it('nomme l’abonnement suspendu, au lieu de nier le forfait', async () => {
+    // Constaté en production le 2026-09-03. Un titulaire Illimité dont
+    // l'abonnement n'est plus actif lisait « Il te reste 3 places sur les 3 de
+    // ton forfait », puis se voyait répondre « Réservé au forfait Illimité, et
+    // à trois collaborateurs au plus » — un refus dont l'écran venait de
+    // démentir les deux motifs affichés.
+    //
+    // Les trois autres conditions se confondent toujours : l'écran les connaît
+    // et peut les vérifier lui-même. Le statut de l'abonnement, non.
+    const suspendu = await creerCollecteur('Titulaire Suspendu', telephone());
+    await admin
+      .from('collecteurs')
+      .update({ palier: 'illimite', abonnement_statut: 'suspendu' })
+      .eq('id', suspendu.id);
+
+    const reponse = await appeler(await jetonDe(suspendu), saisie());
+
+    expect(reponse.status).toBe(403);
+    expect((await reponse.json()).erreur).toBe('ABONNEMENT_INACTIF');
+  });
+
   it('refuse un collaborateur qui voudrait recruter à son tour', async () => {
     const patron = await titulaire('Patron Chaine');
     const awa = await creerCollecteur('Awa Chaine', telephone());

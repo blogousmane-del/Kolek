@@ -160,8 +160,9 @@ export type ResultatCollaborateur =
 
 /** Les refus de `collecteur-creer-collaborateur`, en phrases. */
 const PHRASES_COLLABORATEUR: Record<string, string> = {
-  ACCES_RESERVE:
-    'Réservé au forfait Illimité, et à trois collaborateurs au plus. Vérifie ton abonnement.',
+  ACCES_RESERVE: 'Réservé au forfait Illimité, et à trois collaborateurs au plus.',
+  ABONNEMENT_INACTIF:
+    'Ton abonnement n’est plus actif. Tu ne peux pas activer de collaborateur tant qu’il ne l’est pas. Contacte GTCS.',
   EMAIL_DEJA_PRIS: 'Cette adresse est déjà utilisée par un autre compte.',
   TELEPHONE_DEJA_PRIS: 'Ce numéro est déjà utilisé par un autre compte.',
   MOT_DE_PASSE_COMPROMIS: 'Ce mot de passe figure dans des fuites connues. Choisis-en un autre.',

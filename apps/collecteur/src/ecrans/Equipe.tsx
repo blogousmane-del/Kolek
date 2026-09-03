@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useDonnees } from '../cache';
 import { creerCollaborateur } from '../ecritures-ecrans';
 import { chargerEquipe, type MembreEquipe } from '../lectures-ecrans';
+import { useAbonnementActif } from './commission';
 import { CorpsEcran, EnTeteEcran } from './EnTeteEcran';
 
 /**
@@ -41,6 +42,7 @@ export function Equipe({
     revision,
     messageErreur: 'Équipe indisponible. Vérifie le réseau.',
   });
+  const abonnementActif = useAbonnementActif();
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);
 
   const membres = equipe ?? [];
@@ -103,6 +105,7 @@ export function Equipe({
             {equipe !== null && (
               <Places
                 restantes={restantes}
+                abonnementActif={abonnementActif}
                 ouvert={formulaireOuvert}
                 onOuvrir={() => setFormulaireOuvert(true)}
                 onFermer={() => setFormulaireOuvert(false)}
@@ -175,15 +178,31 @@ function Chiffre({ libelle, valeur }: { libelle: string; valeur: string }) {
  */
 function Places({
   restantes,
+  abonnementActif,
   ouvert,
   onOuvrir,
   onFermer,
 }: {
   restantes: number;
+  abonnementActif: boolean;
   ouvert: boolean;
   onOuvrir: () => void;
   onFermer: () => void;
 }) {
+  // Le serveur refuse un titulaire suspendu, et il a raison. Ce qu'il ne peut
+  // pas faire, c'est empêcher l'écran d'avoir promis le contraire : le
+  // 2026-09-03, un titulaire lisait « Il te reste 3 places » avant de se voir
+  // refuser. La place existe bien ; c'est l'abonnement qui manque, et c'est ce
+  // qu'il faut dire — avant le formulaire, pas après l'envoi.
+  if (!abonnementActif) {
+    return (
+      <p className="font-body text-sm text-muted-foreground text-center py-2">
+        Ton abonnement n’est plus actif. Tes {COLLABORATEURS_MAX} places restent, mais tu ne peux
+        pas activer de collaborateur tant qu’il ne l’est pas. Contacte GTCS.
+      </p>
+    );
+  }
+
   if (restantes <= 0) {
     return (
       <p className="font-body text-sm text-muted-foreground text-center py-2">
