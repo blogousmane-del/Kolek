@@ -2604,24 +2604,38 @@ git commit -m "test(securite): chercher l'usage qui ferait fuir la clé Chariow,
 
 ## Task 9: Le champ téléphone à sélecteur de pays
 
+> **Repris le 2026-09-03, à l'exécution.** Le texte d'origine posait
+> `outline-none` sur les deux contrôles. `Champ.test.tsx` l'interdit depuis le
+> 2026-08-23 — un jour après l'écriture de ce plan : l'anneau de focus vit dans
+> `packages/core/src/base.css` sur `:focus-visible`, et aucun composant n'a le
+> droit de l'éteindre.
+>
+> Le composant ne recopie donc plus les classes de `Champ` : il **délègue** sa
+> partie numéro. Une liste de classes recopiée est une règle qu'on redécouvre
+> une fois sur deux, et celle-ci serait née fausse le jour même. `Champ` gagne
+> pour cela une propriété `inputMode`, qui lui manquait.
+>
+> Le `select` du pays, lui, n'a pas d'équivalent partagé : il garde ses classes
+> et deux tests redisent sur lui la règle de l'anneau et la cible de 44 px.
+
 **Files:**
 - Create: `packages/ui/src/ChampTelephone.tsx`
-- Modify: `packages/ui/src/index.ts`
+- Modify: `packages/ui/src/Champ.tsx` (propriété `inputMode`), `packages/ui/src/Champ.test.tsx`, `packages/ui/src/index.ts`
 - Test: `packages/ui/src/ChampTelephone.test.tsx`
 
 **Interfaces:**
 - Consumes: rien.
-- Produces: `ChampTelephone` · `type ValeurTelephone = { pays: string; local: string; e164: string; valide: boolean }` · `composerE164(pays: string, local: string): string` · `PAYS_TELEPHONE`.
+- Produces: `ChampTelephone` · `type ValeurTelephone = { pays: string; local: string; e164: string; valide: boolean }` · `composerE164(pays: string, local: string): string` · `PAYS_TELEPHONE` · `type PaysTelephone`. `Champ` accepte en plus `inputMode?: 'text' | 'numeric' | 'tel'`.
 
 - [ ] **Step 1: Écrire les tests qui échouent**
 
 Créer `packages/ui/src/ChampTelephone.test.tsx` :
 
 ```tsx
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ChampTelephone, composerE164 } from './ChampTelephone';
+import { ChampTelephone, composerE164, PAYS_TELEPHONE } from './ChampTelephone';
 
 /**
  * Le formulaire de paiement envoie trois champs au serveur — E.164, pays ISO2,
@@ -2629,6 +2643,8 @@ import { ChampTelephone, composerE164 } from './ChampTelephone';
  * création de checkout viennent d'un téléphone mal transmis, et le repli
  * serveur ne sait déduire le pays que des indicatifs africains.
  */
+
+afterEach(cleanup);
 
 describe('composerE164', () => {
   it('retire le zéro national et pose l’indicatif', () => {
@@ -2642,12 +2658,36 @@ describe('composerE164', () => {
   it('rend une chaîne vide sur un pays inconnu', () => {
     expect(composerE164('ZZ', '0700000000')).toBe('');
   });
+
+  it('rend une chaîne vide sur un numéro vide', () => {
+    // Sans ce retour, un champ vide produirait « +225 », que le fournisseur
+    // refuse en « Invalid phone number » sans dire lequel des deux manque.
+    expect(composerE164('CI', '')).toBe('');
+    expect(composerE164('CI', '000')).toBe('');
+  });
+});
+
+describe('PAYS_TELEPHONE', () => {
+  it('ouvre sur le pays du pilote', () => {
+    expect(PAYS_TELEPHONE.at(0)?.code).toBe('CI');
+  });
+
+  it('ne porte que des codes ISO2 et des indicatifs numériques', () => {
+    // Le fournisseur attend `country_code` en ISO2. Un code à trois lettres
+    // passerait la compilation et serait refusé au moment du paiement.
+    for (const pays of PAYS_TELEPHONE) {
+      expect(pays.code).toMatch(/^[A-Z]{2}$/);
+      expect(pays.indicatif).toMatch(/^\d+$/);
+    }
+  });
 });
 
 describe('ChampTelephone', () => {
   it('remonte les trois formes à chaque frappe', () => {
     const onChange = vi.fn();
-    render(<ChampTelephone libelle="Téléphone" valeur={{ pays: 'CI', local: '' }} onChange={onChange} />);
+    render(
+      <ChampTelephone libelle="Téléphone" valeur={{ pays: 'CI', local: '' }} onChange={onChange} />,
+    );
 
     fireEvent.change(screen.getByLabelText('Téléphone'), { target: { value: '0700000000' } });
 
@@ -2661,7 +2701,9 @@ describe('ChampTelephone', () => {
 
   it('marque invalide un numéro trop court', () => {
     const onChange = vi.fn();
-    render(<ChampTelephone libelle="Téléphone" valeur={{ pays: 'CI', local: '' }} onChange={onChange} />);
+    render(
+      <ChampTelephone libelle="Téléphone" valeur={{ pays: 'CI', local: '' }} onChange={onChange} />,
+    );
 
     fireEvent.change(screen.getByLabelText('Téléphone'), { target: { value: '070' } });
 
@@ -2671,7 +2713,11 @@ describe('ChampTelephone', () => {
   it('recompose l’E.164 quand le pays change', () => {
     const onChange = vi.fn();
     render(
-      <ChampTelephone libelle="Téléphone" valeur={{ pays: 'CI', local: '0700000000' }} onChange={onChange} />,
+      <ChampTelephone
+        libelle="Téléphone"
+        valeur={{ pays: 'CI', local: '0700000000' }}
+        onChange={onChange}
+      />,
     );
 
     fireEvent.change(screen.getByLabelText('Pays'), { target: { value: 'SN' } });
@@ -2679,6 +2725,28 @@ describe('ChampTelephone', () => {
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ pays: 'SN', e164: '+221700000000' }),
     );
+  });
+
+  it('n’éteint l’anneau de focus sur aucun des deux contrôles', () => {
+    // La règle du 2026-08-23, portée par `Champ.test.tsx` : l'anneau vit dans
+    // `packages/core/src/base.css`, sur `:focus-visible`, et aucun composant
+    // n'a le droit de l'éteindre. Ce champ en porte deux, dont un `select` que
+    // `Champ` ne couvre pas — la règle doit donc être redite ici.
+    render(
+      <ChampTelephone libelle="Téléphone" valeur={{ pays: 'CI', local: '' }} onChange={vi.fn()} />,
+    );
+
+    expect(screen.getByLabelText('Téléphone').className).not.toContain('outline-none');
+    expect(screen.getByLabelText('Pays').className).not.toContain('outline-none');
+  });
+
+  it('garde les deux cibles de saisie à 44 px', () => {
+    render(
+      <ChampTelephone libelle="Téléphone" valeur={{ pays: 'CI', local: '' }} onChange={vi.fn()} />,
+    );
+
+    expect(screen.getByLabelText('Téléphone').className).toMatch(/\bmin-h-11\b/);
+    expect(screen.getByLabelText('Pays').className).toMatch(/\bmin-h-11\b/);
   });
 });
 ```
@@ -2698,6 +2766,8 @@ Créer `packages/ui/src/ChampTelephone.tsx` :
 ```tsx
 import { useId } from 'react';
 
+import { Champ } from './Champ';
+
 /**
  * Saisie d'un numéro : un pays, un numéro national.
  *
@@ -2708,6 +2778,13 @@ import { useId } from 'react';
  *
  * Le composant remonte les **trois** formes à chaque frappe. Le serveur les
  * reçoit toutes les trois et tranche lui-même : le front ne pré-nettoie rien.
+ *
+ * La partie numéro délègue à `Champ` plutôt que de recopier ses classes. Le
+ * plan prévoyait une copie ; elle serait née fausse le jour même, avec le
+ * `outline-none` que `Champ` a cessé de poser le 2026-08-23 — l'anneau de
+ * focus vit dans `packages/core/src/base.css` et aucun composant n'a le droit
+ * de l'éteindre. Une liste de classes recopiée est une règle qu'on redécouvre
+ * une fois sur deux.
  */
 
 export interface PaysTelephone {
@@ -2767,8 +2844,9 @@ interface Props {
 }
 
 export function ChampTelephone({ libelle, valeur, onChange, className = '' }: Props) {
+  // `useId` plutôt qu'un identifiant passé en propriété : deux formulaires sur
+  // un même écran ne peuvent pas se voler leur étiquette par accident.
   const idPays = useId();
-  const idNumero = useId();
 
   function remonter(pays: string, local: string) {
     const national = sansZeroDeTete(chiffres(local));
@@ -2791,7 +2869,7 @@ export function ChampTelephone({ libelle, valeur, onChange, className = '' }: Pr
             id={idPays}
             value={valeur.pays}
             onChange={(e) => remonter(e.target.value, valeur.local)}
-            className="w-full min-h-11 px-2 bg-input border-[1.5px] border-hairline rounded-md text-base font-body text-ink outline-none focus:border-primary"
+            className="w-full min-h-11 px-2 bg-input border-[1.5px] border-hairline rounded-md text-base font-body text-ink focus:border-primary"
           >
             {PAYS_TELEPHONE.map((p) => (
               <option key={p.code} value={p.code}>
@@ -2802,20 +2880,13 @@ export function ChampTelephone({ libelle, valeur, onChange, className = '' }: Pr
         </div>
 
         <div className="flex-1 min-w-0">
-          <label
-            htmlFor={idNumero}
-            className="block text-sm font-body font-semibold text-ink mb-1.5"
-          >
-            {libelle}
-          </label>
-          <input
-            id={idNumero}
+          <Champ
+            libelle={libelle}
             type="tel"
             inputMode="numeric"
             autoComplete="tel-national"
-            value={valeur.local}
-            onChange={(e) => remonter(valeur.pays, e.target.value)}
-            className="w-full min-h-11 px-3.5 bg-input border-[1.5px] border-hairline rounded-md text-base font-body text-ink outline-none focus:border-primary"
+            valeur={valeur.local}
+            onChange={(local) => remonter(valeur.pays, local)}
           />
         </div>
       </div>
@@ -2844,12 +2915,13 @@ export {
 - [ ] **Step 5: Lancer les tests pour vérifier qu'ils passent**
 
 Run: `npm test --workspace @kolek/ui`
-Expected: PASS — 6 nouveaux tests.
+Expected: PASS — 89 tests, dont 11 nouveaux (10 ici, un dans `Champ.test.tsx`
+pour le passage de `inputMode`).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add packages/ui/src/ChampTelephone.tsx packages/ui/src/ChampTelephone.test.tsx packages/ui/src/index.ts
+git add packages/ui/src/ChampTelephone.tsx packages/ui/src/ChampTelephone.test.tsx packages/ui/src/Champ.tsx packages/ui/src/Champ.test.tsx packages/ui/src/index.ts
 git commit -m "feat(ui): un champ téléphone qui rend les trois formes que le paiement exige"
 ```
 

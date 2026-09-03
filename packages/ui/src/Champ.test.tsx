@@ -35,6 +35,15 @@ describe('Champ', () => {
     expect(screen.getByLabelText('Mot de passe').className).not.toContain('outline-none');
   });
 
+  it('ouvre le clavier demandé', () => {
+    // Posé pour `ChampTelephone`, qui délègue ici sa partie numéro plutôt que
+    // de recopier les classes du champ. Sans ce passage, le collecteur saisit
+    // un numéro sur un clavier alphabétique.
+    render(<Champ libelle="Numéro" valeur="" onChange={vi.fn()} inputMode="numeric" />);
+
+    expect(screen.getByLabelText('Numéro')).toHaveProperty('inputMode', 'numeric');
+  });
+
   it('garde la cible de saisie à 44 px', () => {
     render(<Champ libelle="Téléphone" valeur="" onChange={vi.fn()} />);
 

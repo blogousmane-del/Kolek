@@ -18,6 +18,13 @@ export { CarrouselCartes, type CarteItem } from './CarrouselCartes';
 export { CarteStat } from './CarteStat';
 export { CarteZone } from './CarteZone';
 export { Champ } from './Champ';
+export {
+  ChampTelephone,
+  composerE164,
+  PAYS_TELEPHONE,
+  type PaysTelephone,
+  type ValeurTelephone,
+} from './ChampTelephone';
 export { Bruit, Onde, Rosace } from './Guilloche';
 export { EcranConnexion } from './EcranConnexion';
 export { EcranMessage } from './EcranMessage';

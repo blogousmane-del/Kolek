@@ -7,6 +7,10 @@ interface Props {
   onChange: (valeur: string) => void;
   requis?: boolean;
   autoComplete?: string;
+  /** Le clavier que le téléphone doit ouvrir. `numeric` évite au collecteur de
+      chercher les chiffres sur un clavier alphabétique — le geste le plus
+      fréquent de l'application. */
+  inputMode?: 'text' | 'numeric' | 'tel';
   className?: string;
   /** Rendu sur fond sombre. Les deux écrans de connexion sont passés au vert
       coffre le 2026-08-23 ; un champ blanc à bordure claire y devient une
@@ -23,6 +27,7 @@ export function Champ({
   onChange,
   requis = false,
   autoComplete,
+  inputMode,
   className = '',
   sombre = false,
 }: Props) {
@@ -46,6 +51,7 @@ export function Champ({
         value={valeur}
         required={requis}
         autoComplete={autoComplete}
+        inputMode={inputMode}
         onChange={(e) => onChange(e.target.value)}
         className={`w-full min-h-11 px-3.5 border-[1.5px] rounded-md text-base font-body ${
           sombre
