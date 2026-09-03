@@ -975,7 +975,15 @@ les deux tables où entre l'argent. À passer à une heure creuse, pas à midi.
 ```
 npm run verifier:migrations   # doit être muet
 npm run verifier:en-ligne     # les trois sites servent bien la construction du jour
+npm run verifier:promos       # les deux catalogues de remises disent la même chose
 ```
+
+`verifier:promos` n'a de sens qu'une fois le paiement en ligne, et il exige
+`CHARIOW_CLE_API` en plus des deux clés Supabase. Il compare `codes_promo` aux
+Offres de la boutique Chariow : c'est **elle** qui applique la remise au moment
+de payer, le checkout ne fait qu'envoyer le code. Une divergence ne se voit
+nulle part — elle se lit sur la facture du collecteur, qui a lu -20 % dans
+l'application et s'est fait débiter autre chose.
 
 Puis le geste que rien n'automatise : refaire dans l'application le chemin
 exact qui a motivé la livraison. Le 2026-09-02, c'était d'ouvrir une carte à
@@ -985,10 +993,13 @@ exact qui a motivé la livraison. Le 2026-09-02, c'était d'ouvrir une carte à
 
 ## 7. Le paiement d'abonnement (J5)
 
-Cette section décrit un dispositif **qui n'est pas encore en ligne** : les
-fonctions `abonnement-payer`, `abonnement-verifier` et `chariow-webhook`
-n'existent pas au moment où ces lignes sont écrites. Elle est là pour que le
-jour où elles existent, personne n'ait à redécouvrir les six pièges ci-dessous.
+Cette section décrit un dispositif **qui n'est pas encore en ligne**. Les
+fonctions `abonnement-payer`, `abonnement-verifier`, `chariow-webhook` et
+`demander-ouverture` existent dans le dépôt depuis le 2026-09-03 et sont
+couvertes par la suite de tests ; **aucune n'est déployée**, et aucun secret
+Chariow n'est posé sur le projet. Rien n'encaisse tant que les deux ne sont pas
+faits. Cette section est là pour que ce jour-là, personne n'ait à redécouvrir
+les six pièges ci-dessous.
 
 ### 7.1 Ce qui se fait à la main chez Chariow, une fois
 
