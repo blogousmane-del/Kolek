@@ -63,6 +63,44 @@ export function composerE164(pays: string, local: string): string {
   return `+${trouve.indicatif}${national}`;
 }
 
+/**
+ * L'inverse de `composerE164` : d'un numéro international vers le couple
+ * (pays, numéro national) que ce champ manipule.
+ *
+ * Sert à **pré-remplir** le champ depuis une fiche déjà enregistrée. Sans elle,
+ * l'appelant serait tenté de poser l'E.164 tel quel dans `local` — et
+ * `composerE164` recomposerait alors « +225 » devant un numéro qui porte déjà
+ * son indicatif, soit un numéro faux que le champ déclarerait valide.
+ *
+ * Deux refus délibérés, qui rendent `null` plutôt que de deviner :
+ *
+ * * **Ce qui ne commence pas par `+`.** Un « 0701020304 » national et un
+ *   « 2250102030 » sans indicatif ne se distinguent pas de façon sûre, et un
+ *   champ pré-rempli faux est pire qu'un champ vide : personne ne relit ce qui
+ *   est déjà écrit.
+ * * **Un pays absent de la liste.** Le champ ne saurait pas l'afficher.
+ *
+ * L'indicatif le plus long l'emporte, pour que l'ajout d'un pays dont
+ * l'indicatif en prolonge un autre ne change pas silencieusement le sens des
+ * numéros déjà enregistrés.
+ */
+export function separerE164(e164: string): { pays: string; local: string } | null {
+  if (!e164.trim().startsWith('+')) return null;
+
+  const brut = chiffres(e164);
+  const parIndicatifDecroissant = [...PAYS_TELEPHONE].sort(
+    (a, b) => b.indicatif.length - a.indicatif.length,
+  );
+
+  for (const pays of parIndicatifDecroissant) {
+    if (!brut.startsWith(pays.indicatif)) continue;
+    const local = brut.slice(pays.indicatif.length);
+    return local ? { pays: pays.code, local } : null;
+  }
+
+  return null;
+}
+
 export interface ValeurTelephone {
   pays: string;
   local: string;

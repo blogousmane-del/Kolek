@@ -33,6 +33,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const getUser = vi.fn();
 const maybeSingle = vi.fn();
 const signOut = vi.fn();
+const invoke = vi.fn();
 
 vi.mock('./supabase', () => ({
   supabase: {
@@ -41,6 +42,11 @@ vi.mock('./supabase', () => ({
       signOut: () => signOut(),
     },
     from: () => ({ select: () => ({ maybeSingle: () => maybeSingle() }) }),
+    // La coquille réconcilie les paiements en silence à chaque ouverture — c'est
+    // ce qui remplace un cron. Sans ce témoin, l'appel lève dans un effet, hors
+    // de toute assertion : la suite affiche sept erreurs et sort en échec en
+    // annonçant « 165 passed ».
+    functions: { invoke: (...args: unknown[]) => invoke(...args) },
   },
 }));
 
@@ -49,12 +55,16 @@ vi.mock('./cache', () => ({ viderCache: vi.fn() }));
 // Les dix écrans sont remplacés par des témoins : ce test porte sur la
 // coquille, pas sur ce qu'elle affiche.
 const temoin = (nom: string) => ({ [nom]: () => <div>écran {nom}</div> });
+vi.mock('./ecrans/Abonnement', () => temoin('Abonnement'));
 vi.mock('./ecrans/Alertes', () => temoin('Alertes'));
 vi.mock('./ecrans/Avis', () => temoin('Avis'));
 vi.mock('./ecrans/Bilan', () => temoin('Bilan'));
 vi.mock('./ecrans/Plus', () => temoin('Plus'));
 vi.mock('./ecrans/Rapprochement', () => temoin('Rapprochement'));
 vi.mock('./ecrans/Recus', () => temoin('Recus'));
+vi.mock('./ecrans/RetourPaiement', () => ({
+  RetourPaiement: () => <div>écran RetourPaiement</div>,
+}));
 
 // L'écran d'encaissement, bavard : il dit ce que la coquille lui donne. C'est
 // exactement ce que le vrai fait — tout son corps est sous `{!carte ? … : …}`.
@@ -162,6 +172,7 @@ const { Coquille } = await import('./Coquille');
 beforeEach(() => {
   getUser.mockResolvedValue({ data: { user: { id: 'collecteur-1' } } });
   maybeSingle.mockResolvedValue({ data: { nom: 'Awa' } });
+  invoke.mockResolvedValue({ data: { credites: 0, enAttente: 0, echeance: null }, error: null });
   // `window.scrollTo` n'existe pas dans jsdom : sans ce témoin, chaque rendu
   // écrit une erreur « Not implemented » dans la sortie du test.
   vi.stubGlobal('scrollTo', vi.fn());
@@ -175,6 +186,56 @@ afterEach(() => {
   getUser.mockReset();
   maybeSingle.mockReset();
   signOut.mockReset();
+  invoke.mockReset();
+  window.history.replaceState({}, '', '/');
+});
+
+describe('le retour depuis la page de paiement', () => {
+  /**
+   * L'application n'a pas de routeur : la navigation est un état, et
+   * `netlify.toml` réécrit toute route sur `index.html`. Le retour du
+   * fournisseur passe donc par un paramètre sur la racine.
+   */
+
+  it('ouvre l’écran de confirmation sur ?paiement=retour', () => {
+    window.history.replaceState({}, '', '/?paiement=retour');
+
+    render(<Coquille onDeconnexion={vi.fn()} />);
+
+    expect(screen.getByText('écran RetourPaiement')).toBeTruthy();
+  });
+
+  it('efface le paramètre, sans quoi un rechargement rejouerait l’écran', () => {
+    window.history.replaceState({}, '', '/?paiement=retour');
+
+    render(<Coquille onDeconnexion={vi.fn()} />);
+
+    expect(window.location.search).toBe('');
+  });
+
+  it('garde les autres paramètres de l’adresse', () => {
+    // Un seul paramètre nous appartient. Effacer la requête entière emporterait
+    // ce que quelqu'un d'autre y a mis — une campagne, un jeton de partage.
+    window.history.replaceState({}, '', '/?paiement=retour&de=affiche');
+
+    render(<Coquille onDeconnexion={vi.fn()} />);
+
+    expect(window.location.search).toBe('?de=affiche');
+  });
+
+  it('ne l’ouvre pas sans le paramètre', () => {
+    render(<Coquille onDeconnexion={vi.fn()} />);
+
+    expect(screen.queryByText('écran RetourPaiement')).toBeNull();
+  });
+
+  it('réconcilie en silence à chaque ouverture', () => {
+    // Ce qui rattrape un collecteur qui a payé puis fermé l'onglet : il est
+    // crédité en rouvrant son carnet, sans rien demander à personne.
+    render(<Coquille onDeconnexion={vi.fn()} />);
+
+    expect(invoke).toHaveBeenCalledWith('abonnement-verifier', { body: {} });
+  });
 });
 
 describe('ce que la coquille fait de la carte encaissée', () => {

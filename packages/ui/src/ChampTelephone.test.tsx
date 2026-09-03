@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ChampTelephone, composerE164, PAYS_TELEPHONE } from './ChampTelephone';
+import { ChampTelephone, composerE164, PAYS_TELEPHONE, separerE164 } from './ChampTelephone';
 
 /**
  * Le formulaire de paiement envoie trois champs au serveur — E.164, pays ISO2,
@@ -113,5 +113,50 @@ describe('ChampTelephone', () => {
 
     expect(screen.getByLabelText('Téléphone').className).toMatch(/\bmin-h-11\b/);
     expect(screen.getByLabelText('Pays').className).toMatch(/\bmin-h-11\b/);
+  });
+});
+
+describe('separerE164', () => {
+  /**
+   * L'inverse de `composerE164`, employé pour pré-remplir le champ depuis une
+   * fiche. Le danger n'est pas qu'il échoue : c'est qu'il devine.
+   */
+
+  it('fait l’aller-retour sur chaque pays de la liste', () => {
+    // La propriété qui compte : ce que le champ compose, il doit savoir le
+    // relire. Sans elle, un numéro enregistré ici reviendrait ailleurs.
+    for (const pays of PAYS_TELEPHONE) {
+      const e164 = composerE164(pays.code, '0700000000');
+      expect(separerE164(e164)).toEqual({ pays: pays.code, local: '700000000' });
+    }
+  });
+
+  it('refuse ce qui ne porte pas d’indicatif international', () => {
+    // Un « 0701020304 » national et un « 2250102030 » sans indicatif ne se
+    // distinguent pas de façon sûre. Un champ pré-rempli faux est pire qu'un
+    // champ vide : personne ne relit ce qui est déjà écrit.
+    expect(separerE164('0701020304')).toBeNull();
+    expect(separerE164('2250701020304')).toBeNull();
+    expect(separerE164('')).toBeNull();
+  });
+
+  it('refuse un pays absent de la liste, que le champ ne saurait afficher', () => {
+    expect(separerE164('+19995550100')).toBeNull();
+  });
+
+  it('refuse un indicatif sans numéro derrière', () => {
+    expect(separerE164('+225')).toBeNull();
+  });
+
+  it('ne recompose jamais un numéro qui porterait deux fois son indicatif', () => {
+    // Le défaut que cette fonction existe pour empêcher : poser l'E.164 tel quel
+    // dans `local` donnait « +225 » devant un numéro qui portait déjà « 225 »,
+    // et le champ le déclarait valide.
+    const stocke = '+225700000000';
+    const separe = separerE164(stocke);
+
+    expect(separe).not.toBeNull();
+    expect(composerE164(separe!.pays, separe!.local)).toBe(stocke);
+    expect(composerE164('CI', stocke)).not.toBe(stocke);
   });
 });

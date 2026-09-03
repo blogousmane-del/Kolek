@@ -1,7 +1,9 @@
 import { NavBureau, NavMobile, useEnLigne, type CleNavCollecteur } from '@kolek/ui';
 import { useEffect, useState } from 'react';
 
+import { verifierPaiements } from './abonnement';
 import { viderCache } from './cache';
+import { Abonnement } from './ecrans/Abonnement';
 import { Accueil } from './ecrans/Accueil';
 import { Alertes } from './ecrans/Alertes';
 import { Avis } from './ecrans/Avis';
@@ -13,6 +15,7 @@ import { EquipeClients } from './ecrans/EquipeClients';
 import { Plus } from './ecrans/Plus';
 import { Rapprochement } from './ecrans/Rapprochement';
 import { Recus } from './ecrans/Recus';
+import { RetourPaiement } from './ecrans/RetourPaiement';
 import { Retrait } from './ecrans/Retrait';
 import { supabase } from './supabase';
 
@@ -32,7 +35,9 @@ type EcranSecondaire =
   | 'avis'
   | 'plus'
   | 'equipe'
-  | 'equipe-clients';
+  | 'equipe-clients'
+  | 'abonnement'
+  | 'retour-paiement';
 
 export type Page = CleNavCollecteur | EcranSecondaire;
 
@@ -66,6 +71,11 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
   const [erreurSortie, setErreurSortie] = useState<string | null>(null);
   const [collecteurId, setCollecteurId] = useState<string | null>(null);
   const [nomCollecteur, setNomCollecteur] = useState<string | null>(null);
+  /** Le palier et le numéro de la fiche, lus une fois pour l'écran d'abonnement :
+      il présélectionne la formule courante et pré-remplit le numéro plutôt que
+      de faire ressaisir au marché ce que la base sait déjà. */
+  const [palierCollecteur, setPalierCollecteur] = useState<string | null>(null);
+  const [telephoneCollecteur, setTelephoneCollecteur] = useState<string | null>(null);
   /** Demande faite à l'écran des clients d'ouvrir le formulaire d'inscription.
       C'est le bouton « Souscrire » de l'accueil qui la pose. */
   const [souscrire, setSouscrire] = useState(false);
@@ -114,10 +124,40 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
     // ce qu'il a corrigé. La politique RLS la borne à sa propre ligne.
     void supabase
       .from('collecteurs')
-      .select('nom')
+      .select('nom, palier, telephone')
       .maybeSingle()
-      .then(({ data }) => setNomCollecteur((data as { nom?: string } | null)?.nom ?? null));
+      .then(({ data }) => {
+        const fiche = data as { nom?: string; palier?: string; telephone?: string } | null;
+        setNomCollecteur(fiche?.nom ?? null);
+        setPalierCollecteur(fiche?.palier ?? null);
+        setTelephoneCollecteur(fiche?.telephone ?? null);
+      });
   }, [collecteurId]);
+
+  // Le retour depuis la page de paiement.
+  //
+  // L'application n'a pas de routeur : la navigation est un état, et
+  // `netlify.toml` réécrit toute route sur `index.html`. Un `redirect_url`
+  // pointant vers `/paiement/retour` afficherait donc l'accueil. Le retour passe
+  // par un paramètre sur la racine, qu'on efface aussitôt lu — sans quoi un
+  // rechargement rejouerait l'écran de confirmation indéfiniment.
+  useEffect(() => {
+    const parametres = new URLSearchParams(window.location.search);
+    if (parametres.get('paiement') !== 'retour') return;
+
+    setPage('retour-paiement');
+    parametres.delete('paiement');
+    const reste = parametres.toString();
+    window.history.replaceState({}, '', reste ? `/?${reste}` : '/');
+  }, []);
+
+  // Réconciliation silencieuse à l'ouverture : c'est ce qui remplace un cron.
+  // Un collecteur qui a payé puis fermé l'onglet est crédité en rouvrant son
+  // carnet. Sans effet visible et sans message d'erreur : une panne de réseau ne
+  // doit pas gêner l'affichage du carnet.
+  useEffect(() => {
+    void verifierPaiements();
+  }, []);
 
   async function deconnecter() {
     setErreurSortie(null);
@@ -291,8 +331,20 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
       {page === 'alertes' && <Alertes revision={revision} onRetour={() => naviguer('accueil')} />}
       {page === 'avis' && <Avis revision={revision} onRetour={() => naviguer('accueil')} />}
       {(page === 'plus' || page === 'profil') && (
-        <Plus onRetour={() => naviguer('accueil')} onDeconnexion={deconnecter} />
+        <Plus
+          onRetour={() => naviguer('accueil')}
+          onDeconnexion={deconnecter}
+          onAbonnement={() => naviguer('abonnement')}
+        />
       )}
+      {page === 'abonnement' && (
+        <Abonnement
+          palierCourant={palierCollecteur ?? 'essai'}
+          telephoneCollecteur={telephoneCollecteur ?? ''}
+          onRetour={() => naviguer('plus')}
+        />
+      )}
+      {page === 'retour-paiement' && <RetourPaiement onTermine={() => naviguer('plus')} />}
 
     </>
   );

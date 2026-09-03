@@ -22,6 +22,7 @@ export {
   ChampTelephone,
   composerE164,
   PAYS_TELEPHONE,
+  separerE164,
   type PaysTelephone,
   type ValeurTelephone,
 } from './ChampTelephone';

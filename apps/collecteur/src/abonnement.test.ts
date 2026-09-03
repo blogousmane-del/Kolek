@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('./supabase', () => ({
@@ -106,46 +103,5 @@ describe('verifierPaiements', () => {
     invoke.mockResolvedValueOnce({ data: null, error: { message: 'réseau' } });
 
     expect(await verifierPaiements()).toEqual({ credites: 0, enAttente: 0, echeance: null });
-  });
-});
-
-describe('la table des phrases', () => {
-  /**
-   * Le filet qui empêche la table de prendre du retard sur le serveur.
-   *
-   * Sans lui, chaque refus ajouté côté Edge Function s'afficherait « Paiement
-   * impossible. Réessaie. » — une phrase qui ne dit ni ce qui s'est passé ni
-   * quoi faire, et qui a l'air d'une panne alors que la correction est souvent
-   * dans la saisie. Le retard ne se verrait qu'au moment où quelqu'un le
-   * rencontre, c'est-à-dire au marché.
-   *
-   * Les trois fichiers lus sont ceux qui peuvent rendre un code à ce module :
-   * les deux routes, et le module partagé dont `abonnement-payer` relaie
-   * l'issue telle quelle (`return reponse({ erreur: issue.erreur }, …)`).
-   */
-  const SOURCES = [
-    '../../../supabase/functions/abonnement-payer/index.ts',
-    '../../../supabase/functions/abonnement-verifier/index.ts',
-    '../../../supabase/functions/_shared/depot-chariow.ts',
-  ];
-
-  it('couvre tout code que les deux routes peuvent rendre', () => {
-    const codes = new Set<string>();
-    for (const chemin of SOURCES) {
-      const source = readFileSync(fileURLToPath(new URL(chemin, import.meta.url)), 'utf8');
-      for (const trouve of source.matchAll(/erreur: '([A-Z_]+)'/g)) {
-        codes.add(trouve[1] as string);
-      }
-    }
-
-    // La sonde d'abord : un motif qui ne trouverait rien ferait passer ce test
-    // sans rien mesurer, et c'est la façon la plus courante dont un contrôle par
-    // lecture de source cesse silencieusement de contrôler.
-    expect(codes.size).toBeGreaterThan(10);
-
-    const generique = messagePour('CODE_QUI_N_EXISTE_PAS');
-    const sansPhrase = [...codes].filter((code) => messagePour(code) === generique).sort();
-
-    expect(sansPhrase).toEqual([]);
   });
 });

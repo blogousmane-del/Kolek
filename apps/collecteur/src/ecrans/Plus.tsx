@@ -8,19 +8,24 @@ import { CorpsEcran, EnTeteEcran } from './EnTeteEcran';
 /**
  * « Plus » : la fiche du collecteur, son abonnement, l'état de l'application.
  *
- * L'écran ne propose **aucune modification**. Ce n'est pas un manque : les
- * colonnes `nom`, `telephone` et `zone` de `collecteurs` sont bien ouvertes en
- * écriture au collecteur, mais `palier` et `abonnement_*` ne le sont pas — c'est
- * GTCS qui les fixe. Un formulaire qui mêlerait les deux laisserait croire qu'on
- * peut changer d'offre depuis son téléphone.
+ * L'écran ne propose aucune modification **de fiche** : les colonnes `nom`,
+ * `telephone` et `zone` de `collecteurs` sont bien ouvertes en écriture au
+ * collecteur, mais il n'y a pas de formulaire ici — c'est un choix, pas une
+ * lacune.
+ *
+ * L'abonnement, lui, se règle depuis J5. Le collecteur ne *choisit* pas son
+ * échéance, il l'achète : `palier` et `abonnement_*` restent fermés en écriture,
+ * et ne changent qu'après un règlement confirmé par le serveur, jamais par un
+ * geste d'interface.
  *
  * L'état du réseau est montré parce qu'il explique la moitié des questions qu'un
  * collecteur se pose : pourquoi un chiffre ne bouge pas, pourquoi une mise
  * semble perdue.
  */
-export function Plus({ onRetour, onDeconnexion }: {
+export function Plus({ onRetour, onDeconnexion, onAbonnement }: {
   onRetour: () => void;
   onDeconnexion: () => void;
+  onAbonnement: () => void;
 }) {
   const { donnees: profil, erreur } = useDonnees('profil', chargerProfil, {
     messageErreur: 'Fiche indisponible. Vérifie le réseau.',
@@ -131,9 +136,22 @@ export function Plus({ onRetour, onDeconnexion }: {
                       }
                     />
                   </dl>
-                  <p className="font-body text-xs text-muted-foreground mt-3 pt-3 border-t border-hairline">
-                    Le changement de formule se fait auprès de GTCS, pas depuis l’application.
-                  </p>
+                  <div className="mt-3 pt-3 border-t border-hairline">
+                    {/* Un collaborateur qui ne voit aucun bouton, sur un écran
+                        qui affiche son palier juste au-dessus, se demande où il
+                        paie — et finit par appeler GTCS. La phrase répond avant
+                        que la question ne se pose, et dit quelque chose de vrai
+                        qu'il ignore peut-être : ce n'est pas lui qui paie. */}
+                    {profil.titulaireId ? (
+                      <p className="font-body text-sm text-muted-foreground">
+                        Ton abonnement est payé par ton titulaire. Tu n’as rien à régler.
+                      </p>
+                    ) : (
+                      <Bouton pleineLargeur icone="credit-card" onClick={onAbonnement}>
+                        Renouveler mon abonnement
+                      </Bouton>
+                    )}
+                  </div>
                 </Carte>
                 </div>
 
