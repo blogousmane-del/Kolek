@@ -5,6 +5,7 @@ import {
   normaliserTelephone,
   validerDemande,
 } from '../functions/_shared/valider-demande.ts';
+import { LONGUEUR_MOT_DE_PASSE } from '../functions/_shared/valider-collecteur.ts';
 
 /**
  * La validation de la demande d'ouverture.
@@ -24,6 +25,11 @@ const VALIDE = {
   zone: 'Adjamé',
   palier: 'pro',
   message: 'Je collecte au marché depuis six ans.',
+  // Obligatoire depuis le 2026-09-03 pour un palier payant : le prospect règle
+  // au formulaire, et son compte naîtra du règlement sans qu'un humain lui
+  // remette d'identifiants. `pro` est payant, donc cette clé n'est pas un
+  // ornement du gabarit — sans elle, la demande est refusée.
+  motDePasse: 'kolek-2026-mariam',
 };
 
 describe('la normalisation du téléphone', () => {
@@ -199,5 +205,74 @@ describe('l’adresse électronique', () => {
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.champ).toBe('nom');
+  });
+});
+
+describe('le mot de passe d’une demande payante', () => {
+  it('l’exige pour un palier payant, et nomme le champ', () => {
+    // Amendement « payer vaut accord » : le prospect règle au formulaire, et
+    // son compte naîtra du règlement sans qu'un humain lui remette
+    // d'identifiants. Sans mot de passe, ce compte serait inatteignable.
+    const r = validerDemande({ ...VALIDE, motDePasse: undefined });
+
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.erreur).toBe('MOT_DE_PASSE_REQUIS');
+    expect(r.champ).toBe('motDePasse');
+  });
+
+  it('distingue « absent » de « trop court »', () => {
+    // Deux causes, deux corrections. « Requis » se lit « tu as oublié un
+    // champ » ; « trop court » se lit « recommence, plus long ».
+    const r = validerDemande({ ...VALIDE, motDePasse: 'court' });
+
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.erreur).toBe('MOT_DE_PASSE_COURT');
+  });
+
+  it('reprend la longueur minimale de validerCollecteur, sans la recopier', () => {
+    // Deux vérités finiraient par diverger, et la moins stricte gagnerait.
+    const juste = validerDemande({ ...VALIDE, motDePasse: 'x'.repeat(LONGUEUR_MOT_DE_PASSE) });
+    const court = validerDemande({ ...VALIDE, motDePasse: 'x'.repeat(LONGUEUR_MOT_DE_PASSE - 1) });
+
+    expect(juste.ok).toBe(true);
+    expect(court.ok).toBe(false);
+  });
+
+  it('n’en demande pas pour un essai, et n’en retient pas', () => {
+    // Un essai attend l'accord d'un humain : aucun compte ne naîtra de cette
+    // demande toute seule. Garder une empreinte dont personne ne se servira
+    // serait un secret gardé pour rien.
+    const r = validerDemande({ ...VALIDE, palier: 'essai', motDePasse: undefined });
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.motDePasse).toBeNull();
+
+    const avec = validerDemande({ ...VALIDE, palier: 'essai', motDePasse: 'kolek-2026-mariam' });
+    expect(avec.ok).toBe(true);
+    if (!avec.ok) return;
+    expect(avec.motDePasse).toBeNull();
+  });
+
+  it('ne le range pas dans la demande, qui part telle quelle en base', () => {
+    // La propriété qui rend la faute impossible plutôt que détectable : ce que
+    // `demander-ouverture` insère est `demande`, et le clair n'y est pas.
+    const r = validerDemande(VALIDE);
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.motDePasse).toBe('kolek-2026-mariam');
+    expect(JSON.stringify(r.demande)).not.toContain('kolek-2026-mariam');
+  });
+
+  it('ne rogne pas les espaces qui font partie du mot de passe', () => {
+    const avecEspaces = '  kolek 2026 mariam  ';
+    const r = validerDemande({ ...VALIDE, motDePasse: avecEspaces });
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.motDePasse).toBe(avecEspaces);
   });
 });

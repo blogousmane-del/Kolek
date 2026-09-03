@@ -2017,6 +2017,38 @@ git commit -m "feat(abonnement): la vérification, appelée par le retour et par
 > Ce qui reste hors de portée d'ici, et c'est écrit plutôt que caché : la vente
 > elle-même, la remise en `discount_code`, et la supersession des tentatives
 > précédentes. Les trois vivent derrière `CHARIOW_CLE_API`.
+>
+> ---
+>
+> **Complété le 2026-09-03 : le chemin du prospect.** L'amendement donne à
+> `demander-ouverture` son propre checkout. Il est écrit, et il n'a pas la forme
+> que la table des tâches touchées laissait attendre.
+>
+> **Le refus passe avant la première écriture.** Une demande payante lit la
+> configuration Chariow, résout le téléphone et interroge HIBP **avant**
+> d'insérer quoi que ce soit. L'ordre inverse — écrire, puis découvrir que la
+> vente ne peut pas partir — laisserait une demande orpheline portant une
+> empreinte, et son numéro verrouillé par l'index d'unicité jusqu'à ce qu'un
+> humain la traite. C'est un test à part entière : « n'écrit rien quand le
+> paiement n'est pas configuré », et il est observable précisément parce que
+> `CHARIOW_CLE_API` n'existe ni en local ni au CI.
+>
+> **Le bloc de checkout est sorti dans `_shared/depot-chariow.ts`.** Les deux
+> chemins — renouvellement et première souscription — ne diffèrent que par leurs
+> métadonnées ; tout le reste, y compris la façon de refuser, doit être
+> identique. Recopié, ce bloc aurait donné deux traitements d'une réponse
+> incomplète, et l'un des deux aurait fini par rediriger quand même.
+>
+> `creerVenteChariow` est du coup **mesurable**, ce que la version en ligne dans
+> `abonnement-payer` n'était pas : neuf tests à `fetch` bouchonné couvrent le 422
+> distingué de la panne, les cinq formes de réponse incomplète, le corps
+> illisible, le réseau qui tombe — et surtout qu'**aucun montant ne part dans la
+> requête**. `couperNom` sort dans `_shared/chariow.ts` pour la même raison.
+>
+> **Ce qui reste hors de portée d'ici** : l'empreinte réellement écrite et le
+> lien réellement rendu. Les deux vivent derrière la clé. Ce qui est mesuré, en
+> revanche, c'est que l'essai n'a pas bougé — pas de mot de passe exigé, pas
+> d'empreinte retenue même si le formulaire en envoie un.
 
 
 **Files:**

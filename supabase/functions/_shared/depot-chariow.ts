@@ -2,6 +2,7 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 import type { StatutPaiement } from './chariow.ts';
 import type { Depot, PaiementEnCours, VenteDistante } from './reconciliation.ts';
+import type { TelephoneChariow } from './chariow.ts';
 
 /**
  * Le branchement réel de la réconciliation : Chariow d'un côté, la base de
@@ -171,4 +172,123 @@ export function creerDepot(
 
     journaliser: (message) => console.error('[Abonnement]', message),
   };
+}
+
+/* --------------------------- La création d'une vente ---------------------- */
+
+/**
+ * Ce qu'il faut savoir pour ouvrir un paiement chez Chariow.
+ *
+ * Aucun montant. C'est la propriété centrale du dispositif, et elle tient à ce
+ * qui **n'est pas** dans cette structure : Chariow débite le prix du produit
+ * configuré dans sa boutique, et un code de remise est le seul moyen de le
+ * réduire (`Docs/Chariow.md` §3.1). Un appelant — Edge Function comme
+ * téléphone — ne peut donc pas fixer ce qui sera prélevé.
+ */
+export interface SaisieVente {
+  produitId: string;
+  email: string;
+  prenom: string;
+  nomFamille: string;
+  telephone: TelephoneChariow;
+  /** Absent plutôt que nul : Chariow valide la présence de la clé. */
+  codeRemise?: string | null;
+  urlRetour: string;
+  metadonnees: Record<string, unknown>;
+}
+
+export type IssueVente =
+  | { ok: true; venteId: string; checkoutUrl: string; montant: number; devise: string }
+  | { ok: false; erreur: string; statut: number };
+
+/**
+ * Ouvre une vente, et ne rend un lien que si la réponse est complète.
+ *
+ * Les deux chemins de paiement s'en servent — le renouvellement d'un collecteur
+ * et la première souscription d'un prospect. Ils ne diffèrent que par ce qu'ils
+ * mettent dans `metadonnees` ; tout le reste, y compris la manière de refuser,
+ * doit être identique. Recopié, ce bloc aurait donné deux façons de traiter une
+ * réponse incomplète, et l'une des deux aurait fini par rediriger quand même.
+ *
+ * **Jamais de redirection sur une réponse incomplète.** Un lien manquant ou un
+ * identifiant de vente absent renvoient `CHECKOUT_INCOMPLET` : mieux vaut un
+ * refus lisible qu'un payeur envoyé sur une page qui n'existe pas, ou une vente
+ * réglée que nous ne saurions rattacher à personne.
+ *
+ * Le montant et la devise viennent de la **réponse**, jamais de la grille : la
+ * réconciliation comparera le débit réel à ce qui est enregistré, et enregistrer
+ * ce que nous espérions plutôt que ce que la boutique a dit ferait de ce
+ * contrôle une tautologie.
+ */
+export async function creerVenteChariow(
+  saisie: SaisieVente,
+  options: OptionsChariow,
+): Promise<IssueVente> {
+  let appel: Response;
+  try {
+    appel = await fetch(`${options.racine}/checkout`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${options.cleApi}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(10_000),
+      body: JSON.stringify({
+        product_id: saisie.produitId,
+        email: saisie.email,
+        first_name: saisie.prenom,
+        last_name: saisie.nomFamille,
+        phone: saisie.telephone,
+        ...(saisie.codeRemise ? { discount_code: saisie.codeRemise } : {}),
+        redirect_url: saisie.urlRetour,
+        custom_metadata: saisie.metadonnees,
+      }),
+    });
+  } catch (cause) {
+    console.error('[Abonnement] checkout :', cause instanceof Error ? cause.message : cause);
+    return { ok: false, erreur: 'CHECKOUT_IMPOSSIBLE', statut: 502 };
+  }
+
+  if (!appel.ok) {
+    const detail = await appel.text().catch(() => '');
+    console.error('[Abonnement] checkout refusé :', appel.status, detail.slice(0, 300));
+    // 422 : le fournisseur a refusé la saisie — le seul cas qu'il vaille la
+    // peine de distinguer pour celui qui paie, parce que c'est le seul qu'il
+    // puisse corriger lui-même.
+    return appel.status === 422
+      ? { ok: false, erreur: 'SAISIE_REFUSEE', statut: 400 }
+      : { ok: false, erreur: 'CHECKOUT_IMPOSSIBLE', statut: 502 };
+  }
+
+  let corps: {
+    data?: {
+      purchase?: { id?: unknown; amount?: { value?: unknown; currency?: unknown } };
+      payment?: { checkout_url?: unknown };
+    };
+  };
+  try {
+    corps = await appel.json();
+  } catch {
+    console.error('[Abonnement] réponse de checkout illisible');
+    return { ok: false, erreur: 'CHECKOUT_INCOMPLET', statut: 502 };
+  }
+
+  const vente = corps.data?.purchase ?? {};
+  const lien = corps.data?.payment?.checkout_url;
+  const montant = Number(vente.amount?.value);
+  const devise =
+    typeof vente.amount?.currency === 'string' ? vente.amount.currency.toUpperCase() : '';
+
+  if (typeof vente.id !== 'string' || !vente.id || typeof lien !== 'string' || !lien) {
+    console.error('[Abonnement] réponse de checkout incomplète');
+    return { ok: false, erreur: 'CHECKOUT_INCOMPLET', statut: 502 };
+  }
+
+  if (!Number.isFinite(montant) || !/^[A-Z]{3}$/.test(devise)) {
+    console.error('[Abonnement] montant ou devise illisibles dans la réponse');
+    return { ok: false, erreur: 'CHECKOUT_INCOMPLET', statut: 502 };
+  }
+
+  return { ok: true, venteId: vente.id, checkoutUrl: lien, montant, devise };
 }

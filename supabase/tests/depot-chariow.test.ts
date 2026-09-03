@@ -4,8 +4,10 @@ import {
   JOURS_RATTRAPAGE,
   chargerPaiementsRattrapables,
   creerDepot,
+  creerVenteChariow,
   lireVenteChariow,
 } from '../functions/_shared/depot-chariow';
+import { couperNom } from '../functions/_shared/chariow';
 import { admin, creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
 
 /**
@@ -225,5 +227,170 @@ describe('chargerPaiementsRattrapables', () => {
     // La borne mord dans un sens seulement : sans cette seconde assertion, une
     // fenêtre réglée à zéro jour passerait ce test.
     expect(lot).toContain(recent);
+  });
+});
+
+describe('creerVenteChariow', () => {
+  const SAISIE = {
+    produitId: 'prod_pro',
+    email: 'mariam@example.ci',
+    prenom: 'Mariam',
+    nomFamille: 'Koné',
+    telephone: { number: '0701020304', country_code: 'CI' },
+    urlRetour: 'https://app.kolek.cash/?paiement=retour',
+    metadonnees: { palier: 'pro' },
+  };
+
+  function repondre(corps: unknown, statut = 200): Response {
+    return new Response(JSON.stringify(corps), {
+      status: statut,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const COMPLETE = {
+    data: {
+      purchase: { id: 'v_42', amount: { value: 5000, currency: 'xof' } },
+      payment: { checkout_url: 'https://pay.chariow.test/v_42' },
+    },
+  };
+
+  it('n’envoie aucun montant — c’est la boutique qui décide du débit', async () => {
+    // La propriété centrale du dispositif. Si un montant partait d'ici, il
+    // suffirait d'un appelant fautif pour vendre un abonnement à un franc.
+    const appel = vi.fn(async () => repondre(COMPLETE));
+    vi.stubGlobal('fetch', appel);
+
+    await creerVenteChariow(SAISIE, OPTIONS);
+
+    const corps = JSON.parse((appel.mock.calls[0] as [string, RequestInit])[1].body as string);
+    expect(corps).toMatchObject({ product_id: 'prod_pro' });
+    expect(Object.keys(corps)).not.toContain('amount');
+    expect(Object.keys(corps)).not.toContain('price');
+    expect(JSON.stringify(corps)).not.toMatch(/\b5000\b/);
+  });
+
+  it('rend le montant et la devise de la réponse, normalisés', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => repondre(COMPLETE)));
+
+    const issue = await creerVenteChariow(SAISIE, OPTIONS);
+
+    expect(issue).toEqual({
+      ok: true,
+      venteId: 'v_42',
+      checkoutUrl: 'https://pay.chariow.test/v_42',
+      montant: 5000,
+      devise: 'XOF',
+    });
+  });
+
+  it('n’ajoute un code de remise que s’il y en a un', async () => {
+    // Chariow valide la **présence** de la clé, pas seulement sa valeur : un
+    // `discount_code: null` fait répondre 422 à une vente irréprochable.
+    const appel = vi.fn(async () => repondre(COMPLETE));
+    vi.stubGlobal('fetch', appel);
+
+    await creerVenteChariow({ ...SAISIE, codeRemise: null }, OPTIONS);
+    let corps = JSON.parse((appel.mock.calls[0] as [string, RequestInit])[1].body as string);
+    expect(Object.keys(corps)).not.toContain('discount_code');
+
+    await creerVenteChariow({ ...SAISIE, codeRemise: 'RENTREE20' }, OPTIONS);
+    corps = JSON.parse((appel.mock.calls[1] as [string, RequestInit])[1].body as string);
+    expect(corps.discount_code).toBe('RENTREE20');
+  });
+
+  it('distingue une saisie refusée d’une panne du fournisseur', async () => {
+    // 422 est le seul cas que celui qui paie puisse corriger lui-même. Les
+    // confondre l'enverrait relire une saisie irréprochable.
+    vi.stubGlobal('fetch', vi.fn(async () => repondre({ message: 'invalid phone' }, 422)));
+    expect(await creerVenteChariow(SAISIE, OPTIONS)).toMatchObject({
+      ok: false,
+      erreur: 'SAISIE_REFUSEE',
+      statut: 400,
+    });
+
+    vi.stubGlobal('fetch', vi.fn(async () => repondre({}, 500)));
+    expect(await creerVenteChariow(SAISIE, OPTIONS)).toMatchObject({
+      ok: false,
+      erreur: 'CHECKOUT_IMPOSSIBLE',
+      statut: 502,
+    });
+  });
+
+  it('ne rend jamais de lien sur une réponse incomplète', async () => {
+    // Ce que ce test empêche : envoyer quelqu'un vers une page qui n'existe
+    // pas, ou enregistrer une vente qu'on ne saurait rattacher à personne.
+    const incompletes = [
+      { data: { purchase: { id: 'v_42', amount: { value: 5000, currency: 'XOF' } } } },
+      { data: { payment: { checkout_url: 'https://pay.chariow.test/v_42' } } },
+      {
+        data: {
+          purchase: { id: '', amount: { value: 5000, currency: 'XOF' } },
+          payment: { checkout_url: 'https://pay.chariow.test/v_42' },
+        },
+      },
+      {
+        data: {
+          purchase: { id: 'v_42', amount: { value: 'cinq mille', currency: 'XOF' } },
+          payment: { checkout_url: 'https://pay.chariow.test/v_42' },
+        },
+      },
+      {
+        data: {
+          purchase: { id: 'v_42', amount: { value: 5000 } },
+          payment: { checkout_url: 'https://pay.chariow.test/v_42' },
+        },
+      },
+    ];
+
+    for (const corps of incompletes) {
+      vi.stubGlobal('fetch', vi.fn(async () => repondre(corps)));
+      const issue = await creerVenteChariow(SAISIE, OPTIONS);
+      expect(issue).toMatchObject({ ok: false, erreur: 'CHECKOUT_INCOMPLET', statut: 502 });
+      expect(JSON.stringify(issue)).not.toContain('pay.chariow.test');
+    }
+  });
+
+  it('traite un corps illisible comme une réponse incomplète', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('<html>502</html>', { status: 200 })));
+
+    expect(await creerVenteChariow(SAISIE, OPTIONS)).toMatchObject({
+      ok: false,
+      erreur: 'CHECKOUT_INCOMPLET',
+    });
+  });
+
+  it('rend un refus plutôt que de lever quand le réseau tombe', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('ECONNRESET');
+      }),
+    );
+
+    expect(await creerVenteChariow(SAISIE, OPTIONS)).toMatchObject({
+      ok: false,
+      erreur: 'CHECKOUT_IMPOSSIBLE',
+      statut: 502,
+    });
+  });
+});
+
+describe('couperNom', () => {
+  it('coupe au premier espace', () => {
+    expect(couperNom('Mariam Koné')).toEqual({ prenom: 'Mariam', nomFamille: 'Koné' });
+    expect(couperNom('Awa Konan Yao')).toEqual({ prenom: 'Awa', nomFamille: 'Konan Yao' });
+  });
+
+  it('replie plutôt que de refuser un nom d’un seul mot', () => {
+    // Quelqu'un enregistré sous un seul mot ne doit pas être empêché de payer
+    // parce qu'un fournisseur veut deux cases.
+    expect(couperNom('Adama')).toEqual({ prenom: 'Adama', nomFamille: 'Kolek' });
+    expect(couperNom('   ')).toEqual({ prenom: 'Collecteur', nomFamille: 'Kolek' });
+    expect(couperNom('')).toEqual({ prenom: 'Collecteur', nomFamille: 'Kolek' });
+  });
+
+  it('ne laisse pas des espaces multiples fabriquer un nom vide', () => {
+    expect(couperNom('  Mariam    Koné  ')).toEqual({ prenom: 'Mariam', nomFamille: 'Koné' });
   });
 });

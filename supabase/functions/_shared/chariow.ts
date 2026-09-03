@@ -222,3 +222,28 @@ export function lireProduits(brut: string | undefined | null): Record<string, st
   }
   return produits;
 }
+
+/**
+ * Le nom complet d'une fiche Kolek, coupé en prénom et nom pour Chariow.
+ *
+ * Chariow exige les deux champs. Une fiche Kolek n'en porte qu'un — c'est ainsi
+ * qu'on inscrit les gens ici, et le formulaire de la vitrine ne demande pas
+ * autre chose. On coupe donc au premier espace, avec un **repli plutôt qu'un
+ * refus** : quelqu'un enregistré sous un seul mot ne doit pas être empêché de
+ * payer parce qu'un fournisseur veut deux cases.
+ *
+ * Deux appelants s'en servent — le renouvellement d'un collecteur et la
+ * première souscription d'un prospect. La règle est la même, et la recopier
+ * aurait donné deux découpes qui finiraient par diverger.
+ */
+export function couperNom(complet: string): { prenom: string; nomFamille: string } {
+  const morceaux = String(complet ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  return {
+    prenom: morceaux[0] ?? 'Collecteur',
+    nomFamille: morceaux.length > 1 ? morceaux.slice(1).join(' ') : 'Kolek',
+  };
+}

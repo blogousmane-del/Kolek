@@ -1,8 +1,12 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import { ORIGINES_COLLECTEUR, entetesCors, listerOrigines } from '../_shared/cors.ts';
-import { lireProduits, resoudreTelephone } from '../_shared/chariow.ts';
-import { chargerPaiementsRattrapables, creerDepot } from '../_shared/depot-chariow.ts';
+import { couperNom, lireProduits, resoudreTelephone } from '../_shared/chariow.ts';
+import {
+  chargerPaiementsRattrapables,
+  creerDepot,
+  creerVenteChariow,
+} from '../_shared/depot-chariow.ts';
 import { reconcilier } from '../_shared/reconciliation.ts';
 
 /**
@@ -187,12 +191,9 @@ Deno.serve(async (requete) => {
     typeof fiche.remise_fin === 'string' &&
     fiche.remise_fin >= aujourdHui;
 
-  // Chariow exige un prénom **et** un nom. Une fiche Kolek ne porte qu'un nom
-  // complet : on le coupe, avec un repli plutôt qu'un refus — un collecteur
-  // enregistré sous un seul mot ne doit pas être empêché de payer.
-  const morceaux = String(fiche.nom).trim().split(/\s+/);
-  const prenom = morceaux[0] ?? 'Collecteur';
-  const nomFamille = morceaux.length > 1 ? morceaux.slice(1).join(' ') : 'Kolek';
+  // Chariow exige un prénom **et** un nom. `couperNom` porte la règle et son
+  // repli, partagés avec le chemin du prospect.
+  const { prenom, nomFamille } = couperNom(String(fiche.nom));
 
   // --- Passé ce point seulement, la clé de service sort ---
 
@@ -221,79 +222,32 @@ Deno.serve(async (requete) => {
 
   // --- La vente ---
 
-  let vente: { id?: unknown; amount?: { value?: unknown; currency?: unknown } };
-  let checkoutUrl: string;
-  try {
-    const appel = await fetch(`${racine}/checkout`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${cleApi}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
+  const issue = await creerVenteChariow(
+    {
+      produitId: produits[palier] as string,
+      email: courriel,
+      prenom,
+      nomFamille,
+      telephone,
+      codeRemise: remiseActive ? String(fiche.promo_code) : null,
+      urlRetour: `${retour}/?paiement=retour`,
+      metadonnees: {
+        collecteurId,
+        palier,
+        echeanceAvant: fiche.abonnement_echeance,
+        // Ce que Kolek croyait accorder, au moment de l'achat. La réconciliation
+        // compare le montant réellement encaissé au prix du palier ; sans cette
+        // trace, une divergence entre les deux catalogues de codes serait
+        // indémêlable six mois plus tard.
+        remisePct: remiseActive ? fiche.remise_pct : null,
+        promoCode: remiseActive ? fiche.promo_code : null,
       },
-      signal: AbortSignal.timeout(10000),
-      body: JSON.stringify({
-        product_id: produits[palier],
-        email: courriel,
-        first_name: prenom,
-        last_name: nomFamille,
-        phone: telephone,
-        // Absent plutôt que `null` quand il n'y a pas de remise : Chariow valide
-        // la présence de la clé, pas seulement sa valeur.
-        ...(remiseActive ? { discount_code: fiche.promo_code } : {}),
-        redirect_url: `${retour}/?paiement=retour`,
-        custom_metadata: {
-          collecteurId,
-          palier,
-          echeanceAvant: fiche.abonnement_echeance,
-          // Ce que Kolek croyait accorder, au moment de l'achat. La
-          // réconciliation compare le montant réellement encaissé au prix du
-          // palier ; sans cette trace, une divergence entre les deux catalogues
-          // de codes serait indémêlable six mois plus tard.
-          remisePct: remiseActive ? fiche.remise_pct : null,
-          promoCode: remiseActive ? fiche.promo_code : null,
-        },
-      }),
-    });
+    },
+    { racine, cleApi },
+  );
 
-    if (!appel.ok) {
-      const detail = await appel.text();
-      console.error('[Abonnement] checkout refusé :', appel.status, detail.slice(0, 300));
-      // 422 : le fournisseur a refusé la saisie — le seul cas qu'il vaut la
-      // peine de distinguer pour le collecteur.
-      return reponse(
-        { erreur: appel.status === 422 ? 'SAISIE_REFUSEE' : 'CHECKOUT_IMPOSSIBLE' },
-        appel.status === 422 ? 400 : 502,
-        requete,
-      );
-    }
-
-    const corps = (await appel.json()) as {
-      data?: { purchase?: typeof vente; payment?: { checkout_url?: unknown } };
-    };
-    vente = corps.data?.purchase ?? {};
-    const lien = corps.data?.payment?.checkout_url;
-
-    // Jamais de redirection en dur sur une réponse incomplète.
-    if (typeof vente.id !== 'string' || typeof lien !== 'string' || !lien) {
-      console.error('[Abonnement] réponse de checkout incomplète');
-      return reponse({ erreur: 'CHECKOUT_INCOMPLET' }, 502, requete);
-    }
-    checkoutUrl = lien;
-  } catch (cause) {
-    console.error('[Abonnement] checkout :', cause instanceof Error ? cause.message : cause);
-    return reponse({ erreur: 'CHECKOUT_IMPOSSIBLE' }, 502, requete);
-  }
-
-  // Le montant et la devise viennent de la réponse, jamais de la grille : c'est
-  // la boutique qui décide de ce qui sera débité.
-  const montant = Number(vente.amount?.value);
-  const devise =
-    typeof vente.amount?.currency === 'string' ? vente.amount.currency.toUpperCase() : '';
-
-  if (!Number.isFinite(montant) || !/^[A-Z]{3}$/.test(devise)) {
-    console.error('[Abonnement] montant ou devise illisibles dans la réponse');
-    return reponse({ erreur: 'CHECKOUT_INCOMPLET' }, 502, requete);
+  if (!issue.ok) {
+    return reponse({ erreur: issue.erreur }, issue.statut, requete);
   }
 
   const { data: pose, error: erreurPose } = await clientService
@@ -301,9 +255,9 @@ Deno.serve(async (requete) => {
     .insert({
       collecteur_id: collecteurId,
       palier,
-      vente_id: vente.id as string,
-      montant,
-      devise,
+      vente_id: issue.venteId,
+      montant: issue.montant,
+      devise: issue.devise,
       // Ce qui a été demandé à Chariow, et non ce que la fiche portera demain.
       remise_pct: remiseActive ? Number(fiche.remise_pct) : 0,
       echeance_avant: fiche.abonnement_echeance,
@@ -319,5 +273,5 @@ Deno.serve(async (requete) => {
     return reponse({ erreur: 'ENREGISTREMENT_IMPOSSIBLE' }, 500, requete);
   }
 
-  return reponse({ checkoutUrl, paiementId: pose.id }, 201, requete);
+  return reponse({ checkoutUrl: issue.checkoutUrl, paiementId: pose.id }, 201, requete);
 });

@@ -128,3 +128,87 @@ describe('la borne de débit', () => {
     expect((await deposer(demande('j'), ip)).status).toBe(201);
   });
 });
+
+describe('la demande payante', () => {
+  /**
+   * L'amendement « payer vaut accord » du 2026-09-02 : un palier payant part
+   * payer au lieu d'attendre un rappel.
+   *
+   * Ce que la base locale peut mesurer s'arrête où `CHARIOW_CLE_API` manque —
+   * elle n'existe ni ici ni au CI. La vente elle-même, l'empreinte écrite et le
+   * lien rendu vivent derrière. Reste ce qui compte le plus, et qui est
+   * justement observable **parce que** la clé manque : rien n'est écrit quand le
+   * paiement ne peut pas partir.
+   */
+
+  it('refuse un palier payant sans mot de passe, en nommant le champ', async () => {
+    const reponse = await deposer({ ...demande('mdp-absent'), palier: 'pro' });
+
+    expect(reponse.status).toBe(400);
+    expect(await reponse.json()).toMatchObject({
+      erreur: 'MOT_DE_PASSE_REQUIS',
+      champ: 'motDePasse',
+    });
+  });
+
+  it('refuse un mot de passe trop court', async () => {
+    const reponse = await deposer({
+      ...demande('mdp-court'),
+      palier: 'pro',
+      motDePasse: 'court',
+    });
+
+    expect(reponse.status).toBe(400);
+    expect(await reponse.json()).toMatchObject({ erreur: 'MOT_DE_PASSE_COURT' });
+  });
+
+  it('n’écrit rien quand le paiement n’est pas configuré', async () => {
+    // La propriété qui compte ici. Écrire d'abord et découvrir ensuite que la
+    // vente ne peut pas partir laisserait une demande orpheline portant une
+    // empreinte, et son numéro verrouillé par l'index d'unicité jusqu'à ce
+    // qu'un humain la traite. Le contrôle passe donc avant la première écriture.
+    const saisie = { ...demande('sans-boutique'), palier: 'pro', motDePasse: 'kolek-2026-essai' };
+
+    const reponse = await deposer(saisie);
+
+    expect(reponse.status).toBe(503);
+    expect(await reponse.json()).toMatchObject({ erreur: 'PAIEMENT_INDISPONIBLE' });
+
+    const { data } = await admin
+      .from('demandes_ouverture')
+      .select('id')
+      .eq('telephone', saisie.telephone);
+    expect(data).toEqual([]);
+  });
+
+  it('laisse l’essai suivre le chemin d’avant, sans mot de passe ni empreinte', async () => {
+    // L'essai vaut zéro franc : il n'y a rien à encaisser, et il attend l'accord
+    // d'un humain. C'est aussi la porte d'entrée de qui n'a pas de moyen de
+    // paiement en ligne.
+    const saisie = demande('essai-intact');
+
+    const reponse = await deposer(saisie);
+    expect(reponse.status).toBe(201);
+    expect(await reponse.json()).toEqual({ recue: true });
+
+    const { data } = await admin
+      .from('demandes_ouverture')
+      .select('statut, mot_de_passe_hash')
+      .eq('telephone', saisie.telephone)
+      .single();
+    expect(data).toEqual({ statut: 'nouvelle', mot_de_passe_hash: null });
+  });
+
+  it('ne retient pas d’empreinte pour un essai, même si le formulaire en envoie un', async () => {
+    const saisie = { ...demande('essai-avec-mdp'), motDePasse: 'kolek-2026-inutile' };
+
+    expect((await deposer(saisie)).status).toBe(201);
+
+    const { data } = await admin
+      .from('demandes_ouverture')
+      .select('mot_de_passe_hash')
+      .eq('telephone', saisie.telephone)
+      .single();
+    expect(data?.mot_de_passe_hash).toBeNull();
+  });
+});

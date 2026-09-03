@@ -17,7 +17,9 @@
  * transaction pour une saisie vide.
  */
 
+import { PALIERS_PAYANTS } from './chariow.ts';
 import { EMAIL_MAX, validerEmail } from './valider-email.ts';
+import { LONGUEUR_MOT_DE_PASSE } from './valider-collecteur.ts';
 
 /** Reprises des contraintes `CHECK` de `public.demandes_ouverture`. */
 export const BORNES = {
@@ -38,6 +40,8 @@ export interface DemandeBrute {
   zone?: unknown;
   palier?: unknown;
   message?: unknown;
+  /** Exigé pour un palier payant seulement. Voir `Resultat`. */
+  motDePasse?: unknown;
 }
 
 export interface DemandeValide {
@@ -49,8 +53,21 @@ export interface DemandeValide {
   message: string | null;
 }
 
+/**
+ * Le mot de passe voyage **à côté** de la demande, jamais dedans.
+ *
+ * `demande` est inséré tel quel dans `demandes_ouverture`. Y laisser le clair
+ * l'écrirait en base au premier appel — et la contrainte
+ * `demandes_mot_de_passe_empreinte` le refuserait, ce qui est le bon
+ * comportement mais un mauvais moment pour l'apprendre. Deux champs séparés
+ * rendent la faute impossible plutôt que détectable.
+ *
+ * `motDePasse` est nul pour une demande d'essai : il n'y a pas de compte à
+ * créer plus tard, donc rien à retenir, et conserver une empreinte dont
+ * personne ne se servira serait un secret gardé pour rien.
+ */
 export type Resultat =
-  | { ok: true; demande: DemandeValide }
+  | { ok: true; demande: DemandeValide; motDePasse: string | null }
   | { ok: false; erreur: string; champ: string };
 
 function texte(valeur: unknown): string {
@@ -126,6 +143,29 @@ export function validerDemande(brut: DemandeBrute): Resultat {
     return { ok: false, erreur: 'PALIER_INCONNU', champ: 'palier' };
   }
 
+  // Le mot de passe, pour un palier payant seulement.
+  //
+  // Amendement « payer vaut accord » du 2026-09-02 : un prospect qui règle au
+  // formulaire n'a pas d'administrateur pour lui remettre des identifiants. Il
+  // choisit donc son mot de passe **avant** de payer, et il est jugé ici — le
+  // refuser après l'encaissement serait le pire moment possible.
+  //
+  // Pas de `trim` : les espaces de tête ou de fin font partie du mot de passe,
+  // et les retirer changerait silencieusement ce que la personne a tapé. Même
+  // raison que dans `validerCollecteur`, dont la longueur minimale est reprise
+  // plutôt que recopiée — deux vérités finiraient par diverger.
+  const palier = palierBrut as PalierDemande;
+  const payant = PALIERS_PAYANTS.includes(palier);
+  const motDePasse = typeof brut.motDePasse === 'string' ? brut.motDePasse : '';
+
+  if (payant && motDePasse.length < LONGUEUR_MOT_DE_PASSE) {
+    return {
+      ok: false,
+      erreur: motDePasse ? 'MOT_DE_PASSE_COURT' : 'MOT_DE_PASSE_REQUIS',
+      champ: 'motDePasse',
+    };
+  }
+
   return {
     ok: true,
     demande: {
@@ -133,8 +173,12 @@ export function validerDemande(brut: DemandeBrute): Resultat {
       telephone,
       email: verdictEmail.email,
       zone: zone || null,
-      palier: palierBrut as PalierDemande,
+      palier,
       message: message || null,
     },
+    // Nul pour un essai, même si le formulaire en a envoyé un : aucun compte ne
+    // naîtra de cette demande sans l'accord d'un humain, et garder une empreinte
+    // dont personne ne se servira serait un secret gardé pour rien.
+    motDePasse: payant ? motDePasse : null,
   };
 }
