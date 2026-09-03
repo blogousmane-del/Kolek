@@ -6,6 +6,7 @@ import {
   sondeDemandee,
   verifierIdentifiants,
 } from '../_shared/passerelle-sms.ts';
+import { secretValide } from '../_shared/secret.ts';
 
 /**
  * Le drainage de la file des avis.
@@ -13,6 +14,24 @@ import {
  * Appelée par une tâche planifiée — pas par un navigateur. Elle n'a donc
  * **aucun en-tête CORS** : aucune page n'a de raison légitime de l'appeler, et
  * ne pas en émettre est la façon la plus simple de le dire.
+ *
+ * ## Qui a le droit d'entrer
+ *
+ * Ne pas émettre de CORS dit une intention ; ça n'arrête personne. `curl` s'en
+ * moque, et la barrière de plateforme `verify_jwt` accepte la **clé publiable**,
+ * qui voyage dans le paquet JavaScript des trois sites — par construction, pas
+ * par accident. Jusqu'au 2026-09-03, cette fonction ne contrôlait donc que la
+ * méthode HTTP : n'importe qui pouvait déclencher un drainage.
+ *
+ * L'appelant légitime est `avis_declencher_drainage()`, qui lit la clé de
+ * service dans Vault et la présente en porteur. C'est cette clé, et elle seule,
+ * qui ouvre ici — comparée à temps constant, parce qu'une comparaison qui
+ * s'arrête au premier caractère différent dit combien de caractères étaient
+ * bons.
+ *
+ * Le contrôle passe **avant** l'examen de la passerelle : sinon un appelant sans
+ * droit apprendrait, par la seule différence entre deux réponses, si les
+ * identifiants SMS sont posés.
  *
  * ## Ce qu'elle fait quand rien n'est configuré
  *
@@ -25,6 +44,25 @@ import {
  * le client croirait détenir une trace, le collecteur croirait être surveillé,
  * et personne ne le découvrirait avant une contestation — c'est-à-dire au pire
  * moment.
+ *
+ * ## Pourquoi le lot se réserve avant de partir
+ *
+ * Cette fonction lisait sa file par un `select`, envoyait, puis marquait
+ * `envoye`. Rien n'empêchait deux exécutions de lire les mêmes lignes — et il
+ * n'en faut pas dix : un lot de cinquante SMS dépasse la minute qui sépare deux
+ * réveils de l'horloge. Le client recevait deux fois « versement 500 FCFA » et
+ * croyait avoir versé mille ; le collecteur payait deux fois le segment.
+ *
+ * `avis_reserver_lot` remplace le `select`. Elle marque `en_cours` et ne rend
+ * que ce qu'elle a marqué, sous `for update skip locked` : deux drainages
+ * simultanés ne voient jamais la même ligne. Ce que la base rend est donc à nous
+ * seuls.
+ *
+ * `tentatives` s'incrémente à la réservation, plus ici. Une ligne sortie de la
+ * réservation a consommé son essai même si cette fonction meurt avant d'écrire —
+ * ce qui est voulu : c'est ce qui empêche une ligne empoisonnée de tourner sans
+ * fin. Les réservations qu'une mort laisse derrière elle sont libérées par la
+ * réservation suivante, au bout de cinq minutes.
  *
  * ## L'ordre des opérations, et pourquoi il ne peut pas être inversé
  *
@@ -44,6 +82,7 @@ interface Avis {
   destinataire: string;
   corps: string;
   segments: number;
+  /** Déjà incrémenté par `avis_reserver_lot` : c'est le numéro de cet essai-ci. */
   tentatives: number;
 }
 
@@ -64,6 +103,15 @@ Deno.serve(async (requete) => {
   if (!url || !cleService) {
     console.error('Configuration Supabase incomplète.');
     return reponse({ erreur: 'CONFIGURATION' }, 500);
+  }
+
+  // Voir l'en-tête. Le porteur attendu est la clé de service, celle que
+  // `avis_declencher_drainage()` sort de Vault — pas la clé publiable, que
+  // `verify_jwt` a déjà laissé passer.
+  const porteur = requete.headers.get('Authorization')?.replace(/^Bearer /, '') ?? null;
+  if (!(await secretValide(porteur, cleService))) {
+    console.error('Appel refusé : porteur absent ou différent de la clé de service.');
+    return reponse({ erreur: 'ACCES_RESERVE' }, 403);
   }
 
   const passerelle = passerelleDepuis(Deno.env.toObject());
@@ -87,16 +135,10 @@ Deno.serve(async (requete) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data, error } = await client
-    .from('avis_clients')
-    .select('id, collecteur_id, destinataire, corps, segments, tentatives')
-    .in('statut', ['a_envoyer', 'echoue'])
-    .lt('tentatives', TENTATIVES_MAX)
-    .order('cree_le', { ascending: true })
-    .limit(LOT);
+  const { data, error } = await client.rpc('avis_reserver_lot', { p_taille: LOT });
 
   if (error) {
-    console.error('Lecture de la file impossible :', error.message);
+    console.error('Réservation du lot impossible :', error.message);
     return reponse({ erreur: 'LECTURE_IMPOSSIBLE' }, 500);
   }
 
@@ -121,7 +163,7 @@ Deno.serve(async (requete) => {
         .update({
           statut: 'envoye',
           envoye_le: new Date().toISOString(),
-          tentatives: avis.tentatives + 1,
+          reserve_le: null,
           derniere_erreur: null,
         })
         .eq('id', avis.id);
@@ -145,18 +187,18 @@ Deno.serve(async (requete) => {
       console.error('Sonde des identifiants :', diagnostic);
     }
 
-    const tentatives = avis.tentatives + 1;
     // `abandonne` est définitif : ni un refus d'identifiants ni un numéro
     // invalide ne passeront au quatrième essai, et les rejouer indéfiniment
-    // masquerait la cause sous le bruit.
+    // masquerait la cause sous le bruit. `avis.tentatives` compte déjà cet
+    // essai-ci — la réservation l'a incrémenté avant de rendre la ligne.
     const statut =
-      !issue.reessayable || tentatives >= TENTATIVES_MAX ? 'abandonne' : 'echoue';
+      !issue.reessayable || avis.tentatives >= TENTATIVES_MAX ? 'abandonne' : 'echoue';
 
     await client
       .from('avis_clients')
       .update({
         statut,
-        tentatives,
+        reserve_le: null,
         derniere_erreur: diagnostic
           ? `${issue.raison} | SONDE: ${diagnostic}`.slice(0, 400)
           : issue.raison,

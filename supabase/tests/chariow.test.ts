@@ -5,7 +5,6 @@ import {
   mapperStatut,
   montantCoherent,
   resoudreTelephone,
-  secretValide,
 } from '../functions/_shared/chariow';
 
 /**
@@ -122,21 +121,5 @@ describe('lireProduits', () => {
   it('lève sur du JSON illisible ou absent', () => {
     expect(() => lireProduits('pas du json')).toThrow();
     expect(() => lireProduits(undefined)).toThrow();
-  });
-});
-
-describe('secretValide', () => {
-  it('accepte le secret exact', async () => {
-    expect(await secretValide('s3cr3t', 's3cr3t')).toBe(true);
-  });
-
-  it('refuse un préfixe correct de même longueur', async () => {
-    expect(await secretValide('s3cr3T', 's3cr3t')).toBe(false);
-  });
-
-  it('refuse une longueur différente, un secret vide, un secret absent', async () => {
-    expect(await secretValide('s3cr3', 's3cr3t')).toBe(false);
-    expect(await secretValide(null, 's3cr3t')).toBe(false);
-    expect(await secretValide('s3cr3t', '')).toBe(false);
   });
 });
