@@ -1,4 +1,42 @@
+import { etatPaiement } from '../_shared/etat-paiement.ts';
 import { entetesPour, ouvrir, reponse } from '../_shared/portillon-super-admin.ts';
+
+/**
+ * La boutique répond-elle ?
+ *
+ * L'état déclaré ne suffit pas : une clé présente et fausse se comporte
+ * exactement comme une clé absente le jour du premier paiement, et personne ne
+ * l'apprend avant. `GET /products` est la lecture la plus inoffensive du
+ * contrat (`Docs/Chariow.md` §3.4) — elle n'écrit rien, elle n'engage rien.
+ *
+ * Trois secondes, et un échec qui ne fait **pas** échouer l'écran : les réglages
+ * doivent s'afficher même quand Chariow est en panne. C'est justement le moment
+ * où on vient les regarder.
+ *
+ * 401 et 403 disent « la clé est mauvaise », le reste dit « le service ne va pas
+ * ». Les confondre enverrait GTCS régénérer une clé parfaitement correcte.
+ */
+async function sonderBoutique(
+  cleConfiguree: boolean,
+): Promise<'joignable' | 'refusee' | 'injoignable' | 'non_configuree'> {
+  if (!cleConfiguree) return 'non_configuree';
+
+  try {
+    const racine = Deno.env.get('CHARIOW_API_URL') ?? 'https://api.chariow.com/v1';
+    const appel = await fetch(`${racine}/products`, {
+      headers: {
+        Authorization: `Bearer ${Deno.env.get('CHARIOW_CLE_API')}`,
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(3000),
+    });
+
+    if (appel.ok) return 'joignable';
+    return appel.status === 401 || appel.status === 403 ? 'refusee' : 'injoignable';
+  } catch {
+    return 'injoignable';
+  }
+}
 
 /**
  * L'état de la plateforme, pour l'écran Super Admin.
@@ -53,12 +91,23 @@ Deno.serve(async (requete) => {
 
   const plateforme = reglages.data as Record<string, unknown>;
 
+  // Ce que l'environnement déclare, puis ce que la boutique répond. La clé ne
+  // sort jamais : `etatPaiement` est pure et trois tests mesurent qu'aucune des
+  // trois valeurs sensibles ne se retrouve dans sa sortie.
+  const paiement = etatPaiement({
+    cle: Deno.env.get('CHARIOW_CLE_API'),
+    produits: Deno.env.get('CHARIOW_PRODUITS'),
+    secretWebhook: Deno.env.get('CHARIOW_SECRET_WEBHOOK'),
+  });
+  const boutique = await sonderBoutique(paiement.cleConfiguree);
+
   return reponse(
     {
       ...(etat.data as Record<string, unknown>),
       volumes: plateforme.volumes,
       journal: plateforme.journal,
       postgres: plateforme.postgres,
+      paiement: { ...paiement, boutique },
       // L'appelant, pour que l'écran marque « c'est toi » dans la liste des
       // administrateurs sans redemander la session — et parce que c'est la
       // seule ligne sur laquelle aucune action n'est proposée.

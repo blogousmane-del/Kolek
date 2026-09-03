@@ -365,6 +365,112 @@ describe('la plateforme', () => {
   });
 });
 
+describe('le paiement des abonnements', () => {
+  /** Une configuration complète et acceptée par la boutique. */
+  const COMPLET = {
+    cleConfiguree: true,
+    cleIndice: 'MNOP',
+    webhookConfigure: true,
+    produits: [
+      { palier: 'standard', configure: true },
+      { palier: 'pro', configure: true },
+      { palier: 'illimite', configure: true },
+    ],
+    boutique: 'joignable' as const,
+  };
+
+  it('n’offre aucun champ où saisir une clé', () => {
+    // Le cœur de cet écran. Un champ imposerait que la clé traverse le
+    // navigateur d'un administrateur, se pose quelque part, et revienne à
+    // l'écran à chaque ouverture. Ce test tombe si quelqu'un en ajoute un.
+    poser({ statut: 'ok', etat: { ...ETAT, paiement: COMPLET } });
+
+    rendre('paiement');
+
+    const carte = within(screen.getByTestId('paiement'));
+    expect(carte.queryAllByRole('textbox')).toEqual([]);
+    expect(carte.queryAllByRole('button')).toEqual([]);
+  });
+
+  it('montre les quatre derniers caractères de la clé, et rien de plus', () => {
+    poser({ statut: 'ok', etat: { ...ETAT, paiement: COMPLET } });
+
+    rendre('paiement');
+
+    const carte = within(screen.getByTestId('paiement'));
+    expect(carte.getByText('…MNOP')).toBeDefined();
+    expect(carte.getByText('Posée')).toBeDefined();
+  });
+
+  it('nomme le palier dont le produit manque, et ce qu’il en coûtera', () => {
+    poser({
+      statut: 'ok',
+      etat: {
+        ...ETAT,
+        paiement: {
+          ...COMPLET,
+          produits: [
+            { palier: 'standard', configure: true },
+            { palier: 'pro', configure: false },
+            { palier: 'illimite', configure: true },
+          ],
+        },
+      },
+    });
+
+    rendre('paiement');
+
+    const alerte = screen.getByRole('alert').textContent ?? '';
+    expect(alerte).toContain('pro');
+    expect(alerte).toMatch(/refus/i);
+  });
+
+  it('distingue une clé refusée d’un service en panne', () => {
+    // Les confondre enverrait GTCS régénérer une clé parfaitement correcte.
+    poser({ statut: 'ok', etat: { ...ETAT, paiement: { ...COMPLET, boutique: 'refusee' } } });
+    rendre('paiement');
+    expect(screen.getByRole('alert').textContent).toMatch(/refuse la clé/i);
+
+    cleanup();
+
+    poser({ statut: 'ok', etat: { ...ETAT, paiement: { ...COMPLET, boutique: 'injoignable' } } });
+    rendre('paiement');
+    expect(screen.getByRole('alert').textContent).toMatch(/n’a pas répondu/i);
+  });
+
+  it('ne prétend pas avoir interrogé la boutique quand aucune clé n’est posée', () => {
+    poser({
+      statut: 'ok',
+      etat: {
+        ...ETAT,
+        paiement: {
+          ...COMPLET,
+          cleConfiguree: false,
+          cleIndice: null,
+          boutique: 'non_configuree' as const,
+        },
+      },
+    });
+
+    rendre('paiement');
+
+    const carte = within(screen.getByTestId('paiement'));
+    expect(carte.getByText('Absente')).toBeDefined();
+    expect(carte.getByText(/rien n’a été demandé à la boutique/)).toBeDefined();
+  });
+
+  it('dit que la fonction en ligne est en retard plutôt que de se rendre vide', () => {
+    // Le front part par Netlify à la poussée, la fonction attend un
+    // déploiement. Entre les deux, la clé `paiement` n'existe pas dans la
+    // réponse — un écran vide se lirait comme « rien n'est configuré ».
+    poser({ statut: 'ok', etat: ETAT });
+
+    rendre('paiement');
+
+    expect(screen.getByText(/ne rend pas encore l’état du paiement/)).toBeDefined();
+  });
+});
+
 describe('les remises en cours', () => {
   it('nomme le collecteur, son code et la fin de la remise', () => {
     poser({ statut: 'ok', etat: ETAT });

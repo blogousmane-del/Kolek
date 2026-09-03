@@ -55,6 +55,23 @@ export interface RemiseEnCours {
   remise_fin: string;
 }
 
+/**
+ * L'état du paiement d'abonnement, tel que le serveur le décrit.
+ *
+ * Aucune valeur secrète ici, et ce n'est pas une convention de nommage : la
+ * fonction qui compose cet objet est pure et testée pour ça. `cleIndice` est
+ * volontairement le seul reste de la clé — quatre caractères, assez pour
+ * distinguer deux clés au téléphone, pas assez pour en fabriquer une.
+ */
+export interface EtatPaiement {
+  cleConfiguree: boolean;
+  cleIndice: string | null;
+  webhookConfigure: boolean;
+  produits: Array<{ palier: string; configure: boolean }>;
+  /** L'état vivant : la clé posée est-elle **acceptée** par la boutique ? */
+  boutique: 'joignable' | 'refusee' | 'injoignable' | 'non_configuree';
+}
+
 export interface EtatSuperAdmin {
   genere_le: string;
   /** Qui regarde, pour marquer « c'est toi » sans redemander la session. */
@@ -67,6 +84,9 @@ export interface EtatSuperAdmin {
   volumes: Record<string, number>;
   journal: { derniere_ecriture: string | null; tables: string[] };
   postgres: string;
+  /** Absent tant que la fonction `super-admin-etat` déployée est antérieure à
+      cet écran — d'où le `| null`, et le message que la section affiche alors. */
+  paiement?: EtatPaiement | null;
 }
 
 const MESSAGES: Record<string, string> = {

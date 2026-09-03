@@ -30,6 +30,7 @@ export type CleNavSuper =
   | 'administrateurs'
   | 'promos'
   | 'securite'
+  | 'paiement'
   | 'plateforme';
 
 type CleNav = CleNavAdmin | CleNavSuper;
@@ -110,6 +111,11 @@ const SUPER_PILOTAGE: Entree[] = [
 
 const SUPER_SYSTEME: Entree[] = [
   { cle: 'securite', icone: 'shield-check', libelle: 'Sécurité', disponible: true },
+  // La configuration de l'encaissement d'abonnement. Sous « Système » et non
+  // sous « Pilotage » : ce n'est pas une recette qu'on regarde, c'est un
+  // branchement qu'on vérifie. Aucune clé ne s'y saisit — l'écran répond « est-ce
+  // configuré, et est-ce que ça marche », pas « voici la clé ».
+  { cle: 'paiement', icone: 'credit-card', libelle: 'Paiement', disponible: true },
   { cle: 'plateforme', icone: 'bar-chart-2', libelle: 'Plateforme', disponible: true },
 ];
 

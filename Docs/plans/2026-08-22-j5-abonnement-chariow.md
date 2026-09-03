@@ -4595,11 +4595,11 @@ async function lireDistants(cleApi) {
 if (import.meta.url === `file://${process.argv[1]}`.replace(/\\/g, '/')) {
   const url = process.env.SUPABASE_URL;
   const cleService = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const cleApi = process.env.CHARIOW_API_KEY;
+  const cleApi = process.env.CHARIOW_CLE_API;
 
   if (!url || !cleService || !cleApi) {
     console.error(
-      'Il manque SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY ou CHARIOW_API_KEY. ' +
+      'Il manque SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY ou CHARIOW_CLE_API. ' +
         'Ce contrôle interroge les deux catalogues : sans les deux clés, il ne peut rien affirmer.',
     );
     process.exit(1);
@@ -4857,9 +4857,9 @@ Dans `supabase/functions/admin-reglages/index.ts`, après la lecture de
 ```ts
   // L'état statique : ce que l'environnement déclare.
   const paiement = etatPaiement({
-    cle: Deno.env.get('CHARIOW_API_KEY'),
+    cle: Deno.env.get('CHARIOW_CLE_API'),
     produits: Deno.env.get('CHARIOW_PRODUITS'),
-    secretWebhook: Deno.env.get('CHARIOW_WEBHOOK_SECRET'),
+    secretWebhook: Deno.env.get('CHARIOW_SECRET_WEBHOOK'),
   });
 
   // Puis l'état vivant : la clé fonctionne-t-elle ? Une clé présente et fausse
@@ -4876,7 +4876,7 @@ Dans `supabase/functions/admin-reglages/index.ts`, après la lecture de
       const racine = Deno.env.get('CHARIOW_API_URL') ?? 'https://api.chariow.com/v1';
       const appel = await fetch(`${racine}/products`, {
         headers: {
-          Authorization: `Bearer ${Deno.env.get('CHARIOW_API_KEY')}`,
+          Authorization: `Bearer ${Deno.env.get('CHARIOW_CLE_API')}`,
           Accept: 'application/json',
         },
         signal: AbortSignal.timeout(3000),
@@ -4964,9 +4964,9 @@ function SectionPaiement({ paiement }: { paiement: EtatPaiement | null }) {
         commande, une fois :
       </p>
       <pre className="mt-2 overflow-x-auto rounded-md bg-canvas p-3 font-mono text-xs">
-{`npx supabase secrets set CHARIOW_API_KEY=…
+{`npx supabase secrets set CHARIOW_CLE_API=…
 npx supabase secrets set CHARIOW_PRODUITS='{"standard":"prod_…","pro":"prod_…","illimite":"prod_…"}'
-npx supabase secrets set CHARIOW_WEBHOOK_SECRET=$(openssl rand -hex 24)`}
+npx supabase secrets set CHARIOW_SECRET_WEBHOOK=$(openssl rand -hex 24)`}
       </pre>
     </Section>
   );

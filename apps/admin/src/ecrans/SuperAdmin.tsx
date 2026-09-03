@@ -21,12 +21,14 @@ import {
   type ActionSuperAdmin,
   type AdministrateurSuper,
   type CodePromo,
+  type EtatPaiement,
   type EtatSuperAdmin,
   type PageJournal,
 } from '../superadmin';
 
 /**
- * La console de plateforme, découpée en cinq écrans le 2026-08-30.
+ * La console de plateforme, découpée en cinq écrans le 2026-08-30, six depuis
+ * que « Paiement » y est entrée le 2026-09-03.
  *
  * Elle n'a pas de navigation à elle : la barre latérale de la coquille la
  * porte, et cet écran reçoit l'entrée courante en `onglet`. Une console qui
@@ -100,6 +102,11 @@ const ONGLETS: ConfigOnglet[] = [
     cle: 'securite',
     filAriane: ['Super Admin', 'Sécurité'],
     titre: 'Journal de sécurité',
+  },
+  {
+    cle: 'paiement',
+    filAriane: ['Super Admin', 'Paiement'],
+    titre: 'Paiement des abonnements',
   },
   {
     cle: 'plateforme',
@@ -358,6 +365,8 @@ export function SuperAdmin({
             )}
 
             {onglet === 'securite' && <Journal />}
+
+            {onglet === 'paiement' && <Paiement paiement={etat.etat.paiement ?? null} />}
 
             {onglet === 'plateforme' && <Plateforme etat={etat.etat} />}
           </>
@@ -1380,6 +1389,166 @@ function Journal() {
           </>
         )}
       </Carte>
+    </section>
+  );
+}
+
+/* ================================ Paiement =============================== */
+
+/** Ce que chaque état de la boutique veut dire, et ce qu'il faut en faire. */
+const BOUTIQUE: Record<EtatPaiement['boutique'], { ton: 'ok' | 'ko' | 'neutre'; texte: string }> = {
+  joignable: { ton: 'ok', texte: 'La boutique répond et accepte la clé.' },
+  refusee: {
+    ton: 'ko',
+    texte:
+      'La boutique refuse la clé (401/403). Elle est posée mais fausse, révoquée ou d’un autre compte — en régénérer une.',
+  },
+  injoignable: {
+    ton: 'ko',
+    texte:
+      'La boutique n’a pas répondu en trois secondes. La clé n’est pas en cause : c’est le service ou le réseau.',
+  },
+  non_configuree: { ton: 'neutre', texte: 'Aucune clé posée : rien n’a été demandé à la boutique.' },
+};
+
+function Pastille({ ok, libelle }: { ok: boolean; libelle: string }) {
+  return (
+    <span
+      className={`px-2.5 py-1 rounded-pill text-xs font-body font-semibold whitespace-nowrap ${
+        ok ? 'bg-positive-tint text-positive' : 'bg-negative-tint text-negative'
+      }`}
+    >
+      {libelle}
+    </span>
+  );
+}
+
+/**
+ * L'état du paiement d'abonnement.
+ *
+ * **Aucun champ de saisie, et c'est le sujet de cet écran.** La question posée
+ * le 2026-09-02 était « il n'y a pas de place pour la clé API Chariow ». Il ne
+ * doit pas y en avoir : une clé qui encaisse ne traverse pas le navigateur d'un
+ * administrateur, ne se pose pas en base, et ne revient pas à l'écran à chaque
+ * ouverture de page. Elle vit dans l'environnement des Edge Functions, et
+ * `verifier-bundles.mjs` refuse tout artefact qui en porterait la trace.
+ *
+ * Ce qui manquait n'était pas un champ, c'était la réponse à la vraie question :
+ * **est-ce configuré, et est-ce que ça marche ?** Sans cet écran, la seule façon
+ * de l'apprendre serait qu'un collecteur échoue à payer.
+ *
+ * D'où deux blocs et non un : ce que l'environnement **déclare**, puis ce que la
+ * boutique **répond**. Une clé présente et fausse coche la première case et rate
+ * la seconde — c'est toute la différence entre une case cochée et un contrôle.
+ */
+function Paiement({ paiement }: { paiement: EtatPaiement | null }) {
+  if (!paiement) {
+    return (
+      <section>
+        <h2 className="font-headings font-bold text-xl text-ink mb-1">Paiement des abonnements</h2>
+        <Carte className="p-5">
+          <p className="font-body text-sm text-muted-foreground">
+            La fonction <code>super-admin-etat</code> en ligne ne rend pas encore l’état du
+            paiement. Redéploie-la pour que cet écran ait quelque chose à lire.
+          </p>
+        </Carte>
+      </section>
+    );
+  }
+
+  const boutique = BOUTIQUE[paiement.boutique];
+  const manquants = paiement.produits.filter((p) => !p.configure);
+
+  return (
+    <section>
+      <h2 className="font-headings font-bold text-xl text-ink mb-1">Paiement des abonnements</h2>
+      <p className="font-body text-sm text-muted-foreground mb-3">
+        Aucune clé ne se saisit ici, et il n’y a pas de champ pour ça. Une clé qui encaisse vit dans
+        les secrets des Edge Functions — <code>npx supabase secrets set</code>, voir{' '}
+        <code>Docs/deploiement.md</code> §7. Cet écran dit ce qui est posé et si la boutique
+        l’accepte, jamais ce que valent les secrets.
+      </p>
+
+      <div data-testid="paiement">
+        <Carte className="p-5 space-y-5">
+          <div>
+            <p className="font-body text-sm font-semibold text-ink mb-2">Ce qui est déclaré</p>
+            <dl className="space-y-2.5">
+              <div className="flex items-center justify-between gap-4">
+                <dt className="font-body text-sm text-muted-foreground">
+                  Clé d’API <code>CHARIOW_CLE_API</code>
+                </dt>
+                <dd className="flex items-center gap-2">
+                  {paiement.cleIndice && (
+                    <span className="font-body text-xs text-muted-foreground tabular-nums">
+                      …{paiement.cleIndice}
+                    </span>
+                  )}
+                  <Pastille
+                    ok={paiement.cleConfiguree}
+                    libelle={paiement.cleConfiguree ? 'Posée' : 'Absente'}
+                  />
+                </dd>
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <dt className="font-body text-sm text-muted-foreground">
+                  Secret de webhook <code>CHARIOW_SECRET_WEBHOOK</code>
+                </dt>
+                <dd>
+                  <Pastille
+                    ok={paiement.webhookConfigure}
+                    libelle={paiement.webhookConfigure ? 'Posé' : 'Absent ou trop court'}
+                  />
+                </dd>
+              </div>
+
+              <div className="flex items-start justify-between gap-4">
+                <dt className="font-body text-sm text-muted-foreground">
+                  Produits <code>CHARIOW_PRODUITS</code>
+                </dt>
+                <dd className="flex flex-wrap justify-end gap-1.5">
+                  {paiement.produits.map((p) => (
+                    <Pastille key={p.palier} ok={p.configure} libelle={p.palier} />
+                  ))}
+                </dd>
+              </div>
+            </dl>
+
+            {manquants.length > 0 && (
+              <p role="alert" className="font-body text-sm text-negative mt-3">
+                {manquants.length === 1
+                  ? `Le palier ${manquants[0]?.palier} n’a pas de produit déclaré.`
+                  : `${manquants.length} paliers n’ont pas de produit déclaré.`}{' '}
+                Un collecteur qui choisit ce palier-là verra le paiement refusé, et il finira par
+                le choisir.
+              </p>
+            )}
+          </div>
+
+          <div className="border-t border-hairline pt-4">
+            <p className="font-body text-sm font-semibold text-ink mb-2">Ce que la boutique répond</p>
+            <p
+              role={boutique.ton === 'ko' ? 'alert' : 'status'}
+              className={`font-body text-sm ${
+                boutique.ton === 'ok'
+                  ? 'text-positive'
+                  : boutique.ton === 'ko'
+                    ? 'text-negative'
+                    : 'text-muted-foreground'
+              }`}
+            >
+              {boutique.texte}
+            </p>
+            <p className="font-body text-xs text-muted-foreground mt-2">
+              Mesuré à l’ouverture de cet écran, par un <code>GET /products</code> chez Chariow —
+              la lecture la plus inoffensive du contrat. Trois secondes d’attente au plus : une
+              boutique en panne ne doit pas empêcher d’afficher la page où l’on vient justement
+              voir ce qui ne va pas.
+            </p>
+          </div>
+        </Carte>
+      </div>
     </section>
   );
 }
