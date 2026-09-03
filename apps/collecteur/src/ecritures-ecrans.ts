@@ -163,6 +163,7 @@ const PHRASES_COLLABORATEUR: Record<string, string> = {
   ACCES_RESERVE:
     'Réservé au forfait Illimité, et à trois collaborateurs au plus. Vérifie ton abonnement.',
   EMAIL_DEJA_PRIS: 'Cette adresse est déjà utilisée par un autre compte.',
+  TELEPHONE_DEJA_PRIS: 'Ce numéro est déjà utilisé par un autre compte.',
   MOT_DE_PASSE_COMPROMIS: 'Ce mot de passe figure dans des fuites connues. Choisis-en un autre.',
   TROP_DE_TENTATIVES: 'Trop de créations en peu de temps. Réessaie dans une heure.',
   EMAIL_INVALIDE: 'Cette adresse ne ressemble pas à une adresse.',

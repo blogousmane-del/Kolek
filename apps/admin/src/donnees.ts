@@ -194,6 +194,7 @@ export interface SaisieCollecteur {
 const MESSAGES_CREATION: Record<string, string> = {
   EMAIL_INVALIDE: 'Adresse électronique invalide.',
   EMAIL_DEJA_PRIS: 'Un compte existe déjà avec cette adresse.',
+  TELEPHONE_DEJA_PRIS: 'Un autre collecteur porte déjà ce numéro.',
   MOT_DE_PASSE_COURT: 'Le mot de passe doit faire au moins 10 caractères.',
   NOM_REQUIS: 'Le nom du collecteur est obligatoire.',
   TELEPHONE_REQUIS: 'Le téléphone est obligatoire — il identifie le collecteur.',

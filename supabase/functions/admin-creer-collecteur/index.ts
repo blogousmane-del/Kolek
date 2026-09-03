@@ -156,11 +156,31 @@ Deno.serve(async (requete) => {
   if (erreurAuth || !cree.user) {
     const message = erreurAuth?.message ?? 'création impossible';
     console.error('createUser a échoué :', message);
-    // Le seul cas qu'il faut nommer : l'adresse est déjà prise. Les autres
-    // restent génériques — le détail d'une erreur GoTrue n'aide pas
-    // l'administrateur et renseigne un attaquant sur les comptes existants.
-    const deja = /already|exist|registered/i.test(message);
-    return reponse({ erreur: deja ? 'EMAIL_DEJA_PRIS' : 'CREATION_IMPOSSIBLE' }, deja ? 409 : 500, requete);
+    // Deux causes qu'une correction de saisie répare, et qu'il faut donc
+    // nommer. Les autres restent génériques — le détail d'une erreur GoTrue
+    // n'aide pas l'administrateur. La première, l'adresse déjà prise, GoTrue la
+    // nomme lui-même.
+    if (/already|exist|registered/i.test(message)) {
+      return reponse({ erreur: 'EMAIL_DEJA_PRIS' }, 409, requete);
+    }
+
+    // L'autre cause, que GoTrue ne nomme pas : le numéro déjà porté.
+    // `collecteurs.telephone` est unique, donc le déclencheur
+    // `creer_collecteur_apres_signup` échoue, donc l'insertion dans
+    // `auth.users` échoue — et il n'en remonte qu'un « Database error creating
+    // new user ». Sans ce coup de sonde, le seul défaut que la saisie puisse
+    // corriger s'affiche « réessaie », sur une manœuvre condamnée d'avance.
+    //
+    // Il n'a lieu qu'après un échec : il ne renseigne personne qui n'ait déjà
+    // franchi la validation et la borne d'abus.
+    const { data: porte } = await clientService
+      .from('collecteurs')
+      .select('id')
+      .eq('telephone', telephone)
+      .maybeSingle();
+    if (porte) return reponse({ erreur: 'TELEPHONE_DEJA_PRIS' }, 409, requete);
+
+    return reponse({ erreur: 'CREATION_IMPOSSIBLE' }, 500, requete);
   }
 
   // Le déclencheur a créé la ligne `collecteurs`. Zone et palier ne font pas

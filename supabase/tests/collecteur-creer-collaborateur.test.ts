@@ -154,4 +154,50 @@ describe('collecteur-creer-collaborateur', () => {
       .eq('titulaire_id', patron.id);
     expect(count).toBe(0);
   });
+
+  it('nomme le numéro déjà pris, au lieu d’un « réessaie » sans issue', async () => {
+    // Remonté de la production le 2026-09-03. Un titulaire voyait « Création
+    // impossible. Réessaie. » sur un numéro déjà porté par un autre compte —
+    // et réessayer ne pouvait pas marcher.
+    //
+    // Le chemin : `collecteurs.telephone` est unique, donc le déclencheur
+    // `creer_collecteur_apres_signup` échoue, donc l'insertion dans
+    // `auth.users` échoue, et GoTrue rend « Database error creating new user ».
+    // Ce message ne nomme ni l'adresse ni le numéro : la fonction repliait sur
+    // `CREATION_IMPOSSIBLE`, qui invite à recommencer une manœuvre condamnée.
+    const patron = await titulaire('Patron Doublon');
+    const occupe = telephone();
+    await creerCollecteur('Deja La', occupe);
+
+    const reponse = await appeler(await jetonDe(patron), { ...saisie(), telephone: occupe });
+
+    expect(reponse.status).toBe(409);
+    expect((await reponse.json()).erreur).toBe('TELEPHONE_DEJA_PRIS');
+
+    // Et rien n'est resté derrière : l'insertion `auth.users` a été annulée
+    // avec le déclencheur qui l'a fait échouer.
+    const { count: rattaches } = await admin
+      .from('collecteurs')
+      .select('id', { count: 'exact', head: true })
+      .eq('titulaire_id', patron.id);
+    expect(rattaches).toBe(0);
+  });
+
+  it('nomme l’adresse déjà prise', async () => {
+    // L'autre cause que le titulaire peut corriger seul. Celle-ci, GoTrue la
+    // nomme ; ce test tient la lecture de son message, qui n'est pas un
+    // contrat et peut changer d'une version à l'autre.
+    const patron = await titulaire('Patron Adresse');
+    const premier = saisie();
+
+    const creation = await appeler(await jetonDe(patron), premier);
+    expect(creation.status).toBe(201);
+    const id = (await creation.json()).collaborateurId;
+
+    const doublon = await appeler(await jetonDe(patron), { ...saisie(), email: premier.email });
+    expect(doublon.status).toBe(409);
+    expect((await doublon.json()).erreur).toBe('EMAIL_DEJA_PRIS');
+
+    await admin.auth.admin.deleteUser(id);
+  });
 });
