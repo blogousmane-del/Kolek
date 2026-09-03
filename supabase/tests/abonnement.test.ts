@@ -389,3 +389,17 @@ describe('un paiement de demande d’ouverture', () => {
     expect(error?.message).toContain('PAIEMENT_IDENTITE_FIGEE');
   });
 });
+
+describe('suppression d’un collecteur', () => {
+  it('est refusée en base dès qu’un paiement existe', async () => {
+    // `on delete restrict` : la cascade depuis `auth.users` s'arrête net. Ce
+    // test tient le comportement de la base ; ce que la tâche 7 ajoute côté
+    // Edge Function ne le crée pas, elle le rend lisible — voir
+    // `admin-supprimer-collecteur.test.ts`.
+    const payeur = await creerCollecteur('Payeur', telephone());
+    await poserPaiement(payeur.id, `vente-suppr-${crypto.randomUUID()}`);
+
+    const { error } = await admin.auth.admin.deleteUser(payeur.id);
+    expect(error).not.toBeNull();
+  });
+});

@@ -298,6 +298,8 @@ const MESSAGES_SUPPRESSION: Record<string, string> = {
   // l'administrateur dans une console \u00e0 laquelle il n'a pas forc\u00e9ment acc\u00e8s.
   CIBLE_ADMINISTRATEUR:
     'Ce compte est un compte d\u2019administration. Retire-lui ce droit depuis l\u2019\u00e9cran Super Admin, puis reviens le supprimer.',
+  COMPTE_A_PAYE:
+    'Ce collecteur a r\u00e9gl\u00e9 au moins un abonnement. Son compte porte une \u00e9criture comptable et ne peut pas \u00eatre supprim\u00e9 \u2014 suspends son abonnement \u00e0 la place.',
   SUPPRESSION_IMPOSSIBLE: 'Suppression impossible. R\u00e9essaie.',
   CORPS_ILLISIBLE: 'Requ\u00eate mal form\u00e9e.',
 };

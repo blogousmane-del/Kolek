@@ -149,20 +149,30 @@ Deno.serve(async (requete) => {
   // restrict` sur `mises` et `retraits` — mais elle refuserait par une violation
   // de clé étrangère, illisible pour qui l'affiche.
 
-  const [{ count: mises }, { count: retraits }, { count: clients }] = await Promise.all([
-    clientService
-      .from('mises')
-      .select('id', { count: 'exact', head: true })
-      .eq('collecteur_id', collecteurId),
-    clientService
-      .from('retraits')
-      .select('id', { count: 'exact', head: true })
-      .eq('collecteur_id', collecteurId),
-    clientService
-      .from('clients')
-      .select('id', { count: 'exact', head: true })
-      .eq('collecteur_id', collecteurId),
-  ]);
+  const [{ count: mises }, { count: retraits }, { count: paiements }, { count: clients }] =
+    await Promise.all([
+      clientService
+        .from('mises')
+        .select('id', { count: 'exact', head: true })
+        .eq('collecteur_id', collecteurId),
+      clientService
+        .from('retraits')
+        .select('id', { count: 'exact', head: true })
+        .eq('collecteur_id', collecteurId),
+      // Ajouté en J5 : `paiements_abonnement.collecteur_id` est en `on delete
+      // restrict`, comme les deux précédentes. Sans ce comptage, le premier
+      // collecteur ayant réglé son abonnement devenait indélétable par une
+      // violation de clé étrangère, rendue en 500 SUPPRESSION_IMPOSSIBLE —
+      // « réessaie », sur une manœuvre condamnée.
+      clientService
+        .from('paiements_abonnement')
+        .select('id', { count: 'exact', head: true })
+        .eq('collecteur_id', collecteurId),
+      clientService
+        .from('clients')
+        .select('id', { count: 'exact', head: true })
+        .eq('collecteur_id', collecteurId),
+    ]);
 
   if ((mises ?? 0) > 0 || (retraits ?? 0) > 0) {
     return reponse(
@@ -174,6 +184,13 @@ Deno.serve(async (requete) => {
       409,
       requete,
     );
+  }
+
+  // Un compte qui n'a jamais encaissé mais qui a payé son abonnement reste une
+  // écriture comptable de GTCS. Le code est distinct parce que le remède ne
+  // l'est pas moins : on ne suspend pas un abonnement pour effacer une facture.
+  if ((paiements ?? 0) > 0) {
+    return reponse({ erreur: 'COMPTE_A_PAYE', paiements: paiements ?? 0 }, 409, requete);
   }
 
   // `auth.users` est la racine : la cascade emporte `collecteurs`, puis `clients`

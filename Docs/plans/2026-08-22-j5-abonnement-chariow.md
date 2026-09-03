@@ -2401,8 +2401,23 @@ git commit -m "feat(abonnement): le webhook Chariow, public mais incapable de cr
 
 ## Task 7: La suppression d'un collecteur compte les paiements
 
+> **Repris le 2026-09-03, à l'exécution.** Le seul test prévu portait sur la
+> **base** — `deleteUser` échoue, la contrainte existe depuis la tâche 2 — et
+> passait donc avant toute modification. Ce que cette tâche change, c'est la
+> réponse de l'Edge Function, et rien ne l'éprouvait.
+>
+> `admin-supprimer-collecteur` n'avait aucun test de bout en bout. Il en a
+> maintenant deux : le refus nommé avec son nombre, et un contrôle négatif —
+> un compte sans écriture se supprime toujours. Sans le second, un comptage qui
+> refuserait tout le monde passerait pour un succès.
+>
+> Mesuré avant la modification : la fonction rendait **500
+> `SUPPRESSION_IMPOSSIBLE`** — « réessaie », sur une manœuvre condamnée. Même
+> famille que le `CREATION_IMPOSSIBLE` corrigé le matin même.
+
 **Files:**
-- Modify: `supabase/functions/admin-supprimer-collecteur/index.ts:152-177`
+- Modify: `supabase/functions/admin-supprimer-collecteur/index.ts`, `apps/admin/src/donnees.ts`
+- Create: `supabase/tests/admin-supprimer-collecteur.test.ts`
 - Test: `supabase/tests/abonnement.test.ts` (ajouter un cas)
 
 **Interfaces:**
@@ -2411,31 +2426,148 @@ git commit -m "feat(abonnement): le webhook Chariow, public mais incapable de cr
 
 - [ ] **Step 1: Écrire le test qui échoue**
 
-Ajouter à la fin de `supabase/tests/abonnement.test.ts` :
+Deux fichiers. D'abord le comportement de la **base**, à la fin de
+`supabase/tests/abonnement.test.ts` :
 
 ```ts
 describe('suppression d’un collecteur', () => {
   it('est refusée en base dès qu’un paiement existe', async () => {
-    const payeur = await creerCollecteur('Payeur', `+225070004${Date.now() % 1000}`);
+    // `on delete restrict` : la cascade depuis `auth.users` s'arrête net. Ce
+    // test tient le comportement de la base ; ce que la tâche 7 ajoute côté
+    // Edge Function ne le crée pas, elle le rend lisible — voir
+    // `admin-supprimer-collecteur.test.ts`.
+    const payeur = await creerCollecteur('Payeur', telephone());
     await poserPaiement(payeur.id, `vente-suppr-${crypto.randomUUID()}`);
 
-    // `on delete restrict` : la cascade depuis auth.users s'arrête net.
     const { error } = await admin.auth.admin.deleteUser(payeur.id);
     expect(error).not.toBeNull();
   });
 });
 ```
 
+Puis la réponse de l'**Edge Function**, dans un fichier neuf
+`supabase/tests/admin-supprimer-collecteur.test.ts` — c'est celui-là qui tombe
+avant la modification, en 500 au lieu de 409 :
+
+```ts
+import { afterAll, describe, expect, it } from 'vitest';
+
+import { admin, creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
+
+afterAll(nettoyer);
+
+/**
+ * `admin-supprimer-collecteur` — ce que la fonction dit quand elle refuse.
+ *
+ * La base refuserait de toute façon : `mises`, `retraits` et, depuis la
+ * tâche 2, `paiements_abonnement` référencent le collecteur en `on delete
+ * restrict`. Ce que la fonction ajoute, c'est de dire **pourquoi** avec un
+ * nombre, au lieu de laisser remonter une violation de clé étrangère que
+ * personne ne sait lire.
+ *
+ * Le cas du paiement mérite son propre code : le remède n'est pas le même. Un
+ * compte qui a encaissé porte l'argent de ses clients ; un compte qui a payé
+ * porte une écriture comptable de GTCS. On ne suspend pas un abonnement pour
+ * effacer une facture.
+ */
+
+const BASE = `${process.env.SUPABASE_URL}/functions/v1/admin-supprimer-collecteur`;
+
+const SERIE = String(Date.now()).slice(-7);
+let compteur = 0;
+function telephone(): string {
+  compteur += 1;
+  return `+225${SERIE}${String(compteur).padStart(2, '0')}`;
+}
+
+async function appeler(jeton: string, collecteurId: string): Promise<Response> {
+  return fetch(BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jeton}` },
+    body: JSON.stringify({ collecteurId }),
+  });
+}
+
+async function jetonDe(collecteur: CollecteurTest): Promise<string> {
+  const { data } = await collecteur.client.auth.getSession();
+  return data.session!.access_token;
+}
+
+/** Un compte inscrit aux admins, seul habilité à franchir le portillon. */
+async function administrateur(nom: string): Promise<CollecteurTest> {
+  const compte = await creerCollecteur(nom, telephone());
+  const { error } = await admin.from('admins').insert({ user_id: compte.id });
+  expect(error).toBeNull();
+  return compte;
+}
+
+async function poserPaiement(collecteurId: string) {
+  const { error } = await admin.from('paiements_abonnement').insert({
+    collecteur_id: collecteurId,
+    palier: 'pro',
+    vente_id: `vente-suppr-${crypto.randomUUID()}`,
+    montant: 5000,
+    devise: 'XOF',
+    echeance_avant: '2026-01-01',
+  });
+  if (error) throw error;
+}
+
+describe('admin-supprimer-collecteur', () => {
+  it('refuse un collecteur qui a réglé un abonnement, et compte les règlements', async () => {
+    const gtcs = await administrateur('GTCS Suppression');
+    const payeur = await creerCollecteur('A Paye', telephone());
+    await poserPaiement(payeur.id);
+
+    const reponse = await appeler(await jetonDe(gtcs), payeur.id);
+
+    expect(reponse.status).toBe(409);
+    const corps = await reponse.json();
+    expect(corps.erreur).toBe('COMPTE_A_PAYE');
+    expect(corps.paiements).toBe(1);
+
+    // Et le compte est toujours là : le refus précède la suppression, il ne la
+    // rattrape pas.
+    const { data } = await admin.from('collecteurs').select('id').eq('id', payeur.id).single();
+    expect(data?.id).toBe(payeur.id);
+  });
+
+  it('supprime un collecteur qui n’a ni encaissé ni payé', async () => {
+    // Le contrôle négatif. Sans lui, un comptage qui refuserait tout le monde
+    // passerait pour un succès — le test précédent ne verrait pas la
+    // différence.
+    const gtcs = await administrateur('GTCS Suppression Nette');
+    const neuf = await creerCollecteur('Rien A Son Nom', telephone());
+
+    const reponse = await appeler(await jetonDe(gtcs), neuf.id);
+
+    expect(reponse.status).toBe(200);
+
+    const { data } = await admin.from('collecteurs').select('id').eq('id', neuf.id).maybeSingle();
+    expect(data).toBeNull();
+  });
+});
+```
+
 - [ ] **Step 2: Lancer le test pour vérifier qu'il échoue**
 
-Run: `npx vitest run --config supabase/tests/vitest.config.ts supabase/tests/abonnement.test.ts`
-Expected: PASS déjà — la contrainte `on delete restrict` existe depuis la tâche 2. Ce test verrouille le comportement en base ; la modification de l'étape 3 sert à le rendre **lisible** côté Edge Function plutôt qu'à le créer.
+Run: `npx vitest run --config supabase/tests/vitest.config.ts abonnement.test admin-supprimer-collecteur`
+Expected : le test de base **PASS déjà** — la contrainte `on delete restrict`
+existe depuis la tâche 2. Celui de l'Edge Function **FAIL**, `expected 409 to
+be 500` : aujourd'hui la fonction tente la suppression, la base la refuse par
+une violation de clé étrangère, et l'écran lit « Suppression impossible.
+Réessaie. »
 
-Si le test échoue, la contrainte de clé étrangère de la tâche 2 n'a pas été écrite en `restrict` : la corriger avant de continuer.
+Si le test de base échoue, la contrainte de clé étrangère de la tâche 2 n'a pas
+été écrite en `restrict` : la corriger avant de continuer.
+
+Rappel de la pile locale : une Edge Function **modifiée** ne se recharge pas
+toute seule. `docker restart supabase_edge_runtime_Kolek` avant de relancer,
+sinon le test mesure l'ancienne version.
 
 - [ ] **Step 3: Compter les paiements dans la fonction**
 
-Dans `supabase/functions/admin-supprimer-collecteur/index.ts`, remplacer le bloc des lignes 152 à 177 par :
+Dans `supabase/functions/admin-supprimer-collecteur/index.ts`, remplacer le bloc de comptage — celui qui ouvre sur `const [{ count: mises }, …` — par :
 
 ```ts
   const [{ count: mises }, { count: retraits }, { count: paiements }, { count: clients }] =
@@ -2493,13 +2625,14 @@ Dans `apps/admin/src/donnees.ts`, ajouter une entrée au dictionnaire `MESSAGES_
 
 - [ ] **Step 5: Lancer la suite**
 
-Run: `npx vitest run --config supabase/tests/vitest.config.ts && npm test`
-Expected: PASS — suite de base et suites d'applications.
+Run: `npm run test:db && npm test`
+Expected: PASS — 589 tests de base sur 53 fichiers, puis les suites
+d'applications.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add supabase/functions/admin-supprimer-collecteur/index.ts supabase/tests/abonnement.test.ts apps/admin/src/donnees.ts
+git add supabase/functions/admin-supprimer-collecteur/index.ts supabase/tests/abonnement.test.ts supabase/tests/admin-supprimer-collecteur.test.ts apps/admin/src/donnees.ts
 git commit -m "fix(admin): la suppression bute désormais sur les paiements en le disant"
 ```
 
