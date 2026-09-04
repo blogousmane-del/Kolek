@@ -273,9 +273,21 @@ Le dispositif de paiement est **entier dans le dépôt et absent de la
 production**. Rien n'encaisse, et rien ne le fera avant trois gestes qui
 demandent des identifiants :
 
-1. **Régénérer `SUPABASE_ACCESS_TOKEN`** — celui en place date du 2026-08-30 et
-   se fait refuser en `401`. Le travail de déploiement du CI est rouge à chaque
-   poussée depuis.
+1. **Régénérer `SUPABASE_ACCESS_TOKEN`.** *Fait le 2026-09-04 à 07:00 ; reste à
+   éprouver.*
+
+   > **Correction du 2026-09-04.** La première rédaction de cette ligne disait
+   > « le travail de déploiement du CI est rouge à chaque poussée depuis ».
+   > C'est faux, et l'historique des exécutions le dit : le job a été **rouge une
+   > seule fois**, le 2026-09-03 à 16:46 (exécution 33780606136), à l'étape
+   > « Le jeton est-il accepté ? ». Le secret a ensuite été retiré, et depuis, le
+   > job **passe au vert en sautant le déploiement** — l'étape « Le jeton est-il
+   > posé ? » répond non et pose un avertissement.
+   >
+   > La nuance compte : un job rouge se voit, un job vert qui n'a rien déployé ne
+   > se voit pas. C'est exactement le piège que le commentaire du workflow décrit
+   > pour les « ✓ en 7 secondes » qui ne déployaient rien, et je l'ai reproduit
+   > en lisant un verdict d'exécution sans lire ses étapes.
 2. **Appliquer les quatre migrations**, avant les fonctions.
 3. **Poser les quatre secrets Chariow**, et déployer le webhook avec
    `--no-verify-jwt` — le seul endroit du projet où ce drapeau paraît.
