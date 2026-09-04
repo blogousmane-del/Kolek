@@ -146,8 +146,12 @@ describe('ce que le formulaire envoie', () => {
     fireEvent.submit(screen.getByRole('button', { name: /envoyer ma demande/i }));
 
     await waitFor(() => expect(envoi).toHaveBeenCalled());
+    // Le zéro reste : il fait partie du numéro ivoirien depuis le 31 janvier
+    // 2021. Ce test attendait `+225701020304`, neuf chiffres — la forme même que
+    // Chariow refusait en « 400 Invalid phone number », et que le commentaire
+    // ci-dessus donne pourtant comme le symptôme à éviter.
     expect(envoi.mock.calls[0][0]).toMatchObject({
-      telephone: '+225701020304',
+      telephone: '+2250701020304',
       paysTelephone: 'CI',
       telephoneLocal: '07 01 02 03 04',
     });

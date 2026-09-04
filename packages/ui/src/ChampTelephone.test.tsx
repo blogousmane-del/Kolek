@@ -13,16 +13,28 @@ import { ChampTelephone, composerE164, PAYS_TELEPHONE, separerE164 } from './Cha
 afterEach(cleanup);
 
 describe('composerE164', () => {
-  it('retire le zéro national et pose l’indicatif', () => {
-    expect(composerE164('CI', '0700000000')).toBe('+225700000000');
+  it('garde le zéro ivoirien, qui fait partie du numéro', () => {
+    // Corrigé le 2026-09-04. Ce test attendait `+225700000000` et encodait une
+    // règle qu'on croyait universelle : « le zéro de tête tombe à
+    // l'international ». C'est celle de la France, pas de la Côte d'Ivoire, où
+    // le numéro fait dix chiffres et garde son zéro depuis le 31 janvier 2021.
+    //
+    // Le coût de l'erreur : Chariow refusait `400 Invalid phone number` sur tout
+    // numéro ivoirien, et aucun abonnement n'a jamais pu être réglé. La suite
+    // était verte — elle vérifiait que le code faisait ce qu'il faisait.
+    expect(composerE164('CI', '0711282992')).toBe('+2250711282992');
+  });
+
+  it('retire le zéro là où le plan de numérotation en porte un', () => {
+    expect(composerE164('FR', '0612345678')).toBe('+33612345678');
   });
 
   it('ignore les espaces et les tirets de saisie', () => {
-    expect(composerE164('CI', '07 00 00 00 00')).toBe('+225700000000');
+    expect(composerE164('CI', '07 11 28 29 92')).toBe('+2250711282992');
   });
 
   it('rend une chaîne vide sur un pays inconnu', () => {
-    expect(composerE164('ZZ', '0700000000')).toBe('');
+    expect(composerE164('ZZ', '0711282992')).toBe('');
   });
 
   it('rend une chaîne vide sur un numéro vide', () => {
@@ -55,12 +67,12 @@ describe('ChampTelephone', () => {
       <ChampTelephone libelle="Téléphone" valeur={{ pays: 'CI', local: '' }} onChange={onChange} />,
     );
 
-    fireEvent.change(screen.getByLabelText('Téléphone'), { target: { value: '0700000000' } });
+    fireEvent.change(screen.getByLabelText('Téléphone'), { target: { value: '0711282992' } });
 
     expect(onChange).toHaveBeenCalledWith({
       pays: 'CI',
-      local: '0700000000',
-      e164: '+225700000000',
+      local: '0711282992',
+      e164: '+2250711282992',
       valide: true,
     });
   });
@@ -81,15 +93,18 @@ describe('ChampTelephone', () => {
     render(
       <ChampTelephone
         libelle="Téléphone"
-        valeur={{ pays: 'CI', local: '0700000000' }}
+        valeur={{ pays: 'CI', local: '0711282992' }}
         onChange={onChange}
       />,
     );
 
     fireEvent.change(screen.getByLabelText('Pays'), { target: { value: 'SN' } });
 
+    // Le numéro national ne bouge pas, seul l'indicatif change — et le Sénégal
+    // ne porte pas de préfixe national, donc le zéro saisi reste. C'est voulu :
+    // le champ recompose, il ne réinterprète pas ce que la personne a tapé.
     expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({ pays: 'SN', e164: '+221700000000' }),
+      expect.objectContaining({ pays: 'SN', e164: '+2210711282992' }),
     );
   });
 
@@ -125,9 +140,17 @@ describe('separerE164', () => {
   it('fait l’aller-retour sur chaque pays de la liste', () => {
     // La propriété qui compte : ce que le champ compose, il doit savoir le
     // relire. Sans elle, un numéro enregistré ici reviendrait ailleurs.
+    // Le local attendu dépend maintenant du pays : celui qui porte un préfixe
+    // national le perd, les autres gardent leur numéro entier. L'aller-retour,
+    // lui, doit tenir dans les deux cas — c'est ce que ce test mesure, et non
+    // une forme particulière.
     for (const pays of PAYS_TELEPHONE) {
-      const e164 = composerE164(pays.code, '0700000000');
-      expect(separerE164(e164)).toEqual({ pays: pays.code, local: '700000000' });
+      const e164 = composerE164(pays.code, '0711282992');
+      const separe = separerE164(e164);
+
+      expect(separe).not.toBeNull();
+      expect(separe!.pays).toBe(pays.code);
+      expect(composerE164(separe!.pays, separe!.local)).toBe(e164);
     }
   });
 
@@ -152,7 +175,7 @@ describe('separerE164', () => {
     // Le défaut que cette fonction existe pour empêcher : poser l'E.164 tel quel
     // dans `local` donnait « +225 » devant un numéro qui portait déjà « 225 »,
     // et le champ le déclarait valide.
-    const stocke = '+225700000000';
+    const stocke = '+2250711282992';
     const separe = separerE164(stocke);
 
     expect(separe).not.toBeNull();

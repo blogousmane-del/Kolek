@@ -132,9 +132,51 @@ function iso2(v: unknown): string {
   return /^[A-Za-z]{2}$/.test(nettoye) ? nettoye.toUpperCase() : '';
 }
 
-/** Le zéro national de tête ne fait pas partie du numéro pour Chariow. */
-function sansZeroDeTete(national: string): string {
-  return national.replace(/^0+/, '');
+/**
+ * Les pays dont le plan de numérotation porte un **préfixe national** — ce zéro
+ * qu'on compose à l'intérieur du pays et qui tombe à l'international.
+ *
+ * ## Pourquoi une liste, et non une règle
+ *
+ * « Le zéro de tête ne fait pas partie du numéro » était écrit ici comme une
+ * règle universelle. Elle ne l'est pas, et elle était fausse pour le pays
+ * principal du produit.
+ *
+ * Depuis le 31 janvier 2021, un numéro ivoirien fait dix chiffres et **garde
+ * son zéro** : `07 11 28 29 92` s'écrit `+225 0711282992`. Le retirer produit
+ * neuf chiffres, c'est-à-dire un numéro qui n'existe pas. Mesuré le 2026-09-04 :
+ * Chariow rendait `400 Invalid phone number` sur tout numéro ivoirien, et le
+ * paiement était impossible depuis le premier jour.
+ *
+ * Le Bénin est dans le même cas depuis son passage à dix chiffres.
+ *
+ * ## Ce que cette liste vaut, et ce qu'elle ne vaut pas
+ *
+ * `CI` en est absent sur la foi d'une vérification datée. Les autres pays
+ * ouest-africains de la liste — Sénégal, Togo, Burkina, Mali, Niger, Guinée,
+ * Cameroun — ont des numéros nationaux sans zéro de tête : les inscrire ou non
+ * ne change rien à un numéro correctement saisi, et ne pas les inscrire est le
+ * choix qui abîme le moins une saisie inhabituelle.
+ *
+ * Les pays inscrits ci-dessous le sont sur la base de leur plan de numérotation
+ * connu. Aucun n'a été vérifié à la source le 2026-09-04 — seul `CI` l'a été,
+ * et c'est pour l'en **retirer**. Le jour où un numéro d'un de ces pays sera
+ * refusé, c'est ici qu'il faudra regarder, et la vérification manquante est
+ * nommée plutôt que supposée faite.
+ */
+const PREFIXE_NATIONAL: ReadonlySet<string> = new Set([
+  'FR',
+  'MA',
+  'DZ',
+  'NG',
+  'GH',
+  'MG',
+  'CD',
+]);
+
+/** Retire le zéro de tête **seulement** là où le plan de numérotation en a un. */
+function sansZeroDeTete(national: string, pays: string): string {
+  return PREFIXE_NATIONAL.has(pays) ? national.replace(/^0+/, '') : national;
 }
 
 function utilisable(national: string): boolean {
@@ -146,7 +188,7 @@ export function decouperIndicatif(brut: string): TelephoneChariow | null {
   const n = brut.replace(/^00/, '');
   for (const [indicatif, code] of INDICATIFS) {
     if (!n.startsWith(indicatif)) continue;
-    const national = sansZeroDeTete(n.slice(indicatif.length));
+    const national = sansZeroDeTete(n.slice(indicatif.length), code);
     if (utilisable(national)) return { number: national, country_code: code };
   }
   return null;
@@ -161,7 +203,7 @@ export function decouperIndicatif(brut: string): TelephoneChariow | null {
  */
 export function resoudreTelephone(saisie: SaisieTelephone): TelephoneChariow | null {
   const pays = iso2(saisie.paysTelephone);
-  const local = sansZeroDeTete(chiffres(saisie.telephoneLocal));
+  const local = sansZeroDeTete(chiffres(saisie.telephoneLocal), pays);
   const complet = chiffres(saisie.telephone);
 
   // 1. Le cas normal : le formulaire a envoyé les deux.
@@ -173,7 +215,7 @@ export function resoudreTelephone(saisie: SaisieTelephone): TelephoneChariow | n
 
   // 3. Un pays, et des chiffres dont on ne sait pas s'ils portent l'indicatif.
   if (pays) {
-    const brut = sansZeroDeTete(complet);
+    const brut = sansZeroDeTete(complet, pays);
     if (utilisable(brut)) return { number: brut, country_code: pays };
   }
 

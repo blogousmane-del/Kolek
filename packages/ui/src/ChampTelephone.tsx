@@ -50,15 +50,73 @@ function chiffres(brut: string): string {
   return brut.replace(/\D/g, '');
 }
 
-function sansZeroDeTete(national: string): string {
-  return national.replace(/^0+/, '');
+/**
+ * Les pays dont le plan de numérotation porte un **préfixe national** — ce zéro
+ * qu'on compose à l'intérieur du pays et qui tombe à l'international.
+ *
+ * ## Pourquoi une liste, et non une règle
+ *
+ * « Le zéro de tête ne fait pas partie du numéro » était écrit ici comme une
+ * règle universelle. Elle ne l'est pas, et elle était fausse pour le pays
+ * principal du produit.
+ *
+ * Depuis le 31 janvier 2021, un numéro ivoirien fait dix chiffres et **garde
+ * son zéro** : `07 11 28 29 92` s'écrit `+225 0711282992`. Le retirer produit
+ * neuf chiffres, c'est-à-dire un numéro qui n'existe pas. Mesuré le 2026-09-04 :
+ * Chariow rendait `400 Invalid phone number` sur tout numéro ivoirien, et le
+ * paiement était impossible depuis le premier jour.
+ *
+ * Le Bénin est dans le même cas depuis son passage à dix chiffres.
+ *
+ * ## Ce que cette liste vaut, et ce qu'elle ne vaut pas
+ *
+ * `CI` en est absent sur la foi d'une vérification datée. Les autres pays
+ * ouest-africains de la liste — Sénégal, Togo, Burkina, Mali, Niger, Guinée,
+ * Cameroun — ont des numéros nationaux sans zéro de tête : les inscrire ou non
+ * ne change rien à un numéro correctement saisi, et ne pas les inscrire est le
+ * choix qui abîme le moins une saisie inhabituelle.
+ *
+ * Les pays inscrits ci-dessous le sont sur la base de leur plan de numérotation
+ * connu. Aucun n'a été vérifié à la source le 2026-09-04 — seul `CI` l'a été,
+ * et c'est pour l'en **retirer**. Le jour où un numéro d'un de ces pays sera
+ * refusé, c'est ici qu'il faudra regarder, et la vérification manquante est
+ * nommée plutôt que supposée faite.
+ */
+const PREFIXE_NATIONAL: ReadonlySet<string> = new Set([
+  'FR',
+  'MA',
+  'DZ',
+  'NG',
+  'GH',
+  'MG',
+  'CD',
+]);
+
+/** Retire le zéro de tête **seulement** là où le plan de numérotation en a un. */
+function sansZeroDeTete(national: string, pays: string): string {
+  return PREFIXE_NATIONAL.has(pays) ? national.replace(/^0+/, '') : national;
+}
+
+/**
+ * Le numéro national, ou la chaîne vide s'il n'y en a pas.
+ *
+ * `sansZeroDeTete` tenait lieu de garde tant qu'elle rabotait tous les zéros :
+ * « 000 » devenait « », et le champ restait vide. En cessant de raboter pour la
+ * Côte d'Ivoire, cette garde a disparu par effet de bord et « 000 » composait
+ * « +225000 ». Un test l'a dit ; elle est maintenant écrite pour elle-même,
+ * indépendante du pays.
+ */
+function nationalDe(local: string, pays: string): string {
+  const bruts = chiffres(local);
+  if (!bruts || /^0+$/.test(bruts)) return '';
+  return sansZeroDeTete(bruts, pays);
 }
 
 /** Compose l'E.164. Rend une chaîne vide si le pays n'est pas dans la liste. */
 export function composerE164(pays: string, local: string): string {
   const trouve = PAYS_TELEPHONE.find((p) => p.code === pays);
   if (!trouve) return '';
-  const national = sansZeroDeTete(chiffres(local));
+  const national = nationalDe(local, pays);
   if (!national) return '';
   return `+${trouve.indicatif}${national}`;
 }
@@ -127,7 +185,7 @@ interface Props {
  * refuse.
  */
 export function lireTelephone(pays: string, local: string): ValeurTelephone {
-  const national = sansZeroDeTete(chiffres(local));
+  const national = nationalDe(local, pays);
   return {
     pays,
     local,

@@ -64,10 +64,31 @@ describe('montantCoherent', () => {
 });
 
 describe('resoudreTelephone', () => {
-  it('retire le zéro national quand le pays est donné', () => {
-    expect(resoudreTelephone({ paysTelephone: 'CI', telephoneLocal: '0700000000' })).toEqual({
-      number: '700000000',
+  it('garde le zéro d’un numéro ivoirien — il fait partie du numéro', () => {
+    // Le défaut le plus coûteux de la journée du 2026-09-04, et le plus discret.
+    //
+    // Ce test attendait `700000000`. Il encodait une règle qu'on croyait
+    // universelle — « le zéro de tête tombe à l'international » — et qui est
+    // celle de la France, pas de la Côte d'Ivoire. Depuis le 31 janvier 2021 un
+    // numéro ivoirien fait dix chiffres et garde son zéro ; le retirer en
+    // produit neuf, c'est-à-dire aucun numéro.
+    //
+    // Chariow rendait donc `400 Invalid phone number` sur **tout** numéro
+    // ivoirien, et le paiement n'a jamais pu aboutir depuis le premier jour. La
+    // suite était verte : elle vérifiait que le code faisait ce qu'il faisait.
+    expect(resoudreTelephone({ paysTelephone: 'CI', telephoneLocal: '0711282992' })).toEqual({
+      number: '0711282992',
       country_code: 'CI',
+    });
+  });
+
+  it('retire le zéro là où le plan de numérotation en porte un', () => {
+    // La France, elle, a bien un préfixe national : `06 12 34 56 78` se compose
+    // `+33 612345678`. La règle n'est pas fausse — elle n'est simplement pas
+    // universelle, et c'est ce que la liste explicite dit désormais.
+    expect(resoudreTelephone({ paysTelephone: 'FR', telephoneLocal: '0612345678' })).toEqual({
+      number: '612345678',
+      country_code: 'FR',
     });
   });
 
