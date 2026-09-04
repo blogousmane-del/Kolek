@@ -78,13 +78,25 @@ describe('l’image de partage', () => {
     expect(ogSvg()).not.toMatch(/<text|font-family/);
   });
 
-  it('est produite dans le dossier public du site, sous le nom que les balises citent', () => {
-    const chemins = artefacts().map((a) => a.chemin);
-    expect(chemins).toContain('apps/site/public/og.png');
+  it(
+    'est produite dans le dossier public du site, sous le nom que les balises citent',
+    () => {
+      const chemins = artefacts().map((a) => a.chemin);
+      expect(chemins).toContain('apps/site/public/og.png');
 
-    const html = readFileSync(join(RACINE, 'apps/site/index.html'), 'utf8');
-    expect(html).toContain('/og.png');
-  });
+      const html = readFileSync(join(RACINE, 'apps/site/index.html'), 'utf8');
+      expect(html).toContain('/og.png');
+    },
+    // Même raison, même remède que `fichiersPerimes()` plus haut : `artefacts()`
+    // rend les trois PNG avec `resvg`, dont l'image de partage en 1200 × 630.
+    // Ce test-ci n'avait pas reçu le délai élargi le jour où son voisin l'a
+    // reçu, et il vivait depuis sous les 5 s par défaut — assez large sur une
+    // machine au repos, trop juste dès que la chaîne complète tourne à côté.
+    // Mesuré le 2026-09-04 : 7077 ms sous charge, trois passages verts au
+    // repos. Un test qui tombe une fois sur trois pour une raison qu'il ne
+    // nomme pas apprend à tout le monde à relancer sans lire.
+    20000,
+  );
 });
 
 describe('zone de sécurité de l’icône d’application', () => {
