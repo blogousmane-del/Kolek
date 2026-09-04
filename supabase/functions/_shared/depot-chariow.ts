@@ -273,7 +273,13 @@ export function refusDeChariow(statut: number): IssueVente {
   if (statut === 404) {
     return { ok: false, erreur: 'PRODUIT_INTROUVABLE', statut: 500 };
   }
-  if (statut === 422) {
+  // 400 **et** 422. Mesuré en production le 2026-09-04 : Chariow rend
+  // `400 {"message":"Invalid phone number…"}` là où cette table n'attendait
+  // que 422. Le refus tombait donc dans le cas par défaut, et celui qui payait
+  // lisait « le service ne répond pas » devant un numéro qu'il pouvait corriger
+  // lui-même. 422 reste accepté : rien ne dit qu'ils ne l'emploient nulle part,
+  // et le retirer troquerait un défaut contre un autre.
+  if (statut === 400 || statut === 422) {
     return { ok: false, erreur: 'SAISIE_REFUSEE', statut: 400 };
   }
   // Tout le reste — 5xx, 429, un statut qu'ils ajouteraient demain. Celui-là

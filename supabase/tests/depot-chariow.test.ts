@@ -482,6 +482,10 @@ describe('couperNom', () => {
  */
 describe('refusDeChariow', () => {
   it.each([
+    // 400 vient d'une mesure, pas d'une lecture de doc : Chariow l'a rendu en
+    // production le 2026-09-04 sur un numéro invalide. Sans cette ligne, la
+    // saisie refusée la plus fréquente reparaît en « panne passagère ».
+    [400, 'SAISIE_REFUSEE', 400],
     [401, 'CLE_CHARIOW_REFUSEE', 500],
     [403, 'CLE_CHARIOW_REFUSEE', 500],
     [404, 'PRODUIT_INTROUVABLE', 500],
@@ -497,7 +501,7 @@ describe('refusDeChariow', () => {
     // La propriété qui compte, énoncée une fois plutôt que déduite de sept
     // lignes : un refus qu'aucune attente ne corrigera ne doit pas porter le
     // message qui invite à attendre.
-    const definitifs = [401, 403, 404, 422];
+    const definitifs = [400, 401, 403, 404, 422];
     for (const statut of definitifs) {
       expect(refusDeChariow(statut).ok === false && refusDeChariow(statut).erreur).not.toBe(
         'CHECKOUT_IMPOSSIBLE',
