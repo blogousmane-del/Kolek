@@ -153,7 +153,7 @@ export function Hero() {
             </a>
             <a
               href={APP_COLLECTEUR}
-              className="rounded-pill border border-white/20 px-7 py-3.5 text-center font-body text-base font-medium text-white/80 transition-transform duration-300 hover:-translate-y-px hover:text-white"
+              className="rounded-pill border border-white/40 px-7 py-3.5 text-center font-body text-base font-medium text-white/80 transition-transform duration-300 hover:-translate-y-px hover:text-white"
             >
               J’ai déjà un compte
             </a>

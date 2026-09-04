@@ -65,11 +65,11 @@ export function PiedDePage() {
       </div>
 
       <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-white/8 pt-6">
-        <p className="font-body text-xs text-white/30">
+        <p className="font-body text-xs text-white/55">
           © {new Date().getFullYear()} GTCS · Kolek. Aucun flux d’épargne ne transite par cette
           page.
         </p>
-        <p className="flex items-center gap-2 font-mono text-xs text-white/40">
+        <p className="flex items-center gap-2 font-mono text-xs text-white/55">
           {/* Fixe, et non `animate-pulse`. Le point ne mesure rien : il dit que la
               page est servie. Le faire battre lui prêtait une surveillance qui
               n'existe pas — la CSP de cette page interdit tout appel sortant, donc

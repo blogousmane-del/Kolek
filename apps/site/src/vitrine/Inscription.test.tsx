@@ -81,6 +81,65 @@ describe('le formulaire d’ouverture', () => {
     expect(screen.queryByText(/nom, numéro et zone uniquement/i)).toBeNull();
     expect(screen.getByText(/aucun mot de passe/i)).toBeTruthy();
   });
+
+  it('n’éteint l’anneau de focus sur aucun de ses champs', () => {
+    // La règle du 2026-08-23 : l'anneau vit dans `packages/core/src/base.css`,
+    // sur `:focus-visible`, et aucun composant n'a le droit de l'éteindre.
+    // `Champ.test.tsx` et `ChampTelephone.test.tsx` la font respecter côté
+    // application. Personne ne la surveillait sur la vitrine — et les cinq
+    // champs de cette page l'éteignaient depuis leur écriture, sur un
+    // formulaire qui demande un numéro, une adresse et un mot de passe.
+    const { container } = render(<Inscription />);
+    // Le palier payant, pour que le champ mot de passe existe lui aussi.
+    choisirPalier('Pro');
+
+    const controles = container.querySelectorAll('input, select, textarea');
+    // Garde-fou du garde-fou : une requête qui ne trouverait plus rien
+    // passerait cette boucle sans rien vérifier.
+    expect(controles.length).toBeGreaterThanOrEqual(5);
+    for (const controle of controles) {
+      expect(controle.className).not.toContain('outline-none');
+    }
+  });
+});
+
+describe('la ligne du numéro : deux contrôles, deux pistes', () => {
+  /**
+   * Le défaut du 2026-09-04, visible à l'œil sur la page en ligne : le pays
+   * occupait toute la ligne et le numéro se repliait sur un carré de 44 px.
+   *
+   * jsdom ne calcule aucune mise en page — aucun test ici ne peut mesurer une
+   * largeur en pixels. Ce qui est mesurable, c'est la **cause** : deux
+   * utilitaires de largeur posés sur le même élément, dont l'un annule l'autre
+   * selon un ordre que la chaîne de classes ne décide pas.
+   */
+
+  it('ne pose jamais deux largeurs sur le même contrôle', () => {
+    render(<Inscription />);
+
+    for (const controle of [
+      screen.getByLabelText('Pays'),
+      screen.getByLabelText(/ton numéro/i),
+    ]) {
+      const largeurs = controle.className.split(/\s+/).filter((classe) => /^w-/.test(classe));
+      // Celle de `CHAMP_SOMBRE`, et elle seule. `w-32` ajoutée à côté rendait
+      // ['w-full', 'w-32'] — et c'est la feuille Tailwind qui tranchait.
+      expect(largeurs).toEqual(['w-full']);
+    }
+  });
+
+  it('donne au pays une piste fixe et au numéro tout le reste', () => {
+    render(<Inscription />);
+
+    const pistePays = screen.getByLabelText('Pays').parentElement;
+    const pisteNumero = screen.getByLabelText(/ton numéro/i).parentElement;
+
+    expect(pistePays?.className).toMatch(/\bw-32\b/);
+    expect(pistePays?.className).toMatch(/\bshrink-0\b/);
+    expect(pisteNumero?.className).toMatch(/\bflex-1\b/);
+    // Sans `min-w-0`, la largeur minimale d'un élément flex est son contenu.
+    expect(pisteNumero?.className).toMatch(/\bmin-w-0\b/);
+  });
 });
 
 describe('le palier payant : payer vaut accord', () => {

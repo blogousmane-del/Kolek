@@ -21,6 +21,27 @@ body {
   background: var(--color-dark-canvas);
 }
 
+/* L'anneau de focus, retourné pour le fond sombre.
+
+   `base.css` le dessine pour la surface claire des applications : trait
+   `--color-primary` (#14402C, un vert très sombre) cerné d'un halo
+   `--color-surface` blanc. Posé tel quel sur la vitrine, le trait disparaît
+   dans le fond et il ne reste que le halo — l'anneau perd sa forme.
+
+   Les deux couleurs sont donc échangées, et rien d'autre : même géométrie,
+   même sélecteur `:focus-visible`, même règle. L'or n'est pas employé — le
+   Design System §1 le réserve à la pièce du logo, et `base.css` dit déjà
+   pourquoi.
+
+   Ceci remplace le `outline-none` que les champs du formulaire d'ouverture
+   portaient jusqu'au 2026-09-04. Éteindre l'anneau parce qu'il tombait mal
+   revenait à laisser la navigation au clavier sans repère sur les cinq champs
+   d'une page qui demande un numéro, une adresse et un mot de passe. */
+:focus-visible {
+  outline-color: #ffffff;
+  box-shadow: 0 0 0 2px var(--color-dark-canvas);
+}
+
 /* Le bouton « magnétique » du système de design de la vitrine : lift subtil,
    et un voile qui glisse au survol. En CSS pur — trois boutons ne justifient
    pas un composant. */

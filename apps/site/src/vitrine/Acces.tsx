@@ -102,7 +102,7 @@ export function Acces() {
                   majuscule espacé. Trois d'affilée, c'est le tic ; ce qu'elles
                   portent — à qui chaque porte s'adresse — est réel et reste, en
                   typographie de texte. */}
-              <p className="mb-2 font-body text-sm font-semibold text-dark-canvas/60">
+              <p className="mb-2 font-body text-sm font-semibold text-dark-canvas/75">
                 J’ai déjà un compte
               </p>
               <h3 className="mb-3 font-headings text-3xl font-bold sm:text-4xl">
@@ -131,7 +131,7 @@ export function Acces() {
               href={INSCRIPTION}
               className="group flex-1 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 transition-transform duration-300 hover:-translate-y-1"
             >
-              <p className="mb-2 font-body text-sm font-semibold text-white/40">
+              <p className="mb-2 font-body text-sm font-semibold text-white/55">
                 Pas encore de compte
               </p>
               <h3 className="mb-2 font-headings text-xl font-bold text-white">
@@ -156,7 +156,7 @@ export function Acces() {
               href={APP_ADMIN}
               className="group rounded-[2rem] border border-white/10 bg-white/[0.02] p-6 transition-transform duration-300 hover:-translate-y-1"
             >
-              <p className="mb-2 font-body text-sm font-semibold text-white/30">Équipe GTCS</p>
+              <p className="mb-2 font-body text-sm font-semibold text-white/55">Équipe GTCS</p>
               <span className="inline-flex items-center gap-2 font-body text-sm font-medium text-white/60">
                 Administration
                 <FlecheEntrante />

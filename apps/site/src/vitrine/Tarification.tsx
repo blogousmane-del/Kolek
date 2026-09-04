@@ -81,7 +81,7 @@ export function Tarification() {
                             ? 'bg-or/20 text-or'
                             : 'bg-positive-tint text-positive'
                           : vedette
-                            ? 'bg-white/5 text-white/25'
+                            ? 'bg-white/5 text-white/55'
                             : 'bg-muted text-muted-foreground/40'
                       }`}
                     >
@@ -94,7 +94,7 @@ export function Tarification() {
                             ? 'text-white/85'
                             : 'text-ink'
                           : vedette
-                            ? 'text-white/30'
+                            ? 'text-white/55'
                             : 'text-muted-foreground/50'
                       }
                     >

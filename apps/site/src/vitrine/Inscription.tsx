@@ -51,8 +51,20 @@ import { APP_COLLECTEUR, CONTACT_DEMO } from './liens';
  * unique.
  */
 
+/**
+ * Le gabarit des champs du formulaire.
+ *
+ * Pas de `outline-none` ici, et c'est une règle, pas un oubli : l'anneau de
+ * focus vit dans `packages/core/src/base.css` sur `:focus-visible`, et aucun
+ * composant n'a le droit de l'éteindre — c'est la règle du 2026-08-23, que
+ * `Champ.test.tsx` et `ChampTelephone.test.tsx` font déjà respecter côté
+ * application. Elle valait pour la vitrine aussi ; personne ne la surveillait
+ * ici, et les cinq champs l'éteignaient depuis leur écriture.
+ *
+ * `styles.css` retourne les deux couleurs de l'anneau pour le fond sombre.
+ */
 const CHAMP_SOMBRE =
-  'w-full min-h-11 rounded-md border-[1.5px] border-white/15 bg-white/5 px-3.5 font-body text-base text-white outline-none placeholder:text-white/25 focus:border-or';
+  'w-full min-h-11 rounded-md border-[1.5px] border-white/40 bg-white/5 px-3.5 font-body text-base text-white placeholder:text-white/55 focus:border-or';
 
 function Etiquette({ pour, children }: { pour: string; children: React.ReactNode }) {
   return (
@@ -163,7 +175,7 @@ export function Inscription() {
               <strong className="text-white">{email}</strong>. Garde ton téléphone à portée
               et surveille tes courriels.
             </p>
-            <p className="font-body text-sm text-white/40">
+            <p className="font-body text-sm text-white/55">
               Tu as déjà un compte ?{' '}
               <a href={APP_COLLECTEUR} className="font-semibold text-or underline underline-offset-2">
                 Connecte-toi
@@ -216,35 +228,52 @@ export function Inscription() {
                     pays et le numéro national séparés — un E.164 brut lui revient
                     en « 400 Invalid phone number ». Le serveur reçoit les deux
                     formes et tranche lui-même. */}
+                {/* La piste de chaque contrôle est portée par son conteneur, et
+                    non par une classe de largeur ajoutée à `CHAMP_SOMBRE`.
+                    Corrigé le 2026-09-04 : le `select` recevait
+                    `${CHAMP_SOMBRE} w-32`, donc `w-full` et `w-32` sur le même
+                    élément. L'ordre dans la chaîne ne tranche pas — c'est
+                    l'ordre de la feuille Tailwind, et `w-full` l'emportait. Le
+                    pays prenait toute la ligne, le numéro se repliait sur son
+                    minimum : un carré de 44 px où l'on ne pouvait rien lire de
+                    ce qu'on tapait. `ChampTelephone`, dans `packages/ui`, porte
+                    ce découpage depuis le début. */}
                 <div className="flex gap-2">
-                  <select
-                    aria-label="Pays"
-                    value={paysTelephone}
-                    onChange={(e) => setPaysTelephone(e.target.value)}
-                    className={`${CHAMP_SOMBRE} w-32 shrink-0`}
-                  >
-                    {PAYS_TELEPHONE.map((p) => (
-                      <option key={p.code} value={p.code} className="text-dark-canvas">
-                        {p.code} +{p.indicatif}
-                      </option>
-                    ))}
-                  </select>
-                  {/* `tel` : sur un téléphone, il ouvre le pavé numérique sans
-                      les flèches d'incrément, que personne ne veut sur un
-                      numéro. */}
-                  <input
-                    id="telephone"
-                    type="tel"
-                    value={telephoneLocal}
-                    onChange={(e) => setTelephoneLocal(e.target.value)}
-                    required
-                    maxLength={24}
-                    autoComplete="tel-national"
-                    placeholder="07 01 02 03 04"
-                    className={CHAMP_SOMBRE}
-                  />
+                  <div className="w-32 shrink-0">
+                    <select
+                      aria-label="Pays"
+                      value={paysTelephone}
+                      onChange={(e) => setPaysTelephone(e.target.value)}
+                      className={CHAMP_SOMBRE}
+                    >
+                      {PAYS_TELEPHONE.map((p) => (
+                        <option key={p.code} value={p.code} className="text-dark-canvas">
+                          {p.code} +{p.indicatif}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* `min-w-0` : sans lui, la largeur minimale par défaut d'un
+                      élément flex est son contenu, et le champ refuserait de
+                      descendre sous la largeur du gabarit. */}
+                  <div className="min-w-0 flex-1">
+                    {/* `tel` : sur un téléphone, il ouvre le pavé numérique sans
+                        les flèches d'incrément, que personne ne veut sur un
+                        numéro. */}
+                    <input
+                      id="telephone"
+                      type="tel"
+                      value={telephoneLocal}
+                      onChange={(e) => setTelephoneLocal(e.target.value)}
+                      required
+                      maxLength={24}
+                      autoComplete="tel-national"
+                      placeholder="07 01 02 03 04"
+                      className={CHAMP_SOMBRE}
+                    />
+                  </div>
                 </div>
-                <p className="mt-1.5 font-body text-xs text-white/30">
+                <p className="mt-1.5 font-body text-xs text-white/55">
                   {payant
                     ? 'C’est le numéro qui règle l’abonnement.'
                     : 'C’est le numéro sur lequel GTCS te rappelle.'}
@@ -267,7 +296,7 @@ export function Inscription() {
                 {/* Dire à quoi elle sert au moment où on la demande. Un
                     formulaire qui réclame une adresse sans expliquer pourquoi
                     fait hésiter, et l'hésitation coûte des demandes. */}
-                <p className="mt-1.5 font-body text-xs text-white/30">
+                <p className="mt-1.5 font-body text-xs text-white/55">
                   C’est là que tu recevras ton accès quand GTCS aura ouvert ton compte.
                 </p>
               </div>
@@ -298,18 +327,18 @@ export function Inscription() {
                       className={`cursor-pointer rounded-md border px-3 py-2.5 text-left font-body transition-colors ${
                         p.cle === palier
                           ? 'border-or bg-or/15 text-white'
-                          : 'border-white/10 text-white/50 hover:border-white/25'
+                          : 'border-white/40 text-white/70 hover:border-white/70'
                       }`}
                     >
                       <span className="block text-sm font-semibold">{p.nom}</span>
-                      <span className="block font-mono text-xs tabular-nums text-white/40">
+                      <span className="block font-mono text-xs tabular-nums text-white/55">
                         {p.prix === 0 ? 'Gratuit' : `${formatMontant(p.prix)} F/${p.periode}`}
                       </span>
                     </button>
                   ))}
                 </div>
                 {choisi && (
-                  <p className="mt-2 font-body text-xs text-white/40">
+                  <p className="mt-2 font-body text-xs text-white/55">
                     {choisi.limite} · {choisi.accroche}
                   </p>
                 )}
@@ -338,7 +367,7 @@ export function Inscription() {
                     placeholder="Au moins 10 caractères"
                     className={CHAMP_SOMBRE}
                   />
-                  <p className="mt-1.5 font-body text-xs text-white/30">
+                  <p className="mt-1.5 font-body text-xs text-white/55">
                     C’est celui avec lequel tu ouvriras l’application. Ton compte se crée dès le
                     paiement confirmé — personne ne te rappellera pour te donner un accès.
                   </p>
@@ -397,7 +426,7 @@ export function Inscription() {
                   il y a désormais un mot de passe, et un paiement. La corriger
                   pour les deux cas plutôt que de la retirer — un formulaire qui
                   demande un numéro et une adresse doit dire ce qu'il en fait. */}
-              <p className="mt-4 text-center font-body text-xs text-white/30">
+              <p className="mt-4 text-center font-body text-xs text-white/55">
                 {payant
                   ? 'Ton mot de passe ne nous parvient jamais en clair : il est transformé avant d’être rangé, et le paiement se fait sur la page sécurisée de notre encaisseur.'
                   : 'Nom, numéro, adresse e-mail et zone. Aucun mot de passe, aucun paiement à cette étape.'}
@@ -408,7 +437,7 @@ export function Inscription() {
                   de build absente. Offrir la voie du courriel à côté — plutôt
                   qu'à la place — coûte une ligne et garantit qu'aucun visiteur
                   ne se retrouve devant une impasse. */}
-              <p className="mt-3 text-center font-body text-xs text-white/30">
+              <p className="mt-3 text-center font-body text-xs text-white/55">
                 Tu préfères écrire ?{' '}
                 <a href={CONTACT_DEMO} className="text-or/70 underline underline-offset-2">
                   Envoyer un courriel à GTCS
@@ -416,7 +445,7 @@ export function Inscription() {
               </p>
             </form>
 
-            <p data-entree className="mt-6 text-center font-body text-sm text-white/40">
+            <p data-entree className="mt-6 text-center font-body text-sm text-white/55">
               Tu as déjà un compte ?{' '}
               <a
                 href={APP_COLLECTEUR}
