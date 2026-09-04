@@ -1028,17 +1028,36 @@ chaque rotation de clé ou changement de boutique.
    qui diverge de la grille est signalé au journal (`GRILLE — …`) sans bloquer
    le collecteur, qui n'y est pour rien.
 2. Relever la clé d'API dans le tableau de bord Chariow.
-3. Tirer un secret de webhook : `openssl rand -hex 32`.
+3. Tirer un secret de webhook : `openssl rand -hex 32`. Il ne vient **pas**
+   de Chariow — c'est nous qui l'inventons, et il ne sert qu'à écarter le bruit
+   avant tout calcul.
+4. Créer le Pulse : **Automations → Pulses → Add Pulse**, l'URL de la §7.4,
+   événement `successful.sale` au minimum (les autres catégories sont
+   `license.*` et `affiliate.joined`, qui ne nous concernent pas). Puis relever
+   son **Signing secret** — onglet *Overview* du Pulse, un `whsec_…` propre à
+   cette destination et distinct de la clé d'API.
 
 ### 7.2 Les secrets des Edge Functions
 
 ```bash
 npx supabase secrets set \
   CHARIOW_CLE_API="…" \
-  CHARIOW_PRODUITS='{"standard":"prod_…","pro":"prod_…","illimite":"prod_…"}' \
+  CHARIOW_PRODUITS='{"standard":"prd_…","pro":"prd_…","illimite":"prd_…"}' \
   CHARIOW_SECRET_WEBHOOK="…" \
+  CHARIOW_SECRET_SIGNATURE="whsec_…" \
   URL_RETOUR_COLLECTEUR="https://app.kolek.cash"
 ```
+
+**Sous Windows, passer par un fichier.** Le JSON de `CHARIOW_PRODUITS` porte des
+guillemets doubles que `cmd.exe` mange en chemin, et le secret arrive tronqué
+sans que rien ne le dise. `supabase secrets set --env-file <fichier>` prend un
+`.env` ordinaire, une paire par ligne, sans échappement. Le fichier doit vivre
+**hors du dépôt** et être effacé aussitôt après.
+
+Que la valeur soit arrivée intacte se vérifie sans la révéler : `secrets list`
+rend l'empreinte SHA-256 de chaque secret. Pour une valeur non secrète comme
+`CHARIOW_PRODUITS`, on la recalcule et on compare — c'est ainsi que la pose du
+2026-09-04 a été confirmée.
 
 **`URL_RETOUR_COLLECTEUR` prend l'adresse canonique**, pas
 `kolek-collecteur.netlify.app`. Cette dernière rend un 301 vers la première
@@ -1088,18 +1107,61 @@ d'atteindre le code, pas celui d'obtenir quoi que ce soit : le secret d'URL est
 comparé en temps constant, et la fonction ne crédite jamais sur la foi du corps
 reçu — elle relit la vente chez le fournisseur.
 
-### 7.4 L'URL à coller chez Chariow
+### 7.4 L'URL à coller chez Chariow, et les deux barrières
 
 ```
 https://<référence-du-projet>.supabase.co/functions/v1/chariow-webhook?secret=<CHARIOW_SECRET_WEBHOOK>
 ```
 
+Cette URL **est** un secret : elle porte la clé dans son adresse. Elle ne va
+nulle part ailleurs que dans le champ du Pulse.
+
+**Le secret d'URL n'est pas le contrôle principal, et ne peut pas l'être.**
+Chariow n'en pose aucun de lui-même ; il signe le corps. Sa documentation le
+dit sans détour : « Your endpoint URL is public, so anyone who discovers it can
+post to it. » Le webhook vérifie donc, dans cet ordre :
+
+| Barrière | Ce qu'elle écarte |
+|---|---|
+| `?secret=` comparé à `CHARIOW_SECRET_WEBHOOK` | le bruit, sans aucun calcul |
+| `x-chariow-signature` contre `CHARIOW_SECRET_SIGNATURE` | tout ce qui ne vient pas de Chariow |
+
+La signature vaut `sha256=` suivi du HMAC-SHA256 du **corps brut**. Deux pièges,
+tous deux coûteux :
+
+1. **Lire le corps en `text()` avant tout parsing.** Chariow sérialise en JSON
+   compact, barres obliques échappées (`https:\/\/`) et non-ASCII en `\uXXXX`.
+   Re-sérialiser l'objet analysé produit d'autres octets, donc une empreinte
+   différente — une porte fermée en permanence, qu'on ne diagnostique qu'en
+   comparant deux chaînes caractère par caractère.
+2. **Le préfixe `sha256=` fait partie de ce qui est comparé.** L'accepter sans
+   lui reviendrait à tolérer un format que le fournisseur n'émet pas, et un
+   format toléré est un format que personne ne vérifie.
+
+**Ce que la signature n'apporte pas**, et qu'il ne faut pas croire qu'elle
+apporte : elle n'empêche aucun crédit frauduleux. `reconcilier` ne croit pas le
+corps reçu — il relit la vente chez Chariow, et
+`chargerPaiementsRattrapables` ne recharge que les paiements `en_attente` ou
+`echoue`. Un `successful.sale` forgé ne crédite rien, signature ou pas. Ce
+qu'elle empêche est plus modeste et réel : qu'un tiers ayant découvert l'URL
+désigne des lignes et fasse consommer des lectures d'API au quota.
+
+Rotation du secret d'URL : la reposer par `secrets set` **invalide l'ancienne
+adresse immédiatement**, et Supabase reversionne la fonction de lui-même. Mettre
+à jour le Pulse dans la foulée — entre les deux, tout paiement est perdu.
+
 ### 7.5 Vérifier après déploiement
 
 ```bash
-# Sans secret : doit répondre 401.
-curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+# Sans secret : doit répondre 401 {"erreur":"SECRET_INVALIDE"} — première barrière.
+curl -s -X POST \
   "https://<réf>.supabase.co/functions/v1/chariow-webhook" -d '{}'
+
+# Avec le bon secret mais sans signature : doit répondre
+# 401 {"erreur":"SIGNATURE_INVALIDE"} — c'est le seul appel qui prouve que la
+# seconde barrière est en ligne. Un {"recu":true} ici signale un code périmé.
+curl -s -X POST \
+  "https://<réf>.supabase.co/functions/v1/chariow-webhook?secret=<le secret>" -d '{}'
 
 # Sans jeton : doivent répondre 401.
 for f in abonnement-payer abonnement-verifier; do
