@@ -17,6 +17,19 @@ import { admin, anonyme, creerCollecteur, nettoyer, type CollecteurTest } from '
  * sites, par construction. Le test qui compte ici est celui de la clé
  * publiable : c'est exactement le jeton qu'un attaquant a déjà.
  *
+ * **Ce que la porte compare, depuis le 2026-09-04.** Le premier correctif
+ * comparait le porteur à `SUPABASE_SERVICE_ROLE_KEY`, en la tenant pour la
+ * valeur que l'horloge sort de Vault. Ce sont deux choses différentes — la
+ * plateforme injecte `SUPABASE_SERVICE_ROLE_KEY = eyJ…` à côté de
+ * `SUPABASE_INTERNAL_SECRET_KEY = sb_secret_…`, et Vault porte la seconde forme
+ * depuis le 2026-08-28. Le drainage s'est arrêté en production au déploiement.
+ *
+ * Ce fichier ne l'a pas vu, et c'est le vrai enseignement : son test d'acceptation
+ * présentait `SUPABASE_SERVICE_ROLE_KEY` en porteur, c'est-à-dire la variable que
+ * la fonction lisait elle-même. Il mesurait la fonction contre elle-même, jamais
+ * contre ce que l'appelant réel envoie. `refuse la clé de service seule`
+ * ci-dessous est le test qui manquait.
+ *
  * **Le lot.** Sans réservation, deux drainages lisent les mêmes cinquante
  * lignes, envoient deux fois le même SMS à de vrais clients, et décomptent deux
  * fois le quota. Il n'en faut pas dix : un lot de cinquante SMS dépasse la
@@ -35,6 +48,12 @@ const ROUTE = `${process.env.SUPABASE_URL}/functions/v1/envoyer-avis`;
 const CLE_PUBLIABLE = process.env.SUPABASE_ANON_KEY as string;
 const CLE_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
 
+/** Lu dans le fichier même que le runtime local charge au démarrage. Une
+    constante recopiée ici passerait au vert avec un runtime qui n'a pas le
+    secret — le test dirait « la porte s'ouvre » en mesurant sa propre chaîne. */
+const ENV_FONCTIONS = readFileSync('supabase/functions/.env', 'utf8');
+const SECRET_DRAINAGE = (ENV_FONCTIONS.match(/^DRAINAGE_SECRET=(.+)$/m)?.[1] ?? '').trim();
+
 const MARQUE = crypto.randomUUID().slice(0, 8);
 let collecteur: CollecteurTest;
 let clientId: string;
@@ -49,12 +68,15 @@ interface LigneReservee {
   tentatives: number;
 }
 
-async function appeler(jeton: string | null): Promise<Response> {
+/** `secret` reproduit ce que `avis_declencher_drainage()` envoie : le porteur
+    ne sert qu'à traverser `verify_jwt`, l'en-tête seul ouvre. */
+async function appeler(jeton: string | null, secret: string | null = null): Promise<Response> {
   return fetch(ROUTE, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(jeton ? { Authorization: `Bearer ${jeton}` } : {}),
+      ...(secret ? { 'x-kolek-drainage': secret } : {}),
     },
     body: '{}',
   });
@@ -157,16 +179,97 @@ describe('la porte de envoyer-avis', () => {
     expect(await publiable.json()).toEqual(await collecteurJeton.json());
   });
 
-  it('accepte la clé de service, et laisse la file intacte sans passerelle', async () => {
+  it('refuse la clé de service seule — le défaut du 2026-09-04', async () => {
+    // Le test qui manquait, et qui a coûté une panne silencieuse en production.
+    //
+    // Jusqu'ici, cet appel exact rendait 200 : la fonction comparait le porteur
+    // à `SUPABASE_SERVICE_ROLE_KEY`, et le test présentait cette même variable.
+    // L'appelant réel, lui, présente ce que Vault contient — `sb_secret_…`, une
+    // autre valeur. La production a donc rendu 403 pendant que la suite était
+    // verte.
+    //
+    // Le sens n'est plus « la clé de service ouvre » mais « rien n'ouvre sauf le
+    // secret de drainage ». La clé de service est un jeton comme un autre.
+    const reponse = await appeler(CLE_SERVICE);
+
+    expect(reponse.status).toBe(403);
+    expect(await reponse.json()).toEqual({ erreur: 'ACCES_RESERVE' });
+  });
+
+  it('refuse un secret de drainage faux', async () => {
+    // Même longueur, même forme, un caractère de moins au bout : ce qu'une
+    // troncature au collage produit. Sans ce test, une comparaison sur un
+    // préfixe passerait.
+    const reponse = await appeler(CLE_SERVICE, SECRET_DRAINAGE.slice(0, -1));
+
+    expect(reponse.status).toBe(403);
+    expect(await reponse.json()).toEqual({ erreur: 'ACCES_RESERVE' });
+  });
+
+  it('accepte le secret de drainage, et laisse la file intacte sans passerelle', async () => {
     const id = await poser();
 
-    const reponse = await appeler(CLE_SERVICE);
+    const reponse = await appeler(CLE_SERVICE, SECRET_DRAINAGE);
 
     expect(reponse.status).toBe(200);
     expect(await reponse.json()).toMatchObject({ etat: 'PASSERELLE_NON_CONFIGUREE' });
     // Aucun envoi simulé, aucune ligne marquée : la file repartira telle quelle
     // le jour où les identifiants arriveront.
     expect(await lire(id)).toMatchObject({ statut: 'a_envoyer', tentatives: 0 });
+  });
+
+  it('n’exige plus rien du porteur — c’est voulu, et c’est le correctif', async () => {
+    // La clé publiable ouvre, dès lors que l'en-tête est bon. Ça se lit mal et
+    // c'est pourtant le point : la porte ne dépend plus d'une clé dont la
+    // rotation ne nous appartient pas. Ce qu'elle protège tient entièrement au
+    // secret de drainage, qui n'est publié nulle part — contrairement à la clé
+    // publiable, servie dans le paquet JavaScript des trois sites.
+    const reponse = await appeler(CLE_PUBLIABLE, SECRET_DRAINAGE);
+
+    expect(reponse.status).toBe(200);
+  });
+});
+
+describe('le secret de drainage, des deux côtés', () => {
+  it('n’est pas un vrai secret dans le fichier versionné', () => {
+    // `supabase/functions/.env` est commité — voir `.gitignore` — parce que le
+    // runtime local le lit au démarrage et qu'une machine neuve serait rouge
+    // sans lui. Le prix de cette exception est ce contrôle : le jour où
+    // quelqu'un y colle le secret de production, la suite le dit avant que git
+    // ne le publie.
+    expect(SECRET_DRAINAGE).toMatch(/^test_local_/);
+    // Assez long pour que `avis_declencher_drainage()` l'accepte : sinon le
+    // fichier passerait ce test et la fonction SQL le rejetterait en
+    // `SECRET_DRAINAGE_COURT`, hors de portée de toute mesure d'ici.
+    expect(SECRET_DRAINAGE.length).toBeGreaterThanOrEqual(32);
+  });
+
+  it('est présenté par l’horloge dans l’en-tête, et lu dans Vault', () => {
+    // Lecture du source : `avis_declencher_drainage()` est révoquée pour
+    // `service_role` (test suivant), donc le harnais ne peut pas l'exécuter, et
+    // aucune mesure d'ici ne peut voir ce qu'elle envoie. Ça ne vaut pas une
+    // mesure ; c'est écrit pour qu'on ne le prenne pas pour une.
+    //
+    // Ce qu'il couvre est précis : un retour au couplage d'avant, où l'horloge
+    // ne présentait que la clé de service, laisserait tout le reste au vert
+    // puisque la porte, elle, accepte n'importe quel porteur.
+    const source = readFileSync(
+      'supabase/migrations/20260904090000_avis_secret_dedie.sql',
+      'utf8',
+    );
+
+    expect(source).toContain("name = 'kolek_secret_drainage'");
+    expect(source).toContain("'x-kolek-drainage', secret");
+  });
+
+  it('n’est pas atteignable par le porteur de la clé de service', async () => {
+    // L'horloge tourne en `postgres`. Si `service_role` pouvait l'appeler,
+    // n'importe quel détenteur de la clé de service déclencherait un drainage —
+    // et surtout ferait sortir de Vault, en clair dans un en-tête HTTP, un
+    // secret que rien d'autre ne lui donnerait.
+    const { error } = await admin.rpc('avis_declencher_drainage');
+
+    expect(error).not.toBeNull();
   });
 });
 

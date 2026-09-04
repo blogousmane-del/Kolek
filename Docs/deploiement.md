@@ -1144,29 +1144,123 @@ Les deux refus se lisent différemment, et la distinction dit où chercher :
                                      la clé de service
 ```
 
-Un **403** en production veut donc dire que `kolek_cle_service` ne contient plus
-la bonne clé — c'est exactement l'incident du 2026-08-28, où le secret a reçu le
-gabarit non remplacé puis la clé publiable. Le contrôle de plausibilité de
-`avis_declencher_drainage()` écarte ces deux valeurs-là avant même de partir, en
-rendant `SECRET_INVALIDE` ; un 403 signale ce qu'il ne peut pas voir : une clé
-bien formée mais périmée, par exemple après une rotation.
+Un **403** veut dire que ce que l'horloge présente n'est pas ce que la fonction
+attend.
 
 ```sql
 -- Ce que l'horloge répond, sans rien envoyer si la file est vide.
 select public.avis_declencher_drainage();
---  FILE_VIDE | SECRETS_ABSENTS | SECRET_INVALIDE | ADRESSE_INVALIDE | DEMANDE
+--  FILE_VIDE | SECRETS_ABSENTS | SECRET_DRAINAGE_ABSENT | SECRET_INVALIDE
+--  | SECRET_DRAINAGE_COURT | ADRESSE_INVALIDE | DEMANDE
 ```
 
-Après une rotation de la clé de service, reposer le secret :
+### 8.2 Le secret de drainage, et pourquoi ce n'est plus la clé de service
+
+**Ce qui s'est passé le 2026-09-04.** La première version de cette porte
+comparait le porteur à `SUPABASE_SERVICE_ROLE_KEY`, en tenant cette variable
+pour la valeur que l'horloge sort de Vault. Ce sont deux choses différentes, et
+la plateforme le dit elle-même — l'inspection du runtime Edge donne :
+
+```
+SUPABASE_SERVICE_ROLE_KEY      = eyJhbGciOiJI...   (JWT hérité)
+SUPABASE_INTERNAL_SECRET_KEY   = sb_secret_...     (forme du 2026-08-28)
+```
+
+Vault porte `sb_secret_` depuis la migration des clés. La comparaison ne pouvait
+donc plus réussir : le drainage s'est arrêté net au déploiement de la version 30,
+à 07:50 UTC, en rendant `403 ACCES_RESERVE` à chaque réveil de l'horloge — sans
+autre trace que `net._http_response`.
+
+**Le correctif ne vise pas l'autre variable.** `SUPABASE_INTERNAL_SECRET_KEY`
+porte `INTERNAL` dans son nom : elle appartient à la plateforme et n'est pas
+contractuelle. Surtout, le défaut de fond est ailleurs — une porte dont la clé
+est tournée par quelqu'un d'autre casse à la rotation suivante, et
+`kolek_cle_service` en est à son troisième incident depuis le 2026-08-28.
+
+L'horloge n'a pas à prouver qu'elle détient la clé de service. Elle a à prouver
+qu'elle est l'horloge. C'est un secret partagé, posé **des deux côtés par
+nous** :
+
+| Où | Nom | Posé par |
+|---|---|---|
+| Vault | `kolek_secret_drainage` | `vault.create_secret`, éditeur SQL |
+| Edge Functions | `DRAINAGE_SECRET` | `supabase secrets set` |
+| Runtime local | `supabase/functions/.env` | commité, valeur de test |
+
+`Authorization` continue de porter `kolek_cle_service`, dont le seul rôle est
+désormais de traverser `verify_jwt` — `envoyer-avis` le garde, seul
+`chariow-webhook` en est dispensé. Le contrôle réel se fait sur
+`x-kolek-drainage`. Rien ne change au déploiement : pas de `--no-verify-jwt` à
+ne pas oublier, dont l'oubli arrêterait le drainage exactement comme ce matin.
+
+### 8.3 Poser le secret — les trois gestes, dans cet ordre
+
+**1. Le générer.** Une fois, n'importe où hors du dépôt :
+
+```bash
+openssl rand -hex 32
+```
+
+**2. Le poser côté fonction.** Sans historique de terminal :
+
+```powershell
+$s = Read-Host -AsSecureString "Secret de drainage"
+$v = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+  [Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))
+npx.cmd supabase secrets set DRAINAGE_SECRET="$v"
+```
+
+**3. Le poser côté horloge.** Éditeur SQL du tableau de bord, jamais un terminal
+local :
 
 ```sql
-select vault.update_secret(
-  (select id from vault.secrets where name = 'kolek_cle_service'),
-  '<la nouvelle clé>'
-);
+select vault.create_secret('<le secret>', 'kolek_secret_drainage');
+-- S'il existe déjà :
+-- select vault.update_secret(
+--   (select id from vault.secrets where name = 'kolek_secret_drainage'), '<le secret>');
 ```
 
-### 8.2 L'ordre, pour cette livraison-là en particulier
+Vérifier sans divulguer :
+
+```sql
+select name, length(decrypted_secret) as longueur
+  from vault.decrypted_secrets
+ where name = 'kolek_secret_drainage';
+-- Attendu : 64 (openssl rand -hex 32).
+```
+
+**L'ordre compte.** Le secret côté fonction d'abord : une fonction sans
+`DRAINAGE_SECRET` rend `500 CONFIGURATION` et refuse tout le monde, ce qui est
+voulu — un secret absent ferme la porte, il ne l'ouvre pas. Un Vault sans
+`kolek_secret_drainage` fait rendre `SECRET_DRAINAGE_ABSENT` à l'horloge, qui
+n'appelle alors personne. Dans les deux cas la file reste intacte.
+
+### 8.4 Éprouver, sans déranger un client
+
+La sonde ne lit pas la file et n'envoie rien. C'est le seul appel qui mesure la
+porte sans risquer un SMS :
+
+```bash
+curl -s -X POST "https://<projet>.supabase.co/functions/v1/envoyer-avis" \
+  -H "Authorization: Bearer <clé publiable>" \
+  -H "x-kolek-drainage: <le secret>" \
+  -H "Content-Type: application/json" \
+  -d '{"sonde": true}'
+```
+
+`{"etat":"SONDE",...}` = la porte s'ouvre. `{"erreur":"ACCES_RESERVE"}` = les deux
+côtés ne portent pas la même valeur.
+
+Puis, de bout en bout, en remettant une ligne dans la file et en attendant une
+minute :
+
+```sql
+select created, status_code, content
+  from net._http_response
+ order by created desc limit 3;
+```
+
+### 8.5 L'ordre, pour la livraison du 2026-09-03
 
 `20260903120000_avis_drainage_ferme` crée `avis_reserver_lot`, dont la nouvelle
 version d'`envoyer-avis` dépend entièrement. Déployer la fonction avant la

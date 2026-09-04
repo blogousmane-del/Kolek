@@ -23,11 +23,28 @@ import { secretValide } from '../_shared/secret.ts';
  * par accident. Jusqu'au 2026-09-03, cette fonction ne contrôlait donc que la
  * méthode HTTP : n'importe qui pouvait déclencher un drainage.
  *
- * L'appelant légitime est `avis_declencher_drainage()`, qui lit la clé de
- * service dans Vault et la présente en porteur. C'est cette clé, et elle seule,
- * qui ouvre ici — comparée à temps constant, parce qu'une comparaison qui
- * s'arrête au premier caractère différent dit combien de caractères étaient
+ * L'appelant légitime est `avis_declencher_drainage()`, qui présente le secret
+ * `kolek_secret_drainage` dans l'en-tête `x-kolek-drainage`. C'est ce secret, et
+ * lui seul, qui ouvre ici — comparé à temps constant, parce qu'une comparaison
+ * qui s'arrête au premier caractère différent dit combien de caractères étaient
  * bons.
+ *
+ * ## Pourquoi ce n'est plus la clé de service — le défaut du 2026-09-04
+ *
+ * Cette porte a d'abord comparé le porteur à `SUPABASE_SERVICE_ROLE_KEY`, en
+ * tenant cette variable pour la valeur que l'horloge sort de Vault. Ce sont deux
+ * choses différentes, et la plateforme le dit elle-même : elle expose
+ * `SUPABASE_SERVICE_ROLE_KEY = eyJ…` (le JWT hérité) à côté de
+ * `SUPABASE_INTERNAL_SECRET_KEY = sb_secret_…`. Vault porte la seconde forme
+ * depuis le 2026-08-28. Le drainage s'est donc arrêté net au déploiement, en
+ * `403`, sans que rien d'autre que `net._http_response` ne l'écrive.
+ *
+ * Le correctif ne consiste pas à viser l'autre variable. Une porte dont la clé
+ * est tournée par quelqu'un d'autre casse à la rotation suivante ; un secret
+ * partagé, posé des deux côtés par nous, ne casse qu'à notre demande.
+ *
+ * `SUPABASE_SERVICE_ROLE_KEY` reste lue — mais pour ce qu'elle est : le jeton
+ * avec lequel cette fonction parle à sa propre base, pas une preuve d'identité.
  *
  * Le contrôle passe **avant** l'examen de la passerelle : sinon un appelant sans
  * droit apprendrait, par la seule différence entre deux réponses, si les
@@ -100,17 +117,27 @@ Deno.serve(async (requete) => {
 
   const url = Deno.env.get('SUPABASE_URL');
   const cleService = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const secretDrainage = Deno.env.get('DRAINAGE_SECRET');
   if (!url || !cleService) {
     console.error('Configuration Supabase incomplète.');
     return reponse({ erreur: 'CONFIGURATION' }, 500);
   }
 
-  // Voir l'en-tête. Le porteur attendu est la clé de service, celle que
-  // `avis_declencher_drainage()` sort de Vault — pas la clé publiable, que
-  // `verify_jwt` a déjà laissé passer.
-  const porteur = requete.headers.get('Authorization')?.replace(/^Bearer /, '') ?? null;
-  if (!(await secretValide(porteur, cleService))) {
-    console.error('Appel refusé : porteur absent ou différent de la clé de service.');
+  // Un secret absent ferme la porte, il ne l'ouvre pas. Le repli sur l'ancienne
+  // comparaison aurait rendu le déploiement plus doux et le défaut invisible :
+  // la fonction aurait continué de rendre 403 en donnant l'air de marcher.
+  if (!secretDrainage) {
+    console.error('DRAINAGE_SECRET absent — la porte reste fermée.');
+    return reponse({ erreur: 'CONFIGURATION' }, 500);
+  }
+
+  // Voir l'en-tête. Ce que la plateforme a laissé passer par `verify_jwt` ne
+  // prouve rien : la clé publiable la franchit, et elle voyage dans le paquet
+  // JavaScript des trois sites. Seul cet en-tête-ci dit que l'appelant est
+  // l'horloge.
+  const presente = requete.headers.get('x-kolek-drainage');
+  if (!(await secretValide(presente, secretDrainage))) {
+    console.error('Appel refusé : en-tête x-kolek-drainage absent ou faux.');
     return reponse({ erreur: 'ACCES_RESERVE' }, 403);
   }
 

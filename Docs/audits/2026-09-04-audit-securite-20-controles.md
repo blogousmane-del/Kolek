@@ -61,6 +61,36 @@ mesuré le comportement passait avec la clause retirée, PostgREST sérialisant 
 appels : il a été supprimé plutôt que gardé. Un contrôle qui ne peut pas échouer
 pour la bonne raison n'est pas un contrôle.
 
+#### Correction du 2026-09-04, après déploiement — le code cité ci-dessus était faux
+
+Ce paragraphe a été écrit avant que quoi que ce soit ne soit en ligne. Déployée
+le 2026-09-04 à 07:50 UTC, la porte a refusé **l'horloge elle-même** : `403
+ACCES_RESERVE` à chaque réveil, mesuré dans `net._http_response` à 08:12 et 08:13.
+
+`cleService` vaut `SUPABASE_SERVICE_ROLE_KEY`, que la plateforme injecte, tandis
+que `avis_declencher_drainage()` présente ce que Vault contient. Les deux ont été
+tenues pour la même valeur ; elles ne le sont pas. Le runtime expose
+`SUPABASE_SERVICE_ROLE_KEY = eyJ…` (JWT hérité) à côté de
+`SUPABASE_INTERNAL_SECRET_KEY = sb_secret_…`, et Vault porte la seconde forme
+depuis le 2026-08-28 — vérifié : préfixe `sb_secret_`, 41 caractères.
+
+**Ce qui était juste, et ce qui ne l'était pas.** La faille de sécurité était
+bien fermée : la clé publiable ne passait plus. C'est la disponibilité qui est
+tombée — la porte refusait tout le monde, l'appelant légitime compris. Un audit
+de sécurité qui ne regarde que « qui est refusé » ne voit pas cette moitié-là.
+
+**Ce que la suite de tests n'a pas vu, et pourquoi.** `avis-drainage.test.ts`
+présentait `SUPABASE_SERVICE_ROLE_KEY` en porteur — la variable que la fonction
+lisait elle-même. Il mesurait la fonction contre sa propre constante, jamais
+contre ce que l'appelant réel envoie. Le défaut était donc reproductible en
+local depuis le premier jour ; c'est le test qui regardait ailleurs.
+
+Corrigé par `20260904090000_avis_secret_dedie` : un secret partagé dédié,
+`kolek_secret_drainage` côté Vault et `DRAINAGE_SECRET` côté fonction, présenté
+dans l'en-tête `x-kolek-drainage`. Plus aucune rotation de clé Supabase ne touche
+cette porte. Le test qui manquait — `refuse la clé de service seule` — échoue
+bien quand on réintroduit l'ancien couplage, vérifié.
+
 ### L'empreinte de mot de passe ne sort par aucune des trois portes
 
 `demandes_ouverture.mot_de_passe_hash` est né le 2026-09-03. Trois sorties

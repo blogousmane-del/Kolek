@@ -17,6 +17,14 @@ build/
 .env.*
 !.env.example
 
+# L'exception, et sa raison. Le runtime Edge local lit ce fichier au démarrage
+# de la pile : sans lui, `DRAINAGE_SECRET` est absent, `envoyer-avis` ferme sa
+# porte en 500, et toute la suite d'avis tombe sur une machine neuve sans que
+# rien ne dise pourquoi. La valeur qu'il porte n'ouvre rien — en production le
+# secret vient de `supabase secrets set`, et `avis-drainage.test.ts` refuse que
+# ce fichier contienne autre chose qu'une valeur de test.
+!supabase/functions/.env
+
 # Netlify — état local de liaison site/dossier, propre à la machine
 .netlify/
 
