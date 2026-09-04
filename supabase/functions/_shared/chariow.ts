@@ -1,4 +1,5 @@
 import { TARIFS } from './paliers.ts';
+import { secretValide } from './secret.ts';
 
 /**
  * Le contrat Chariow, réduit à ce que Kolek en utilise.
@@ -246,4 +247,60 @@ export function couperNom(complet: string): { prenom: string; nomFamille: string
     prenom: morceaux[0] ?? 'Collecteur',
     nomFamille: morceaux.length > 1 ? morceaux.slice(1).join(' ') : 'Kolek',
   };
+}
+
+/**
+ * La signature que Chariow pose sur le corps de ses « Pulses ».
+ *
+ * `x-chariow-signature` vaut `sha256=` suivi du HMAC-SHA256 du **corps brut**,
+ * clé par le secret de signature du Pulse — un `whsec_…` propre à chaque
+ * destination, distinct de la clé d'API et de tout ce qui traverse l'URL.
+ *
+ * ## Pourquoi le corps brut, et pas l'objet
+ *
+ * Chariow sérialise en JSON compact avec les barres obliques échappées
+ * (`https:\/\/`) et le non-ASCII en `\uXXXX`. Re-sérialiser l'objet analysé
+ * produirait d'autres octets, donc une autre empreinte, et la signature ne
+ * correspondrait jamais — une porte fermée en permanence, pour une raison qu'on
+ * ne trouve qu'en comparant deux chaînes caractère par caractère.
+ *
+ * ## Ce qu'elle ajoute au secret de l'URL, et ce qu'elle n'ajoute pas
+ *
+ * Elle **n'empêche pas** un crédit frauduleux : `reconcilier` ne croit pas le
+ * corps reçu — il relit la vente chez Chariow et ne recharge que les paiements
+ * `en_attente` ou `echoue`. Un `successful.sale` forgé ne crédite donc rien.
+ *
+ * Elle empêche ce que le secret d'URL laisse passer : un tiers qui découvre
+ * l'adresse — un journal du fournisseur, une capture — peut désigner des lignes
+ * et faire consommer des lectures d'API à notre quota. Et c'est le contrôle que
+ * le fournisseur prescrit : s'en passer, c'est ignorer la seule preuve
+ * d'origine qu'il émet.
+ *
+ * Les deux barrières restent, dans cet ordre : le secret d'URL écarte le bruit
+ * sans calcul, la signature répond de l'origine.
+ */
+export async function signatureChariowValide(
+  entete: string | null,
+  corpsBrut: string,
+  secret: string,
+): Promise<boolean> {
+  if (!secret || !entete) return false;
+
+  const encodeur = new TextEncoder();
+  const cle = await crypto.subtle.importKey(
+    'raw',
+    encodeur.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const brut = await crypto.subtle.sign('HMAC', cle, encodeur.encode(corpsBrut));
+  const attendu = `sha256=${[...new Uint8Array(brut)]
+    .map((octet) => octet.toString(16).padStart(2, '0'))
+    .join('')}`;
+
+  // Comparaison en temps constant, comme partout ailleurs : une comparaison qui
+  // s'arrête au premier caractère différent dit combien de caractères étaient
+  // bons, et une signature se reconstitue alors octet par octet.
+  return secretValide(entete, attendu);
 }

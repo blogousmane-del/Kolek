@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
+import { signatureChariowValide } from '../_shared/chariow.ts';
 import { chargerPaiementsRattrapables, creerDepot, type Cible } from '../_shared/depot-chariow.ts';
 import { ouvrirCompteDepuisDemande } from '../_shared/ouvrir-compte.ts';
 import { reconcilier } from '../_shared/reconciliation.ts';
@@ -68,6 +69,22 @@ Deno.serve(async (requete) => {
     return reponse({ erreur: 'SECRET_INVALIDE' }, 401);
   }
 
+  // Le corps brut, lu **avant** tout parsing : la signature porte sur les
+  // octets reçus, et `JSON.stringify` d'un objet analysé n'en rend pas les
+  // mêmes. Une seule lecture est possible sur un Request — d'où le `text()`
+  // ici et le `JSON.parse` plus bas, au lieu du `json()` d'avant.
+  const corpsBrut = await requete.text();
+
+  // La barrière que le fournisseur prescrit. Fail-closed comme le secret d'URL :
+  // sans `CHARIOW_SECRET_SIGNATURE`, `signatureChariowValide` refuse tout. Une
+  // fonction déployée avant son secret ne s'ouvre à personne.
+  const signature = requete.headers.get('x-chariow-signature');
+  const secretSignature = Deno.env.get('CHARIOW_SECRET_SIGNATURE') ?? '';
+
+  if (!(await signatureChariowValide(signature, corpsBrut, secretSignature))) {
+    return reponse({ erreur: 'SIGNATURE_INVALIDE' }, 401);
+  }
+
   const url = Deno.env.get('SUPABASE_URL');
   const cleService = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const cleApi = Deno.env.get('CHARIOW_CLE_API');
@@ -80,7 +97,7 @@ Deno.serve(async (requete) => {
 
   let charge: Record<string, unknown>;
   try {
-    charge = (await requete.json()) as Record<string, unknown>;
+    charge = JSON.parse(corpsBrut) as Record<string, unknown>;
   } catch {
     // Corps illisible : on accuse réception sans rien faire. Réessayer
     // n'améliorerait pas un corps mal formé.

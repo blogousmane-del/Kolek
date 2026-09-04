@@ -993,19 +993,37 @@ exact qui a motivé la livraison. Le 2026-09-02, c'était d'ouvrir une carte à
 
 ## 7. Le paiement d'abonnement (J5)
 
-Cette section décrit un dispositif **qui n'est pas encore en ligne**. Les
-fonctions `abonnement-payer`, `abonnement-verifier`, `chariow-webhook` et
-`demander-ouverture` existent dans le dépôt depuis le 2026-09-03 et sont
-couvertes par la suite de tests ; **aucune n'est déployée**, et aucun secret
-Chariow n'est posé sur le projet. Rien n'encaisse tant que les deux ne sont pas
-faits. Cette section est là pour que ce jour-là, personne n'ait à redécouvrir
-les six pièges ci-dessous.
+**En ligne depuis le 2026-09-04.** Les quatre secrets Chariow sont posés, les
+dix-neuf Edge Functions sont déployées, et les trois portes ont été mesurées :
+
+| Appel | Réponse |
+|---|---|
+| `chariow-webhook` sans secret, ou avec un faux | `401 {"erreur":"SECRET_INVALIDE"}` |
+| `abonnement-payer` sans jeton | `401 {"erreur":"JETON_ABSENT"}` |
+| `abonnement-verifier` sans jeton | `401 {"erreur":"JETON_ABSENT"}` |
+
+Ces corps-là viennent de **notre** code et non de la plateforme : c'est ce qui
+prouve que `verify_jwt = false` a bien été lu depuis `config.toml` pour le
+webhook, sans qu'un `--no-verify-jwt` ait eu à être pensé au déploiement.
+
+**Ce qui reste avant qu'un franc n'entre :** l'URL du webhook doit être collée
+chez Chariow (§7.4), et aucun paiement réel n'a encore été passé de bout en
+bout. Tant que ce test n'est pas fait, `product_id` reste une hypothèse — voir
+§7.1.
+
+Cette section garde les six pièges ci-dessous, parce qu'ils se redécouvrent à
+chaque rotation de clé ou changement de boutique.
 
 ### 7.1 Ce qui se fait à la main chez Chariow, une fois
 
 1. Créer **trois produits** dans la boutique GTCS, aux prix exacts de la grille
    (`packages/core/src/paliers.ts`) : Standard 2 500, Pro 5 000, Illimité
-   10 000 FCFA. Aucun montant libre ne passe par l'API — Chariow débite le prix
+   10 000 FCFA. L'identifiant relevé le 2026-09-04 a la forme `prd_…` — non
+   `prod_…`, que cette section écrivait — et c'est le dernier segment du lien
+   de paiement hébergé, pas le lien entier : `creerVenteChariow` l'envoie tel
+   quel en `product_id` à `api.chariow.com/v1/checkout`. **Non vérifié** tant
+   qu'aucun paiement réel n'a abouti ; un identifiant que l'API ne reconnaît pas
+   rend `422`, que le code traduit en `SAISIE_REFUSEE`. Aucun montant libre ne passe par l'API — Chariow débite le prix
    de son produit, et un code de remise est le seul moyen de le réduire. Un prix
    qui diverge de la grille est signalé au journal (`GRILLE — …`) sans bloquer
    le collecteur, qui n'y est pour rien.
