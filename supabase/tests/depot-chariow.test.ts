@@ -6,6 +6,7 @@ import {
   creerDepot,
   creerVenteChariow,
   lireVenteChariow,
+  refusDeChariow,
 } from '../functions/_shared/depot-chariow';
 import { couperNom } from '../functions/_shared/chariow';
 import { admin, creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
@@ -370,6 +371,27 @@ describe('creerVenteChariow', () => {
     });
   });
 
+  it('ne dit pas « réessaie » devant une clé refusée ni un produit absent', async () => {
+    // Le défaut du 2026-09-04, vu par un collecteur : « Le service de paiement
+    // ne répond pas. Réessaie dans un moment. » devant un 401. Réessayer ne
+    // corrige pas une clé, et la seule personne qui pouvait agir n'était pas
+    // prévenue.
+    vi.stubGlobal('fetch', vi.fn(async () => repondre({ error: 'Unauthorised' }, 401)));
+    expect(await creerVenteChariow(SAISIE, OPTIONS)).toMatchObject({
+      ok: false,
+      erreur: 'CLE_CHARIOW_REFUSEE',
+    });
+
+    // Le plus traître des trois : un produit créé mais laissé en brouillon rend
+    // le même 404 qu'un identifiant faux, et l'ancien code les traduisait tous
+    // deux en panne passagère.
+    vi.stubGlobal('fetch', vi.fn(async () => repondre({ error: 'Product not found' }, 404)));
+    expect(await creerVenteChariow(SAISIE, OPTIONS)).toMatchObject({
+      ok: false,
+      erreur: 'PRODUIT_INTROUVABLE',
+    });
+  });
+
   it('ne rend jamais de lien sur une réponse incomplète', async () => {
     // Ce que ce test empêche : envoyer quelqu'un vers une page qui n'existe
     // pas, ou enregistrer une vente qu'on ne saurait rattacher à personne.
@@ -445,5 +467,41 @@ describe('couperNom', () => {
 
   it('ne laisse pas des espaces multiples fabriquer un nom vide', () => {
     expect(couperNom('  Mariam    Koné  ')).toEqual({ prenom: 'Mariam', nomFamille: 'Koné' });
+  });
+});
+
+/**
+ * La table des refus, prise à part.
+ *
+ * `creerVenteChariow` la traverse au travers d'un `fetch` simulé ; ici elle est
+ * appelée seule, ce qui permet de couvrir les statuts qu'un test de bout en
+ * bout ne prendrait pas la peine de simuler. Le cas `403` en est un : Chariow
+ * ne le documente pas, mais une passerelle intermédiaire peut le rendre, et le
+ * traiter comme une panne passagère renverrait « réessaie » à quelqu'un dont la
+ * clé est en cause.
+ */
+describe('refusDeChariow', () => {
+  it.each([
+    [401, 'CLE_CHARIOW_REFUSEE', 500],
+    [403, 'CLE_CHARIOW_REFUSEE', 500],
+    [404, 'PRODUIT_INTROUVABLE', 500],
+    [422, 'SAISIE_REFUSEE', 400],
+    [429, 'CHECKOUT_IMPOSSIBLE', 502],
+    [500, 'CHECKOUT_IMPOSSIBLE', 502],
+    [503, 'CHECKOUT_IMPOSSIBLE', 502],
+  ])('traduit %i en %s', (statut, erreur, rendu) => {
+    expect(refusDeChariow(statut as number)).toEqual({ ok: false, erreur, statut: rendu });
+  });
+
+  it('ne dit « réessaie » que là où réessayer peut marcher', () => {
+    // La propriété qui compte, énoncée une fois plutôt que déduite de sept
+    // lignes : un refus qu'aucune attente ne corrigera ne doit pas porter le
+    // message qui invite à attendre.
+    const definitifs = [401, 403, 404, 422];
+    for (const statut of definitifs) {
+      expect(refusDeChariow(statut).ok === false && refusDeChariow(statut).erreur).not.toBe(
+        'CHECKOUT_IMPOSSIBLE',
+      );
+    }
   });
 });

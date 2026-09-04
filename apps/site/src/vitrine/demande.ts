@@ -80,6 +80,10 @@ const MESSAGES: Record<string, string> = {
   TELEPHONE_INVALIDE: 'Ce numéro n’est pas utilisable pour le paiement. Vérifie le pays et le numéro.',
   PAIEMENT_INDISPONIBLE:
     'Le paiement en ligne est indisponible pour le moment. Réessaie plus tard, ou écris à GTCS.',
+  CLE_CHARIOW_REFUSEE:
+    'Le paiement n’est pas disponible pour l’instant. Ta demande est enregistrée — nous te recontactons.',
+  PRODUIT_INTROUVABLE:
+    'Cette formule n’est pas en vente pour l’instant. Ta demande est enregistrée — nous te recontactons.',
   CHECKOUT_IMPOSSIBLE: 'Le service de paiement ne répond pas. Ta demande est enregistrée — réessaie dans un moment.',
   CHECKOUT_INCOMPLET: 'Le service de paiement a répondu incomplètement. Ta demande est enregistrée — réessaie.',
   METHODE_NON_AUTORISEE: 'La demande n’a pas pu être lue. Réessaie.',

@@ -32,6 +32,11 @@ const MESSAGES: Record<string, string> = {
   FICHE_INTROUVABLE: 'Ta fiche est introuvable. Contacte GTCS.',
   ABONNEMENT_DU_TITULAIRE: 'Ton abonnement est payé par ton titulaire. Tu n’as rien à régler.',
   CHECKOUT_IMPOSSIBLE: 'Le service de paiement ne répond pas. Réessaie dans un moment.',
+  // Deux refus que « réessaie » ne corrigerait jamais. Ils ne nomment pas la
+  // cause à l'écran — un inconnu n'a pas à apprendre l'état de notre boutique —
+  // mais ils envoient chercher la bonne personne.
+  CLE_CHARIOW_REFUSEE: 'Le paiement n’est pas configuré. Préviens GTCS.',
+  PRODUIT_INTROUVABLE: 'Cette formule n’est pas en vente pour l’instant. Préviens GTCS.',
   CHECKOUT_INCOMPLET: 'Le service de paiement a répondu incomplètement. Réessaie.',
   ENREGISTREMENT_IMPOSSIBLE:
     'Le paiement n’a pas pu être enregistré chez nous. N’envoie pas d’argent — préviens GTCS.',

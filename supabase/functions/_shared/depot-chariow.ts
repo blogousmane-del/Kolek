@@ -238,6 +238,49 @@ export type IssueVente =
  * ce que nous espérions plutôt que ce que la boutique a dit ferait de ce
  * contrôle une tautologie.
  */
+/**
+ * Ce que veut dire un refus de Chariow, statut par statut.
+ *
+ * ## Le défaut que ceci corrige, mesuré le 2026-09-04
+ *
+ * Seul `422` était distingué ; tout le reste devenait `CHECKOUT_IMPOSSIBLE`,
+ * dont le message dit « le service ne répond pas, réessaie dans un moment ».
+ * Un collecteur a donc lu ça devant une clé d'API refusée — un cas où réessayer
+ * ne changera jamais rien, et où la personne capable d'agir n'est pas prévenue.
+ *
+ * La documentation du fournisseur nomme trois refus, et ils n'appellent pas la
+ * même personne :
+ *
+ * | Statut | Ce que Chariow dit | Qui peut corriger |
+ * |---|---|---|
+ * | `401` | `Unauthorised` — clé absente ou invalide | GTCS, dans les secrets |
+ * | `404` | `Product not found` — identifiant inconnu **ou produit non publié** | GTCS, dans la boutique |
+ * | `422` | saisie refusée | celui qui paie |
+ *
+ * Le `404` est le plus traître : un produit créé mais laissé en brouillon rend
+ * exactement la même chose qu'un identifiant faux, et l'ancien code traduisait
+ * les deux en « le service ne répond pas ».
+ *
+ * Ce que l'utilisateur lit ne dit jamais laquelle des deux configurations
+ * cloche — il n'a pas à le savoir, et l'écrire à l'écran renseignerait un
+ * inconnu sur l'état de notre boutique. Le journal, lui, porte le statut et le
+ * corps de la réponse.
+ */
+export function refusDeChariow(statut: number): IssueVente {
+  if (statut === 401 || statut === 403) {
+    return { ok: false, erreur: 'CLE_CHARIOW_REFUSEE', statut: 500 };
+  }
+  if (statut === 404) {
+    return { ok: false, erreur: 'PRODUIT_INTROUVABLE', statut: 500 };
+  }
+  if (statut === 422) {
+    return { ok: false, erreur: 'SAISIE_REFUSEE', statut: 400 };
+  }
+  // Tout le reste — 5xx, 429, un statut qu'ils ajouteraient demain. Celui-là
+  // seul mérite « réessaie » : c'est le seul où réessayer peut marcher.
+  return { ok: false, erreur: 'CHECKOUT_IMPOSSIBLE', statut: 502 };
+}
+
 export async function creerVenteChariow(
   saisie: SaisieVente,
   options: OptionsChariow,
@@ -271,12 +314,7 @@ export async function creerVenteChariow(
   if (!appel.ok) {
     const detail = await appel.text().catch(() => '');
     console.error('[Abonnement] checkout refusé :', appel.status, detail.slice(0, 300));
-    // 422 : le fournisseur a refusé la saisie — le seul cas qu'il vaille la
-    // peine de distinguer pour celui qui paie, parce que c'est le seul qu'il
-    // puisse corriger lui-même.
-    return appel.status === 422
-      ? { ok: false, erreur: 'SAISIE_REFUSEE', statut: 400 }
-      : { ok: false, erreur: 'CHECKOUT_IMPOSSIBLE', statut: 502 };
+    return refusDeChariow(appel.status);
   }
 
   let corps: {
