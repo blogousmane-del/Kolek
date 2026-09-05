@@ -1,5 +1,5 @@
 import { PALIERS, formatMontant, type Palier } from '@kolek/core';
-import { Onde, PAYS_TELEPHONE, Rosace, lireTelephone } from '@kolek/ui';
+import { Icone, Onde, PAYS_TELEPHONE, Rosace, lireTelephone } from '@kolek/ui';
 import { useState } from 'react';
 
 import { entree, useAnimations } from './animation';
@@ -156,17 +156,22 @@ export function Inscription() {
       />
 
       <div className="relative z-10 mx-auto max-w-xl">
+        {/* La flèche est une icône, plus le caractère `←`. Un glyphe
+            typographique employé comme pictogramme change de dessin et de chasse
+            d'une police système à l'autre ; celui-ci portait en plus l'espace
+            avant le libellé, que `gap-2` dessinait déjà. */}
         <a
           href="/"
           className="mb-8 inline-flex items-center gap-2 font-body text-sm text-white/50 transition-colors hover:text-white"
         >
-          ← Retour à l’accueil
+          <Icone nom="arrow-left" taille={15} />
+          Retour à l’accueil
         </a>
 
         {envoyee ? (
-          <div className="rounded-[2rem] border border-or/30 bg-white/[0.04] p-8 backdrop-blur-xl">
+          <div className="rounded-3xl border border-or/30 bg-white/[0.04] p-8 backdrop-blur-xl">
             <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-pill bg-or">
-              <span className="text-2xl text-dark-canvas">✓</span>
+              <Icone nom="check" taille={26} className="text-dark-canvas" />
             </div>
             <h1 className="mb-3 font-headings text-3xl font-bold text-white">Demande enregistrée</h1>
             <p className="mb-6 font-body text-base leading-relaxed text-white/60">
@@ -199,14 +204,14 @@ export function Inscription() {
                 suivante, quand rien ne s'ouvre. */}
             <p data-entree className="mb-8 font-body text-base leading-relaxed text-white/60">
               {payant
-                ? 'Choisis ta formule, règle par Mobile Money, et ton compte s’ouvre dès le paiement confirmé — sans attendre de rappel.'
+                ? 'Choisis ta formule, règle par Mobile Money, et ton compte s’ouvre dès le paiement confirmé. Sans attendre de rappel.'
                 : 'L’essai est gratuit et se demande ici : GTCS te rappelle, ouvre ton compte, et tu encaisses dès le lendemain.'}
             </p>
 
             <form
               data-entree
               onSubmit={soumettre}
-              className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8"
+              className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8"
             >
               <div className="mb-4">
                 <Etiquette pour="nom">Ton nom complet</Etiquette>
@@ -369,7 +374,7 @@ export function Inscription() {
                   />
                   <p className="mt-1.5 font-body text-xs text-white/55">
                     C’est celui avec lequel tu ouvriras l’application. Ton compte se crée dès le
-                    paiement confirmé — personne ne te rappellera pour te donner un accès.
+                    paiement confirmé : personne ne te rappellera pour te donner un accès.
                   </p>
                 </div>
               )}

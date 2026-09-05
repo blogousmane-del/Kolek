@@ -44,6 +44,10 @@ export function Telephone({ className }: { className?: string }) {
       {/* Le châssis. Une lueur or plutôt qu'une ombre noire : sur un fond vert
           coffre, une ombre neutre creuse un trou là où un halo chaud pose un
           objet. */}
+      {/* Le châssis, seconde exception à l'échelle des rayons — voir `rayons`
+          dans `tokens.ts`. 44 px à l'extérieur, 36 px à l'intérieur : ce n'est
+          pas une surface d'interface mais un objet représenté, et le ranger dans
+          l'échelle le ferait cesser de ressembler à un téléphone. */}
       <div className="relative mx-auto w-[320px] max-w-full rounded-[2.75rem] border border-white/15 bg-dark-canvas p-2.5 shadow-[0_30px_80px_-20px_rgba(210,178,76,0.25)]">
         <div className="overflow-hidden rounded-[2.25rem] bg-canvas" aria-hidden>
           {/* La barre haute du collecteur, à l'identique : fond `sidebar`, titre

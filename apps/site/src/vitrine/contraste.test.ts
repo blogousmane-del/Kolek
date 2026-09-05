@@ -1,6 +1,8 @@
 import { couleurs } from '@kolek/core';
 import { describe, expect, it } from 'vitest';
 
+import { sourcesRendues } from './sources.test-utils';
+
 /**
  * Le plancher de contraste de la vitrine.
  *
@@ -18,6 +20,11 @@ import { describe, expect, it } from 'vitest';
  * build, et sans faire entrer les types Node dans un projet navigateur — puis
  * recalcule le contraste réel selon WCAG 2.1.
  *
+ * Les commentaires sont retirés avant la recherche. Sans cela, le commentaire
+ * écrit pour expliquer une correction fait rougir le test en citant la classe
+ * qu'il vient de retirer — et un test qui punit la documentation de sa propre
+ * correction apprend à ne plus rien documenter. Voir `sources.test-utils.ts`.
+ *
  * ## Il encode la règle, pas un nombre magique
  *
  * On n'écrit nulle part « au moins 55 % ». On écrit « au moins 4,5:1 », et les
@@ -33,14 +40,12 @@ import { describe, expect, it } from 'vitest';
  */
 
 /** Les sources rendues de la vitrine — les tests eux-mêmes n'en sont pas. */
-const SOURCES = Object.entries(
+const SOURCES = sourcesRendues(
   import.meta.glob('./*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<
     string,
     string
   >,
-)
-  .filter(([chemin]) => !chemin.endsWith('.test.tsx'))
-  .map(([chemin, texte]) => ({ fichier: chemin.replace('./', ''), texte }));
+);
 
 /* ------------------------- Le calcul WCAG 2.1 ---------------------------- */
 
@@ -137,6 +142,27 @@ describe('le plancher de contraste du texte', () => {
 
     expect(fautifs).toEqual([]);
   });
+
+  /**
+   * Le pendant clair de la règle. Il manquait au premier jet de ce fichier, qui
+   * ne regardait que le blanc et l'encre sur or — et deux fautes ont donc
+   * survécu au lot 1 : la mention d'une fonction **non incluse** de la grille
+   * tarifaire, en `text-muted-foreground/50`, à 2,07:1 sur la carte blanche.
+   *
+   * Le visiteur qui veut savoir ce qu'une formule ne comprend pas lisait la
+   * ligne la moins lisible de la page. Ce n'est pas une commande désactivée —
+   * celles-là, WCAG 1.4.3 les dispense — c'est de l'information.
+   */
+  it('pose tout texte gris au-dessus de 4,5:1 sur la surface claire', () => {
+    const surface = versCanaux(couleurs.surface);
+    const gris = versCanaux(couleurs.mutedForeground);
+
+    const fautifs = scanner(/text-muted-foreground\/(\d{1,3})\b/g)
+      .filter(({ opacite }) => contraste(aplatir(gris, opacite, surface), surface) < AA_TEXTE)
+      .map(({ fichier, classe }) => `${fichier} · ${classe}`);
+
+    expect(fautifs).toEqual([]);
+  });
 });
 
 /**
@@ -171,7 +197,7 @@ describe('le plancher de contraste des commandes', () => {
     const source = SOURCES.find((s) => s.fichier === fichier);
     expect(source, `${fichier} introuvable`).toBeDefined();
 
-    const trouve = source?.texte.match(motif) ?? null;
+    const trouve = source?.brut.match(motif) ?? null;
     // Un motif qui ne trouve plus rien n'est pas un succès : la commande a été
     // réécrite, et personne ne mesure plus sa bordure.
     expect(trouve, `bordure introuvable dans ${fichier} — motif à remettre à jour`).not.toBeNull();

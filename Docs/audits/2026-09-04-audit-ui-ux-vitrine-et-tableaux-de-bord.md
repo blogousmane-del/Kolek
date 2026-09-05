@@ -503,29 +503,170 @@ nommés observés tomber :
 
 Puis restauré : `tsc -b` propre, 37 tests verts sur les 5 fichiers du site.
 
-### Lot 2 — Retirer les tics restants de la vitrine
+### Lot 2 — Retirer les tics restants de la vitrine — **fait le 2026-09-04**
 
-| # | Action | Fichier |
+| # | Action | Fichier | État |
+|---|---|---|---|
+| 2.1 | Supprimer le point vert et `SYSTÈME OPÉRATIONNEL` | `PiedDePage.tsx` | fait |
+| 2.2 | Supprimer la pastille or de `FLUX EN DIRECT` | `Fonctionnalites.tsx` | fait |
+| 2.3 | Réécrire les 3 tirets cadratins de la copie visible | `Protocole.tsx`, `Inscription.tsx` ×2 | fait |
+| 2.4 | `✓`, `—` et `←` vers le composant `Icone` | `Tarification.tsx`, `Inscription.tsx` ×2 | fait |
+| 2.5 | Raccourcir l'accroche du Hero à 13 mots | `Hero.tsx` | fait |
+| 2.6 | Le garde-fou : test qui bannit `—` et `–` de la copie rendue | `vitrine/copie.test.ts` | fait |
+
+**Trois précisions sur ce qui a été fait.**
+
+Le `←` du lien « Retour à l'accueil » ne figurait pas au constat 2.4 : il a été
+trouvé en le corrigeant, et c'est le même défaut — un glyphe typographique qui
+tient lieu de pictogramme. Il portait en plus l'espace avant le libellé, que le
+`gap-2` du conteneur dessinait déjà.
+
+L'absence d'une fonction, dans la grille tarifaire, est devenue **un trait
+plein** et non une seconde icône. Une croix se lirait « erreur » ; la ligne dit
+seulement que cette formule ne comprend pas cette fonction. Le `✓` qui reste
+dans `JOURNAL` (`Fonctionnalites.tsx`) n'est pas concerné : c'est de la sortie
+de terminal rendue en monospace, où le caractère est à sa place.
+
+L'accroche du hero n'a pas été coupée pour tenir un seuil. Sa seconde phrase —
+« L'argent, lui, ne quitte jamais ta main » — était **dite trois fois ailleurs
+sur la même page** : titre de la troisième carte du produit, thèse du
+manifeste, premier argument de la grille tarifaire. Le hero ne se lit qu'une
+fois, à l'arrivée ; il porte ce que rien d'autre ne porte.
+
+**Le point 2.6 n'était pas au plan.** Ajouté pour la même raison que 1.8 : la
+pastille de `FLUX EN DIRECT` avait déjà été « corrigée » le 2026-09-02 en
+cessant de battre, et elle était toujours là deux jours plus tard. Un tic qu'on
+retire à la main revient ; un tic qu'un test refuse ne revient pas. Le test
+retire les commentaires avant de chercher — ce dépôt écrit ses raisons en prose
+dans le code, et cette prose n'est pas rendue — et il contrôle que ce nettoyage
+fonctionne, faute de quoi il serait faussement vert.
+
+Validé selon la convention du dépôt, défaut réintroduit :
+
+```
+× ne contient aucun tiret cadratin
+  + "Protocole.tsx:26 · 'Cycle bouclé : … Ta commission — la première mise — est déjà à part.',"
+```
+
+Puis restauré : `tsc -b` propre, **40 tests verts** sur les 6 fichiers du site,
+build réussi.
+
+### Lot 3 — Unifier les jetons — **fait le 2026-09-05**
+
+Arbitrage retenu : **fusionner**. `paper` disparaît plutôt que de s'aligner, et
+la collision devient impossible au lieu d'être atténuée. Portée : les trois
+applications, `packages/core` et `packages/ui` compris.
+
+| # | Action | Fichier | État |
+|---|---|---|---|
+| 3.1 | `paper` supprimé ; `muted` refroidi de `#EFEFEA` à `#EEEFEC` | `core/src/tokens.ts` | fait |
+| 3.2 | La règle des rayons écrite, un rôle par jeton | `Docs/Kolek Design System.md` §3.4 | fait |
+| 3.3 | Les 11 rayons arbitraires de la vitrine ramenés sur des jetons | `apps/site/src/vitrine` | fait |
+| 3.4 | Deux crans ajoutés — `radius-2xl` 20 px, `radius-3xl` 32 px | `core/src/tokens.ts` | fait |
+| 3.5 | Les 4 couleurs de graphique refondues en échelle de clarté | `core/src/tokens.ts` | fait |
+| 3.6 | Dégradés de zone réalignés sur la nouvelle palette | `core/src/tokens.ts` | fait |
+| 3.7 | `text-muted-foreground/50` à 2,07:1 corrigé, et le garde-fou étendu | `Tarification.tsx`, `contraste.test.ts` | fait |
+| 3.8 | Thème régénéré et vérifié | `npm run verifier:theme` | fait |
+
+#### Un constat de l'audit était faux : les rayons de l'administration
+
+Le point 3.4 initial demandait de « ramener les 14 rayons égarés de
+l'administration ». **Il n'y en avait aucun.** Le comptage avait pris des
+usages de jetons pour du bruit. En les ouvrant un par un, une échelle
+parfaitement cohérente apparaît, appliquée partout, et simplement **écrite
+nulle part** :
+
+| Valeur | Où | Rôle |
 |---|---|---|
-| 2.1 | Supprimer le point vert et `SYSTÈME OPÉRATIONNEL` | `PiedDePage.tsx:78-86` |
-| 2.2 | Supprimer la pastille or de `FLUX EN DIRECT` | `Fonctionnalites.tsx:167-169` |
-| 2.3 | Réécrire les 3 tirets cadratins de la copie visible | `Protocole.tsx:36`, `Inscription.tsx:202,372` |
-| 2.4 | `✓` et `—` vers le composant `Icone` | `Tarification.tsx:88`, `Inscription.tsx:169` |
-| 2.5 | Raccourcir l'accroche du Hero à 13 mots | `Hero.tsx:126-129` |
+| `rounded-lg` 10 px | `Carte`, `CarteStat`, `CarteZone`, `EcranMessage` | la carte d'application |
+| `rounded-xl` 12 px | `CarteCollecte`, `ActionsCarte`, `CarrouselCartes` | la carte mise en avant |
+| `rounded-md` 6 px | champs, boutons, lignes | la saisie |
+| `rounded-sm` 4 px | `BarreEmpilee` | le segment de jauge |
+| `rounded-pill` | badges, boutons ronds, avatars | le rond |
 
-### Lot 3 — Unifier les jetons
+La tâche est donc devenue : **documenter cette échelle**, et y ajouter les deux
+crans qui manquaient pour que la vitrine puisse s'y ranger. C'est le sens du
+3.2 et du 3.4 tels qu'ils ont été exécutés.
 
-À faire avant le lot 5 : le tableau de bord va gagner des composants, autant
-qu'ils naissent dans un système déjà arbitré.
+#### Trois défauts trouvés en chemin
 
-| # | Action | Fichier |
-|---|---|---|
-| 3.1 | Arbitrer `canvas` (froid) contre `paper`/`muted` (chaud) ; retirer le perdant | `packages/core/src/tokens.ts` |
-| 3.2 | Écrire la règle des rayons (quel rayon pour quel rôle) | `Docs/Kolek Design System.md` |
-| 3.3 | Ramener les 11 rayons de la vitrine sur les jetons retenus | `apps/site/src/vitrine/*.tsx` |
-| 3.4 | Ramener les 14 rayons égarés de l'administration | `apps/admin/src`, `packages/ui/src` |
-| 3.5 | Reconstruire les 4 couleurs de graphique sur une échelle de luminance | `packages/core/src/tokens.ts` |
-| 3.6 | Régénérer et vérifier le thème | `npm run generer:theme && npm run verifier:theme` |
+**Le Design System annonçait des rayons que le produit n'a jamais employés.**
+Son §3.4 donnait 8 / 12 / 16 / 24 px ; `tokens.ts` émet 4 / 6 / 10 / 12 px
+depuis l'origine. Le seul document où l'on aurait pu trancher décrivait autre
+chose que le code. Corrigé, avec la mention de l'écart.
+
+**`text-muted-foreground/50` donnait 2,07:1** sur la carte blanche de la grille
+tarifaire. C'est le libellé d'une fonction **non incluse** : le visiteur qui
+veut savoir ce qu'une formule ne comprend pas lisait la ligne la moins lisible
+de la page. Le garde-fou du lot 1 ne l'avait pas vu — il ne regardait que le
+blanc et l'encre sur or. Il regarde désormais aussi le gris sur surface claire.
+
+Le cas voisin de `NavMobile.tsx` (`text-muted-foreground/40`) a été **laissé
+tel quel** : c'est une commande désactivée, et WCAG 1.4.3 les dispense
+explicitement de tout seuil de contraste. La distinction n'est pas cosmétique —
+un onglet indisponible doit se lire comme indisponible.
+
+**Les quatre dégradés de zone étaient bâtis sur l'ancienne palette**, en dur.
+Réalignés : sans cela, la carte de zone et la liste « Top zones », qui décrivent
+les mêmes zones, auraient divergé sans que rien ne le signale.
+
+#### Le garde-fou a puni la documentation de sa propre correction
+
+Le contrôle du gris est passé au rouge sur `Tarification.tsx` alors que la
+faute venait d'y être corrigée. La classe qu'il citait n'existait plus dans le
+rendu : elle vivait dans le **commentaire écrit pour expliquer le correctif**.
+
+`copie.test.ts` retirait les commentaires avant de chercher ; `contraste.test.ts`
+non. Deux suites qui lisent les mêmes fichiers avec deux règles différentes, et
+c'est la plus stricte qui a mordu la main qui documentait.
+
+Un test qui rougit parce qu'on a expliqué sa propre correction apprend à ne
+plus rien expliquer — dans un dépôt qui écrit ses raisons en prose dans le
+code, c'est un coût réel. La lecture est donc devenue commune
+(`sources.test-utils.ts`) : une seule règle de nettoyage pour les deux suites.
+
+Les motifs de bordure, eux, continuent de chercher dans le fichier **brut** :
+ils portent sur du code, pas sur de la copie, et le nettoyage décalerait les
+lignes.
+
+#### La nouvelle échelle de graphiques, et sa borne
+
+Les quatre valeurs se distinguaient par la teinte seule. `chartBlue` et
+`chartSlate` ne différaient que de **2,1 unités de L\***, soit 1,06:1 : dans la
+barre empilée et dans « Top zones », où la couleur est le seul encodage, deux
+des quatre parts étaient le même gris.
+
+| Jeton | Avant | Après | L\* avant | L\* après |
+|---|---|---|---|---|
+| `chartMint` | `#B7D9BE` | `#D1E8D4` | 83,6 | 89,9 |
+| `chartTeal` | `#7FB6A6` | `#9ACDBE` | 69,9 | 78,6 |
+| `chartBlue` | `#9FC2DA` | `#82ACCC` | 76,7 | 68,5 |
+| `chartSlate` | `#AEB7D6` | `#8D8AC0` | 74,6 | 59,6 |
+
+Environ **10 unités de L\*** entre voisines, contre 2,1 pour la pire paire
+d'avant. C'est perceptible en niveaux de gris.
+
+**L'écart ne pouvait pas être plus grand, et il faut dire pourquoi.** Ces mêmes
+jetons servent de fond aux pastilles d'`Avatar`, dont les initiales sont écrites
+en `sidebar` : aucune des quatre ne peut donc descendre sous 4,5:1 contre
+`#0E2E1F`. `chartSlate` y tient à 4,57:1, c'est-à-dire à la limite. Et
+`chartMint` a un second métier — l'état actif de la barre latérale, le vert de
+réussite sur fond sombre — qui le fixe à l'extrémité claire.
+
+C'est un défaut de fond que ce lot n'a pas traité : **un seul jeu de jetons fait
+deux métiers incompatibles**, l'encodage de données et l'identité visuelle des
+personnes. Les séparer libérerait toute l'échelle pour les graphiques. À
+décider séparément.
+
+#### Ce qui reste ouvert
+
+`hairline` / `border` valent `#E6E3DA` — R230 G227 B218, un neutre franchement
+chaud, quand `canvas` et `muted` tirent maintenant au vert. C'est la même
+famille de défaut que 2.6, sur le jeton le plus employé du produit : toutes les
+bordures des trois applications. Non traité ici parce que l'arbitrage portait
+sur les fonds, et parce que repeindre chaque bordure du produit mérite d'être
+décidé, pas glissé dans un lot de jetons.
+
 
 ### Lot 4 — Le tableau de bord Admin : retirer
 

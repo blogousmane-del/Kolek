@@ -140,14 +140,14 @@ export function Navbar() {
       <div
         id="menu-vitrine"
         hidden={!deplie}
-        className="fixed left-1/2 top-16 z-40 w-[calc(100vw-2rem)] max-w-xs -translate-x-1/2 rounded-[1.5rem] border border-white/10 bg-dark-canvas/95 p-2 shadow-lg backdrop-blur-xl md:hidden"
+        className="fixed left-1/2 top-16 z-40 w-[calc(100vw-2rem)] max-w-xs -translate-x-1/2 rounded-2xl border border-white/10 bg-dark-canvas/95 p-2 shadow-lg backdrop-blur-xl md:hidden"
       >
         {LIENS.map((lien) => (
           <a
             key={lien.href}
             href={lien.href}
             onClick={() => setDeplie(false)}
-            className="block rounded-[1rem] px-4 py-3 font-body text-base font-medium text-white/80 transition-colors hover:bg-white/5 hover:text-white"
+            className="block rounded-xl px-4 py-3 font-body text-base font-medium text-white/80 transition-colors hover:bg-white/5 hover:text-white"
           >
             {lien.libelle}
           </a>
@@ -155,7 +155,7 @@ export function Navbar() {
         <a
           href={INSCRIPTION}
           onClick={() => setDeplie(false)}
-          className="block rounded-[1rem] px-4 py-3 font-body text-base font-semibold text-or transition-colors hover:bg-white/5 sm:hidden"
+          className="block rounded-xl px-4 py-3 font-body text-base font-semibold text-or transition-colors hover:bg-white/5 sm:hidden"
         >
           Ouvrir un compte
         </a>

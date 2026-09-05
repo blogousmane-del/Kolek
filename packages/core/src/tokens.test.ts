@@ -60,7 +60,7 @@ describe('genererCssTheme', () => {
 
   it('convertit chaque clé en variable CSS kebab-case', () => {
     const css = genererCssTheme();
-    expect(css).toContain('--color-chart-blue: #9FC2DA;');
+    expect(css).toContain('--color-chart-blue: #82ACCC;');
     expect(css).toContain('--color-muted-foreground: #666B64;');
     expect(css).toContain('--text-2xl: 24px;');
     expect(css).toContain('--font-headings:');

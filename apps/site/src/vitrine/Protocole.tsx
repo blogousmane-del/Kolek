@@ -33,7 +33,7 @@ const ETAPES = [
     numero: '03',
     titre: 'Restituer',
     detail:
-      'Cycle bouclé : le solde à rendre est affiché avant confirmation, calculé par le serveur, inscrit au journal. Ta commission — la première mise — est déjà à part.',
+      'Cycle bouclé : le solde à rendre est affiché avant confirmation, calculé par le serveur, inscrit au journal. Ta commission, la première mise, est déjà à part.',
     animation: 'onde',
   },
 ] as const;
@@ -128,7 +128,7 @@ export function Protocole() {
           <div
             key={etape.numero}
             data-carte-protocole
-            className="sticky top-16 mb-8 grid min-h-[62dvh] items-center gap-8 rounded-[1.75rem] border border-white/8 bg-sidebar p-6 shadow-lg sm:mb-10 sm:min-h-[70dvh] sm:gap-10 sm:rounded-[2.5rem] sm:p-14 lg:grid-cols-2"
+            className="sticky top-16 mb-8 grid min-h-[62dvh] items-center gap-8 rounded-2xl border border-white/8 bg-sidebar p-6 shadow-lg sm:mb-10 sm:min-h-[70dvh] sm:gap-10 sm:rounded-3xl sm:p-14 lg:grid-cols-2"
           >
             <div>
               <p className="mb-4 font-mono text-sm text-or">{etape.numero}</p>

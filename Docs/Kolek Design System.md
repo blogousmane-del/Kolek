@@ -174,13 +174,41 @@ Padding interne des cartes : `p-5` à `p-6` (admin), `p-4` (mobile). Gouttière 
 
 ### 3.4 Rayons
 
-| Token | Classe | Valeur | Usage |
+**Corrigé le 2026-09-04.** Ce tableau annonçait 8 / 12 / 16 / 24 px ; `tokens.ts`
+émettait 4 / 6 / 10 / 12 px depuis l'origine. Le document décrivait donc des
+valeurs que le produit n'a jamais employées, et personne ne pouvait s'y fier
+pour trancher. Les valeurs ci-dessous sont celles du code, vérifiées.
+
+| Token | Classe | Valeur | Rôle |
 |---|---|---|---|
-| `--radius-sm` | `rounded-sm` | 8 px | Petits éléments, cases de cycle, pastilles de légende. |
-| `--radius-md` | `rounded-md` | 12 px | **Tous les boutons rectangulaires**, champs, blocs. |
-| `--radius-lg` | `rounded-lg` | 16 px | Cartes, widgets. |
-| `--radius-xl` | `rounded-xl` | 24 px | Cartes héros, cadre de l'application admin, carte de collecte. |
+| `--radius-sm` | `rounded-sm` | 4 px | Segment de jauge, case de progression. |
+| `--radius-md` | `rounded-md` | 6 px | **Tous les boutons rectangulaires**, champs, lignes de tableau. |
+| `--radius-lg` | `rounded-lg` | 10 px | Carte d'application : `Carte`, `CarteStat`, `CarteZone`, `EcranMessage`. |
+| `--radius-xl` | `rounded-xl` | 12 px | Carte mise en avant, carte de collecte, élément d'un panneau. |
+| `--radius-2xl` | `rounded-2xl` | 20 px | Artefact et carte interne de la vitrine, panneau de navigation. |
+| `--radius-3xl` | `rounded-3xl` | 32 px | Grande surface éditoriale de la vitrine. |
 | `--radius-pill` | `rounded-pill` | 9999 px | Badges et pastilles, boutons **ronds** à icône seule, avatars, points, barres de progression. Jamais un bouton qui porte du texte. |
+
+`2xl` et `3xl` ont été ajoutés le 2026-09-04. La vitrine posait onze rayons
+arbitraires entre 16 et 44 px — `rounded-[2rem]`, `rounded-[1.25rem]`,
+`rounded-[2.5rem]`… — dont aucun ne correspondait à un jeton. L'échelle
+s'arrêtait à 12 px, taillée pour l'application ; la page de vente n'y avait
+simplement pas de place. Ces deux crans la lui donnent, et les valeurs
+arbitraires ont disparu.
+
+Ces deux noms écrasent les valeurs par défaut de Tailwind (16 px et 24 px).
+C'est voulu : les noms restent disponibles, avec les valeurs du produit.
+
+**Deux exceptions, et ce sont les seules.**
+
+1. `Telephone.tsx` dessine un châssis d'appareil — 44 px à l'extérieur, 36 px à
+   l'intérieur. Ce n'est pas une surface d'interface mais un objet représenté ;
+   le ranger dans l'échelle le ferait cesser de ressembler à un téléphone.
+2. Les 31 cases de la carte de collecte miniature font 8 px de haut. À 4 px,
+   `rounded-sm` les arrondirait en stade ; elles gardent 2 px.
+
+Toute autre valeur arbitraire est un défaut. Si un rôle nouveau apparaît, il
+prend un jeton, pas un `rounded-[…]`.
 
 ### 3.5 Élévation
 

@@ -49,7 +49,7 @@ function MelangeurCartes() {
       {cartes.map((carte, i) => (
         <div
           key={carte.nom}
-          className="absolute inset-x-0 rounded-[1.25rem] border border-hairline bg-surface p-4 shadow-md transition-all duration-700 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]"
+          className="absolute inset-x-0 rounded-2xl border border-hairline bg-canvas p-4 shadow-md transition-all duration-700 [transition-timing-function:cubic-bezier(0.34,1.56,0.64,1)]"
           style={{
             top: `${i * 26}px`,
             zIndex: 3 - i,
@@ -63,7 +63,11 @@ function MelangeurCartes() {
               {carte.jour}/{MISES_PAR_CYCLE}
             </p>
           </div>
-          {/* La carte de collecte en miniature : ses cases, sa progression. */}
+          {/* La carte de collecte en miniature : ses cases, sa progression.
+
+              `rounded-[2px]` est l'une des deux exceptions à l'échelle des
+              rayons — voir `rayons` dans `tokens.ts`. Les cases font 8 px de
+              haut ; `rounded-sm` (4 px) les arrondirait en stade. */}
           <div className="mb-3 grid grid-cols-16 gap-0.5">
             {Array.from({ length: MISES_PAR_CYCLE }, (_, c) => (
               <div
@@ -163,11 +167,13 @@ function MachineTelemetrie() {
   }, [anime]);
 
   return (
-    <div className="flex h-56 flex-col rounded-[1.25rem] border border-hairline bg-dark-canvas p-4">
-      <p className="mb-3 flex items-center gap-2 font-mono text-[10px] tracking-widest text-or">
-        {/* Fixe : le journal qui défile dit déjà qu'il se passe quelque chose.
-            Un point qui bat par-dessus n'ajoute rien qu'un tic. */}
-        <span className="inline-block h-1.5 w-1.5 rounded-pill bg-or" />
+    <div className="flex h-56 flex-col rounded-2xl border border-hairline bg-dark-canvas p-4">
+      {/* Sans pastille. Elle était fixe depuis le 2026-09-02 — « le journal qui
+          défile dit déjà qu'il se passe quelque chose » — et retirée le
+          2026-09-04 pour la suite de ce raisonnement : si le journal le dit déjà,
+          la pastille ne dit rien. Elle ne signalait aucun état, sur une
+          démonstration qui n'en a pas. */}
+      <p className="mb-3 font-mono text-[10px] tracking-widest text-or">
         FLUX EN DIRECT · CAISSE DU SOIR
       </p>
       <div className="flex-1 overflow-hidden font-mono text-[11px] leading-6 text-white/70 xs:text-xs">
@@ -242,7 +248,7 @@ function PlanificateurTournee() {
   const surSauvegarde = etape.type === 'sauvegarde';
 
   return (
-    <div className="relative flex h-56 flex-col justify-between rounded-[1.25rem] border border-hairline bg-surface p-4">
+    <div className="relative flex h-56 flex-col justify-between rounded-2xl border border-hairline bg-canvas p-4">
       <p className="font-mono text-[10px] tracking-widest text-muted-foreground">
         TA TOURNÉE · JOURS DE CLÔTURE
       </p>
@@ -328,7 +334,16 @@ export function Fonctionnalites() {
         {ARTEFACTS.map((artefact, i) => (
           <article
             key={artefact.titre}
-            className={`rounded-[2rem] border border-hairline bg-paper p-6 shadow-sm transition-transform duration-300 hover:-translate-y-1 ${
+            /* `bg-surface` depuis le 2026-09-05, `bg-paper` avant. Le jeton
+               `paper` a été supprimé : c'était un troisième fond, dans l'autre
+               famille de neutres, pour un seul usage — celui-ci.
+
+               Les artefacts qu'elle contient sont donc passés à `bg-canvas`.
+               Sur le crème, `bg-surface` les détachait ; sur du blanc, ils
+               auraient été blanc sur blanc, séparés par un filet seul. Enfoncés
+               d'un cran, ils se lisent comme ce qu'ils sont : des écrans
+               montrés à l'intérieur d'une carte, et non des cartes de plus. */
+            className={`rounded-3xl border border-hairline bg-surface p-6 shadow-sm transition-transform duration-300 hover:-translate-y-1 ${
               i === 1 ? 'lg:mt-14' : ''
             }`}
           >

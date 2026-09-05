@@ -120,9 +120,18 @@ export function Hero() {
             </span>
           </h1>
 
+          {/* Une phrase, treize mots. Il y en avait deux et vingt-deux jusqu'au
+              2026-09-04 : la seconde disait « L'argent, lui, ne quitte jamais ta
+              main. »
+
+              Elle n'a pas été coupée pour tenir un seuil. Elle a été coupée
+              parce que la page la dit déjà trois fois : c'est le titre de la
+              troisième carte du produit (« L'argent reste dans ta main »), c'est
+              la thèse du manifeste, et c'est le premier argument de la grille
+              tarifaire. Le hero ne se lit qu'une fois, à l'arrivée ; il porte la
+              promesse que rien d'autre ne porte. */}
           <p data-entree className="mt-5 max-w-xl font-body text-base leading-relaxed text-white/70 sm:mt-6 sm:text-lg">
             Chaque mise comptée, chaque caisse rapprochée le soir, chaque franc tracé.
-            L’argent, lui, ne quitte jamais ta main.
           </p>
 
           {/* Aucun des deux ne mène à une boîte aux lettres. Avant le 2026-08-23 ils

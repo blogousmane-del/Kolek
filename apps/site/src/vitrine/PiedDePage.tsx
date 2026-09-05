@@ -69,14 +69,17 @@ export function PiedDePage() {
           © {new Date().getFullYear()} GTCS · Kolek. Aucun flux d’épargne ne transite par cette
           page.
         </p>
-        <p className="flex items-center gap-2 font-mono text-xs text-white/55">
-          {/* Fixe, et non `animate-pulse`. Le point ne mesure rien : il dit que la
-              page est servie. Le faire battre lui prêtait une surveillance qui
-              n'existe pas — la CSP de cette page interdit tout appel sortant, donc
-              aucune sonde ne peut le démentir. */}
-          <span className="inline-block h-2 w-2 rounded-pill bg-positive" />
-          SYSTÈME OPÉRATIONNEL
-        </p>
+        {/* Il y avait ici un point vert et la mention « SYSTÈME OPÉRATIONNEL ».
+            Retiré le 2026-09-04.
+
+            Le point avait déjà cessé de battre le 2026-09-02, au motif qu'il ne
+            mesurait rien. C'était traiter le symptôme : ce n'est pas le battement
+            qui mentait, c'est le vert. Un voyant d'état emprunte l'apparence d'une
+            sonde, et la CSP de cette page interdit tout appel sortant — aucune
+            sonde ne peut donc exister ici pour le confirmer ou le démentir.
+
+            Ce qui restait de vrai — « le site est servi, donc l'infrastructure qui
+            le sert répond » — le visiteur le sait déjà : il lit la page. */}
       </div>
     </footer>
   );

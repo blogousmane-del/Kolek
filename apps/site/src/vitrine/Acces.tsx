@@ -95,7 +95,7 @@ export function Acces() {
           <a
             data-porte
             href={APP_COLLECTEUR}
-            className="group flex flex-col justify-between rounded-[2rem] bg-or p-7 text-dark-canvas shadow-lg transition-transform duration-300 hover:-translate-y-1 lg:col-span-2"
+            className="group flex flex-col justify-between rounded-3xl bg-or p-7 text-dark-canvas shadow-lg transition-transform duration-300 hover:-translate-y-1 lg:col-span-2"
           >
             <div>
               {/* Les trois étiquettes de cette section étaient en monospace
@@ -129,7 +129,7 @@ export function Acces() {
             <a
               data-porte
               href={INSCRIPTION}
-              className="group flex-1 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 transition-transform duration-300 hover:-translate-y-1"
+              className="group flex-1 rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition-transform duration-300 hover:-translate-y-1"
             >
               <p className="mb-2 font-body text-sm font-semibold text-white/55">
                 Pas encore de compte
@@ -154,7 +154,7 @@ export function Acces() {
             <a
               data-porte
               href={APP_ADMIN}
-              className="group rounded-[2rem] border border-white/10 bg-white/[0.02] p-6 transition-transform duration-300 hover:-translate-y-1"
+              className="group rounded-3xl border border-white/10 bg-white/[0.02] p-6 transition-transform duration-300 hover:-translate-y-1"
             >
               <p className="mb-2 font-body text-sm font-semibold text-white/55">Équipe GTCS</p>
               <span className="inline-flex items-center gap-2 font-body text-sm font-medium text-white/60">

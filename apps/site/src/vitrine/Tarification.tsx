@@ -1,4 +1,6 @@
 import { PALIERS, PALIER_RECOMMANDE, formatMontant } from '@kolek/core';
+import { Icone } from '@kolek/ui';
+
 import { entree, useAnimations } from './animation';
 import { APP_COLLECTEUR, inscriptionPour } from './liens';
 
@@ -21,11 +23,14 @@ export function Tarification() {
   });
 
   return (
-    /* `bg-canvas` et non `bg-paper` : `Protocole`, juste au-dessus, est en
-       `canvas` (#F4F5F2, froid), et `paper` (#FBFAF6, chaud) le jouxtait sans
-       trancher — assez proche pour passer pour un défaut de rendu, assez loin
-       pour se voir. Les deux sections claires forment maintenant un seul bloc
-       entre deux sections sombres. */
+    /* `bg-canvas`, comme `Protocole` juste au-dessus : les deux sections
+       claires forment un seul bloc entre deux sections sombres.
+
+       Ce commentaire disait autre chose jusqu'au 2026-09-04. Il expliquait
+       pourquoi cette section-ci s'était écartée de `bg-paper`, un troisième
+       fond de l'autre famille de neutres qui jouxtait `canvas` sans trancher.
+       C'était un contournement local d'un défaut de jetons ; `paper` a depuis
+       été supprimé, et il n'y a plus rien à contourner. */
     <section id="tarifs" ref={ref} className="bg-canvas px-5 py-20 sm:px-12 sm:py-24 lg:px-20">
       <p className="mb-3 font-mono text-xs tracking-widest text-primary">ADHÉSION</p>
       <h2 className="mb-4 max-w-2xl font-headings text-3xl font-bold text-ink sm:text-4xl">
@@ -43,7 +48,7 @@ export function Tarification() {
             <article
               key={palier.cle}
               data-palier
-              className={`flex flex-col rounded-[2rem] p-6 ${
+              className={`flex flex-col rounded-3xl p-6 ${
                 vedette
                   ? 'bg-sidebar text-white shadow-lg ring-2 ring-or'
                   : 'border border-hairline bg-surface text-ink shadow-sm'
@@ -73,20 +78,41 @@ export function Tarification() {
               <ul className="mb-8 flex flex-col gap-2.5">
                 {palier.fonctions.map((fonction) => (
                   <li key={fonction.libelle} className="flex items-center gap-2.5 font-body text-sm">
+                    {/* Une icône et un trait, plus les caractères `✓` et `—`.
+                        Un glyphe typographique employé comme pictogramme change de
+                        dessin, de chasse et de hauteur d'une police système à
+                        l'autre, et ne porte aucun rôle d'accessibilité. Le tiret
+                        cadratin y ajoutait la seule occurrence rendue qu'il restait
+                        sur la vitrine.
+
+                        L'absence est un trait plein, pas une seconde icône : une
+                        croix se lit « erreur », alors que la ligne dit seulement que
+                        cette formule ne comprend pas cette fonction. */}
                     <span
                       aria-hidden
-                      className={`flex h-4 w-4 items-center justify-center rounded-pill text-[10px] ${
+                      className={`flex h-4 w-4 items-center justify-center rounded-pill ${
                         fonction.incluse
                           ? vedette
                             ? 'bg-or/20 text-or'
                             : 'bg-positive-tint text-positive'
                           : vedette
                             ? 'bg-white/5 text-white/55'
-                            : 'bg-muted text-muted-foreground/40'
+                            : 'bg-muted text-muted-foreground'
                       }`}
                     >
-                      {fonction.incluse ? '✓' : '—'}
+                      {fonction.incluse ? (
+                        <Icone nom="check" taille={11} />
+                      ) : (
+                        <span className="block h-px w-2 bg-current" />
+                      )}
                     </span>
+                    {/* L'absence se marque par l'icône, pas par un texte pâli.
+                        `text-muted-foreground/50` ne donnait que 2,07:1 sur la
+                        carte blanche : le visiteur qui veut savoir ce qu'une
+                        formule ne comprend **pas** lisait la ligne la moins
+                        lisible de la page. Ce n'est pas une commande désactivée,
+                        c'est de l'information — WCAG ne lui accorde aucune
+                        dispense. */}
                     <span
                       className={
                         fonction.incluse
@@ -95,7 +121,7 @@ export function Tarification() {
                             : 'text-ink'
                           : vedette
                             ? 'text-white/55'
-                            : 'text-muted-foreground/50'
+                            : 'text-muted-foreground'
                       }
                     >
                       {fonction.libelle}
