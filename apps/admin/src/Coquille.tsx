@@ -51,7 +51,15 @@ const TITRE_ESPACE: Record<Espace, string> = {
  * il décide de ce que le menu montre — inutile d'apprendre à un administrateur
  * métier qu'il existe un niveau au-dessus du sien.
  */
-export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
+export function Coquille({
+  estSuper = false,
+  modeDemoActive = false,
+  onQuitterDemo,
+}: {
+  estSuper?: boolean;
+  modeDemoActive?: boolean;
+  onQuitterDemo?: () => void;
+} = {}) {
   const [espace, setEspace] = useState<Espace>('admin');
   const [page, setPage] = useState<Page>('tableau');
   const [pageSuper, setPageSuper] = useState<CleNavSuper>('abonnements');
@@ -81,6 +89,10 @@ export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
   }, [menuOuvert]);
 
   async function deconnecter() {
+    if (modeDemoActive && onQuitterDemo) {
+      onQuitterDemo();
+      return;
+    }
     setErreurSortie(null);
     const { error } = await supabase.auth.signOut();
     if (error) setErreurSortie('Déconnexion impossible. Vérifie le réseau et réessaie.');
@@ -116,42 +128,62 @@ export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
           d'administration — Design System §3.5, ombre `lg`. La marge se réduit
           sur téléphone : trois millimètres de fond sombre de chaque côté ne
           signent rien, ils prennent de la largeur au contenu. */}
-      <div className="flex w-full m-1.5 sm:m-3 rounded-lg sm:rounded-xl overflow-hidden shadow-lg">
-        <div className="hidden lg:flex">
-          <BarreLaterale
-            espace={espace}
-            actif={actif}
-            onNaviguer={naviguer}
-            onDeconnexion={deconnecter}
-            estSuper={estSuper}
-            onChangerEspace={changerEspace}
-          />
-        </div>
+      <div className="flex w-full m-1.5 sm:m-3 rounded-lg sm:rounded-xl overflow-hidden shadow-lg flex-col">
+        {modeDemoActive && (
+          <div className="bg-or/20 border-b border-or/30 px-4 py-2 flex items-center justify-between text-xs font-body text-or shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-or animate-pulse" />
+              <span className="font-semibold">Mode Démo Interactif</span>
+              <span className="hidden md:inline text-or/80">• Vos données de test sont chargées avec succès.</span>
+            </div>
+            {onQuitterDemo && (
+              <button
+                type="button"
+                onClick={onQuitterDemo}
+                className="px-2.5 py-1 rounded bg-or/20 hover:bg-or/30 font-semibold cursor-pointer border border-or/40 transition-colors"
+              >
+                Quitter la démo
+              </button>
+            )}
+          </div>
+        )}
 
-        <div className="flex-1 min-w-0 bg-canvas flex flex-col">
-          {/* En-tête de navigation, sous `lg` uniquement : c'est le seul accès
-              au menu quand la barre latérale est repliée. */}
-          <div className="lg:hidden flex items-center gap-2 px-2 py-2 bg-sidebar flex-shrink-0">
-            <button
-              type="button"
-              onClick={() => setMenuOuvert(true)}
-              aria-label="Ouvrir le menu"
-              className="w-11 h-11 flex items-center justify-center rounded-md cursor-pointer"
-            >
-              <Icone nom="menu" className="text-white/70" />
-            </button>
-            <span className="font-headings font-bold text-surface text-lg tracking-tight">
-              {TITRE_ESPACE[espace]}
-            </span>
+        <div className="flex flex-1 min-h-0">
+          <div className="hidden lg:flex">
+            <BarreLaterale
+              espace={espace}
+              actif={actif}
+              onNaviguer={naviguer}
+              onDeconnexion={deconnecter}
+              estSuper={estSuper}
+              onChangerEspace={changerEspace}
+            />
           </div>
 
-          {/* La maquette omettait ce bandeau sur la fiche collecteur. L'état de
-              l'abonnement ne dépend pas de la page où l'on se trouve.
+          <div className="flex-1 min-w-0 bg-canvas flex flex-col">
+            {/* En-tête de navigation, sous `lg` uniquement : c'est le seul accès
+                au menu quand la barre latérale est repliée. */}
+            <div className="lg:hidden flex items-center gap-2 px-2 py-2 bg-sidebar flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setMenuOuvert(true)}
+                aria-label="Ouvrir le menu"
+                className="w-11 h-11 flex items-center justify-center rounded-md cursor-pointer"
+              >
+                <Icone nom="menu" className="text-white/70" />
+              </button>
+              <span className="font-headings font-bold text-surface text-lg tracking-tight">
+                {TITRE_ESPACE[espace]}
+              </span>
+            </div>
 
-              Il ne dépend en revanche que de l'espace : la console de plateforme
-              n'est l'abonnée de personne, et y afficher une échéance de palier
-              parlerait de l'organisation qu'on vient de quitter. */}
-          {espace === 'admin' && <BandeauOffre />}
+            {/* La maquette omettait ce bandeau sur la fiche collecteur. L'état de
+                l'abonnement ne dépend pas de la page où l'on se trouve.
+
+                Il ne dépend en revanche que de l'espace : la console de plateforme
+                n'est l'abonnée de personne, et y afficher une échéance de palier
+                parlerait de l'organisation qu'on vient de quitter. */}
+            {espace === 'admin' && <BandeauOffre />}
 
           {erreurSortie && (
             <p
@@ -216,6 +248,7 @@ export function Coquille({ estSuper = false }: { estSuper?: boolean } = {}) {
           )}
         </div>
       </div>
+    </div>
 
       {menuOuvert && (
         <div className="lg:hidden fixed inset-0 z-40 flex">

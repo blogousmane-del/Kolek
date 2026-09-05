@@ -32,7 +32,7 @@ type Etat = 'verification' | 'admin' | 'refuse' | 'indisponible';
  * greffer l'entrée une fraction de seconde plus tard ferait bouger le menu sous
  * le curseur.
  */
-export function Portillon() {
+export function Portillon({ onActiverDemo }: { onActiverDemo?: () => void } = {}) {
   const [etat, setEtat] = useState<Etat>('verification');
   const [estSuper, setEstSuper] = useState(false);
 
@@ -80,6 +80,11 @@ export function Portillon() {
       {etat === 'indisponible' && (
         <Bouton pleineLargeur onClick={() => window.location.reload()}>
           Réessayer
+        </Bouton>
+      )}
+      {onActiverDemo && (
+        <Bouton pleineLargeur onClick={onActiverDemo}>
+          Accéder en mode Démo (Aperçu)
         </Bouton>
       )}
       <Bouton variante="fantome" pleineLargeur onClick={() => void supabase.auth.signOut()}>
