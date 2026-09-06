@@ -1,12 +1,16 @@
-import { Bouton, EcranConnexion } from '@kolek/ui';
+import { EcranConnexion } from '@kolek/ui';
 
 import { supabase } from './supabase';
 
 interface Props {
+  /** Absent = pas d'entrée de démonstration. L'écran ne la fabrique jamais
+      lui-même : c'est `App` qui décide, et il ne la propose qu'en l'absence de
+      session. */
   onActiverDemo?: () => void;
+  demoEnCoursDeChargement?: boolean;
 }
 
-export function Connexion({ onActiverDemo }: Props) {
+export function Connexion({ onActiverDemo, demoEnCoursDeChargement = false }: Props) {
   return (
     <div className="relative">
       <EcranConnexion
@@ -23,14 +27,21 @@ export function Connexion({ onActiverDemo }: Props) {
             : 'Connexion impossible. Vérifie le réseau et réessaie.';
         }}
       />
+      {/* Centré plutôt qu'en pastille flottante à droite : sur un écran de
+          360 px, la pastille recouvrait le bouton « Se connecter ». Et sobre
+          plutôt qu'or plein — ce n'est pas l'action principale de cet écran,
+          c'est la porte de service pour qui n'a pas encore de compte. */}
       {onActiverDemo && (
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
           <button
             type="button"
             onClick={onActiverDemo}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-or text-dark-canvas font-body font-semibold text-sm shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer border border-or/30"
+            disabled={demoEnCoursDeChargement}
+            className="rounded-pill border border-or/40 bg-dark-canvas/80 px-4 py-2.5 font-body text-sm font-semibold text-or backdrop-blur-sm transition-colors hover:bg-or/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-or disabled:opacity-60 cursor-pointer"
           >
-            <span>✨ Voir l’Admin Dashboard (Mode Démo)</span>
+            {demoEnCoursDeChargement
+              ? 'Chargement de la démonstration…'
+              : 'Découvrir le tableau de bord (démonstration)'}
           </button>
         </div>
       )}

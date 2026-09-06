@@ -32,7 +32,7 @@ type Etat = 'verification' | 'admin' | 'refuse' | 'indisponible';
  * greffer l'entrée une fraction de seconde plus tard ferait bouger le menu sous
  * le curseur.
  */
-export function Portillon({ onActiverDemo }: { onActiverDemo?: () => void } = {}) {
+export function Portillon() {
   const [etat, setEtat] = useState<Etat>('verification');
   const [estSuper, setEstSuper] = useState(false);
 
@@ -82,11 +82,11 @@ export function Portillon({ onActiverDemo }: { onActiverDemo?: () => void } = {}
           Réessayer
         </Bouton>
       )}
-      {onActiverDemo && (
-        <Bouton pleineLargeur onClick={onActiverDemo}>
-          Accéder en mode Démo (Aperçu)
-        </Bouton>
-      )}
+      {/* Aucune entrée de démonstration ici, et c'est délibéré. Un bouton qui
+          ouvre une console sur un écran intitulé « Accès réservé » enseigne
+          exactement la mauvaise chose — à celui qu'on refuse comme à celui qui
+          essaie. La démonstration est proposée avant la connexion, sur
+          `Connexion`, où elle ne contredit aucun refus. */}
       <Bouton variante="fantome" pleineLargeur onClick={() => void supabase.auth.signOut()}>
         Se déconnecter
       </Bouton>

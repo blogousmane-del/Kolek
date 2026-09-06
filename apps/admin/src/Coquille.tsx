@@ -19,7 +19,7 @@ import { Demandes } from './ecrans/Demandes';
 import { Reglages } from './ecrans/Reglages';
 import { SuperAdmin } from './ecrans/SuperAdmin';
 import { TableauDeBord } from './ecrans/TableauDeBord';
-import { useVueGlobale } from './donnees';
+import { useVueGlobale, type VueGlobale } from './donnees';
 import { supabase } from './supabase';
 
 /** Le détail d'un collecteur n'est pas une entrée de menu : on y arrive depuis
@@ -53,11 +53,14 @@ const TITRE_ESPACE: Record<Espace, string> = {
  */
 export function Coquille({
   estSuper = false,
-  modeDemoActive = false,
+  vueDemo,
   onQuitterDemo,
 }: {
   estSuper?: boolean;
-  modeDemoActive?: boolean;
+  /** Les chiffres de démonstration, descendus par `App` quand il n'y a pas de
+      session. Leur présence — et rien d'autre — met la coquille en
+      démonstration : aucun drapeau n'est lu nulle part. */
+  vueDemo?: VueGlobale;
   onQuitterDemo?: () => void;
 } = {}) {
   const [espace, setEspace] = useState<Espace>('admin');
@@ -75,7 +78,7 @@ export function Coquille({
   // afficherait les mêmes totaux au prix de six allers-retours, et laisserait
   // deux écrans ouverts sur des instantanés différents — ce qu'un
   // administrateur lirait comme une incohérence de la base, pas de l'interface.
-  const donnees = useVueGlobale();
+  const donnees = useVueGlobale(vueDemo);
 
   // Échap ferme le tiroir. Sans ça, sur une tablette avec clavier, le seul
   // moyen de refermer est de viser la croix.
@@ -89,7 +92,10 @@ export function Coquille({
   }, [menuOuvert]);
 
   async function deconnecter() {
-    if (modeDemoActive && onQuitterDemo) {
+    // En démonstration il n'y a pas de session à fermer : sortir, c'est rendre
+    // l'écran de connexion. Appeler `signOut` détruirait la session d'un autre
+    // onglet pour rien.
+    if (vueDemo && onQuitterDemo) {
       onQuitterDemo();
       return;
     }
@@ -129,20 +135,30 @@ export function Coquille({
           sur téléphone : trois millimètres de fond sombre de chaque côté ne
           signent rien, ils prennent de la largeur au contenu. */}
       <div className="flex w-full m-1.5 sm:m-3 rounded-lg sm:rounded-xl overflow-hidden shadow-lg flex-col">
-        {modeDemoActive && (
-          <div className="bg-or/20 border-b border-or/30 px-4 py-2 flex items-center justify-between text-xs font-body text-or shrink-0">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-or animate-pulse" />
-              <span className="font-semibold">Mode Démo Interactif</span>
-              <span className="hidden md:inline text-or/80">• Vos données de test sont chargées avec succès.</span>
+        {/* Le bandeau dit « fictif », pas « test ». « Vos données de test sont
+            chargées » — la formule d'origine — laisse entendre que ce sont les
+            siennes ; devant 24 650 000 FCFA inventés, c'est la seule phrase qu'il
+            ne faut pas écrire. `role="status"` pour qu'un lecteur d'écran
+            l'annonce, puisque tout ce qui suit en dépend. */}
+        {vueDemo && (
+          <div
+            role="status"
+            className="bg-or/20 border-b border-or/30 px-4 py-2 flex items-center justify-between gap-3 text-xs font-body text-or shrink-0"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-or shrink-0" />
+              <span className="font-semibold">Démonstration</span>
+              <span className="hidden md:inline text-or/80 truncate">
+                • Chiffres fictifs. Aucune donnée réelle n'est affichée.
+              </span>
             </div>
             {onQuitterDemo && (
               <button
                 type="button"
                 onClick={onQuitterDemo}
-                className="px-2.5 py-1 rounded bg-or/20 hover:bg-or/30 font-semibold cursor-pointer border border-or/40 transition-colors"
+                className="px-2.5 py-1 rounded bg-or/20 hover:bg-or/30 font-semibold cursor-pointer border border-or/40 transition-colors shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-or"
               >
-                Quitter la démo
+                Quitter la démonstration
               </button>
             )}
           </div>
@@ -212,7 +228,13 @@ export function Coquille({
 
           {donnees.statut === 'ok' && espace === 'admin' && (
             <>
-              {page === 'tableau' && <TableauDeBord vue={donnees.vue} onNaviguer={setPage} />}
+              {page === 'tableau' && (
+                <TableauDeBord
+                  vue={donnees.vue}
+                  onNaviguer={setPage}
+                  onRecharger={donnees.recharger}
+                />
+              )}
               {page === 'collecteurs' && (
                 <Collecteurs
                   vue={donnees.vue}

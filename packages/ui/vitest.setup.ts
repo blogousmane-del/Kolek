@@ -48,3 +48,10 @@ function stockageEnMemoire(): Storage {
 if (typeof globalThis.localStorage === 'undefined') {
   vi.stubGlobal('localStorage', stockageEnMemoire());
 }
+
+// `sessionStorage` manque pour la même raison, et il compte autant : un test qui
+// vérifie que rien n'est écrit dans le navigateur passerait tout seul si les
+// deux stockages étaient absents.
+if (typeof globalThis.sessionStorage === 'undefined') {
+  vi.stubGlobal('sessionStorage', stockageEnMemoire());
+}
