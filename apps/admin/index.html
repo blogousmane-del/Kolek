@@ -5,27 +5,130 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kolek — Admin</title>
+    <!--
+      La feuille de l'écran d'attente, écrite ici plutôt qu'en attributs `style`
+      : une animation demande des `@keyframes`, et un attribut ne peut pas en
+      porter. Elle est en ligne et non importée parce qu'elle doit peindre avant
+      le premier octet de JavaScript — c'est tout son métier.
+
+      Les valeurs sont recopiées de `packages/core/src/tokens.ts` : ce document
+      est servi avant Tailwind, donc avant que `@theme` existe. La marque, elle,
+      n'est pas recopiée — l'`<img>` pointe le favicon engendré par
+      `scripts/generer-marque.mjs`, seule source du « k » sur or.
+    -->
+    <style>
+      .attente {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        padding: 24px;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        text-align: center;
+        background: #f4f5f2;
+        color: #171a17;
+      }
+      .attente-slogan {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+        color: #666b64;
+      }
+      .attente-slogan strong {
+        font-weight: 700;
+        color: #171a17;
+      }
+      .attente-piste {
+        position: relative;
+        width: 120px;
+        height: 2px;
+        overflow: hidden;
+        background: #e6e3da;
+      }
+      .attente-piste::after {
+        content: '';
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 40%;
+        background: #d2b24c;
+        animation: attente-glisse 1.4s ease-in-out infinite;
+      }
+      @keyframes attente-glisse {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(350%);
+        }
+      }
+      /*
+        Le diagnostic ne s'affiche qu'au bout de six secondes. Un démarrage
+        normal ne dure pas six secondes : React a remplacé la page bien avant,
+        et personne ne lit jamais cette ligne. Passé ce délai, en revanche,
+        l'attente n'en est plus une, et il faut rendre à celui qui regarde la
+        seule chose utile — quoi vérifier.
+      */
+      .attente-diagnostic {
+        max-width: 340px;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #666b64;
+        opacity: 0;
+        animation: attente-aveu 400ms ease-out 6s forwards;
+      }
+      @keyframes attente-aveu {
+        to {
+          opacity: 1;
+        }
+      }
+      /*
+        Mouvement réduit : la barre cesse de courir mais continue de respirer.
+        Un indicateur figé se lit comme une page morte. Le délai du diagnostic
+        est conservé — c'est une temporisation, pas une animation.
+      */
+      @media (prefers-reduced-motion: reduce) {
+        .attente-piste::after {
+          width: 100%;
+          animation: attente-pouls 2.4s ease-in-out infinite;
+        }
+        .attente-diagnostic {
+          animation-duration: 1ms;
+        }
+        @keyframes attente-pouls {
+          0%,
+          100% {
+            opacity: 0.35;
+          }
+          50% {
+            opacity: 1;
+          }
+        }
+      }
+    </style>
   </head>
   <body>
     <!--
       Repli statique. React le remplace dès qu'il monte. S'il ne monte pas — un
       module qui lève au chargement, par exemple une configuration Supabase
-      absente — ce message reste, à la place d'un écran blanc muet. Le filet
+      absente — ce repli reste, à la place d'un écran blanc muet. Le filet
       React ne couvre pas ce cas : il n'existe qu'une fois React démarré.
+
+      C'est donc deux écrans en un : l'attente de la seconde qui suit, et la
+      panne de la minute d'après. Il porte la marque d'abord, le diagnostic
+      seulement quand l'attente a trop duré.
     -->
     <div id="root">
-      <div
-        style="
-          font-family: system-ui, sans-serif;
-          max-width: 360px;
-          margin: 15vh auto;
-          padding: 0 20px;
-          color: #171a17;
-        "
-      >
-        <h1 style="font-size: 16px">Kolek · Admin ne démarre pas</h1>
-        <p style="color: #6c716a">
-          L’application n’a pas pu se charger. Vérifie la configuration du site — les variables
+      <div class="attente">
+        <img src="/favicon.svg" width="56" height="56" alt="" />
+        <p class="attente-slogan"><strong>Kolek&#8239;!</strong> Ton Djè en Sécurité</p>
+        <div class="attente-piste" role="progressbar" aria-label="Chargement"></div>
+        <p class="attente-diagnostic">
+          Toujours rien&#8239;? Vérifie la configuration du site — les variables
           <code>VITE_SUPABASE_URL</code> et <code>VITE_SUPABASE_ANON_KEY</code> — puis recharge.
         </p>
       </div>
