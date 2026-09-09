@@ -232,8 +232,18 @@ en cache qu'après le premier chargement complet. `@supabase/supabase-js` et les
 gagneraient à passer en `import()` dynamique. L'admin montre que le découpage
 marche déjà : `demo-CzAi8Jvp.js` est sorti tout seul.
 
-**7. `SuperAdmin.tsx`, 1 634 lignes.** Plus du double du deuxième fichier du
-dépôt. Aucun test ne le nomme directement.
+**7. ~~`SuperAdmin.tsx`, 1 634 lignes. Aucun test ne le nomme directement.~~**
+Plus du double du deuxième fichier du dépôt — cela reste vrai. **La seconde
+moitié était fausse, et corrigée le jour même :** `SuperAdmin.test.tsx` fait
+644 lignes et couvre huit parties de l'écran. Ce constat est né d'une recherche
+du nom du fichier dans les tests, là où le fichier de test le rend par import.
+
+Ce qui manquait vraiment était plus précis : le **filtrage des abonnés**, seule
+logique de décision du fichier, n'avait aucun test — dont la frontière à sept
+jours entre « Actif » et « Expirant » et le seuil de trois caractères de la
+recherche. Neuf tests de caractérisation posés, et un manque d'accessibilité
+trouvé en les écrivant : les quatre boutons de filtre ne se distinguaient que
+par la couleur.
 
 **8. Deux couleurs en dur dans `apps/site/src/styles.css`.**
 `outline-color: #ffffff` (ligne 41) et `#fff8e1` dans le dégradé `.reflet-or`

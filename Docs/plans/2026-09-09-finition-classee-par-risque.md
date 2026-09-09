@@ -117,7 +117,10 @@ complet. C'est la seule application qui parte en itinérance.
 
 ## 🟡 E — `SuperAdmin.tsx`, 1 634 lignes
 
-Plus du double du deuxième fichier du dépôt, et aucun test ne le nomme.
+> **Le filet est posé. Le découpage reste à décider — voir en bas.**
+
+Plus du double du deuxième fichier du dépôt. ~~Aucun test ne le nomme.~~ Faux :
+`SuperAdmin.test.tsx` fait 644 lignes et couvre huit de ses parties.
 
 ## 🟡 F — La pagination de la liste clients
 
@@ -370,3 +373,53 @@ Le corriger d'un coup n'était pas raisonnable : les treize requêtes concernée
 sont simulées dans sept fichiers de test dont les faux imitent la chaîne courte.
 Les changer toutes en une fois aurait produit une vague d'échecs sans rapport
 avec le défaut, et un lot qu'on ne peut plus relire.
+
+---
+
+## 🟡 E — Le filet avant le découpage
+
+Le découpage n'a **pas** été fait, et c'est délibéré. L'ordre juste est
+l'inverse de celui qu'on prend d'instinct : déplacer 1 634 lignes sans filet,
+c'est espérer que rien ne bouge sur l'écran d'administration de la plateforme.
+
+### Ce que l'audit disait de travers
+
+« Aucun test ne le nomme directement. » Le constat venait d'une recherche du
+nom du fichier dans les tests — or `SuperAdmin.test.tsx` le rend par import.
+644 lignes, 30 tests, huit parties couvertes. **Je l'ai répété sans vérifier
+avant d'ouvrir le fichier.**
+
+### Ce qui manquait vraiment
+
+Le **filtrage des abonnés** : la seule logique de décision du fichier, sans
+aucun test. Neuf posés, dont ceux qui tiennent les frontières :
+
+| Ce qui est figé | Pourquoi ça casse en silence |
+|---|---|
+| `> 7` jours pour « Actif », `<= 7` pour « Expirant » | Sept jours pile bascule ; un `>=` à la place d'un `>` resterait vert |
+| Deux heures de plus font passer d'« Expirant » à « Actif » | La frontière est éprouvée des **deux** côtés |
+| « Suspendu » ramasse aussi `expire` | Deux statuts en base, un filtre à l'écran |
+| La recherche ne mord qu'à **trois** caractères | Perdre le seuil ne casse rien de visible : le tableau se met à sauter dès la première lettre |
+
+Ce sont des tests de **caractérisation** : ils passent dès l'écriture. Ce n'est
+pas un défaut, c'est leur objet — ils ne cherchent pas un bogue, ils fixent le
+comportement d'aujourd'hui. Un test qui passe du premier coup ne prouve rien sur
+le code, seulement sur ce qu'on vient d'écrire, et le dire évite de le prendre
+pour ce qu'il n'est pas.
+
+### Trouvé en les écrivant, corrigé en TDD
+
+Les quatre boutons de filtre ne se distinguaient que par leur couleur. Au
+lecteur d'écran, ils étaient identiques : rien ne disait sur quel sous-ensemble
+d'abonnés portait le tableau. `aria-pressed` le dit sans rien changer à l'œil.
+
+### Ce qui reste à décider
+
+Le découpage lui-même. Les seams sont nets — dix sous-composants internes, tous
+déjà couverts sauf `OngletAbonnements`, qui l'est maintenant. Un fichier par
+onglet suivrait la structure existante.
+
+**Écart relevé au passage, non corrigé :** l'écran client du collecteur filtre
+dès le premier caractère, l'admin à partir du troisième. Les deux se défendent
+— le premier travaille sur une liste courte et locale, le second sur un tableau
+dense. Mais rien n'indique que l'écart soit voulu plutôt que subi.
