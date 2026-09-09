@@ -76,6 +76,8 @@ règle constante n'est pas « toujours refuser » ni « toujours autoriser », c
 
 ## 🟠 B — Les deux migrations de sécurité ne sont pas en ligne
 
+> **Les deux contrôles préalables sont faits. Voir « Avant-vol » en bas.**
+
 Elles vivent dans la branche et dans la base locale. En production, à cette
 minute : `abonnement_ouvre_droit` reste un oracle, et les trois fonctions
 `security definer` restent accordées à `PUBLIC`.
@@ -200,3 +202,73 @@ le collecteur utilise toute la journée.
   l'est. La cause reste inconnue. Aucun correctif n'a été posé — le test capture
   désormais l'état de la file, pour que la prochaine occurrence livre la preuve
   au lieu d'une hypothèse de plus.
+
+---
+
+## Avant-vol du point B — fait le 2026-09-09, en lecture seule
+
+Deux commandes, aucune écriture : `supabase migration list --linked` et
+`supabase db dump --linked --schema public`.
+
+### 1. La production n'a pas dérivé au niveau des versions
+
+```
+2 migration(s) versionnée(s) et non appliquée(s) :
+  - 20260909120000_abonnement_ouvre_droit_borne.sql
+  - 20260909130000_definers_fermes_a_anon.sql
+```
+
+Exactement les deux nouvelles, et **zéro migration inconnue** — la base ne porte
+rien que le dépôt ignore. Ce contrôle ne voit toutefois que la présence, pas le
+contenu ; c'est le dump qui a levé le reste.
+
+### 2. Le resserrage de `abonnement_ouvre_droit` ne peut rien fermer
+
+Les deux seuls sites d'appel, lus **sur la production** :
+
+```sql
+CREATE POLICY "clients_insert" … WITH CHECK ((collecteur_id = (SELECT auth.uid()))
+                                  AND abonnement_ouvre_droit((SELECT auth.uid())))
+CREATE POLICY "cartes_insert"  … WITH CHECK (… même forme …)
+```
+
+`p_collecteur = auth.uid()` y est vrai par construction. Aucun troisième site.
+
+### 3. Le constat du 3 septembre est confirmé en ligne
+
+Aucune ligne `REVOKE … FROM PUBLIC` pour `journaliser_admin`,
+`paiements_immuables` ni `paiements_naissance` dans le dump : `EXECUTE` y est
+resté au défaut, donc ouvert à `PUBLIC`. Ce n'était pas qu'un état local.
+
+### 4. Une dérive réelle, qu'aucun audit n'avait vue
+
+47 fonctions `security definer` de chaque côté, et l'écart n'est pas nul :
+
+| | |
+|---|---|
+| En production seulement | **`rls_auto_enable`** |
+| En local seulement | `definers_exposes` (ma migration, non déployée) |
+
+`rls_auto_enable()` rend `event_trigger` et active RLS sur toute table créée
+dans `public`. Elle **n'est dans aucune migration du dépôt**. La passe dynamique
+ne filtre pas sur le type de retour : elle la touchera.
+
+**Mesuré plutôt que supposé**, sur une réplique locale jetable :
+
+```
+avant  : =X/postgres | postgres=X/postgres | service_role=X/postgres  → table créée, RLS = t
+revoke all … from public, anon
+après  : postgres=X/postgres | service_role=X/postgres                → table créée, RLS = t
+```
+
+Révoquer `EXECUTE` à `PUBLIC` ne casse pas un déclencheur d'événement. Le
+`=X/postgres` de tête est le droit `PUBLIC` — la forme même qu'une recherche sur
+le nom d'un rôle ne voit pas, et qui a produit l'erreur du matin.
+
+**Conclusion : les deux migrations peuvent partir.** Ce qui reste est une
+décision d'exploitation — le moment — et non une inconnue technique.
+
+**À décider à part :** `rls_auto_enable` devrait
+rejoindre une migration. Une fonction qui vit en production sans être dans le
+dépôt est invisible à toute relecture, et le prochain `db reset` d'une base de
+travail ne la recrée pas.
