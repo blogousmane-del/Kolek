@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { CleNavSuper } from '@kolek/ui';
+import { TAILLE_PAGE, type CleNavSuper } from '@kolek/ui';
 
 import type { VueGlobale } from '../donnees';
 import type { EtatSuperAdmin } from '../superadmin';
@@ -825,5 +825,95 @@ describe('le filtrage des abonnés', () => {
 
     expect(bouton('Expirant')).toBe('true');
     expect(bouton('Tous')).toBe('false');
+  });
+});
+
+/**
+ * La pagination du tableau des abonnés.
+ *
+ * ## Pourquoi ici, alors que le Journal paginait déjà
+ *
+ * Le Journal de sécurité, juste à côté, pagine **côté serveur** depuis le
+ * 2026-08-30 : il demande une page à la fois à `chargerJournal`. Ce tableau-ci
+ * ne peut pas faire pareil — ses lignes viennent de `vue.collecteurs`, chargée
+ * en une fois pour tout l'écran, et lui redemander des pages ajouterait un
+ * aller-retour par clic sur des données déjà en mémoire.
+ *
+ * C'est donc une pagination d'**affichage**, et les deux gardent la même taille
+ * de page. Deux tailles différentes dans la même console se justifieraient mal.
+ *
+ * ## Le piège que ces tests gardent
+ *
+ * Si le découpage se faisait **avant** le filtrage, la recherche ne porterait
+ * plus que sur les cinquante lignes affichées : GTCS chercherait un abonné qui
+ * existe, ne le verrait pas, et conclurait qu'il n'est pas inscrit. Sur un
+ * écran qui sert à suspendre et à réactiver des abonnements payants, c'est la
+ * mauvaise conclusion à laisser prendre.
+ */
+describe('la pagination des abonnés', () => {
+  /** `n` abonnés numérotés, tous actifs et loin de leur échéance. */
+  const beaucoup = (n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      collecteur(`Abonne ${String(i + 1).padStart(3, '0')}`, 'actif', echeanceDans(30)),
+    );
+
+  /** Les lignes réellement rendues. Une par abonné affiché, et une seule. */
+  const lignesRendues = () => screen.queryAllByTestId(/^abonne-/);
+
+  const chercher = (terme: string) =>
+    fireEvent.change(screen.getByPlaceholderText('Rechercher…'), { target: { value: terme } });
+
+  it('ne rend qu’une page de lignes, quel que soit le nombre d’abonnés', () => {
+    rendreAbonnes(beaucoup(120));
+
+    expect(lignesRendues()).toHaveLength(TAILLE_PAGE);
+  });
+
+  it('mène à la page suivante', () => {
+    rendreAbonnes(beaucoup(120));
+
+    fireEvent.click(screen.getByRole('button', { name: /page suivante/i }));
+
+    expect(screen.getByText('Abonne 051')).toBeDefined();
+    expect(screen.queryByText('Abonne 001')).toBeNull();
+  });
+
+  it('cherche dans tous les abonnés, et non dans la page affichée', () => {
+    // Le test qui compte. `Abonne 099` est en troisième page ; s'il ne
+    // remontait pas, GTCS conclurait qu'il n'est pas abonné.
+    rendreAbonnes(beaucoup(120));
+
+    chercher('Abonne 099');
+
+    expect(screen.getByText('Abonne 099')).toBeDefined();
+  });
+
+  it('revient à la première page quand la recherche change', () => {
+    // Sans ce retour, on cherche depuis la page 2 et l'écran répond par le
+    // cinquante-et-unième résultat. Les cinquante premiers existent, et sont
+    // invisibles.
+    rendreAbonnes(beaucoup(120));
+
+    fireEvent.click(screen.getByRole('button', { name: /page suivante/i }));
+    chercher('Abonne');
+
+    expect(screen.getByText('Abonne 001')).toBeDefined();
+  });
+
+  it('revient à la première page quand le filtre change', () => {
+    rendreAbonnes(beaucoup(120));
+
+    fireEvent.click(screen.getByRole('button', { name: /page suivante/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Actif' }));
+
+    expect(screen.getByText('Abonne 001')).toBeDefined();
+  });
+
+  it('n’affiche aucune commande de page quand tout tient sur une', () => {
+    // Deux flèches inertes sous cinq lignes sont du bruit, et GTCS
+    // apprendrait à ne plus les regarder.
+    rendreAbonnes(beaucoup(5));
+
+    expect(screen.queryByRole('button', { name: /page suivante/i })).toBeNull();
   });
 });

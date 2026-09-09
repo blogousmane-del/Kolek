@@ -1,5 +1,5 @@
 import { PALIERS, formatMontant } from '@kolek/core';
-import { BarreHaute, Bouton, Carte, Icone } from '@kolek/ui';
+import { BarreHaute, Bouton, Carte, Icone, Pagination, usePagination } from '@kolek/ui';
 import { useCallback, useEffect, useState } from 'react';
 
 import { telechargerCsv, versCsv, dateDuJour } from '../exporter';
@@ -41,6 +41,10 @@ function prixPalier(cle: string): string {
   if (!palier) return '—';
   return palier.prix === 0 ? 'Essai gratuit' : `${formatMontant(palier.prix)} FCFA/${palier.periode}`;
 }
+
+/** Toujours le même tableau vide, pour la lecture en cours. En recréer un à
+    chaque rendu ferait recalculer la page pour rien. */
+const AUCUNE: Demande[] = [];
 
 function quand(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', {
@@ -108,6 +112,22 @@ export function Demandes() {
 
   const nouvelles = demandes?.filter((d) => d.statut === 'nouvelle').length ?? 0;
 
+  /**
+   * La page affichée.
+   *
+   * ## Pourquoi cette liste-là, plus que les autres
+   *
+   * Elle est alimentée par le formulaire public de la vitrine. Rien ne la
+   * borne : ni le modèle d'affaires — les visiteurs ne sont pas des comptes
+   * payants —, ni le serveur, `admin-demandes` rendant tout ce que la table
+   * contient. Une campagne qui marche, ou un robot qui trouve le formulaire, et
+   * l'écran dessine mille cartes de cinq boutons chacune.
+   *
+   * `exporter()` continue d'écrire toutes les demandes : c'est le fichier des
+   * rappels, et une page ne rappelle personne.
+   */
+  const { page, pages, visibles, allerA } = usePagination(demandes ?? AUCUNE);
+
   return (
     <>
       <BarreHaute
@@ -147,7 +167,7 @@ export function Demandes() {
           </Carte>
         )}
 
-        {demandes?.map((demande) => (
+        {visibles.map((demande) => (
           <Carte
             key={demande.id}
             className={`p-5 ${demande.statut === 'nouvelle' ? 'border-info' : ''}`}
@@ -246,6 +266,11 @@ export function Demandes() {
             )}
           </Carte>
         ))}
+
+        {/* Sous la pile de cartes : la commande se cherche là où l'œil arrive
+            en finissant de lire. Elle ne s'affiche pas tant que tout tient sur
+            une page — ni, donc, pendant la lecture. */}
+        <Pagination page={page} pages={pages} total={demandes?.length ?? 0} onAller={allerA} />
       </div>
     </>
   );

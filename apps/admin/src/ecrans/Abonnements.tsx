@@ -1,5 +1,13 @@
 import { PALIERS, formatMontant } from '@kolek/core';
-import { Avatar, BadgeStatut, BarreHaute, Carte, Icone } from '@kolek/ui';
+import {
+  Avatar,
+  BadgeStatut,
+  BarreHaute,
+  Carte,
+  Icone,
+  Pagination,
+  usePagination,
+} from '@kolek/ui';
 
 import type { LigneCollecteur, VueGlobale } from '../donnees';
 import { dateDuJour, telechargerCsv, versCsv } from '../exporter';
@@ -119,6 +127,21 @@ function PastilleStatut({ c }: { c: LigneCollecteur }) {
 export function Abonnements({ vue }: { vue: VueGlobale }) {
   const { abonnements, collecteurs } = vue;
   const prixParPalier = new Map(abonnements.parPalier.map((p) => [p.palier, p.prix]));
+
+  /**
+   * La page affichée.
+   *
+   * Même liste que l'écran « Collecteurs », vue sous l'angle de la facturation,
+   * et paginée pour les mêmes raisons : rien de visible sous cinquante lignes,
+   * mais « borné par le modèle d'affaires » est une hypothèse commerciale et
+   * non une contrainte technique.
+   *
+   * Ce tableau n'a ni recherche ni filtre : il n'y a donc rien à ramener au
+   * début, contrairement aux trois autres listes paginées. `exporter()`, lui,
+   * continue d'écrire `vue.collecteurs` en entier — c'est le fichier des
+   * relances, et une page ne relance personne.
+   */
+  const { page, pages, visibles, allerA } = usePagination(collecteurs);
 
   const indicateurs = [
     {
@@ -303,11 +326,11 @@ export function Abonnements({ vue }: { vue: VueGlobale }) {
                   <span className="text-right">Dernier paiement</span>
                 </div>
 
-                {collecteurs.map((c, i) => (
+                {visibles.map((c, i) => (
                   <div
                     key={c.id}
                     className={`grid items-center px-4 sm:px-6 py-3.5 gap-4 ${
-                      i < collecteurs.length - 1 ? 'border-b border-hairline' : ''
+                      i < visibles.length - 1 ? 'border-b border-hairline' : ''
                     }`}
                     style={{ gridTemplateColumns: COLONNES }}
                   >
@@ -345,6 +368,10 @@ export function Abonnements({ vue }: { vue: VueGlobale }) {
               </div>
             </div>
           )}
+
+          {/* Hors du conteneur qui défile latéralement : les commandes restent
+              en place même quand le tableau est poussé vers la droite. */}
+          <Pagination page={page} pages={pages} total={collecteurs.length} onAller={allerA} />
         </Carte>
       </div>
     </>

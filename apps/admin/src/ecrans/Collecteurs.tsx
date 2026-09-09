@@ -6,6 +6,8 @@ import {
   CarteZone,
   EnteteSection,
   LigneCollecteur,
+  Pagination,
+  usePagination,
   type Statut,
 } from '@kolek/ui';
 import { useState } from 'react';
@@ -78,6 +80,49 @@ export function Collecteurs({
       (c.zone ?? '').toLowerCase().includes(terme)
     );
   });
+
+  /**
+   * La page affichée.
+   *
+   * ## On filtre, puis on découpe
+   *
+   * L'inverse donnerait un écran qui a l'air de marcher et qui ment : la
+   * recherche ne porterait plus que sur les cinquante lignes dessinées, et
+   * l'administrateur conclurait qu'un collecteur inscrit ne l'est pas — pour en
+   * créer un second, avec son propre abonnement à facturer.
+   *
+   * ## Pourquoi paginer une liste que le modèle d'affaires borne déjà
+   *
+   * Ces comptes sont créés à la main par GTCS, donc quelques dizaines
+   * aujourd'hui : le composant ne rend rien sous cinquante lignes, et rien ne
+   * change à l'œil. Mais « borné par le modèle d'affaires » est une hypothèse
+   * commerciale, pas une contrainte technique — elle tombe le jour où
+   * l'entreprise réussit. Et un administrateur qui apprend les commandes de
+   * page sur le tableau des cartes s'attend à les retrouver ici.
+   *
+   * `listeFiltree` reste ce qu'`exporter()` écrit : le fichier suit le filtre,
+   * jamais la page.
+   */
+  const { page, pages, visibles, allerA } = usePagination(listeFiltree);
+
+  /**
+   * Toute nouvelle question se pose depuis le début de la liste.
+   *
+   * Sans ce retour, on cherche depuis la page 2 et l'écran répond par le
+   * cinquante-et-unième résultat : les cinquante premiers existent, et sont
+   * invisibles. Le repli du crochet — ramener la page dans les bornes — ne
+   * suffit pas, puisqu'une recherche large laisse assez de pages pour que la
+   * deuxième reste valide.
+   */
+  const changerRecherche = (valeur: string) => {
+    setRecherche(valeur);
+    allerA(1);
+  };
+
+  const changerFiltre = (f: Filtre) => {
+    setFiltre(f);
+    allerA(1);
+  };
 
   function exporter() {
     // On exporte **ce qui est affiché**, pas la table entière. Un export qui
@@ -222,7 +267,7 @@ export function Collecteurs({
               <input
                 type="search"
                 value={recherche}
-                onChange={(e) => setRecherche(e.target.value)}
+                onChange={(e) => changerRecherche(e.target.value)}
                 placeholder="Nom, téléphone ou zone"
                 aria-label="Rechercher un collecteur"
                 className="flex-1 min-w-50 h-11 px-3 rounded-md border border-input bg-surface font-body text-champ text-ink"
@@ -232,7 +277,7 @@ export function Collecteurs({
                   <button
                     key={f.cle}
                     type="button"
-                    onClick={() => setFiltre(f.cle)}
+                    onClick={() => changerFiltre(f.cle)}
                     className={`px-3 h-11 rounded-md font-body text-sm font-medium cursor-pointer border ${
                       filtre === f.cle
                         ? 'bg-primary text-primary-foreground border-primary'
@@ -282,7 +327,7 @@ export function Collecteurs({
                   <div className="w-11" />
                 </div>
 
-                {listeFiltree.map((c, i) => (
+                {visibles.map((c, i) => (
                   <LigneCollecteur
                     key={c.id}
                     nom={c.nom}
@@ -291,13 +336,23 @@ export function Collecteurs({
                     clients={c.clients}
                     encaisse={formatMontant(c.encaisse)}
                     statut={statutDe(c)}
-                    derniere={i === collecteurs.length - 1}
+                    // `visibles` et non `collecteurs` : le trait du bas se
+                    // retire sur la dernière ligne **dessinée**. Comparé au
+                    // total des inscrits, il se posait n'importe où — sous la
+                    // dernière ligne dès qu'un filtre était actif, sous aucune
+                    // le reste du temps.
+                    derniere={i === visibles.length - 1}
                     onOuvrir={() => onOuvrirCollecteur(c.id)}
                   />
                 ))}
               </div>
             </div>
           )}
+
+          {/* Hors du conteneur qui défile latéralement : les commandes restent
+              en place même quand le tableau est poussé vers la droite. `total`
+              compte tout ce que le filtre laisse passer, et non la page. */}
+          <Pagination page={page} pages={pages} total={listeFiltree.length} onAller={allerA} />
         </Carte>
       </div>
     </>

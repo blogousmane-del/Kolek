@@ -6,6 +6,8 @@ import {
   Bouton,
   Carte,
   Icone,
+  Pagination,
+  usePagination,
   type CleNavSuper,
   type NomIcone,
 } from '@kolek/ui';
@@ -477,6 +479,46 @@ function OngletAbonnements({
     }
   });
 
+  /**
+   * La page affichée du tableau des abonnés.
+   *
+   * ## On filtre, puis on découpe
+   *
+   * L'inverse donnerait un écran qui a l'air de marcher et qui ment : la
+   * recherche ne porterait plus que sur les cinquante lignes affichées, et GTCS
+   * conclurait qu'un abonné qui existe n'est pas inscrit. Sur un écran qui sert
+   * à suspendre et à réactiver des abonnements payants, c'est la mauvaise
+   * conclusion à laisser prendre.
+   *
+   * ## Pourquoi ce n'est pas la pagination du Journal
+   *
+   * Le Journal de sécurité, plus bas, demande une page à la fois au serveur —
+   * ses lignes sont trop nombreuses pour tenir en mémoire. Ce tableau-ci lit
+   * `vue.collecteurs`, déjà chargée en une fois pour tout l'écran : lui
+   * redemander des pages ajouterait un aller-retour par clic sur des données
+   * qu'on a déjà. Même taille de page pour les deux, cela dit.
+   */
+  const { page, pages, visibles, allerA } = usePagination(collecteursFiltres);
+
+  /**
+   * Toute nouvelle question se pose depuis le début du tableau.
+   *
+   * Sans ce retour, on cherche depuis la page 2 et l'écran répond par le
+   * cinquante-et-unième résultat : les cinquante premiers existent, et sont
+   * invisibles. Le repli du crochet — ramener la page dans les bornes — ne
+   * suffit pas, puisqu'une recherche large laisse assez de pages pour que la
+   * deuxième reste valide.
+   */
+  const changerFiltre = (f: FiltreStatut) => {
+    setFiltre(f);
+    allerA(1);
+  };
+
+  const changerRecherche = (terme: string) => {
+    setRecherche(terme);
+    allerA(1);
+  };
+
   const indicateurs = [
     {
       libelle: 'MRR total',
@@ -684,7 +726,7 @@ function OngletAbonnements({
                   // rien n'indiquait sur quel sous-ensemble d'abonnés on
                   // regardait. `aria-pressed` le dit sans rien changer à l'œil.
                   aria-pressed={filtre === f.cle}
-                  onClick={() => setFiltre(f.cle)}
+                  onClick={() => changerFiltre(f.cle)}
                   className={`px-3 py-1.5 rounded-md text-sm font-body font-medium cursor-pointer transition-colors ${
                     filtre === f.cle
                       ? 'bg-primary text-primary-foreground'
@@ -706,7 +748,7 @@ function OngletAbonnements({
                 type="text"
                 placeholder="Rechercher…"
                 value={recherche}
-                onChange={(e) => setRecherche(e.target.value)}
+                onChange={(e) => changerRecherche(e.target.value)}
                 className="pl-9 pr-3 h-9 bg-surface border border-hairline rounded-md font-body text-champ text-ink outline-none focus:border-primary w-44"
               />
             </div>
@@ -735,12 +777,12 @@ function OngletAbonnements({
                 <span />
               </div>
 
-              {collecteursFiltres.map((c, i) => (
+              {visibles.map((c, i) => (
                 <div
                   key={c.id}
                   data-testid={`abonne-${c.id}`}
                   className={`grid items-center px-4 sm:px-6 py-3.5 gap-4 ${
-                    i < collecteursFiltres.length - 1 ? 'border-b border-hairline' : ''
+                    i < visibles.length - 1 ? 'border-b border-hairline' : ''
                   }`}
                   style={{ gridTemplateColumns: COLONNES_ABONNES }}
                 >
@@ -802,6 +844,16 @@ function OngletAbonnements({
             </div>
           </div>
         )}
+
+        {/* Hors du conteneur qui défile latéralement : les commandes restent en
+            place même quand le tableau est poussé vers la droite. `total`
+            compte tout ce que le filtre laisse passer, et non la page. */}
+        <Pagination
+          page={page}
+          pages={pages}
+          total={collecteursFiltres.length}
+          onAller={allerA}
+        />
       </Carte>
     </>
   );

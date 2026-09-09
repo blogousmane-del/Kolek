@@ -1,4 +1,5 @@
 import { formatMontant, MISES_PAR_CYCLE } from '@kolek/core';
+import { TAILLE_PAGE } from '@kolek/ui';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -462,5 +463,137 @@ describe('liste tronquee par le serveur', () => {
     await screen.findByText('Hj');
 
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+/**
+ * La pagination d'affichage.
+ *
+ * ## Ce qu'elle est, et ce qu'elle n'est pas
+ *
+ * Elle decoupe la liste **deja chargee**. Elle ne va rien chercher au serveur,
+ * et ce n'est pas un raccourci : le collecteur travaille hors ligne, et une
+ * pagination qui demanderait la page suivante au reseau ne rendrait rien au
+ * marche. Les lignes sont toutes chargees — voir `src/pagination.ts` — et seule
+ * leur restitution est decoupee.
+ *
+ * Ce qu'elle gagne : mille deux cents clients ne font plus mille deux cents
+ * lignes dans le document sur un telephone d'entree de gamme.
+ *
+ * ## Le piege que ces tests gardent
+ *
+ * Si le decoupage se faisait **avant** le filtrage, la recherche ne porterait
+ * plus que sur la page affichee. Le collecteur chercherait un client qui existe,
+ * ne le verrait pas, et le reinscrirait : deux carnets pour une personne, et un
+ * solde restituable calcule sur le mauvais. C'est exactement le defaut que le
+ * bandeau de troncature ci-dessus surveille — et une pagination mal branchee le
+ * ferait rentrer par la porte de derriere, sans bandeau pour le dire.
+ */
+describe('pagination de la liste', () => {
+  /** `n` clients numerotes, pour que l'ordre de lecture se lise a l'oeil nu. */
+  const beaucoup = (n: number) =>
+    Array.from({ length: n }, (_, i) => {
+      const rang = String(i + 1).padStart(3, '0');
+      return { id: `c${rang}`, nom: `Client ${rang}`, marche: null, telephone: null, avis_actifs: false };
+    });
+
+  /** Les memes faux que `brancherSupabase`, avec une liste de clients au choix. */
+  function brancherListe(clients: ReturnType<typeof beaucoup>) {
+    const page = <T,>(lignes: T[], count: number | null) => ({
+      range: (debut: number, fin: number) =>
+        Promise.resolve({ data: lignes.slice(debut, fin + 1), error: null, count }),
+    });
+
+    from.mockImplementation((table: string) => {
+      if (table === 'clients') {
+        return { select: () => ({ order: () => ({ order: () => page(clients, clients.length) }) }) };
+      }
+      return { select: () => ({ order: () => page([], null) }) };
+    });
+  }
+
+  const chercher = (terme: string) =>
+    fireEvent.change(screen.getByLabelText('Rechercher un client'), {
+      target: { value: terme },
+    });
+
+  /** Une commande par ligne rendue, et une seule : de quoi les compter. */
+  const lignesRendues = () => screen.queryAllByRole('button', { name: /^Ouvrir la fiche de/ });
+
+  it('ne rend qu’une page de lignes, quelle que soit la longueur de la liste', async () => {
+    brancherListe(beaucoup(120));
+    rendre();
+    await screen.findByText('Client 001');
+
+    expect(lignesRendues()).toHaveLength(TAILLE_PAGE);
+  });
+
+  it('mene a la page suivante', async () => {
+    brancherListe(beaucoup(120));
+    rendre();
+    await screen.findByText('Client 001');
+
+    fireEvent.click(screen.getByRole('button', { name: /page suivante/i }));
+
+    expect(screen.getByText('Client 051')).toBeDefined();
+    expect(screen.queryByText('Client 001')).toBeNull();
+  });
+
+  it('cherche dans tous les clients, et non dans la page affichee', async () => {
+    // Le test qui compte. `Client 099` est en troisieme page ; s'il ne
+    // remontait pas, le collecteur conclurait qu'il n'est pas inscrit.
+    brancherListe(beaucoup(120));
+    rendre();
+    await screen.findByText('Client 001');
+
+    chercher('Client 099');
+
+    expect(screen.getByText('Client 099')).toBeDefined();
+  });
+
+  it('compte tous les clients trouves, et non ceux de la page', async () => {
+    brancherListe(beaucoup(120));
+    rendre();
+    await screen.findByText('Client 001');
+
+    // « Client 0 » vaut pour 001 a 099. Annoncer 50 — le nombre de lignes
+    // rendues — ferait croire que la recherche s'arrete la.
+    chercher('Client 0');
+
+    expect(screen.getByText(/99 clients trouvés/)).toBeDefined();
+  });
+
+  it('revient a la premiere page quand la recherche change', async () => {
+    // Sans ce retour, on cherche depuis la page 2 et l'ecran repond par le
+    // 51e resultat. Les cinquante premiers existent, et sont invisibles.
+    brancherListe(beaucoup(120));
+    rendre();
+    await screen.findByText('Client 001');
+
+    fireEvent.click(screen.getByRole('button', { name: /page suivante/i }));
+    chercher('Client');
+
+    expect(screen.getByText('Client 001')).toBeDefined();
+  });
+
+  it('revient a la premiere page quand le filtre change', async () => {
+    brancherListe(beaucoup(120));
+    rendre();
+    await screen.findByText('Client 001');
+
+    fireEvent.click(screen.getByRole('button', { name: /page suivante/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sans carte' }));
+
+    expect(screen.getByText('Client 001')).toBeDefined();
+  });
+
+  it('n’affiche aucune commande de page quand tout tient sur une', async () => {
+    // Deux fleches inertes sous trois lignes sont du bruit, et le collecteur
+    // apprendrait a ne plus les regarder.
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+
+    expect(screen.queryByRole('button', { name: /page suivante/i })).toBeNull();
   });
 });

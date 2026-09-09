@@ -122,12 +122,48 @@ complet. C'est la seule application qui parte en itinérance.
 Plus du double du deuxième fichier du dépôt. ~~Aucun test ne le nomme.~~ Faux :
 `SuperAdmin.test.tsx` fait 644 lignes et couvre huit de ses parties.
 
-## 🟡 F — La pagination de la liste clients
+## 🟡 → ✅ F — La pagination de la liste clients
 
 Le bandeau posé aujourd'hui dit la troncature ; il ne la répare pas. Au-delà de
 mille clients, un collecteur voit un avertissement et rien d'autre. Demande de
 décider ce que devient la recherche — locale aujourd'hui, donc incapable de
 trouver ce que le serveur n'a pas envoyé.
+
+**Réglé en deux fois, et les deux moitiés ne se remplacent pas.**
+
+*Le chargement*, d'abord : `apps/collecteur/src/pagination.ts` épuise les pages
+jusqu'au bout, les quatre lectures du bilan comprises. La troncature à mille
+lignes est fermée, et le bandeau est devenu un recoupement — le serveur dit
+combien il possède, l'écran compare à ce qu'il a reçu. On le garde parce qu'un
+contrôle qui ne peut plus rien attraper est exactement celui qu'on retire la
+veille du jour où il aurait servi.
+
+*La restitution*, ensuite : `packages/ui/src/Pagination.tsx` découpe la liste
+déjà en mémoire, cinquante lignes à la fois. Ce n'est pas la même pagination et
+elle ne remplace pas la première — le collecteur travaille hors ligne, et une
+pagination qui demanderait la page suivante au réseau ne rendrait rien au
+marché. Ce qu'elle gagne est le rendu : mille deux cents clients ne font plus
+mille deux cents lignes dans le document sur un téléphone d'entrée de gamme.
+
+**La question laissée ouverte trouve sa réponse dans l'ordre des deux
+opérations.** On filtre, *puis* on découpe. L'inverse donnerait un écran qui a
+l'air de marcher et qui ment : la recherche ne porterait plus que sur les
+cinquante lignes dessinées, et le collecteur conclurait qu'un client inscrit ne
+l'est pas — c'est-à-dire le défaut même que le bandeau surveille, rentré par la
+porte de derrière et sans bandeau pour le dire. Les trois listes qui ont une
+recherche portent chacune un test qui garde cet ordre : une ligne de la
+troisième page doit remonter.
+
+Branchée sur six listes. Une côté collecteur, `Clients` ; cinq côté
+administration, `EncoursSoldes`, `Collecteurs`, `Abonnements`, `Demandes` et les
+abonnés du Super Admin.
+
+Cinq d'entre elles sont bornées par ailleurs — cinq cents cartes côté serveur,
+quelques dizaines de comptes payants créés à la main — et n'afficheront donc
+rien avant longtemps. On les pagine quand même : « borné par le modèle
+d'affaires » est une hypothèse commerciale et non une contrainte technique, et
+elle tombe le jour où l'entreprise réussit. La sixième, `Demandes`, n'est bornée
+par personne : elle est alimentée par le formulaire public de la vitrine.
 
 ## 🟢 → ✅ G — Le README envoie le nouveau venu dans le mur
 
@@ -171,6 +207,8 @@ un défaut du code. À savoir avant d'aller chercher un bogue qui n'existe pas.
 3. **C** — les trois portillons non testés.
 4. **B** — sur décision de l'exploitant, après `verifier:migrations`.
 5. **D, E, F** — chantiers à part entière, à ouvrir chacun avec son plan.
+   **F est fait** — voir sa section, réglé en deux moitiés qui ne se remplacent
+   pas. **D et E restent ouverts.**
 
 ---
 

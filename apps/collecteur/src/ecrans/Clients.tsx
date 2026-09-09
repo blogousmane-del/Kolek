@@ -6,10 +6,12 @@ import {
   Bouton,
   Carte,
   Icone,
+  Pagination,
   Rosace,
   SqueletteKPI,
   SqueletteLigne,
   useEnLigne,
+  usePagination,
   type Statut,
 } from '@kolek/ui';
 import { useEffect, useMemo, useState } from 'react';
@@ -347,6 +349,50 @@ export function Clients({
   }, [lignes, toutesCartes, recherche, filtre]);
 
   /**
+   * La page affichée, découpée dans `visibles`.
+   *
+   * ## L'ordre des deux opérations est le sujet
+   *
+   * On filtre, **puis** on découpe. L'inverse — découper puis filtrer — donne
+   * un écran qui a l'air de marcher et qui ment : la recherche ne porterait
+   * plus que sur les cinquante lignes affichées. Le collecteur chercherait un
+   * client inscrit, ne le verrait pas, et le réinscrirait. Deux carnets pour
+   * une personne, et un solde restituable calculé sur le mauvais — c'est
+   * exactement ce que le bandeau de troncature ci-dessus surveille, et une
+   * pagination posée à l'envers le ferait rentrer sans bandeau pour le dire.
+   *
+   * `visibles.length` reste donc le compte de tout ce qui correspond : les
+   * commandes de page l'annoncent, et l'annonce de recherche s'appuie dessus.
+   *
+   * Ce que ça ne change pas : les lignes sont toutes chargées. Voir
+   * `src/pagination.ts` — dans une application qui travaille hors ligne,
+   * demander la page suivante au réseau ne rendrait rien au marché.
+   */
+  const { page, pages, visibles: affichees, allerA } = usePagination(visibles);
+
+  /**
+   * Toute nouvelle question se pose depuis le début de la liste.
+   *
+   * Sans ce retour, on cherche depuis la page 3 et l'écran répond par le
+   * cent-unième résultat : les cent premiers existent, et sont invisibles.
+   * Le repli du crochet — ramener la page dans les bornes — ne suffit pas ici,
+   * puisqu'une recherche large laisse assez de pages pour que la troisième
+   * reste valide.
+   *
+   * C'est un geste, donc ça se fait dans le gestionnaire et non dans un
+   * `useEffect` : rien à synchroniser après coup.
+   */
+  const changerRecherche = (terme: string) => {
+    setRecherche(terme);
+    allerA(1);
+  };
+
+  const changerFiltre = (f: Filtre) => {
+    setFiltre(f);
+    allerA(1);
+  };
+
+  /**
    * Combien de clients la **recherche** trouve, filtre ignoré.
    *
    * `visibles` est rétréci par deux choses à la fois. Compter dessus faisait
@@ -519,11 +565,11 @@ export function Clients({
             // touche et qui ne fait pas 44 px.
             type="text"
             value={recherche}
-            onChange={(e) => setRecherche(e.target.value)}
+            onChange={(e) => changerRecherche(e.target.value)}
             onKeyDown={(e) => {
               // Le geste attendu partout, et le seul qui ne demande pas de
               // viser : la main qui tape n'a pas à retrouver la croix.
-              if (e.key === 'Escape') setRecherche('');
+              if (e.key === 'Escape') changerRecherche('');
             }}
             placeholder="Nom, numéro ou marché…"
             aria-label="Rechercher un client"
@@ -539,7 +585,7 @@ export function Clients({
           {recherche && (
             <button
               type="button"
-              onClick={() => setRecherche('')}
+              onClick={() => changerRecherche('')}
               aria-label="Effacer la recherche"
               // 44 px, comme `Champ` et `ChampTelephone`. La croix faisait
               // 20 px : au marché, à une main, la manquer efface un caractère
@@ -603,7 +649,7 @@ export function Clients({
           <button
             key={f}
             type="button"
-            onClick={() => setFiltre(f)}
+            onClick={() => changerFiltre(f)}
             className={`px-4 py-1.5 rounded-md text-xs xs:text-sm font-body font-semibold border whitespace-nowrap cursor-pointer transition-all shadow-xs ${
               f === filtre
                 ? 'bg-primary text-primary-foreground border-primary'
@@ -661,7 +707,7 @@ export function Clients({
           </Carte>
         )}
 
-        {visibles.map((ligne, rang) => (
+        {affichees.map((ligne, rang) => (
           <div
             key={ligne.cle}
             className={premier ? 'anim-cascade' : undefined}
@@ -676,6 +722,11 @@ export function Clients({
           </div>
         ))}
       </div>
+
+      {/* Sous la liste, et non au-dessus : la commande se cherche là où le
+          pouce arrive en finissant de lire. Elle ne s'affiche pas du tout tant
+          que tout tient sur une page. */}
+      <Pagination page={page} pages={pages} total={visibles.length} onAller={allerA} />
 
       <div className="flex-1 min-h-4" />
 

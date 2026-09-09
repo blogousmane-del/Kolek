@@ -1,5 +1,13 @@
 import { MISES_PAR_CYCLE, formatMontant } from '@kolek/core';
-import { Avatar, BadgeStatut, BarreHaute, Carte, type Statut } from '@kolek/ui';
+import {
+  Avatar,
+  BadgeStatut,
+  BarreHaute,
+  Carte,
+  Pagination,
+  usePagination,
+  type Statut,
+} from '@kolek/ui';
 
 import type { LigneCarte, VueGlobale } from '../donnees';
 
@@ -34,6 +42,19 @@ function statutDe(c: LigneCarte): Statut {
 
 export function EncoursSoldes({ vue }: { vue: VueGlobale }) {
   const { totaux, cartes, cartes_total_lignes } = vue;
+
+  /**
+   * La page affichée.
+   *
+   * C'est la plus longue liste de l'admin : `admin-vue-globale` en rend jusqu'à
+   * cinq cents lignes de six colonnes, soit trois mille cellules dans le
+   * document, sur un tableau qu'on ouvre pour en lire vingt.
+   *
+   * Elle ne va rien chercher de plus au serveur : la borne des cinq cents reste,
+   * et le compte en tête continue de la dire. Seul le nombre de lignes rendues
+   * d'un coup change.
+   */
+  const { page, pages, visibles, allerA } = usePagination(cartes);
 
   const indicateurs = [
     {
@@ -119,11 +140,11 @@ export function EncoursSoldes({ vue }: { vue: VueGlobale }) {
                   <span className="text-right">Statut</span>
                 </div>
 
-                {cartes.map((c, i) => (
+                {visibles.map((c, i) => (
                   <div
                     key={c.id}
                     className={`grid items-center px-4 sm:px-6 py-3.5 gap-4 ${
-                      i < cartes.length - 1 ? 'border-b border-hairline' : ''
+                      i < visibles.length - 1 ? 'border-b border-hairline' : ''
                     }`}
                     style={{ gridTemplateColumns: COLONNES }}
                   >
@@ -153,6 +174,12 @@ export function EncoursSoldes({ vue }: { vue: VueGlobale }) {
               </div>
             </div>
           )}
+
+          {/* Hors du conteneur qui défile latéralement : les commandes doivent
+              rester sous le pouce même quand le tableau est poussé vers la
+              droite. `total` compte les cartes reçues — la borne serveur, elle,
+              se lit en tête. */}
+          <Pagination page={page} pages={pages} total={cartes.length} onAller={allerA} />
         </Carte>
       </div>
     </>
