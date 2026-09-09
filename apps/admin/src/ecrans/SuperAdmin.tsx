@@ -678,6 +678,12 @@ function OngletAbonnements({
                 <button
                   key={f.cle}
                   type="button"
+                  // Lequel des quatre porte le tableau ne se disait que par la
+                  // couleur — `bg-primary` contre `text-muted-foreground`. Au
+                  // lecteur d'écran, les quatre boutons étaient identiques, et
+                  // rien n'indiquait sur quel sous-ensemble d'abonnés on
+                  // regardait. `aria-pressed` le dit sans rien changer à l'œil.
+                  aria-pressed={filtre === f.cle}
                   onClick={() => setFiltre(f.cle)}
                   className={`px-3 py-1.5 rounded-md text-sm font-body font-medium cursor-pointer transition-colors ${
                     filtre === f.cle

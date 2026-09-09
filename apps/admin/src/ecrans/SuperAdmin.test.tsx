@@ -642,3 +642,188 @@ describe('les commandes d’une ligne d’abonné', () => {
     expect(valeurs).toEqual(enCours);
   });
 });
+
+/**
+ * Le filtrage des abonnés.
+ *
+ * ## Pourquoi ce bloc arrive après les autres
+ *
+ * `SuperAdmin.tsx` fait 1 634 lignes et l'audit du 2026-09-09 proposait de le
+ * découper. Ces trente tests couvraient déjà huit de ses parties — l'audit
+ * disait « aucun test ne le nomme », ce qui était faux — mais **pas** celle-ci,
+ * qui est pourtant la seule vraie logique de décision du fichier.
+ *
+ * Ce sont donc des tests de **caractérisation** : ils passent dès l'écriture,
+ * et ce n'est pas un défaut, c'est leur objet. Ils ne cherchent pas un bogue,
+ * ils fixent le comportement d'aujourd'hui pour qu'un découpage qui le change
+ * échoue au lieu de passer inaperçu. Le dire est important : un test qui passe
+ * du premier coup ne prouve rien sur le code, seulement sur ce qu'on a écrit.
+ *
+ * ## La frontière qui compte
+ *
+ * `jours = ceil((échéance − maintenant) / 86 400 000)`, puis `> 7` pour
+ * « Actif » et `<= 7` pour « Expirant ». Sept jours pile tombe donc dans
+ * « Expirant ». Une réécriture qui prendrait `floor`, ou `< 7`, déplacerait
+ * silencieusement le moment où GTCS voit qu'un abonnement s'éteint.
+ */
+function echeanceDans(jours: number, heures = 0): string {
+  return new Date(Date.now() + jours * 86_400_000 + heures * 3_600_000).toISOString();
+}
+
+function collecteur(
+  nom: string,
+  abonnement_statut: string,
+  echeance: string,
+  telephone = '+2250700000009',
+) {
+  return {
+    id: `id-${nom}`,
+    nom,
+    telephone,
+    zone: 'Cocody',
+    palier: 'pro',
+    abonnement_statut,
+    abonnement_echeance: echeance,
+    cree_le: '2026-06-12T09:00:00Z',
+    clients: 1,
+    cartes_actives: 1,
+    encaisse: 0,
+    commissions: 0,
+    restitutions: 0,
+    encours: 0,
+  };
+}
+
+function rendreAbonnes(collecteurs: unknown[]) {
+  poser({ statut: 'ok', etat: ETAT });
+  return render(
+    <SuperAdmin
+      vue={{ ...VUE, collecteurs } as unknown as VueGlobale}
+      onglet="abonnements"
+      onRecharger={rechargerVue}
+    />,
+  );
+}
+
+/** Les noms visibles dans le tableau des abonnés. */
+function nomsAffiches(): string[] {
+  // Des noms qui ne peuvent pas entrer en collision avec les libellés des
+  // filtres : une première version appelait un collecteur « Suspendu », et
+  // `queryByText` trouvait aussi le bouton du même nom.
+  return ['Adjoa', 'Brahima', 'Cisse', 'Diarra', 'Ekra'].filter(
+    (n) => screen.queryByText(n) !== null,
+  );
+}
+
+describe('le filtrage des abonnés', () => {
+  const TOUS = [
+    collecteur('Adjoa', 'actif', echeanceDans(30)),
+    collecteur('Brahima', 'actif', echeanceDans(3)),
+    collecteur('Cisse', 'actif', echeanceDans(7)),
+    collecteur('Diarra', 'suspendu', echeanceDans(30)),
+    collecteur('Ekra', 'expire', echeanceDans(-5)),
+  ];
+
+  it('montre tout le monde par défaut', () => {
+    rendreAbonnes(TOUS);
+
+    expect(nomsAffiches()).toEqual(['Adjoa', 'Brahima', 'Cisse', 'Diarra', 'Ekra']);
+  });
+
+  it('« Actif » écarte ceux dont l’échéance est dans sept jours ou moins', () => {
+    rendreAbonnes(TOUS);
+    fireEvent.click(screen.getByRole('button', { name: 'Actif' }));
+
+    expect(nomsAffiches()).toEqual(['Adjoa']);
+  });
+
+  it('« Expirant » ne prend que les actifs à sept jours ou moins', () => {
+    // Sept jours pile en fait partie : `ceil` d'un écart de sept jours vaut
+    // sept, et la borne est `<= 7`. C'est le cas qu'une réécriture déplace.
+    rendreAbonnes(TOUS);
+    fireEvent.click(screen.getByRole('button', { name: 'Expirant' }));
+
+    expect(nomsAffiches()).toEqual(['Brahima', 'Cisse']);
+  });
+
+  it('deux heures de plus font basculer d’« Expirant » à « Actif »', () => {
+    // La frontière, éprouvée des deux côtés plutôt qu'affirmée : sans ce test,
+    // un `>=` mis à la place d'un `>` resterait vert.
+    rendreAbonnes([collecteur('Cisse', 'actif', echeanceDans(7, 2))]);
+    fireEvent.click(screen.getByRole('button', { name: 'Actif' }));
+
+    expect(screen.queryByText('Cisse')).not.toBeNull();
+  });
+
+  it('« Suspendu » ramasse aussi les abonnements expirés', () => {
+    // Deux statuts distincts en base, un seul filtre à l'écran : pour GTCS, un
+    // abonnement éteint est un abonnement éteint, quelle qu'en soit la cause.
+    rendreAbonnes(TOUS);
+    fireEvent.click(screen.getByRole('button', { name: 'Suspendu' }));
+
+    expect(nomsAffiches()).toEqual(['Diarra', 'Ekra']);
+  });
+
+  it('cherche par nom et par téléphone', () => {
+    rendreAbonnes([
+      collecteur('Adjoa', 'actif', echeanceDans(30), '+2250701010101'),
+      collecteur('Brahima', 'actif', echeanceDans(3), '+2250702020202'),
+    ]);
+    const champ = screen.getByPlaceholderText('Rechercher…');
+
+    fireEvent.change(champ, { target: { value: 'adjoa' } });
+    expect(nomsAffiches()).toEqual(['Adjoa']);
+
+    fireEvent.change(champ, { target: { value: '0702020202' } });
+    expect(nomsAffiches()).toEqual(['Brahima']);
+  });
+
+  it('cumule la recherche et le filtre', () => {
+    rendreAbonnes(TOUS);
+    fireEvent.change(screen.getByPlaceholderText('Rechercher…'), { target: { value: 'rra' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Expirant' }));
+
+    // « rra » ne prend que Diarra, que le filtre écarte ensuite : suspendu.
+    // Aucun des deux seul ne donnerait une liste vide.
+    expect(nomsAffiches()).toEqual([]);
+  });
+
+  it('ne cherche qu’à partir de trois caractères', () => {
+    // Seuil délibéré : sous trois lettres, presque tout le monde correspond et
+    // le tableau clignoterait à chaque frappe. Un découpage qui le perdrait ne
+    // casserait rien de visible — la liste se mettrait seulement à sauter dès
+    // la première lettre.
+    //
+    // Noté au passage : l'écran client du collecteur n'a pas ce seuil et
+    // filtre dès le premier caractère. Les deux se défendent, mais rien
+    // n'indique que l'écart soit voulu.
+    rendreAbonnes(TOUS);
+    const champ = screen.getByPlaceholderText('Rechercher…');
+
+    fireEvent.change(champ, { target: { value: 'ad' } });
+    expect(nomsAffiches()).toHaveLength(5);
+
+    fireEvent.change(champ, { target: { value: 'adj' } });
+    expect(nomsAffiches()).toEqual(['Adjoa']);
+  });
+
+  it('dit lequel des quatre filtres est actif', () => {
+    // Manque relevé en écrivant ce bloc : les quatre boutons ne se
+    // distinguaient que par leur couleur — `bg-primary` contre
+    // `text-muted-foreground`. Au lecteur d'écran, les quatre étaient
+    // identiques, et rien ne disait sur quel sous-ensemble portait le tableau.
+    rendreAbonnes(TOUS);
+
+    // `getAttribute` et non `toHaveAttribute` : ce dépôt ne charge pas les
+    // matchers de jest-dom, et l'assertion serait `undefined` à l'exécution.
+    const bouton = (nom: string) =>
+      screen.getByRole('button', { name: nom }).getAttribute('aria-pressed');
+
+    expect(bouton('Tous')).toBe('true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expirant' }));
+
+    expect(bouton('Expirant')).toBe('true');
+    expect(bouton('Tous')).toBe('false');
+  });
+});
