@@ -319,3 +319,54 @@ clients et des cartes exactement comme avant.
 
 **Le dépôt n'a pas été fusionné ni poussé.** Les migrations sont en base, le
 code reste sur la branche. Rien n'a été déployé côté Edge Functions.
+
+---
+
+## 🟡 F — Fait en partie, et le reste est nommé
+
+### Fermé
+
+- **`Clients.tsx`** — les deux requêtes épuisent leurs pages. La seconde,
+  `cartes`, se tronquait aussi et **rien ne pouvait le voir** : le comptage posé
+  la veille ne portait que sur `clients`. Un collecteur au-delà de mille cartes
+  aurait vu des clients dépourvus des leurs.
+- **`chargerBilan()`** — ses quatre lectures. C'est celle qui comptait le plus :
+  le bilan **somme de l'argent**, et une troncature n'y casse rien visiblement,
+  elle rend un total plus petit que la réalité. Trente jours à cinquante
+  encaissements par jour font mille cinq cents lignes de `mises`.
+
+### Le dessin retenu, et pourquoi
+
+Tout charger, pas paginer à l'écran. Le collecteur travaille **hors ligne** et
+sa recherche filtre le tableau déjà chargé : une pagination à l'écran irait
+demander au serveur ce que le collecteur n'a pas, c'est-à-dire rien, dans un
+marché sans réseau.
+
+`order('id')` avant `range` partout — une pagination sur un ordre non total peut
+rendre deux fois la même ligne et en sauter une autre. `nom` n'est pas unique.
+
+### Ce qui reste, et ce qu'il ne faut pas croire
+
+Un balayage heuristique signale une vingtaine d'autres lectures sans borne dans
+`lectures-ecrans.ts`, `lectures.ts` et `ecritures.ts`. **Cette liste n'est pas
+exploitable telle quelle** : elle a signalé à tort les trois lectures du bilan
+qui venaient d'être paginées, parce que le `.range()` tombait hors de sa fenêtre
+de trois lignes. Beaucoup des autres sont naturellement bornées par un `.eq()`
+sur un seul client.
+
+Chaque site demande donc un jugement : *cette table peut-elle dépasser mille
+lignes pour un collecteur, et que se passe-t-il si elle le fait ?* Le balayage
+sert à ouvrir la liste, pas à la clore :
+
+```
+grep -rn "\.from('\(mises\|cartes\|clients\|retraits\)'" apps/collecteur/src
+```
+
+**Ordre suggéré, par conséquence :** ce qui affiche de l'argent d'abord
+(`chargerRapprochement`, `chargerRecus`), puis ce qui compte
+(`chargerProfil`, `chargerEtatAvis`), puis le reste.
+
+Le corriger d'un coup n'était pas raisonnable : les treize requêtes concernées
+sont simulées dans sept fichiers de test dont les faux imitent la chaîne courte.
+Les changer toutes en une fois aurait produit une vague d'échecs sans rapport
+avec le défaut, et un lot qu'on ne peut plus relire.

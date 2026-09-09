@@ -1,6 +1,7 @@
 import { MISES_PAR_CYCLE, formatMontant, soldeRestituable } from '@kolek/core';
 
 import type { Carte, MiseRecente } from './lectures';
+import { chargerTout } from './pagination';
 import { supabase } from './supabase';
 
 /**
@@ -78,11 +79,47 @@ export interface Bilan {
 export async function chargerBilan(): Promise<Bilan> {
   const depuis = ilYA(30).toISOString();
 
+  // ## Pourquoi ces quatre lectures épuisent leurs pages
+  //
+  // PostgREST applique `max_rows = 1000` sans erreur ni en-tête. Le bilan
+  // **somme de l'argent** : une troncature ne casse rien visiblement, elle rend
+  // un total plus petit que la réalité, et le collecteur n'a aucun moyen de
+  // s'en apercevoir.
+  //
+  // Le cas n'est pas théorique. Trente jours à cinquante encaissements par jour
+  // font mille cinq cents lignes de `mises` : au-delà du millier, « encaissé sur
+  // 30 jours » se met à mentir vers le bas. `cartes` et `clients` sont, elles,
+  // sans borne de date et grandissent avec l'ancienneté du collecteur.
+  //
+  // `order('id')` avant `range` : une pagination sur un ordre non total peut
+  // rendre deux fois la même ligne et en sauter une autre.
   const [rMises, rCartes, rClients, rRetraits] = await Promise.all([
-    supabase.from('mises').select('montant, est_commission, encaisse_le').gte('encaisse_le', depuis),
-    supabase.from('cartes').select('id, mise, statut, mises_encaissees, ouverte_le, cloturee_le'),
-    supabase.from('clients').select('id'),
-    supabase.from('retraits').select('montant_restitue, effectue_le').gte('effectue_le', depuis),
+    chargerTout((debut, fin) =>
+      supabase
+        .from('mises')
+        .select('montant, est_commission, encaisse_le')
+        .gte('encaisse_le', depuis)
+        .order('id')
+        .range(debut, fin),
+    ),
+    chargerTout((debut, fin) =>
+      supabase
+        .from('cartes')
+        .select('id, mise, statut, mises_encaissees, ouverte_le, cloturee_le')
+        .order('id')
+        .range(debut, fin),
+    ),
+    chargerTout((debut, fin) =>
+      supabase.from('clients').select('id').order('id').range(debut, fin),
+    ),
+    chargerTout((debut, fin) =>
+      supabase
+        .from('retraits')
+        .select('montant_restitue, effectue_le')
+        .gte('effectue_le', depuis)
+        .order('id')
+        .range(debut, fin),
+    ),
   ]);
 
   const mises = (rMises.data ?? []) as Array<{
