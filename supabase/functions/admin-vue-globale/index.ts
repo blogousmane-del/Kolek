@@ -117,6 +117,20 @@ Deno.serve(async (requete) => {
   if (requete.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: entetesPour(requete) });
   }
+  // Seule des sept fonctions d'administration à ne contrôler aucune méthode
+  // jusqu'au 2026-09-09 : un `DELETE` traversait le portillon et repartait avec
+  // les chiffres de toute la plateforme, en `200`.
+  //
+  // Le portillon d'admin tenait — rien n'était exposé à qui n'était pas admin —
+  // donc ce n'était pas une brèche. Mais un verbe qui traverse sans être nommé
+  // est une surface qui n'a été ni décidée ni relue, et `apps/admin` déclare
+  // `methode: 'GET'` pour cette fonction depuis le début.
+  //
+  // Trouvé par `supabase/tests/portillons-admin.test.ts`, qui éprouve les sept
+  // par table plutôt qu'une par une.
+  if (requete.method !== 'GET') {
+    return reponse({ erreur: 'METHODE_NON_AUTORISEE' }, 405, requete);
+  }
 
   const autorisation = requete.headers.get('Authorization');
   if (!autorisation?.startsWith('Bearer ')) {
