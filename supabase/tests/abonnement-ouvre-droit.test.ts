@@ -99,3 +99,69 @@ describe('un abonnement suspendu', () => {
     expect(error).toBeNull();
   });
 });
+
+/**
+ * La fonction ne répond que sur son appelant.
+ *
+ * Relevé par l'audit du 2026-09-03 : `abonnement_ouvre_droit` était la seule
+ * fonction de lecture à prendre un identifiant sans le borner. `security
+ * definer`, ouverte à `authenticated`, son corps était un `exists` sur
+ * l'identifiant reçu — sans aucune comparaison à `auth.uid()`.
+ *
+ * Ce que ça donnait : tout collecteur connecté pouvait demander si un
+ * identifiant arbitraire portait un abonnement actif. Il faut déjà connaître
+ * l'UUID, et la réponse tient en un booléen — c'est pourquoi ça n'a jamais été
+ * plus qu'un jaune. Mais c'est un oracle, et c'était le seul écart de motif avec
+ * `equipe_clients`, qui borne le sien à la ligne d'à côté et rend un tableau
+ * vide plutôt qu'une erreur, « pour ne rien dire de ce qu'on n'a pas le droit de
+ * voir ».
+ *
+ * Le resserrage est sans risque pour les appelants légitimes, et c'est
+ * vérifiable plutôt que supposé : les deux seuls sites d'appel sont les policies
+ * `clients_insert` et `cartes_insert`, qui passent toutes deux
+ * `(select auth.uid())` — mesuré sur `pg_policies`, pas lu dans un fichier de
+ * migration qui pourrait avoir été remplacé depuis. Aucune Edge Function ne
+ * l'appelle.
+ */
+describe('abonnement_ouvre_droit', () => {
+  let actif: CollecteurTest;
+
+  beforeAll(async () => {
+    actif = await creerCollecteur('Abonne Actif', telephone());
+  });
+
+  it('ne renseigne pas sur un autre collecteur', async () => {
+    const { data, error } = await collecteur.client.rpc('abonnement_ouvre_droit', {
+      p_collecteur: actif.id,
+    });
+
+    // `false` et non une erreur : même choix que `equipe_clients`. Un refus
+    // explicite distinguerait « cet identifiant existe mais ne te regarde pas »
+    // de « cet identifiant n'existe pas », ce qui est encore un oracle.
+    expect(error).toBeNull();
+    expect(data).toBe(false);
+  });
+
+  it('répond toujours vrai sur soi-même quand l’abonnement est actif', async () => {
+    // Le garde-fou de l'autre côté : un resserrage qui rendrait `false` pour
+    // tout le monde fermerait l'ouverture de client à des collecteurs à jour,
+    // et le test ci-dessus resterait vert.
+    const { data, error } = await actif.client.rpc('abonnement_ouvre_droit', {
+      p_collecteur: actif.id,
+    });
+
+    expect(error).toBeNull();
+    expect(data).toBe(true);
+  });
+
+  it('laisse un collecteur à jour ouvrir un client', async () => {
+    // La conséquence qui compte vraiment. Les deux policies appellent cette
+    // fonction ; si le resserrage les casse, c'est le métier qui s'arrête, pas
+    // un booléen.
+    const { error } = await actif.client
+      .from('clients')
+      .insert({ id: crypto.randomUUID(), collecteur_id: actif.id, nom: 'Client d’un abonné' });
+
+    expect(error).toBeNull();
+  });
+});

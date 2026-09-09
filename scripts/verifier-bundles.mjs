@@ -58,6 +58,69 @@ export function chercherFuites(dossier) {
   return fuites;
 }
 
+/**
+ * Les copies de fichiers d'environnement laissées sur le poste.
+ *
+ * `apps/admin/.env.prod.bak` a traîné du 2026-09-02 au 2026-09-09, réclamé par
+ * trois audits successifs. Il ne portait que deux valeurs publiques — vérifié à
+ * chaque passage — et c'est précisément pourquoi il est resté : chacun le
+ * trouvait inoffensif, personne ne le supprimait.
+ *
+ * Ce que ce contrôle vise n'est donc pas ce fichier, c'est le geste. Un
+ * `cp .env .env.bak` avant une manipulation est un réflexe ordinaire ; le
+ * fichier survit à la manipulation, suit le dossier d'une machine à l'autre, et
+ * le jour où le même geste porte sur un `.env` qui contient une clé de service,
+ * rien ne le distingue du premier.
+ *
+ * ## Liste de refus, pas liste d'autorisation
+ *
+ * On refuse les suffixes de sauvegarde plutôt que d'autoriser les noms connus.
+ * L'inverse aurait paru plus sûr et vieillirait mal : le jour où quelqu'un
+ * ajoute un `.env.staging` légitime, une liste d'autorisation le refuse, et le
+ * remède immédiat est d'élargir la liste jusqu'à ce qu'elle n'interdise plus
+ * rien.
+ *
+ * ## Où ce contrôle mord
+ *
+ * En local seulement, et c'est cohérent : `.gitignore` couvre `.env.*`, donc le
+ * CI part d'un clone qui n'en a jamais vu. La copie naît sur un poste, elle doit
+ * mourir sur ce poste.
+ */
+const SUFFIXES_DE_COPIE = ['.bak', '.old', '.save', '.orig', '.copie', '.copy', '~'];
+
+const IGNORES = ['node_modules', '.git', 'dist', '.vite', '.netlify'];
+
+export function chercherCopiesDEnv(racine) {
+  const trouvees = [];
+
+  const parcourir = (dossier, prefixe) => {
+    let entrees;
+    try {
+      entrees = readdirSync(dossier, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entree of entrees) {
+      if (IGNORES.includes(entree.name)) continue;
+      const relatif = prefixe ? `${prefixe}/${entree.name}` : entree.name;
+
+      if (entree.isDirectory()) {
+        parcourir(join(dossier, entree.name), relatif);
+        continue;
+      }
+
+      if (!entree.name.startsWith('.env')) continue;
+      if (SUFFIXES_DE_COPIE.some((suffixe) => entree.name.endsWith(suffixe))) {
+        trouvees.push(relatif);
+      }
+    }
+  };
+
+  parcourir(racine, '');
+  return trouvees;
+}
+
 // La détection du JWT par motif base64 est un filet secondaire : le contrôle
 // qui compte est le libellé service_role, présent dans toute clé de service.
 
@@ -84,5 +147,19 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     for (const f of fuites) console.error(`  ${f.chemin} — ${f.motif}`);
     process.exit(1);
   }
-  console.log('Aucune fuite dans les artefacts.');
+
+  // Le second contrôle : ce qui traîne à côté des artefacts, pas dedans.
+  const copies = chercherCopiesDEnv(process.cwd());
+  if (copies.length > 0) {
+    console.error('Copie de fichier d’environnement laissée sur le poste :');
+    for (const c of copies) console.error(`  ${c}`);
+    console.error(
+      '\nCelle-ci ne porte peut-être que des valeurs publiques. Le prochain ' +
+        'cp du même geste portera peut-être autre chose, et rien ne les ' +
+        'distinguera. À supprimer.',
+    );
+    process.exit(1);
+  }
+
+  console.log('Aucune fuite dans les artefacts, aucune copie de .env sur le poste.');
 }

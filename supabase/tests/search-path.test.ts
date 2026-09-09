@@ -80,6 +80,38 @@ describe('search_path des fonctions security definer', () => {
     ).toEqual([]);
   });
 
+  it('n’en laisse aucune atteignable sans session', async () => {
+    // Demandé par l'audit du 2026-09-03, qui avait relevé trois fonctions
+    // `security definer` exécutables par `anon` et concluait : « le motif se
+    // répète à chaque migration, et mériterait un garde-fou ».
+    //
+    // Le motif, justement : PostgreSQL accorde `EXECUTE` à `PUBLIC` sur toute
+    // fonction neuve. Ce n'est pas un oubli occasionnel, c'est le défaut de
+    // fabrique — celui qu'on ne remarque que si quelque chose le regarde.
+    //
+    // Piège mesuré le 2026-09-09, et c'est lui qui rend ce test nécessaire
+    // plutôt que confortable : le droit PUBLIC s'écrit `=X/postgres` dans
+    // `pg_proc.proacl`. Il ne nomme **personne**. Une vérification qui cherche
+    // « anon » dans l'ACL ne le voit pas, et déclare refermées trois fonctions
+    // qui ne le sont pas. C'est exactement ce qui s'est produit ce jour-là, à la
+    // main, avant que cette fonction n'existe.
+    const { data, error } = await admin.rpc('definers_exposes');
+    expect(error).toBeNull();
+
+    const exposees = (data ?? []) as Array<{ fonction: string; droits: string }>;
+
+    expect(
+      exposees,
+      `Fonctions security definer atteignables par anon ou PUBLIC :\n` +
+        exposees.map((f) => `  ${f.fonction}  [${f.droits}]`).join('\n') +
+        `\nUne fonction qui s'exécute avec les droits de son propriétaire n'a aucune ` +
+        `raison d'être appelable sans session. Ajouter à la fin de sa migration : ` +
+        `« revoke all on function public.<nom>(<args>) from public, anon; ». ` +
+        `Révoquer EXECUTE ne casse aucun déclencheur — PostgreSQL ne vérifie pas ` +
+        `ce privilège quand il en déclenche un.`,
+    ).toEqual([]);
+  });
+
   it('garde la forme sur les fonctions de contrôle elles-mêmes', async () => {
     // `journal_couverture` et `search_path_definer` lisent le catalogue avec des
     // références que `pg_temp` peut masquer — c'est le cas mesuré à 795 puis 0.

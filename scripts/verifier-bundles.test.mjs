@@ -1,13 +1,24 @@
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { chercherFuites, chercherFuitesTexte } from './verifier-bundles.mjs';
+import { chercherCopiesDEnv, chercherFuites, chercherFuitesTexte } from './verifier-bundles.mjs';
 
 function dossierAvec(contenu) {
   const base = mkdtempSync(join(tmpdir(), 'kolek-'));
   mkdirSync(join(base, 'assets'), { recursive: true });
   writeFileSync(join(base, 'assets', 'index-abc.js'), contenu);
+  return base;
+}
+
+/** Une arborescence entière, chemin relatif → contenu. */
+function arborescenceAvec(fichiers) {
+  const base = mkdtempSync(join(tmpdir(), 'kolek-'));
+  for (const [relatif, contenu] of Object.entries(fichiers)) {
+    const chemin = join(base, relatif);
+    mkdirSync(dirname(chemin), { recursive: true });
+    writeFileSync(chemin, contenu);
+  }
   return base;
 }
 
@@ -70,5 +81,61 @@ describe('motifs Chariow', () => {
     // sur un autre hôte que la documentation ne fixe pas — un motif sur le seul
     // nom du fournisseur refuserait un jour le seul chemin de paiement prévu.
     expect(chercherFuitesTexte('const marque = "Chariow"')).toEqual([]);
+  });
+});
+
+/**
+ * Les copies de fichiers d'environnement.
+ *
+ * `apps/admin/.env.prod.bak` a traîné du 2026-09-02 au 2026-09-09, demandé à la
+ * suppression par trois audits successifs. Il ne portait que deux valeurs
+ * publiques — vérifié à chaque passage — et c'est justement pourquoi il est
+ * resté : chacun le trouvait inoffensif, et personne ne le supprimait.
+ *
+ * Ce que le contrôle vise n'est pas ce fichier-là, c'est le geste. Un
+ * `cp .env .env.bak` avant une manipulation est un réflexe ordinaire ; le
+ * fichier survit à la manipulation, change de machine avec le dossier, et le
+ * jour où quelqu'un fait le même geste sur un `.env` qui porte une clé de
+ * service, plus rien ne le distingue du premier.
+ *
+ * Ce contrôle ne tourne utilement qu'en local : `.gitignore` couvre `.env.*`,
+ * donc le CI part d'un clone qui n'en a jamais. C'est cohérent — la copie naît
+ * sur un poste, elle doit mourir sur ce poste.
+ */
+describe('copies de fichiers d’environnement', () => {
+  it('signale une sauvegarde de .env', () => {
+    const dossier = arborescenceAvec({ 'apps/admin/.env.prod.bak': 'VITE_SUPABASE_URL=https://x' });
+
+    expect(chercherCopiesDEnv(dossier)).toEqual(['apps/admin/.env.prod.bak']);
+  });
+
+  it('reconnaît les autres formes du même geste', () => {
+    const dossier = arborescenceAvec({
+      '.env.old': 'x',
+      '.env.save': 'x',
+      '.env.production.copie': 'x',
+      'apps/site/.env~': 'x',
+    });
+
+    expect(chercherCopiesDEnv(dossier).sort()).toEqual([
+      '.env.old',
+      '.env.production.copie',
+      '.env.save',
+      'apps/site/.env~',
+    ]);
+  });
+
+  it('laisse tranquilles les fichiers légitimes', () => {
+    // `.env` et `.env.production` sont les fichiers de travail ;
+    // `.env.example` est versionné exprès. Un contrôle qui crierait sur eux
+    // serait désarmé le jour même.
+    const dossier = arborescenceAvec({
+      'apps/admin/.env': 'x',
+      'apps/admin/.env.example': 'x',
+      'apps/admin/.env.production': 'x',
+      'supabase/functions/.env': 'x',
+    });
+
+    expect(chercherCopiesDEnv(dossier)).toEqual([]);
   });
 });
