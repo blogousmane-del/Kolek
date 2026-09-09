@@ -11,6 +11,7 @@ import {
   Check,
   CheckCircle,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
   CircleDollarSign,
@@ -68,6 +69,8 @@ const ICONES = {
   check: Check,
   'check-circle': CheckCircle,
   'chevron-down': ChevronDown,
+  // Ajoutée le 2026-09-09 pour la pagination : `chevron-right` existait seule.
+  'chevron-left': ChevronLeft,
   'chevron-right': ChevronRight,
   'chevrons-up-down': ChevronsUpDown,
   'circle-dollar-sign': CircleDollarSign,

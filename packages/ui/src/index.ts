@@ -18,6 +18,7 @@ export { CarrouselCartes, type CarteItem } from './CarrouselCartes';
 export { CarteStat } from './CarteStat';
 export { CarteZone } from './CarteZone';
 export { Champ } from './Champ';
+export { Pagination, TAILLE_PAGE, usePagination } from './Pagination';
 export {
   ChampTelephone,
   composerE164,
