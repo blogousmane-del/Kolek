@@ -32,6 +32,20 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Le redéploiement à la demande. Il existe à cause du 2026-09-09 : une branche
+  # fusionnée en avance rapide a poussé dix-sept commits d'un coup, dont deux
+  # touchaient des Edge Functions, et le garde-fou ci-dessous n'a regardé que le
+  # dernier — qui ne touchait que `Docs/`. Rien n'a été déployé, et le job a
+  # rendu « succès ».
+  #
+  # Le garde-fou est corrigé, mais il fallait aussi un moyen de rattraper sans
+  # avoir à modifier un fichier pour la forme.
+  workflow_dispatch:
+    inputs:
+      deployer_fonctions:
+        description: Déployer les Edge Functions même si rien n'a changé
+        type: boolean
+        default: false
 
 # Deux poussées rapprochées sur la même branche : seule la dernière compte.
 concurrency:
@@ -192,7 +206,7 @@ jobs:
   fonctions:
     name: Déploiement — Edge Functions
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     # Ne déployer que ce qui a passé les deux vérifications. C'est tout
     # l'intérêt d'avoir un CI : la production ne reçoit rien qu'un test n'ait
@@ -219,18 +233,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Deux commits pour comparer la poussée à son parent.
-          fetch-depth: 2
+          # Historique entier : la plage à comparer est celle de la poussée, et
+          # elle peut porter dix-sept commits. `fetch-depth: 2` suffisait à
+          # comparer au parent — c'était justement l'erreur.
+          fetch-depth: 0
 
+      # ## Ce que ce contrôle a laissé passer le 2026-09-09
+      #
+      # Il comparait `HEAD~1 HEAD` : le dernier commit, et lui seul. Une branche
+      # fusionnée en avance rapide a poussé dix-sept commits d'un coup, dont
+      # deux touchaient `supabase/functions`. Le dernier ne touchait que
+      # `Docs/`, donc le contrôle a conclu « aucune Edge Function touchée » et
+      # le job a rendu « succès » sans rien déployer.
+      #
+      # Le symptôme est le pire de sa catégorie : un correctif de sécurité relu,
+      # testé, fusionné, et jamais mis en ligne — avec un CI vert pour le dire.
+      #
+      # ## Le repli déploie, il ne saute pas
+      #
+      # Quand la plage ne peut pas être calculée — première poussée sur la
+      # branche, historique tronqué, déclenchement manuel — on déploie. Les deux
+      # erreurs possibles ne coûtent pas la même chose : redéployer pour rien
+      # remplace du code par le même code, tandis que sauter un déploiement
+      # laisse la production en arrière **sans que rien ne le dise**. C'est
+      # exactement ce qui s'est produit.
       - name: Y a-t-il quelque chose à déployer ?
         id: portee
         run: |
-          modifiees=$(git diff --name-only HEAD~1 HEAD -- supabase/functions || true)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Déclenchement manuel : on déploie."
+            echo "deployer=oui" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          avant="${{ github.event.before }}"
+          if [ -z "$avant" ]             || [ "$avant" = "0000000000000000000000000000000000000000" ]             || ! git cat-file -e "$avant^{commit}" 2>/dev/null; then
+            echo "Plage de poussée introuvable ($avant) — on déploie par précaution."
+            echo "deployer=oui" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          modifiees=$(git diff --name-only "$avant" "${{ github.sha }}" -- supabase/functions || true)
           if [ -n "$modifiees" ]; then
             echo "$modifiees"
             echo "deployer=oui" >> "$GITHUB_OUTPUT"
           else
-            echo "Aucune Edge Function touchée par cette poussée."
+            echo "Aucune Edge Function touchée entre $avant et ${{ github.sha }}."
             echo "deployer=non" >> "$GITHUB_OUTPUT"
           fi
 
