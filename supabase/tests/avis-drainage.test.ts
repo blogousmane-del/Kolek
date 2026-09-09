@@ -373,7 +373,38 @@ describe('la réservation du lot', () => {
   it('borne la taille du lot des deux côtés', async () => {
     for (let i = 0; i < 3; i += 1) await poser();
 
-    expect(await reserver(1)).toHaveLength(1);
+    // ## Instrumentation, et pourquoi elle est là plutôt qu'un correctif
+    //
+    // Ce test échoue par intermittence — deux fois observées les 2026-09-08 et
+    // 09, toujours en suite complète, jamais seul — avec
+    // `expected [ …3 ] to have a length of 1`. Trois lignes rendues pour une
+    // demandée.
+    //
+    // Ce qui a été **écarté par la mesure**, et non par le raisonnement :
+    //   - une surcharge de signature : `pg_proc` n'en porte qu'une seule ;
+    //   - un corps fautif : `limit greatest(0, least(coalesce(p_taille, 50), 200))`
+    //     ne peut pas rendre plus que demandé ;
+    //   - l'appel lui-même : `{ p_taille: 1 }` par PostgREST rend bien 1 ligne ;
+    //   - la tâche `pg_cron` d'une minute : `avis_declencher_drainage()` sort
+    //     sur `SECRETS_ABSENTS` tant que le coffre est vide, et il l'est.
+    //
+    // Reste que trois lignes ne peuvent sortir que d'un `limit` ≥ 3, donc d'un
+    // `p_taille` qui n'est pas arrivé. Par quel chemin, on ne sait pas encore.
+    //
+    // Poser un correctif ici reviendrait à en choisir un au hasard parmi des
+    // causes non éliminées. On capture donc l'état à la place : la prochaine
+    // occurrence dira ce que la file contenait et ce qui en est sorti.
+    const { count: candidats } = await admin
+      .from('avis_clients')
+      .select('id', { count: 'exact', head: true })
+      .in('statut', ['a_envoyer', 'echoue']);
+
+    const lot = await reserver(1);
+    expect(
+      lot,
+      `${candidats} candidats avant réservation ; ${lot.length} rendus : ` +
+        lot.map((l) => `${l.id}/${l.tentatives}`).join(', '),
+    ).toHaveLength(1);
     // Une demande vide ou absurde ne réserve rien, plutôt que de faire lever la
     // base sur un `limit` négatif.
     expect(await reserver(0)).toEqual([]);
