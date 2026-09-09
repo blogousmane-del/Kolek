@@ -20,6 +20,7 @@
     "verifier:bundles": "node scripts/verifier-bundles.mjs",
     "verifier:champs": "node scripts/verifier-champs.mjs",
     "verifier:lint": "npm run lint --workspaces --if-present && oxlint packages scripts",
+    "verifier:derive": "node scripts/verifier-derive.mjs",
     "verifier:dns": "node scripts/verifier-dns.mjs",
     "verifier:exemples-env": "node scripts/verifier-exemples-env.mjs",
     "verifier:manifeste": "node scripts/verifier-manifeste.mjs",

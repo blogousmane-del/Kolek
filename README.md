@@ -96,5 +96,11 @@ contrôler ce qui reste d'un build précédent.
 - Les couleurs du manifeste PWA sont comparées à `tokens.ts`, pas relues.
   `npm run verifier:manifeste`. Elles vivent hors de toute feuille de style et
   ne réapparaissent que dans un artefact engendré.
+- Aucune fonction `security definer` ne vit en production sans être écrite dans
+  une migration. `npm run verifier:derive` — lecture seule, contre le projet
+  lié, donc à lancer à la main comme `verifier:migrations`. Il existe parce que
+  `verifier:migrations` ne compare que la **présence des versions** : le
+  2026-09-09 il rendait « aucune migration inconnue », vrai, pendant que la
+  production portait `public.rls_auto_enable()` que le dépôt ne crée nulle part.
 - La clé de service ne quitte jamais le serveur. `npm run verifier:bundles`
   le contrôle à chaque build.
