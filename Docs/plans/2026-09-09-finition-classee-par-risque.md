@@ -272,3 +272,50 @@ décision d'exploitation — le moment — et non une inconnue technique.
 rejoindre une migration. Une fonction qui vit en production sans être dans le
 dépôt est invisible à toute relecture, et le prochain `db reset` d'une base de
 travail ne la recrée pas.
+
+---
+
+## 🟠 → ✅ B — Déployé le 2026-09-09
+
+`npx supabase db push --linked --skip-vault --yes`, après un `--dry-run` qui a
+rendu `"seeds":[]` et `"roles":[]` — les deux migrations et rien d'autre.
+
+**`--skip-vault` n'était pas dans la commande demandée.** L'aide du CLI porte
+une ligne qu'aucun de nos documents ne mentionnait : *« Vault secrets from
+config.toml are updated before migrations unless `--skip-vault` is set. »* Le
+drainage SMS de production lit `kolek_url`, `kolek_cle_service` et
+`kolek_secret_drainage` dans ce coffre. `[db.vault]` est commenté dans
+`config.toml`, donc rien n'aurait été écrasé — mais « d'après ma lecture du
+fichier » est exactement la forme de raisonnement qui a produit l'erreur d'ACL
+du matin. Le drapeau ne coûte rien si la lecture est juste, et protège la
+passerelle si elle ne l'est pas.
+
+### État vérifié après coup, sur le schéma de production re-extrait
+
+| Contrôle | Résultat |
+|---|---|
+| `verifier:migrations` | « La base distante porte toutes les migrations du dépôt. » |
+| `abonnement_ouvre_droit` | Corps borné à `(select auth.uid())`, commentaire à jour |
+| `REVOKE … FROM PUBLIC` | 44 → **49** |
+
+Les cinq ajouts, et aucune perte :
+
+```
++ journaliser_admin, paiements_immuables, paiements_naissance   (les trois du 3 septembre)
++ rls_auto_enable                                               (la dérive, mesurée sans risque)
++ definers_exposes                                              (neuve, créée déjà refermée)
+```
+
+Le garde-fou interne de la seconde migration lève si une seule fonction reste
+atteignable. La migration s'est appliquée sans erreur : il a donc passé, et
+c'est cette absence d'erreur qui prouve l'état, pas le message de fin.
+
+**Sans effet sur les applications en ligne.** `abonnement_ouvre_droit` n'est
+appelée par aucune Edge Function ni par aucun écran — vérifié par recherche sur
+`supabase/functions` et `apps`, où seuls deux commentaires la nomment. Ses deux
+seuls consommateurs sont les policies `clients_insert` et `cartes_insert`, qui
+lui passent `(select auth.uid())` : un collecteur à jour continue d'ouvrir des
+clients et des cartes exactement comme avant.
+
+**Le dépôt n'a pas été fusionné ni poussé.** Les migrations sont en base, le
+code reste sur la branche. Rien n'a été déployé côté Edge Functions.
