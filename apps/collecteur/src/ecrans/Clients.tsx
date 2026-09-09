@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { ClientCible } from '../Coquille';
 import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
+import { chargerTout } from '../pagination';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { supabase } from '../supabase';
 import { ChoixMise } from './ChoixMise';
@@ -208,25 +209,44 @@ export function Clients({
     // cette enveloppe, un rejet laisse l'écran figé sur « Chargement… ».
     void (async () => {
       try {
+        // ## Pourquoi ces deux requêtes sont paginées
+        //
+        // PostgREST applique `max_rows = 1000` — réglé dans `config.toml` —
+        // **sans erreur et sans en-tête d'avertissement**. Les deux requêtes se
+        // tronquaient donc en silence, et la seconde sans même que le bandeau
+        // du 2026-09-09 puisse le voir : il ne comptait que les clients. Un
+        // collecteur au-delà de mille cartes aurait vu des clients dépourvus
+        // des leurs, et un solde restituable calculé sur ce qui restait.
+        //
+        // `chargerTout` demande les pages jusqu'à épuisement. Voir
+        // `src/pagination.ts` pour pourquoi tout charger vaut mieux qu'une
+        // pagination à l'écran dans une application hors-ligne d'abord.
+        //
+        // **Le second critère de tri n'est pas décoratif.** Une pagination sur
+        // un ordre non total peut rendre deux fois la même ligne et en sauter
+        // une autre : `nom` n'est pas unique — deux « Konan Kouassi » sur un
+        // marché n'ont rien d'improbable — et `cartes` n'était pas triée du
+        // tout. `id` tranche les ex æquo.
         const [reponseClients, reponseCartes] = await Promise.all([
-          supabase
-            .from('clients')
-            // `count: 'exact'` demande au serveur combien de lignes il possède,
-            // pas combien il en envoie. C'est le seul moyen de voir une
-            // troncature : PostgREST applique `max_rows` — mille, réglé dans
-            // `config.toml` — sans erreur et sans en-tête d'avertissement. Sans
-            // ce comptage, une liste amputée a exactement l'air d'une liste
-            // entière.
-            //
-            // Le coût est un `count(*)` sur un ensemble déjà filtré par RLS et
-            // indexé (`clients_collecteur_idx`), soit quelques centaines de
-            // lignes. Le rapporté est de ne pas laisser un collecteur conclure
-            // qu'un client n'existe pas.
-            .select('id, nom, marche, telephone, avis_actifs', { count: 'exact' })
-            .order('nom'),
-          supabase
-            .from('cartes')
-            .select('id, client_id, mise, statut, mises_encaissees, ouverte_le'),
+          chargerTout<Client>((debut, fin) =>
+            supabase
+              .from('clients')
+              // `count: 'exact'` reste, comme recoupement : le serveur dit
+              // combien de lignes il possède, et on compare à ce qu'on a
+              // vraiment reçu. Si la pagination laissait un jour tomber une
+              // page, ce comptage le dirait au lieu de le taire.
+              .select('id, nom, marche, telephone, avis_actifs', { count: 'exact' })
+              .order('nom')
+              .order('id')
+              .range(debut, fin),
+          ),
+          chargerTout<CarteClient>((debut, fin) =>
+            supabase
+              .from('cartes')
+              .select('id, client_id, mise, statut, mises_encaissees, ouverte_le')
+              .order('id')
+              .range(debut, fin),
+          ),
         ]);
 
         if (!vivant) return;
@@ -268,10 +288,15 @@ export function Clients({
         setToutesCartes(cartes);
         setLignes(construites);
 
-        // `count` est nul si le comptage n'a pas eu lieu. Déduire une
-        // troncature d'une absence de réponse ferait crier l'écran sur toutes
-        // les listes, et le collecteur apprendrait à ignorer le bandeau.
-        const total = reponseClients.count;
+        // Recoupement, et non plus détection de troncature : `chargerTout`
+        // épuise les pages, donc l'écart devrait être nul. S'il ne l'est pas,
+        // c'est qu'une page est tombée ou qu'un client a été inscrit pendant le
+        // chargement — les deux méritent d'être dits plutôt que tus.
+        //
+        // Le total est nul si le comptage n'a pas eu lieu. Déduire un manque
+        // d'une absence de réponse ferait crier l'écran sur toutes les listes,
+        // et le collecteur apprendrait à ignorer le bandeau.
+        const total = reponseClients.total;
         setTotalServeur(typeof total === 'number' && total > clients.length ? total : null);
       } catch {
         if (!vivant) return;
@@ -451,17 +476,21 @@ export function Clients({
 
           PostgREST applique `max_rows` — mille, réglé dans `config.toml` — sans
           erreur et sans en-tête d'avertissement. Au-delà, l'écran affichait une
-          liste incomplète qui avait exactement l'air d'une liste complète.
+          liste incomplète qui avait exactement l'air d'une liste complète, et
+          le collecteur pouvait en conclure qu'un client n'était pas inscrit, et
+          le réinscrire : deux carnets pour une personne, et un solde
+          restituable calculé sur le mauvais.
 
-          Le coût se cumule avec celui du compteur de recherche : le collecteur
-          cherche un client, ne le trouve pas, en conclut qu'il n'est pas
-          inscrit, et le réinscrit. Deux clients pour une personne, deux
-          carnets, et un solde restituable calculé sur le mauvais. La recherche
-          est locale : elle ne va pas chercher les lignes que le serveur n'a pas
-          envoyées, donc elle ne peut pas rattraper la troncature.
+          La troncature est fermée depuis que les deux requêtes épuisent leurs
+          pages — voir `src/pagination.ts`. Ce bandeau n'est donc plus une
+          alerte de troncature mais un **recoupement** : le serveur dit combien
+          de clients il possède, et on compare à ce qu'on a reçu. L'écart
+          devrait être nul.
 
-          Ce bandeau n'est pas la pagination. C'est ce qui empêche l'écran de
-          mentir par omission en attendant. */}
+          On le garde parce qu'un contrôle qui ne peut plus rien attraper est
+          exactement celui qu'on retire la veille du jour où il aurait servi. Si
+          une page tombait, ou si un client était inscrit pendant le chargement,
+          l'écran le dirait au lieu de le taire. */}
       {totalServeur !== null && (
         <div
           role="alert"

@@ -80,15 +80,26 @@ const CARTES = [
  *   que le dernier bloc de tests mesure. `null` = pas de comptage demandé.
  */
 function brancherSupabase(total: number | null = CLIENTS.length) {
+  // La chaîne imite celle de l'écran, `range` compris : les deux requêtes sont
+  // paginées depuis le 2026-09-09, et un faux qui rendrait tout d'un coup
+  // laisserait la pagination sans aucune épreuve ici.
+  //
+  // `range` découpe vraiment le tableau. Les jeux d'essai tiennent en quelques
+  // lignes, donc la première page les rend toutes et le chargement s'arrête —
+  // c'est le chemin nominal. Le comportement sur plusieurs pages est éprouvé
+  // séparément dans `src/pagination.test.ts`, sans passer par le rendu.
+  const page = <T,>(lignes: T[], count: number | null) => ({
+    range: (debut: number, fin: number) =>
+      Promise.resolve({ data: lignes.slice(debut, fin + 1), error: null, count }),
+  });
+
   from.mockImplementation((table: string) => {
     if (table === 'clients') {
       return {
-        select: () => ({
-          order: () => Promise.resolve({ data: CLIENTS, error: null, count: total }),
-        }),
+        select: () => ({ order: () => ({ order: () => page(CLIENTS, total) }) }),
       };
     }
-    return { select: () => Promise.resolve({ data: CARTES, error: null }) };
+    return { select: () => ({ order: () => page(CARTES, null) }) };
   });
 }
 
