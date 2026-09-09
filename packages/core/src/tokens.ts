@@ -69,6 +69,23 @@ export const couleurs = {
   negativeTint: '#F6E4DF',
   info: '#3D6E8E',
   infoTint: '#E6EEF4',
+  // Deux familles fonctionnelles, ajoutées le 2026-09-09 pour `ActionsRapides`.
+  //
+  // L'écran d'accueil du collecteur affiche huit boutons ensemble. Cinq
+  // portaient des hexadécimaux en dur ; les ramener aux jetons sémantiques
+  // existants aurait rendu *Retrait* et *Bilan* identiques — deux boutons
+  // voisins, dont l'un sort de l'argent. La palette sémantique décrit des
+  // **états** (succès, erreur, information) ; elle n'a jamais eu vocation à
+  // distinguer neuf destinations.
+  //
+  // `ocre` n'est pas l'or. `or` est une couleur de marque, que le Design
+  // System §1 interdit sur les surfaces qui manipulent l'argent ; `ocre` est
+  // beaucoup plus sombre et sert de repère fonctionnel, jamais d'ornement. Un
+  // test tient cet écart plutôt qu'un commentaire.
+  ardoise: '#475569',
+  ardoiseTint: '#EFF2F9',
+  ocre: '#7D6B35',
+  ocreTint: '#F8F5EC',
   // Data-viz — une échelle de clarté, et non quatre teintes à la même
   // luminance. Refondue le 2026-09-04.
   //

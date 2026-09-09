@@ -40,15 +40,34 @@ interface Props {
   anime?: boolean;
 }
 
+/**
+ * Une teinte par destination, toutes tirées de `tokens.ts`.
+ *
+ * Cinq de ces neuf entrées ont porté des hexadécimaux en dur jusqu'au
+ * 2026-09-09, contre la règle « aucune valeur visuelle en dur » du README.
+ * Les ramener aux seuls jetons **sémantiques** aurait rendu *Retrait* et
+ * *Bilan* identiques : l'écran d'accueil du collecteur affiche huit de ces
+ * boutons ensemble, et l'un des deux sort de l'argent. La palette sémantique
+ * décrit des états — succès, erreur, information — et n'a jamais eu vocation à
+ * distinguer neuf destinations.
+ *
+ * D'où `ardoise` et `ocre`, ajoutées à `tokens.ts` comme familles
+ * fonctionnelles. `ocre` n'est pas `or` : l'or est une couleur de marque, que
+ * le Design System §1 interdit sur les surfaces qui manipulent l'argent. Un
+ * test tient cet écart, plutôt qu'un commentaire.
+ *
+ * *Rapprochement* et *Reçus* partagent `ocre` — ils partageaient déjà deux
+ * ocres presque identiques, et ce sont les deux écrans de paperasse.
+ */
 const COULEURS_ICONES: Record<string, { fond: string; icone: string; bordure: string }> = {
   'circle-dollar-sign': { fond: 'bg-positive-tint', icone: 'text-positive', bordure: 'border-positive/20' },
-  'user-plus': { fond: 'bg-[#EBF5EE]', icone: 'text-accent', bordure: 'border-accent/20' },
+  'user-plus': { fond: 'bg-secondary', icone: 'text-accent', bordure: 'border-accent/20' },
   'arrow-up-right': { fond: 'bg-info-tint', icone: 'text-info', bordure: 'border-info/20' },
-  'bar-chart-2': { fond: 'bg-[#EBF2F7]', icone: 'text-[#2B6082]', bordure: 'border-[#2B6082]/20' },
-  'refresh-cw': { fond: 'bg-[#FBF6E9]', icone: 'text-[#96741F]', bordure: 'border-[#96741F]/20' },
-  receipt: { fond: 'bg-[#F8F5EC]', icone: 'text-[#7D6B35]', bordure: 'border-[#7D6B35]/20' },
+  'bar-chart-2': { fond: 'bg-ardoise-tint', icone: 'text-ardoise', bordure: 'border-ardoise/20' },
+  'refresh-cw': { fond: 'bg-ocre-tint', icone: 'text-ocre', bordure: 'border-ocre/20' },
+  receipt: { fond: 'bg-ocre-tint', icone: 'text-ocre', bordure: 'border-ocre/20' },
   bell: { fond: 'bg-negative-tint', icone: 'text-negative', bordure: 'border-negative/20' },
-  'message-square': { fond: 'bg-[#EFF2F9]', icone: 'text-[#475569]', bordure: 'border-[#475569]/20' },
+  'message-square': { fond: 'bg-muted', icone: 'text-muted-foreground', bordure: 'border-hairline' },
   'more-horizontal': { fond: 'bg-muted', icone: 'text-muted-foreground', bordure: 'border-hairline' },
 };
 

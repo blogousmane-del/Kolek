@@ -36,7 +36,20 @@ export default defineConfig({
         lang: 'fr',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#FBFAF6',
+        // `canvas` et `primary` de `tokens.ts`, recopiés ici parce que ce
+        // fichier est bâti sous `moduleResolution: node16`, où un import de
+        // `packages/core` demande une extension que la source n'a pas.
+        //
+        // Le manifeste a porté `#FBFAF6` du 2026-09-04 au 2026-09-09 — le
+        // jeton `paper`, supprimé le 4 : l'écran de démarrage de l'application
+        // installée est resté cinq jours la dernière surface du produit peinte
+        // dans une couleur que le Design System ne connaissait plus. Invisible
+        // parce qu'elle ne vit dans aucune feuille de style et ne réapparaît
+        // que dans un artefact engendré.
+        //
+        // `npm run verifier:manifeste` extrait ces deux valeurs et les compare
+        // aux jetons. Une recopie qui dérive fait échouer la vérification.
+        background_color: '#F4F5F2',
         theme_color: '#14402C',
         icons: [
           { src: 'icone-192.png', sizes: '192x192', type: 'image/png' },

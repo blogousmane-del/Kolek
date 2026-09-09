@@ -16,7 +16,7 @@ registres — voir `Docs/Kolek Cahier de charges consolide.md` §11.
 | `supabase/` | Migrations, Edge Functions, tests de base |
 | `apps/collecteur/` | PWA terrain, hors-ligne d'abord |
 | `apps/admin/` | Dashboard de pilotage GTCS |
-| `apps/site/` | Site public — grille tarifaire. Aucune session, aucune donnée |
+| `apps/site/` | Site public — grille tarifaire et formulaire d'ouverture de compte. Aucune session, mais il **poste** vers `demander-ouverture` |
 
 ## Démarrer
 
@@ -30,10 +30,11 @@ npm run db:env            # extrait les clés locales pour les tests
 
 cp apps/collecteur/.env.example apps/collecteur/.env   # y coller les clés locales
 cp apps/admin/.env.example apps/admin/.env
+cp apps/site/.env.example apps/site/.env
 
 npm run dev -w @kolek/collecteur
 npm run dev -w @kolek/admin
-npm run dev -w @kolek/site      # aucun .env : le site ne parle à aucune API
+npm run dev -w @kolek/site      # le .env est requis : gardeEnv() lève sans lui
 ```
 
 ### Si `npm run db:start` échoue localement
@@ -84,5 +85,16 @@ contrôler ce qui reste d'un build précédent.
   la forme qu'avait le défaut du 2026-09-09 : `gardeEnv` importé dans le
   `vite.config.ts` du collecteur sans jamais être posé dans `plugins`. `oxlint`
   sort à zéro sur un avertissement — l'escalade est ce qui rend l'étape utile.
+- **Les tests de base ne tournent que contre la pile locale.** La suite utilise
+  la clé de rôle service — RLS contournée — et vide des tables entières entre
+  deux tests. `process.loadEnvFile` n'écrase pas une variable déjà posée dans le
+  shell : un `SUPABASE_URL` exporté fait donc viser la production malgré un
+  `.env.test` juste. `supabase/tests/charger-env.ts` refuse toute cible qui
+  n'est pas une adresse de bouclage.
+- Chaque application a un `.env.example` qui déclare exactement les variables
+  `VITE_` que son code lit — ni moins, ni plus. `npm run verifier:exemples-env`.
+- Les couleurs du manifeste PWA sont comparées à `tokens.ts`, pas relues.
+  `npm run verifier:manifeste`. Elles vivent hors de toute feuille de style et
+  ne réapparaissent que dans un artefact engendré.
 - La clé de service ne quitte jamais le serveur. `npm run verifier:bundles`
   le contrôle à chaque build.

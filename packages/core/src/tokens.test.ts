@@ -176,3 +176,51 @@ describe('taille de champ', () => {
     expect(genererCssTheme()).toContain('--text-champ: 16px;');
   });
 });
+
+/**
+ * Les deux familles ajoutées le 2026-09-09 pour `ActionsRapides`.
+ *
+ * L'écran d'accueil du collecteur affiche huit boutons d'action ensemble. Cinq
+ * portaient des hexadécimaux en dur, contre la règle « aucune valeur visuelle
+ * en dur » du README. Les ramener aux jetons sémantiques existants aurait rendu
+ * *Retrait* et *Bilan* identiques — deux boutons voisins, dont l'un sort de
+ * l'argent.
+ *
+ * ## Pourquoi 3:1 et non 4,5:1
+ *
+ * Ces couleurs habillent un `div` qui ne contient que l'icône ; le libellé est
+ * en `ink` à côté. Le seuil applicable est donc celui des objets graphiques
+ * (WCAG 1.4.11), pas celui du texte. Exiger 4,5:1 ici assombrirait neuf pastilles
+ * pour une raison qui ne s'applique pas — et une règle qu'on ne peut pas
+ * justifier finit par être desserrée en bloc.
+ */
+describe('familles ajoutées pour les actions rapides', () => {
+  const SUR_TEINTE: Array<[string, string, string]> = [
+    ['ardoise sur sa teinte', couleurs.ardoise, couleurs.ardoiseTint],
+    ['ocre sur sa teinte', couleurs.ocre, couleurs.ocreTint],
+  ];
+
+  for (const [nom, icone, fond] of SUR_TEINTE) {
+    it(`tient 3:1 comme objet graphique — ${nom}`, () => {
+      expect(contraste(icone, fond)).toBeGreaterThanOrEqual(3);
+    });
+  }
+
+  it('reste distinguable des familles voisines', () => {
+    // Le point de l'ajout : sans cet écart, autant réutiliser un jeton existant.
+    // `ardoise` doit se voir contre `info`, et `ocre` contre `or` — ce dernier
+    // parce que le Design System interdit l'or dans les applications et que
+    // deux valeurs proches feraient croire à une infraction.
+    expect(contraste(couleurs.ardoiseTint, couleurs.infoTint)).toBeGreaterThan(1);
+    expect(couleurs.ocre).not.toBe(couleurs.or);
+  });
+
+  it('n’est pas un or déguisé', () => {
+    // `or` est une couleur de marque, interdite sur les surfaces qui manipulent
+    // l'argent. `ocre` est fonctionnel et beaucoup plus sombre : il ne peut pas
+    // être confondu avec la pièce du logo.
+    expect(contraste(couleurs.ocre, couleurs.surface)).toBeGreaterThan(
+      contraste(couleurs.or, couleurs.surface),
+    );
+  });
+});

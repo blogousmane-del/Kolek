@@ -5,7 +5,7 @@ import { ORIGINES_ADMIN, entetesCors, listerOrigines } from '../_shared/cors.ts'
 /**
  * L'état de la plateforme, pour l'écran Réglages.
  *
- * Même portillon que les quatre autres fonctions d'administration : `est_admin()`
+ * Même portillon que les six autres fonctions d'administration : `est_admin()`
  * appelée **avec le jeton de l'appelant**, jamais avec la clé de service, et
  * toute réponse autre qu'un `true` franc referme la porte.
  *

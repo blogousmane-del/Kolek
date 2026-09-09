@@ -44,6 +44,23 @@ L'image fournie est la **maquette de représentation de notre Dashboard Admin** 
 - Contenu réel : **nos données** (collecteurs, clients, cartes, mises) et **le français**, à la place des noms, marques et montants de démonstration.
 - **Aucun or dans les applications** : l'admin et le collecteur collent strictement à la maquette (vert profond, neutres, vert/corail sémantiques, pastels de graphique). Décision actée.
 - **L'or est une couleur de marque, pas une couleur d'interface.** `--color-or` et `--color-or-doux` n'existent que pour le logo, le favicon, l'image Open Graph et la vitrine — les surfaces qui *vendent* Kolek. Les surfaces qui *manipulent l'argent* n'en portent pas une trace. La distinction n'est pas cosmétique : sur un écran d'encaissement, l'or désignerait une valeur, et aucune valeur de ce produit n'est or.
+- **`ocre` n'est pas de l'or, et voici où passe la frontière.** Ajouté le
+  2026-09-09 avec `ardoise` comme famille **fonctionnelle** : `--color-ocre`
+  (`#7D6B35`) est un repère de destination dans `ActionsRapides`, pas un
+  ornement. Ce qui sépare les deux n'est pas la teinte mais l'emploi — l'or
+  *désigne une valeur*, l'ocre *distingue un bouton d'un autre*. La règle
+  au-dessus reste donc entière : aucune surface d'encaissement ne porte d'or.
+
+  Pourquoi ces deux familles existent plutôt que d'être ramenées aux jetons
+  sémantiques : la palette sémantique décrit des **états** — succès, erreur,
+  information — et l'écran d'accueil du collecteur affiche **huit destinations
+  ensemble**. Tout ramener à cinq états y rendait *Retrait* et *Bilan*
+  identiques, deux boutons voisins dont l'un sort de l'argent. Un jeton par
+  état, une famille par destination : ce sont deux axes, pas une seule échelle.
+
+  Ce que ça n'autorise pas : ouvrir une famille fonctionnelle par écran. Deux
+  existent, elles couvrent les neuf boutons, et une troisième demanderait de
+  montrer d'abord que ces deux-là ne suffisent plus.
 
 ---
 

@@ -38,7 +38,7 @@ body {
    revenait à laisser la navigation au clavier sans repère sur les cinq champs
    d'une page qui demande un numéro, une adresse et un mot de passe. */
 :focus-visible {
-  outline-color: #ffffff;
+  outline-color: var(--color-surface);
   box-shadow: 0 0 0 2px var(--color-dark-canvas);
 }
 

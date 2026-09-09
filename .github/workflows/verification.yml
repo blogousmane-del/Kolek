@@ -85,6 +85,29 @@ jobs:
       - name: Aucun champ sous 16 px
         run: npm run verifier:champs
 
+      # `apps/site/.env.example` a manqué du 2026-08-23 au 2026-09-09, réclamé
+      # par trois audits. Pendant ce temps le README affirmait « aucun .env : le
+      # site ne parle à aucune API » — alors que la vitrine poste un mot de
+      # passe vers `demander-ouverture` et que `gardeEnv()` y lève dans le hook
+      # `config`. Un clone neuf suivant le README à la lettre ne démarrait pas.
+      #
+      # Le contrôle compare l'**écart** et non la présence : exiger le fichier
+      # serait vert le jour où quelqu'un ajoute une variable au code sans
+      # l'ajouter à l'exemple, et ce jour-là coûte le même après-midi.
+      - name: Les exemples d'environnement disent la vérité
+        run: npm run verifier:exemples-env
+
+      # Le manifeste PWA a porté `#FBFAF6` du 2026-09-04 au 2026-09-09 — le
+      # jeton `paper`, supprimé le 4. L'écran de démarrage de l'application
+      # installée est resté cinq jours peint dans une couleur que le Design
+      # System ne connaissait plus.
+      #
+      # Invisible parce que cette couleur ne vit dans aucune feuille de style :
+      # elle est recopiée dans `vite.config.ts` et ne réapparaît que dans un
+      # artefact engendré que personne ne relit.
+      - name: Le manifeste PWA suit ses jetons
+        run: npm run verifier:manifeste
+
       # `oxlint` était installé dans les trois applications et câblé à un script
       # `lint` depuis le début. Personne ne le lançait — ni cette vérification,
       # ni `npm run verifier`. Il signalait pourtant, depuis des jours, que
@@ -145,7 +168,7 @@ jobs:
         with:
           version: latest
 
-      # `supabase start` applique les migrations au premier démarrage. Les 366
+      # `supabase start` applique les migrations au premier démarrage. Tous les
       # tests de `supabase/tests/` tournent donc contre le schéma du commit, y
       # compris les garde-fous qui échouent à la migration — dont celui qui
       # vérifie que les six triggers de journal couvrent bien les trois
@@ -236,7 +259,8 @@ jobs:
       # pourtant déclaré prêt : elle ne teste que la présence d'une chaîne.
       #
       # Le déploiement échouait alors sur « unexpected list functions status
-      # 401 », après le regroupement des treize fonctions, sans dire quoi faire.
+      # 401 », après le regroupement des treize fonctions d'alors, sans dire
+      # quoi faire.
       # Un appel qui ne coûte rien tranche la question plus tôt et la nomme.
       - name: Le jeton est-il accepté ?
         if: steps.jeton.outputs.pret == 'oui'
@@ -253,11 +277,11 @@ jobs:
       # copie des modules de `_shared/` qu'elle importe. Une correction dans
       # `cors.ts` ou `plancher.ts` ne parvient donc à une fonction que si
       # **cette fonction** est redéployée. Ne pousser que le fichier modifié
-      # laisserait douze copies de l'ancien module partagé en ligne — et le
-      # symptôme serait une correction de sécurité appliquée à une fonction sur
-      # treize, ce qui ne se voit d'aucune manière.
+      # laisserait en ligne toutes les copies de l'ancien module partagé sauf
+      # une — et le symptôme serait une correction de sécurité appliquée à une
+      # seule fonction, ce qui ne se voit d'aucune manière.
       #
-      # Treize déploiements coûtent quelques minutes. Le raisonnement pour
+      # Redéployer l'ensemble coûte quelques minutes. Le raisonnement pour
       # n'en faire que deux coûterait un jour de recherche le jour où il est
       # faux.
       - name: Déployer
