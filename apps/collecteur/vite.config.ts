@@ -3,10 +3,33 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 // @ts-expect-error — module JavaScript partagé, hors du graphe TypeScript des applications.
+import { decouperLib } from '../../scripts/decouper-lib.mjs';
+// @ts-expect-error — même raison.
 import { gardeEnv } from '../../scripts/garde-env.mjs';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // ## Pourquoi séparer les bibliothèques, et pourquoi pas découper les écrans
+  //
+  // Le service worker précharge **tout** ce que la construction produit : sept
+  // entrées, mesurées dans `dist/sw.js`. Passer les écrans lourds en `import()`
+  // — ce que l'audit du 2026-09-09 suggérait — ne retirerait donc pas un octet
+  // à la première installation, puisque workbox les téléchargerait quand même
+  // pendant l'installation. Ça n'améliore que le temps avant interaction.
+  //
+  // Ce qui réduit vraiment la donnée est ailleurs. Le préchargement est
+  // révisionné par URL : un morceau dont le contenu n'a pas changé garde son
+  // nom haché et n'est **pas** retéléchargé à la mise à jour suivante. Sortir
+  // React et `supabase-js` — qui ne bougent qu'aux montées de version — retire
+  // donc leur poids de chaque mise à jour du produit.
+  //
+  // C'est le bon calcul pour ce produit : le collecteur installe une fois et
+  // met à jour souvent, sur une connexion mobile d'Abidjan.
+  build: {
+    rollupOptions: {
+      output: { manualChunks: decouperLib },
+    },
+  },
   plugins: [
     // En tête, comme dans les deux autres applications : il lève dans le hook
     // `config`, avant que quoi que ce soit ne soit écrit dans `dist/`.
