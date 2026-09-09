@@ -188,6 +188,9 @@ export function Clients({
       autres, et c'est ici qu'il va les chercher. */
   const [toutesCartes, setToutesCartes] = useState<CarteClient[]>([]);
   const [erreur, setErreur] = useState<string | null>(null);
+  /** Le nombre de clients que le serveur dit posséder, quand il en a rendu
+      moins. `null` = liste entière, ou comptage indisponible. */
+  const [totalServeur, setTotalServeur] = useState<number | null>(null);
   const [recherche, setRecherche] = useState('');
   const [filtre, setFiltre] = useState<Filtre>('Tous');
   const enLigne = useEnLigne();
@@ -208,7 +211,18 @@ export function Clients({
         const [reponseClients, reponseCartes] = await Promise.all([
           supabase
             .from('clients')
-            .select('id, nom, marche, telephone, avis_actifs')
+            // `count: 'exact'` demande au serveur combien de lignes il possède,
+            // pas combien il en envoie. C'est le seul moyen de voir une
+            // troncature : PostgREST applique `max_rows` — mille, réglé dans
+            // `config.toml` — sans erreur et sans en-tête d'avertissement. Sans
+            // ce comptage, une liste amputée a exactement l'air d'une liste
+            // entière.
+            //
+            // Le coût est un `count(*)` sur un ensemble déjà filtré par RLS et
+            // indexé (`clients_collecteur_idx`), soit quelques centaines de
+            // lignes. Le rapporté est de ne pas laisser un collecteur conclure
+            // qu'un client n'existe pas.
+            .select('id, nom, marche, telephone, avis_actifs', { count: 'exact' })
             .order('nom'),
           supabase
             .from('cartes')
@@ -253,6 +267,12 @@ export function Clients({
 
         setToutesCartes(cartes);
         setLignes(construites);
+
+        // `count` est nul si le comptage n'a pas eu lieu. Déduire une
+        // troncature d'une absence de réponse ferait crier l'écran sur toutes
+        // les listes, et le collecteur apprendrait à ignorer le bandeau.
+        const total = reponseClients.count;
+        setTotalServeur(typeof total === 'number' && total > clients.length ? total : null);
       } catch {
         if (!vivant) return;
         setErreur('Impossible de charger tes clients.');
@@ -427,6 +447,33 @@ export function Clients({
           bordure et le rayon, donc l'anneau du système suit sa forme et il n'y
           en a qu'un. L'icône et la croix flottent au-dessus en `absolute`.
           C'est aussi ce que `Champ` fait déjà, à l'ornement près. */}
+      {/* La liste est-elle entière ?
+
+          PostgREST applique `max_rows` — mille, réglé dans `config.toml` — sans
+          erreur et sans en-tête d'avertissement. Au-delà, l'écran affichait une
+          liste incomplète qui avait exactement l'air d'une liste complète.
+
+          Le coût se cumule avec celui du compteur de recherche : le collecteur
+          cherche un client, ne le trouve pas, en conclut qu'il n'est pas
+          inscrit, et le réinscrit. Deux clients pour une personne, deux
+          carnets, et un solde restituable calculé sur le mauvais. La recherche
+          est locale : elle ne va pas chercher les lignes que le serveur n'a pas
+          envoyées, donc elle ne peut pas rattraper la troncature.
+
+          Ce bandeau n'est pas la pagination. C'est ce qui empêche l'écran de
+          mentir par omission en attendant. */}
+      {totalServeur !== null && (
+        <div
+          role="alert"
+          className="mx-4 mt-4 rounded-2xl border border-negative/25 bg-negative-tint px-3.5 py-3 text-xs font-body text-negative"
+        >
+          Ta liste est incomplète : {formatMontant(totalServeur)} clients enregistrés, et
+          l’écran n’a pu en charger que {formatMontant(lignes?.length ?? 0)}. La recherche
+          ci-dessous ne porte que sur ceux qui sont chargés — un client absent de la liste
+          peut donc exister quand même. Ne le réinscris pas.
+        </div>
+      )}
+
       <div className="px-4 mt-5">
         <div className="relative">
           <Icone

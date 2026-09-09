@@ -1,4 +1,4 @@
-import { MISES_PAR_CYCLE } from '@kolek/core';
+import { formatMontant, MISES_PAR_CYCLE } from '@kolek/core';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -74,10 +74,19 @@ const CARTES = [
   },
 ];
 
-function brancherSupabase() {
+/**
+ * @param total Ce que le serveur dit posséder, toutes lignes confondues. Quand
+ *   il dépasse le nombre de lignes rendues, PostgREST a tronqué : c'est le cas
+ *   que le dernier bloc de tests mesure. `null` = pas de comptage demandé.
+ */
+function brancherSupabase(total: number | null = CLIENTS.length) {
   from.mockImplementation((table: string) => {
     if (table === 'clients') {
-      return { select: () => ({ order: () => Promise.resolve({ data: CLIENTS, error: null }) }) };
+      return {
+        select: () => ({
+          order: () => Promise.resolve({ data: CLIENTS, error: null, count: total }),
+        }),
+      };
     }
     return { select: () => Promise.resolve({ data: CARTES, error: null }) };
   });
@@ -392,5 +401,55 @@ describe('recherche de client', () => {
       'none',
     );
     expect(champ.getAttribute('autoCorrect') ?? champ.getAttribute('autocorrect')).toBe('off');
+  });
+});
+
+/**
+ * La liste tronquee, et pourquoi elle doit le dire.
+ *
+ * `supabase/config.toml` pose `max_rows = 1000` : PostgREST rend au plus mille
+ * lignes, sans erreur et sans en-tete d'avertissement. Au-dela, l'ecran affiche
+ * une liste incomplete qui a exactement l'air d'une liste complete.
+ *
+ * Le cout n'est pas theorique, et il se cumule avec le defaut que la revue du
+ * 2026-09-09 a deja releve sur le compteur : le collecteur cherche un client,
+ * ne le trouve pas, en conclut qu'il n'est pas inscrit, et le reinscrit. Deux
+ * clients pour une personne, deux carnets, et un solde restituable calcule sur
+ * le mauvais. La recherche est locale — elle ne va pas chercher les lignes que
+ * le serveur n'a pas envoyees, donc elle ne peut pas rattraper la troncature.
+ *
+ * Ce que ces tests exigent n'est pas la pagination : c'est que l'ecran cesse de
+ * mentir par omission. Un defaut visible se corrige ; un defaut silencieux se
+ * paie.
+ */
+describe('liste tronquee par le serveur', () => {
+  it('previent quand le serveur en a plus qu’il n’en a rendu', async () => {
+    brancherSupabase(1200);
+    rendre();
+    await screen.findByText('Hj');
+
+    const alerte = screen.getByRole('alert');
+    expect(alerte.textContent).toContain(formatMontant(1200));
+    expect(alerte.textContent).toMatch(/recherche/i);
+  });
+
+  it('ne previent pas quand la liste est entiere', async () => {
+    brancherSupabase(CLIENTS.length);
+    rendre();
+    await screen.findByText('Hj');
+
+    // Un avertissement permanent est un avertissement qu'on cesse de lire.
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('ne previent pas quand le serveur ne compte pas', async () => {
+    // `count` vaut `null` si le comptage n'a pas ete demande ou a echoue.
+    // Deduire une troncature d'une absence de reponse ferait crier l'ecran sur
+    // toutes les listes, et le collecteur apprendrait a ignorer le bandeau.
+    brancherSupabase(null);
+    rendre();
+    await screen.findByText('Hj');
+
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
