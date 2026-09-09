@@ -225,7 +225,7 @@ export function Collecteurs({
                 onChange={(e) => setRecherche(e.target.value)}
                 placeholder="Nom, téléphone ou zone"
                 aria-label="Rechercher un collecteur"
-                className="flex-1 min-w-50 h-11 px-3 rounded-md border border-input bg-surface font-body text-sm text-ink"
+                className="flex-1 min-w-50 h-11 px-3 rounded-md border border-input bg-surface font-body text-champ text-ink"
               />
               <div className="flex gap-1.5">
                 {FILTRES.map((f) => (

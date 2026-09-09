@@ -78,6 +78,41 @@ jobs:
           npm run verifier:marque
           npm run verifier:paliers
 
+      # Le contrôle qu'aucun test d'interface ne peut faire : jsdom n'a pas de
+      # disposition, donc rien ne mesure une police. Un champ sous 16 px fait
+      # zoomer Safari sur iPhone au premier toucher, et ça ne se voit que sur
+      # un téléphone qu'on n'a pas sous la main au moment de la revue.
+      - name: Aucun champ sous 16 px
+        run: npm run verifier:champs
+
+      # `oxlint` était installé dans les trois applications et câblé à un script
+      # `lint` depuis le début. Personne ne le lançait — ni cette vérification,
+      # ni `npm run verifier`. Il signalait pourtant, depuis des jours, que
+      # `gardeEnv` était importé sans être posé dans le `vite.config.ts` du
+      # collecteur : le garde-fou qui refuse une clé de service dans un paquet
+      # public ne gardait plus l'application du terrain.
+      #
+      # Ce qui rend cette étape utile et non décorative : `no-unused-vars` est
+      # passé de « warn » à « error » dans les trois `.oxlintrc.json`. `oxlint`
+      # sort à **zéro** sur un avertissement — câbler la commande sans cette
+      # escalade aurait laissé passer exactement le défaut qui l'a motivée.
+      # Mesuré : défaut réintroduit, `exit=1`.
+      #
+      # `react/only-export-components` reste délibérément en « warn ». C'est un
+      # conseil de confort de développement, pas une règle de correction, et le
+      # promouvoir bloquerait la construction sur deux fichiers que personne
+      # n'a demandé de réécrire.
+      #
+      # `verifier:lint` et non `npm run lint --workspaces` : ce dernier ne
+      # touche que `apps/*`, les seuls espaces de travail à déclarer un script
+      # `lint`. `packages/core`, `packages/ui` et `scripts/` — 77 fichiers, dont
+      # les composants partagés par les trois applications et les garde-fous
+      # eux-mêmes — passaient donc à travers, avec `--if-present` qui les saute
+      # en silence. Mesuré : un import mort dans `packages/ui` ne faisait rien
+      # échouer.
+      - name: Linter
+        run: npm run verifier:lint
+
       - name: Tests des applications
         run: npm test
 

@@ -410,7 +410,7 @@ export function TableauDeBord({
                       placeholder="Rechercher un client ou un collecteur…"
                       value={rechercheMvt}
                       onChange={(e) => setRechercheMvt(e.target.value)}
-                      className="w-full bg-canvas border border-hairline rounded-md px-3 py-1.5 pl-8 text-xs font-body text-ink placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+                      className="w-full bg-canvas border border-hairline rounded-md px-3 py-1.5 pl-8 text-champ font-body text-ink placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
                     />
                     <Icone
                       nom="search"

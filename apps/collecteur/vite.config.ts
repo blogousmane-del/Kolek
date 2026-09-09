@@ -8,6 +8,14 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   plugins: [
+    // En tête, comme dans les deux autres applications : il lève dans le hook
+    // `config`, avant que quoi que ce soit ne soit écrit dans `dist/`.
+    //
+    // Il était importé sans être posé — de la ligne 6 jusqu'ici, rien. L'import
+    // mort rendait la ligne crédible à la relecture, et `oxlint` le signalait
+    // depuis toujours sans que personne ne lise sa sortie : aucun script ne le
+    // lançait. Constaté le 2026-09-09.
+    gardeEnv(),
     react(),
     tailwindcss(),
     VitePWA({

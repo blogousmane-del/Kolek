@@ -76,5 +76,13 @@ contrôler ce qui reste d'un build précédent.
 - Le Dashboard Admin vérifie `est_admin()` avant d'afficher quoi que ce soit.
   Une session valide n'est pas une autorisation : un collecteur en possède une.
 - Aucune valeur visuelle en dur : tout vient de `packages/core/src/tokens.ts`.
+- Aucun champ de saisie sous 16 px — `text-champ`, jamais `text-base` ni plus
+  petit. Sous ce seuil, Safari sur iPhone zoome la page dès qu'on touche le
+  champ, et il n'existe aucun attribut pour l'en empêcher.
+  `npm run verifier:champs` le contrôle sur les trois applications.
+- Un import inutilisé est une **erreur** de lint, pas un avertissement. C'est
+  la forme qu'avait le défaut du 2026-09-09 : `gardeEnv` importé dans le
+  `vite.config.ts` du collecteur sans jamais être posé dans `plugins`. `oxlint`
+  sort à zéro sur un avertissement — l'escalade est ce qui rend l'étape utile.
 - La clé de service ne quitte jamais le serveur. `npm run verifier:bundles`
   le contrôle à chaque build.

@@ -18,6 +18,8 @@
     "test:db": "npm run db:env && vitest run --config supabase/tests/vitest.config.ts",
     "test:scripts": "vitest run --dir scripts",
     "verifier:bundles": "node scripts/verifier-bundles.mjs",
+    "verifier:champs": "node scripts/verifier-champs.mjs",
+    "verifier:lint": "npm run lint --workspaces --if-present && oxlint packages scripts",
     "verifier:dns": "node scripts/verifier-dns.mjs",
     "verifier:en-ligne": "node scripts/verifier-en-ligne.mjs",
     "verifier:migrations": "node scripts/verifier-migrations.mjs",
@@ -26,7 +28,7 @@
     "verifier:theme": "node scripts/generer-theme.mjs --verifier",
     "generer:marque": "node scripts/generer-marque.mjs",
     "verifier:marque": "node scripts/generer-marque.mjs --verifier",
-    "verifier": "npm run db:reset && npm run verifier:theme && npm run verifier:marque && npm run verifier:paliers && npm run typecheck --workspaces --if-present && npm test && npm run test:scripts && npm run test:db && npm run build && npm run verifier:bundles",
+    "verifier": "npm run db:reset && npm run verifier:theme && npm run verifier:marque && npm run verifier:paliers && npm run verifier:champs && npm run verifier:lint && npm run typecheck --workspaces --if-present && npm test && npm run test:scripts && npm run test:db && npm run build && npm run verifier:bundles",
     "generer:paliers": "node scripts/generer-paliers-edge.mjs",
     "verifier:paliers": "node scripts/generer-paliers-edge.mjs --verifier"
   },

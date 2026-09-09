@@ -74,6 +74,62 @@ const FILTRES = ['Tous', 'Avec carte', 'Clôturées', 'Sans carte'] as const;
 type Filtre = (typeof FILTRES)[number];
 
 /**
+ * Les trois clefs d'un client, dans l'ordre où le collecteur s'en sert.
+ *
+ * Le nom seul ne suffisait pas, et c'est le nom qui est la plus mauvaise des
+ * trois : il s'écrit de plusieurs façons, il se prononce autrement qu'il ne
+ * s'écrit, et deux clients d'un même marché le partagent. Le numéro est exact.
+ * Le marché est ce qui organise la tournée — et il est déjà affiché sous le
+ * nom, ce qui en fait une clef que le collecteur essaie forcément un jour.
+ *
+ * Les deux sont déjà chargés par la requête : cette recherche n'ajoute aucun
+ * aller-retour.
+ */
+function correspond(client: Client, terme: string): boolean {
+  if (!terme) return true;
+  const cherche = nu(terme);
+
+  if (nu(client.nom).includes(cherche)) return true;
+  if (client.marche !== null && nu(client.marche).includes(cherche)) return true;
+
+  if (client.telephone !== null) {
+    if (nu(client.telephone).includes(cherche)) return true;
+    // Le numéro s'écrit « 07 08 09 10 11 » dans la fiche et se tape « 0708 »
+    // dans la recherche. Comparer les deux chaînes telles quelles ne rapproche
+    // jamais rien : on compare les chiffres aux chiffres.
+    const chiffresCherches = chiffres(terme);
+    if (chiffresCherches && chiffres(client.telephone).includes(chiffresCherches)) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Ce que deux personnes tapent pareil : minuscules, sans accents.
+ *
+ * « Adjamé » est saisi avec son accent dans la fiche, et personne ne compose un
+ * accent sur un clavier de téléphone au marché. Sans ce repli, la clef que
+ * l'invite du champ propose — le marché — ne répond pas, et le collecteur cesse
+ * de l'essayer.
+ */
+function nu(texte: string): string {
+  return texte
+    .normalize('NFD')
+    // Les diacritiques combinants, que `NFD` vient de détacher de leur lettre.
+    // Écrits en échappements : une classe posée en caractères bruts se fait
+    // réécrire au premier outil qui touche au fichier, et `[0300-036f]` — ce
+    // qu'une substitution en a fait le 2026-09-09 — mange les chiffres 0, 3 et
+    // 6, donc la recherche par numéro.
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+}
+
+/** Les chiffres seuls, séparateurs et indicatifs de mise en forme retirés. */
+function chiffres(texte: string): string {
+  return texte.replace(/\D/g, '');
+}
+
+/**
  * La maquette proposait « À jour / En retard / Non visités ». Ces trois
  * réponses supposent la date de la dernière mise, que J2a introduit. Les
  * filtres ci-dessus disent ce que la base sait aujourd'hui : proposer un
@@ -231,12 +287,12 @@ export function Clients({
         }))
         .filter((l) => {
           if (l.cartes.length === 0) return false;
-          return !terme || l.client.nom.toLowerCase().includes(terme);
+          return correspond(l.client, terme);
         });
     }
 
     return lignes.filter((l) => {
-      if (terme && !l.client.nom.toLowerCase().includes(terme)) return false;
+      if (!correspond(l.client, terme)) return false;
       if (filtre === 'Avec carte') return l.cartes.length > 0;
       // `Sans carte` valait « aucune carte, jamais ». Il vaut désormais « aucune
       // carte active » : c'est le filtre du geste à faire, ouvrir une carte.
@@ -244,6 +300,34 @@ export function Clients({
       return true;
     });
   }, [lignes, toutesCartes, recherche, filtre]);
+
+  /**
+   * Combien de clients la **recherche** trouve, filtre ignoré.
+   *
+   * `visibles` est rétréci par deux choses à la fois. Compter dessus faisait
+   * dire « Aucun client trouvé » à un écran qui avait parfaitement trouvé le
+   * client, mais dont le filtre le cachait — et c'est le pire mensonge que cet
+   * écran puisse faire : le collecteur en conclut que la personne n'est pas
+   * inscrite et la réinscrit. Deux clients pour une personne, deux carnets, et
+   * un solde restituable qui se calcule sur le mauvais.
+   */
+  const correspondants = useMemo(() => {
+    const terme = recherche.trim().toLowerCase();
+    if (!lignes || !terme) return 0;
+    return lignes.filter((l) => correspond(l.client, terme)).length;
+  }, [lignes, recherche]);
+
+  const masques = Math.max(0, correspondants - visibles.length);
+  const pluriel = (n: number) => (n > 1 ? 's' : '');
+  const annonce = !recherche.trim()
+    ? ''
+    : correspondants === 0
+      ? 'Aucun client trouvé'
+      : masques === 0
+        ? `${correspondants} client${pluriel(correspondants)} trouvé${pluriel(correspondants)}`
+        : visibles.length === 0
+          ? `${correspondants} client${pluriel(correspondants)} trouvé${pluriel(correspondants)}, masqué${pluriel(correspondants)} par le filtre « ${filtre} »`
+          : `${visibles.length} sur ${correspondants} — ${masques} masqué${pluriel(masques)} par le filtre « ${filtre} »`;
 
   // Une ligne par client depuis le 2026-08-26, donc `lignes.length` compte bien
   // des personnes. Les carnets, eux, se comptent en les additionnant : c'est la
@@ -327,29 +411,90 @@ export function Clients({
         </div>
       </div>
 
-      {/* Recherche */}
-      <div className="px-4 mt-5 flex gap-2">
-        <div className="flex-1 flex items-center gap-2.5 bg-surface border border-hairline/80 rounded-2xl px-3.5 py-2.5 shadow-xs focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition-all">
-          <Icone nom="search" taille={16} className="text-muted-foreground" />
+      {/* Recherche
+
+          Un seul élément à cerner, et c'est tout le sujet.
+
+          La version d'avant enveloppait l'`input` dans une boîte qui portait
+          son propre anneau — `focus-within:border-primary focus-within:ring-2`
+          — et éteignait celui du champ par `outline-none`. Sauf que
+          `base.css` est importé après Tailwind : à spécificité égale,
+          `:focus-visible` gagnait. Au clavier, l'écran montrait donc deux
+          anneaux imbriqués, celui de la boîte arrondi et celui du champ à
+          angles droits, avec le halo blanc entre les deux.
+
+          Ici l'`input` est la surface : c'est lui qui porte le fond, la
+          bordure et le rayon, donc l'anneau du système suit sa forme et il n'y
+          en a qu'un. L'icône et la croix flottent au-dessus en `absolute`.
+          C'est aussi ce que `Champ` fait déjà, à l'ornement près. */}
+      <div className="px-4 mt-5">
+        <div className="relative">
+          <Icone
+            nom="search"
+            taille={16}
+            // `pointer-events-none` : sans elle, l'icône avale le toucher qui
+            // visait le début du champ — le geste le plus naturel des deux.
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+          />
           <input
-            type="search"
+            // `text` et non `search` : WebKit dessine sur `search` sa propre
+            // croix d'effacement. Sur l'iPhone où cette application s'installe,
+            // le collecteur en voyait deux, dont une qu'aucun de nos tests ne
+            // touche et qui ne fait pas 44 px.
+            type="text"
             value={recherche}
             onChange={(e) => setRecherche(e.target.value)}
-            placeholder="Rechercher un client…"
+            onKeyDown={(e) => {
+              // Le geste attendu partout, et le seul qui ne demande pas de
+              // viser : la main qui tape n'a pas à retrouver la croix.
+              if (e.key === 'Escape') setRecherche('');
+            }}
+            placeholder="Nom, numéro ou marché…"
             aria-label="Rechercher un client"
-            className="flex-1 min-w-0 bg-transparent text-base font-body text-ink outline-none placeholder:text-muted-foreground"
+            // Le correcteur d'iOS réécrit un nom ivoirien en mot français au
+            // deuxième caractère, et la majuscule automatique casse la
+            // recherche par numéro dès le premier chiffre.
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="search"
+            className="w-full min-h-11 pl-10 pr-12 bg-surface border-[1.5px] border-hairline/80 rounded-2xl text-champ font-body text-ink shadow-xs placeholder:text-muted-foreground focus:border-primary transition-colors"
           />
           {recherche && (
             <button
               type="button"
               onClick={() => setRecherche('')}
               aria-label="Effacer la recherche"
-              className="w-5 h-5 rounded-pill bg-muted flex items-center justify-center text-muted-foreground hover:text-ink cursor-pointer"
+              // 44 px, comme `Champ` et `ChampTelephone`. La croix faisait
+              // 20 px : au marché, à une main, la manquer efface un caractère
+              // au lieu du terme, et il faut recommencer.
+              className="absolute right-1 top-1/2 -translate-y-1/2 min-w-11 min-h-11 flex items-center justify-center rounded-2xl text-muted-foreground hover:text-ink cursor-pointer"
             >
-              <Icone nom="x" taille={12} />
+              <Icone nom="x" taille={16} />
             </button>
           )}
         </div>
+        {/* Trois lignes qui deviennent une, sans un mot : le collecteur ne sait
+            pas s'il a mal tapé ou si le client n'existe pas. Le compte tranche,
+            et `role="status"` le fait lire par le lecteur d'écran sans voler le
+            focus au champ qu'on est en train de remplir.
+
+            La région est montée **en permanence**, vide tant qu'on n'a pas
+            cherché. C'est la seule façon qu'elle serve : un lecteur d'écran
+            annonce les changements survenant dans une région live qu'il observe
+            déjà, et non l'insertion d'une région déjà remplie. Le `{recherche &&
+            (<p role="status">…)}` d'avant écrivait donc un `role="status"` qui
+            ne parlait à personne — correct à la relecture, muet à l'usage.
+
+            À l'œil, rien ne change : un paragraphe vide n'ouvre pas de ligne, et
+            sa marge n'apparaît qu'avec son texte. */}
+        <p
+          role="status"
+          aria-live="polite"
+          className={`px-1 text-xs font-body text-muted-foreground ${annonce ? 'mt-2' : ''}`}
+        >
+          {annonce}
+        </p>
       </div>
 
       {/* Inscrire un client */}
@@ -802,7 +947,7 @@ function FormulaireClient({
         maxLength={120}
         onChange={(e) => setNom(e.target.value)}
         placeholder="Nom du client"
-        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-base font-body text-ink outline-none focus:border-primary placeholder:text-muted-foreground mb-3"
+        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-champ font-body text-ink outline-none focus:border-primary placeholder:text-muted-foreground mb-3"
       />
 
       <label htmlFor="nouveau-tel" className="block text-sm font-body font-semibold text-ink mb-1">
@@ -816,7 +961,7 @@ function FormulaireClient({
         maxLength={32}
         onChange={(e) => setTelephone(e.target.value)}
         placeholder="+225…07 00 00 00"
-        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-base font-body text-ink outline-none focus:border-primary placeholder:text-muted-foreground mb-3"
+        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-champ font-body text-ink outline-none focus:border-primary placeholder:text-muted-foreground mb-3"
       />
 
       <label
@@ -832,7 +977,7 @@ function FormulaireClient({
         maxLength={80}
         onChange={(e) => setMarche(e.target.value)}
         placeholder="Adjamé, Plateau…"
-        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-base font-body text-ink outline-none focus:border-primary placeholder:text-muted-foreground mb-3"
+        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-champ font-body text-ink outline-none focus:border-primary placeholder:text-muted-foreground mb-3"
       />
 
       <div className="mb-3">

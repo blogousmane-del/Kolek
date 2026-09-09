@@ -208,6 +208,31 @@ export const taillesTexte = {
   xs: '11px', // Overline
   sm: '13px', // Small / label
   base: '15px', // Body
+
+  /**
+   * La taille de tout ce dans quoi on tape. 16 px, et pas un de moins.
+   *
+   * Safari sur iPhone zoome la page dès qu'on touche un champ dont la police
+   * calculée passe sous 16 px : le champ grossit, la page déborde, et il faut
+   * pincer pour ressortir — au milieu d'un geste que le collecteur fait
+   * cinquante fois par jour, debout, à une main. Il n'existe pas d'attribut
+   * pour le désactiver. La seule autre porte de sortie, `maximum-scale=1` dans
+   * le `viewport`, supprime le zoom manuel de l'écran entier : on échangerait
+   * un agacement contre un défaut d'accessibilité.
+   *
+   * Pourquoi son propre nom plutôt que `lg`, qui vaut déjà 16 px : `lg`
+   * désigne un titre de carte. Un champ qui emprunte le jeton d'un titre se
+   * fera un jour retailler avec les titres, et le zoom reviendra sans que
+   * personne ait touché à un champ.
+   *
+   * Le corps du produit reste à 15 px. C'est la densité choisie pour des
+   * listes longues, et un pixel sur les seuls champs suffit.
+   *
+   * `scripts/verifier-champs.mjs` refuse toute balise `input`, `textarea` ou
+   * `select` qui déclarerait une taille sous ce seuil.
+   */
+  champ: '16px',
+
   lg: '16px', // H3 — titre de carte
   xl: '20px', // H2 — section
   '2xl': '24px', // Montant de carte

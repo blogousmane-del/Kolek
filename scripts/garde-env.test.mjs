@@ -107,3 +107,34 @@ describe('chargeUtile', () => {
     }
   });
 });
+
+/**
+ * Le greffon est-il branché ?
+ *
+ * Tout ce qui précède mesure la fonction de décision. Rien ne mesurait qu'elle
+ * soit posée — et c'est exactement là qu'elle a manqué : `vite.config.ts` du
+ * collecteur importait `gardeEnv` sans jamais l'ajouter à `plugins`. L'import
+ * mort rendait la ligne crédible à la relecture. Découvert le 2026-09-09.
+ *
+ * L'application la moins gardée était donc la seule à porter une session en
+ * itinérance, sur des téléphones où la mise à jour passe par un service worker.
+ * Le second filet — `verifier:bundles` — attrape encore la clé de service, mais
+ * pas le défaut qui avait motivé ce greffon : une clé anonyme tronquée, valide
+ * d'apparence, qui fait rendre `401` à toute l'application sans que rien n'ait
+ * échoué à la construction.
+ *
+ * Le contrôle porte sur la configuration réelle, importée, pas sur le texte du
+ * fichier : un test qui cherche « gardeEnv » dans la source repasserait au vert
+ * sur le défaut même qu'il doit voir.
+ */
+describe('le greffon est posé dans les trois applications', () => {
+  for (const application of ['admin', 'collecteur', 'site']) {
+    it(`${application} enregistre kolek-garde-env`, async () => {
+      const module = await import(`../apps/${application}/vite.config.ts`);
+      const configuration = module.default;
+      const greffons = (configuration.plugins ?? []).flat(Infinity);
+
+      expect(greffons.map((g) => g?.name)).toContain('kolek-garde-env');
+    });
+  }
+});

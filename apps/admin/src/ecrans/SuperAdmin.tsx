@@ -137,7 +137,7 @@ const TEINTE_STATUT: Record<CodePromo['statut'], string> = {
 };
 
 const CHAMP =
-  'w-full min-h-11 px-3 bg-surface border border-hairline rounded-md font-body text-base text-ink outline-none focus:border-primary';
+  'w-full min-h-11 px-3 bg-surface border border-hairline rounded-md font-body text-champ text-ink outline-none focus:border-primary';
 const ETIQUETTE = 'block font-body text-sm font-semibold text-ink mb-1';
 
 const COLONNES_ABONNES = '1fr 100px 110px 120px 120px 110px 60px';
@@ -550,7 +550,7 @@ function OngletAbonnements({
               <select
                 value={codeChoisi}
                 onChange={(e) => setCodeChoisi(e.target.value)}
-                className="h-11 px-3 rounded-md border border-input bg-surface font-body text-sm text-ink cursor-pointer"
+                className="h-11 px-3 rounded-md border border-input bg-surface font-body text-champ text-ink cursor-pointer"
               >
                 <option value="">Choisir un code…</option>
                 {codesApplicables.map((c) => (
@@ -701,7 +701,7 @@ function OngletAbonnements({
                 placeholder="Rechercher…"
                 value={recherche}
                 onChange={(e) => setRecherche(e.target.value)}
-                className="pl-9 pr-3 h-9 bg-surface border border-hairline rounded-md font-body text-sm text-ink outline-none focus:border-primary w-44"
+                className="pl-9 pr-3 h-9 bg-surface border border-hairline rounded-md font-body text-champ text-ink outline-none focus:border-primary w-44"
               />
             </div>
           </div>

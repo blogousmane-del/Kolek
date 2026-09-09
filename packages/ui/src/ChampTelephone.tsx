@@ -214,7 +214,7 @@ export function ChampTelephone({ libelle, valeur, onChange, className = '' }: Pr
             id={idPays}
             value={valeur.pays}
             onChange={(e) => remonter(e.target.value, valeur.local)}
-            className="w-full min-h-11 px-2 bg-input border-[1.5px] border-hairline rounded-md text-base font-body text-ink focus:border-primary"
+            className="w-full min-h-11 px-2 bg-input border-[1.5px] border-hairline rounded-md text-champ font-body text-ink focus:border-primary"
           >
             {PAYS_TELEPHONE.map((p) => (
               <option key={p.code} value={p.code}>

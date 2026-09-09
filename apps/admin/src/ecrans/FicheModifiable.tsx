@@ -92,7 +92,7 @@ export function FicheModifiable({
           <select
             value={palier}
             onChange={(e) => setPalier(e.target.value)}
-            className="h-11 px-3 rounded-md border border-input bg-surface font-body text-sm text-ink cursor-pointer"
+            className="h-11 px-3 rounded-md border border-input bg-surface font-body text-champ text-ink cursor-pointer"
           >
             {PALIERS.map((p) => (
               <option key={p.cle} value={p.cle}>
@@ -107,7 +107,7 @@ export function FicheModifiable({
           <select
             value={statut}
             onChange={(e) => setStatut(e.target.value)}
-            className="h-11 px-3 rounded-md border border-input bg-surface font-body text-sm text-ink cursor-pointer"
+            className="h-11 px-3 rounded-md border border-input bg-surface font-body text-champ text-ink cursor-pointer"
           >
             <option value="actif">Actif</option>
             <option value="suspendu">Suspendu</option>

@@ -139,3 +139,40 @@ describe('contraste des paires employées', () => {
     expect(contraste('#777777', '#777777')).toBeCloseTo(1, 5);
   });
 });
+
+/**
+ * La taille de champ, et pourquoi elle ne se déduit pas de l'échelle de texte.
+ *
+ * Safari sur iPhone zoome la page dès qu'on touche un champ dont la police
+ * calculée passe sous 16 px. Ce n'est pas une préférence, c'est un
+ * comportement du système : il n'y a pas d'attribut pour le désactiver, et la
+ * seule autre porte de sortie — `maximum-scale=1` dans le `viewport` — coûte
+ * le zoom manuel à tout l'écran, ce qu'aucun référentiel d'accessibilité
+ * n'accepte.
+ *
+ * Le corps du produit vaut 15 px (`base`, Design System §3.2), et il doit le
+ * rester : c'est la densité choisie pour des listes longues. Un pixel de plus
+ * sur les seuls champs suffit, et il lui faut son propre nom — `lg` vaut la
+ * même chose mais désigne un titre de carte, et un champ qui emprunte le
+ * jeton d'un titre se fera un jour retailler avec les titres.
+ */
+describe('taille de champ', () => {
+  it('tient les 16 px sous lesquels iOS zoome', () => {
+    expect(Number.parseFloat(taillesTexte.champ)).toBeGreaterThanOrEqual(16);
+  });
+
+  it('reste au-dessus du corps de texte, jamais en dessous', () => {
+    // Si `base` repassait un jour au-dessus de 16 px, un champ plus petit que
+    // le texte qui l'entoure serait le vrai défaut, et ce test le dirait.
+    expect(Number.parseFloat(taillesTexte.champ)).toBeGreaterThanOrEqual(
+      Number.parseFloat(taillesTexte.base),
+    );
+  });
+
+  it('arrive jusqu’à Tailwind sous le nom `text-champ`', () => {
+    // Sans cette ligne dans `@theme`, la classe n'existe pas et Tailwind la
+    // laisse tomber en silence — le champ garderait sa taille héritée et le
+    // zoom reviendrait sans qu'aucun test ne bouge.
+    expect(genererCssTheme()).toContain('--text-champ: 16px;');
+  });
+});

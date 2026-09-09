@@ -171,7 +171,7 @@ export function ChoixMise({
                 const valeur = Number(texte);
                 onChoisir(validerMise(valeur) && !miseInhabituelle(valeur) ? valeur : null);
               }}
-              className="w-36 bg-surface border border-hairline rounded-md px-3 py-2.5 text-base font-body text-ink tabular-nums outline-none focus:border-primary"
+              className="w-36 bg-surface border border-hairline rounded-md px-3 py-2.5 text-champ font-body text-ink tabular-nums outline-none focus:border-primary"
             />
             <span className="text-base font-body text-muted-foreground">FCFA / jour</span>
           </div>

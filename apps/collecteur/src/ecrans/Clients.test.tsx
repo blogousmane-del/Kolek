@@ -27,8 +27,13 @@ const { Clients } = await import('./Clients');
 
 const CLIENTS = [
   { id: 'cli1', nom: 'Hj', marche: 'Sokourani', telephone: null, avis_actifs: false },
-  { id: 'cli2', nom: 'Ka', marche: null, telephone: null, avis_actifs: false },
-  { id: 'cli3', nom: 'Sy', marche: null, telephone: null, avis_actifs: false },
+  // Le numéro de Ka sert la recherche : c'est la seule des trois clefs que le
+  // collecteur possède quand il ne se rappelle plus l'orthographe d'un nom.
+  // Espacé comme on l'écrit ici, et non collé — c'est la forme réelle.
+  { id: 'cli2', nom: 'Ka', marche: null, telephone: '07 08 09 10 11', avis_actifs: false },
+  // Accentué, comme la fiche le saisit et comme le clavier du marché ne le
+  // tapera pas.
+  { id: 'cli3', nom: 'Sy', marche: 'Adjamé', telephone: null, avis_actifs: false },
 ];
 
 /** Deux cartes actives pour Hj, aucune active pour Ka, une carte pleine pour Sy. */
@@ -192,5 +197,200 @@ describe('liste des clients redevenue liste de personnes', () => {
     // tous ses clients et devait retrouver la ligne à la main — avant un geste
     // qui ne se défait pas, et alors qu'un même client peut en avoir deux.
     expect(onRetrait).toHaveBeenCalledWith({ id: 'cli3', nom: 'Sy' });
+  });
+});
+
+/**
+ * La recherche de client.
+ *
+ * Elle est le premier geste de la journée : le collecteur arrive devant une
+ * personne, pas devant une liste. Tout ce qui suit part de là — ce qu'on tape,
+ * ce qu'on touche, et ce que l'écran répond.
+ */
+describe('recherche de client', () => {
+  const chercher = (terme: string) =>
+    fireEvent.change(screen.getByLabelText('Rechercher un client'), {
+      target: { value: terme },
+    });
+
+  it('trouve un client par son numéro de téléphone', async () => {
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+
+    chercher('0708');
+
+    // Le nom est ce dont on se souvient le moins bien : il s'écrit de trois
+    // façons, il se prononce autrement qu'il ne s'écrit, et deux clients d'un
+    // même marché le partagent. Le numéro, lui, est exact — et il est déjà
+    // chargé par la requête, ligne 155.
+    expect(screen.getByText('Ka')).toBeTruthy();
+    expect(screen.queryByText('Hj')).toBeNull();
+  });
+
+  it('trouve un client par son marché', async () => {
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+
+    chercher('sokou');
+
+    // La tournée s'organise par marché, et le marché est déjà affiché sous le
+    // nom. Une clef visible à l'écran qui ne répond pas à la recherche est une
+    // clef que le collecteur essaie une fois, puis plus jamais.
+    expect(screen.getByText('Hj')).toBeTruthy();
+    expect(screen.queryByText('Ka')).toBeNull();
+  });
+
+  it('garde l’anneau de focus du système sur le champ', async () => {
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+
+    // `base.css` pose `:focus-visible` avec un décalage de 2 px et un halo
+    // blanc, et il est importé après Tailwind : à spécificité égale, c'est lui
+    // qui gagne. Un `outline-none` sur le champ ne l'éteignait donc pas — il le
+    // laissait cerner l'`input` nu, à angles droits, à l'intérieur du cadre
+    // arrondi qui portait déjà son propre anneau. C'est le double anneau de la
+    // capture du 2026-09-09.
+    //
+    // La sortie n'est pas d'éteindre l'anneau — `Champ` et `ChampTelephone`
+    // tiennent la règle inverse — mais de n'avoir qu'un seul élément à cerner.
+    expect(screen.getByLabelText('Rechercher un client').className).not.toContain(
+      'outline-none',
+    );
+  });
+
+  it('donne à la croix d’effacement une cible de 44 px', async () => {
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+    chercher('ka');
+
+    // 20 px auparavant — moins que le `w-6 h-6` que les référentiels citent
+    // déjà comme contre-exemple. Sur un téléphone tenu d'une main, au marché,
+    // la croix ratée efface un caractère au lieu du terme.
+    const croix = screen.getByRole('button', { name: 'Effacer la recherche' });
+    expect(croix.className).toMatch(/\bmin-h-11\b/);
+    expect(croix.className).toMatch(/\bmin-w-11\b/);
+  });
+
+  it('annonce le nombre de clients trouvés', async () => {
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+
+    chercher('ka');
+
+    // Trois lignes qui deviennent une, sans un mot : le collecteur ne sait pas
+    // s'il a mal tapé ou si le client n'existe pas. Le compte tranche, et
+    // `role="status"` le fait lire à voix haute par le lecteur d'écran.
+    expect(screen.getByRole('status').textContent).toMatch(/1 client trouvé/);
+  });
+
+  it('n’écrit rien tant qu’on n’a pas cherché, mais la région existe déjà', async () => {
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+
+    // Deux exigences qui tirent en sens inverse, et il faut les deux.
+    //
+    // À l'œil : rien. Un compteur permanent est un compteur qu'on cesse de
+    // lire, et les trois KPI du haut disent déjà combien de clients il y a.
+    //
+    // Pour le lecteur d'écran : la région doit **déjà être là**. Une région
+    // live insérée dans le document en même temps que son texte n'est
+    // généralement pas annoncée — les lecteurs annoncent les *changements* à
+    // l'intérieur d'une région qu'ils observent déjà. Monter le `<p>` au
+    // moment où il a quelque chose à dire, c'est donc écrire un `role="status"`
+    // qui ne dit jamais rien. C'était le cas jusqu'au 2026-09-09.
+    const region = screen.getByRole('status');
+    expect(region.textContent).toBe('');
+  });
+
+  it('ne dit pas « aucun » quand c’est le filtre qui cache le client', async () => {
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+
+    // Ka n'a aucune carte active : le filtre « Avec carte » l'écarte. Mais la
+    // recherche, elle, l'a bien trouvé.
+    fireEvent.click(screen.getByRole('button', { name: 'Avec carte' }));
+    chercher('ka');
+
+    // « Aucun client trouvé » serait un mensonge aux conséquences chères : le
+    // collecteur conclut que le client n'existe pas et le réinscrit. Deux
+    // clients, deux carnets, et un solde restituable qui se calcule sur le
+    // mauvais.
+    const annonce = screen.getByRole('status').textContent ?? '';
+    expect(annonce).not.toMatch(/^Aucun client trouvé$/);
+    expect(annonce).toMatch(/filtre/i);
+  });
+
+  it('trouve « Adjamé » quand on tape « adjame »', async () => {
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+
+    chercher('adjame');
+
+    // Personne ne compose un accent sur un clavier de téléphone au marché, et
+    // le nom du marché est saisi avec dans la fiche. Sans repli sur les
+    // caractères nus, la clef que l'invite du champ propose ne répond pas.
+    expect(screen.getByText('Sy')).toBeTruthy();
+    expect(screen.queryByText('Hj')).toBeNull();
+  });
+
+  it('trouve un numéro écrit avec des espaces', async () => {
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+
+    chercher('0708');
+
+    // Le numéro est stocké « 07 08 09 10 11 » — c'est ainsi qu'on l'écrit ici.
+    // Le collecteur, lui, tape des chiffres à la suite. Comparer les deux
+    // chaînes telles quelles ne rapproche jamais rien.
+    expect(screen.getByText('Ka')).toBeTruthy();
+    expect(screen.queryByText('Hj')).toBeNull();
+  });
+
+  it('efface la recherche à la touche Échap', async () => {
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+    chercher('ka');
+    expect(screen.queryByText('Hj')).toBeNull();
+
+    fireEvent.keyDown(screen.getByLabelText('Rechercher un client'), { key: 'Escape' });
+
+    // Le geste attendu partout, et le seul qui n'oblige pas à viser la croix.
+    expect(screen.getByText('Hj')).toBeTruthy();
+  });
+
+  it('n’ouvre pas la croix native du navigateur en plus de la sienne', async () => {
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+
+    // `type="search"` fait dessiner à WebKit son propre bouton d'effacement.
+    // Sur iPhone — la cible de cette application installée — le collecteur en
+    // voyait deux, dont un qu'aucun de nos tests ne touche.
+    expect(screen.getByLabelText('Rechercher un client').getAttribute('type')).toBe('text');
+  });
+
+  it('n’ouvre ni majuscule ni correcteur sur le clavier', async () => {
+    brancherSupabase();
+    rendre();
+    await screen.findByText('Hj');
+
+    // Le correcteur d'iOS transforme un nom ivoirien en mot français au
+    // deuxième caractère, et la majuscule automatique casse la recherche par
+    // numéro. Les deux se désarment par attribut, pas par habitude.
+    const champ = screen.getByLabelText('Rechercher un client');
+    expect(champ.getAttribute('autoCapitalize') ?? champ.getAttribute('autocapitalize')).toBe(
+      'none',
+    );
+    expect(champ.getAttribute('autoCorrect') ?? champ.getAttribute('autocorrect')).toBe('off');
   });
 });

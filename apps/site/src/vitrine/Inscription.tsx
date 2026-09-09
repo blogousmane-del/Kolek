@@ -64,7 +64,7 @@ import { APP_COLLECTEUR, CONTACT_DEMO } from './liens';
  * `styles.css` retourne les deux couleurs de l'anneau pour le fond sombre.
  */
 const CHAMP_SOMBRE =
-  'w-full min-h-11 rounded-md border-[1.5px] border-white/40 bg-white/5 px-3.5 font-body text-base text-white placeholder:text-white/55 focus:border-or';
+  'w-full min-h-11 rounded-md border-[1.5px] border-white/40 bg-white/5 px-3.5 font-body text-champ text-white placeholder:text-white/55 focus:border-or';
 
 function Etiquette({ pour, children }: { pour: string; children: React.ReactNode }) {
   return (

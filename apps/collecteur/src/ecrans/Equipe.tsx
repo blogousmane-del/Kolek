@@ -331,7 +331,7 @@ function Champ({
         type={type}
         value={valeur}
         onChange={(e) => onSaisir(e.target.value)}
-        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-base font-body text-ink outline-none focus:border-primary"
+        className="w-full bg-surface border border-hairline rounded-md px-3 py-2.5 text-champ font-body text-ink outline-none focus:border-primary"
       />
     </label>
   );

@@ -343,7 +343,7 @@ function Editeur({
         onChange={(e) =>
           setPolitique({ ...politique, quota_mensuel: Math.trunc(Number(e.target.value)) })
         }
-        className="w-40 bg-surface border border-hairline rounded-md px-3 py-2.5 font-body text-base text-ink tabular-nums outline-none focus:border-primary"
+        className="w-40 bg-surface border border-hairline rounded-md px-3 py-2.5 font-body text-champ text-ink tabular-nums outline-none focus:border-primary"
       />
       <p className="font-body text-xs text-muted-foreground mt-1 mb-4">
         Au-delà, les avis sont composés et marqués « hors quota » plutôt qu’envoyés. Plafond{' '}
