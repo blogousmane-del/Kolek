@@ -10,6 +10,24 @@ afterEach(cleanup);
 import { Pagination, TAILLE_PAGE, usePagination } from './Pagination';
 
 /**
+ * Ce que `usePagination` ne peut pas garder par un test, et qu'il faut donc
+ * écrire.
+ *
+ * `allerA` rendait `setDemandee` tel quel, c'est-à-dire un
+ * `Dispatch<SetStateAction<number>>`. Le type acceptait donc `allerA(p => p + 1)`
+ * — et cet appel-là lirait `demandee`, **la page stockée non bornée**, et non
+ * `page`, celle qui est affichée. Après un rétrécissement de liste les deux
+ * diffèrent : c'est tout le sujet du crochet.
+ *
+ * La correction est une enveloppe qui n'accepte qu'un nombre. Elle est **de
+ * typage seul** : à l'exécution, React traite n'importe quelle fonction reçue
+ * par un `setState` comme une mise à jour fonctionnelle, enveloppe ou pas.
+ * Aucun test ne peut donc démontrer la fermeture — seul le compilateur la voit.
+ * Le test ci-dessous garde ce que l'enveloppe risquait de casser, faute de
+ * pouvoir garder ce qu'elle apporte.
+ */
+
+/**
  * La pagination d'affichage.
  *
  * ## Ce qu'elle est, et ce qu'elle n'est pas
@@ -97,6 +115,87 @@ describe('usePagination', () => {
 
     act(() => result.current.allerA(0));
     expect(result.current.page).toBe(1);
+  });
+
+  /**
+   * Le compte total vient du crochet, et non de l'appelant.
+   *
+   * Relevé par l'auto-audit du 2026-09-09 : le composant réclamait un `total`
+   * que le crochet connaissait déjà. Les six branchements étaient justes — ils
+   * ont été vérifiés un par un — mais rien ne l'imposait. Paginer `listeFiltree`
+   * et annoncer `collecteurs.length` compilait, passait les tests, et affichait
+   * un compte qui ment.
+   *
+   * Le rendre ici ferme la question : l'appelant n'a plus de deuxième nombre à
+   * fournir, donc plus de deuxième nombre à se tromper.
+   */
+  it('rend lui-même le compte total', () => {
+    const { result } = renderHook(() => usePagination(liste(120)));
+
+    expect(result.current.total).toBe(120);
+  });
+
+  it('compte tout ce qu’on lui donne, et non ce qu’il affiche', () => {
+    const { result } = renderHook(() => usePagination(liste(120)));
+
+    act(() => result.current.allerA(2));
+
+    expect(result.current.visibles).toHaveLength(TAILLE_PAGE);
+    expect(result.current.total).toBe(120);
+  });
+
+  /**
+   * `allerA` garde son identité d'un rendu à l'autre.
+   *
+   * Ce test passe déjà avant le changement qu'il accompagne, et c'est voulu :
+   * il ne cherche pas un défaut, il garde une propriété que la correction du
+   * point D pourrait coûter. `allerA` était `setDemandee` tel quel — donc
+   * stable, comme tout `setState`. L'envelopper pour fermer son type le rendrait
+   * neuf à chaque rendu si l'enveloppe n'était pas mémoïsée, et cette identité
+   * voyage jusqu'à la propriété `onAller` du composant.
+   */
+  it('garde la même fonction d’aller-à d’un rendu à l’autre', () => {
+    const { result, rerender } = renderHook(({ n }) => usePagination(liste(n)), {
+      initialProps: { n: 120 },
+    });
+
+    const avant = result.current.allerA;
+    rerender({ n: 200 });
+
+    expect(result.current.allerA).toBe(avant);
+  });
+
+  /**
+   * Une taille de page absurde ne fait pas tomber l'écran.
+   *
+   * Trouvé en relisant la correction du point B, et c'est **elle** qui a créé le
+   * danger. `taille` est un paramètre public du crochet ; à zéro,
+   * `Math.ceil(n / 0)` vaut `Infinity`. Avant que les nombres passent par
+   * `formatMontant`, ça donnait « Page 1 sur Infinity » — laid, mais l'écran
+   * vivait. Depuis, `formatMontant` lève sur un nombre non fini :
+   *
+   *     Montant non fini : Infinity
+   *
+   * Mesuré par une sonde avant d'écrire ce test, et non déduit. Le résultat
+   * n'est pas une pagination fautive, c'est l'écran entier qui tombe — sur le
+   * téléphone d'un collecteur, au marché, c'est la pire des pannes.
+   *
+   * Aucun des six appelants ne passe `taille` aujourd'hui. Le paramètre est
+   * exporté quand même, et un défaut qui attend le premier qui s'en servira est
+   * un défaut.
+   *
+   * Le repli est `TAILLE_PAGE` plutôt que 1 : ramener à 1 donnerait cent vingt
+   * pages d'une ligne, ce qui est vivant mais inutilisable. La valeur par défaut
+   * rend un écran dont on peut se servir pendant qu'on cherche l'erreur.
+   */
+  it('se défend d’une taille de page inutilisable', () => {
+    for (const absurde of [0, -10, Number.NaN]) {
+      const { result } = renderHook(() => usePagination(liste(120), absurde));
+
+      expect(Number.isFinite(result.current.pages)).toBe(true);
+      expect(result.current.visibles).toHaveLength(TAILLE_PAGE);
+      cleanup();
+    }
   });
 
   it('compte une page même sur une liste vide', () => {

@@ -54,7 +54,7 @@ export function EncoursSoldes({ vue }: { vue: VueGlobale }) {
    * et le compte en tête continue de la dire. Seul le nombre de lignes rendues
    * d'un coup change.
    */
-  const { page, pages, visibles, allerA } = usePagination(cartes);
+  const { page, pages, total, visibles, allerA } = usePagination(cartes);
 
   const indicateurs = [
     {
@@ -179,7 +179,7 @@ export function EncoursSoldes({ vue }: { vue: VueGlobale }) {
               rester sous le pouce même quand le tableau est poussé vers la
               droite. `total` compte les cartes reçues — la borne serveur, elle,
               se lit en tête. */}
-          <Pagination page={page} pages={pages} total={cartes.length} onAller={allerA} />
+          <Pagination page={page} pages={pages} total={total} onAller={allerA} />
         </Carte>
       </div>
     </>

@@ -103,7 +103,7 @@ export function Collecteurs({
    * `listeFiltree` reste ce qu'`exporter()` écrit : le fichier suit le filtre,
    * jamais la page.
    */
-  const { page, pages, visibles, allerA } = usePagination(listeFiltree);
+  const { page, pages, total, visibles, allerA } = usePagination(listeFiltree);
 
   /**
    * Toute nouvelle question se pose depuis le début de la liste.
@@ -352,7 +352,7 @@ export function Collecteurs({
           {/* Hors du conteneur qui défile latéralement : les commandes restent
               en place même quand le tableau est poussé vers la droite. `total`
               compte tout ce que le filtre laisse passer, et non la page. */}
-          <Pagination page={page} pages={pages} total={listeFiltree.length} onAller={allerA} />
+          <Pagination page={page} pages={pages} total={total} onAller={allerA} />
         </Carte>
       </div>
     </>

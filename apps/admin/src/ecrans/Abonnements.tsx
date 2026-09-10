@@ -141,7 +141,7 @@ export function Abonnements({ vue }: { vue: VueGlobale }) {
    * continue d'écrire `vue.collecteurs` en entier — c'est le fichier des
    * relances, et une page ne relance personne.
    */
-  const { page, pages, visibles, allerA } = usePagination(collecteurs);
+  const { page, pages, total, visibles, allerA } = usePagination(collecteurs);
 
   const indicateurs = [
     {
@@ -371,7 +371,7 @@ export function Abonnements({ vue }: { vue: VueGlobale }) {
 
           {/* Hors du conteneur qui défile latéralement : les commandes restent
               en place même quand le tableau est poussé vers la droite. */}
-          <Pagination page={page} pages={pages} total={collecteurs.length} onAller={allerA} />
+          <Pagination page={page} pages={pages} total={total} onAller={allerA} />
         </Carte>
       </div>
     </>

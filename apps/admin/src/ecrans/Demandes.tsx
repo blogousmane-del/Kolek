@@ -126,7 +126,7 @@ export function Demandes() {
    * `exporter()` continue d'écrire toutes les demandes : c'est le fichier des
    * rappels, et une page ne rappelle personne.
    */
-  const { page, pages, visibles, allerA } = usePagination(demandes ?? AUCUNE);
+  const { page, pages, total, visibles, allerA } = usePagination(demandes ?? AUCUNE);
 
   return (
     <>
@@ -270,7 +270,7 @@ export function Demandes() {
         {/* Sous la pile de cartes : la commande se cherche là où l'œil arrive
             en finissant de lire. Elle ne s'affiche pas tant que tout tient sur
             une page — ni, donc, pendant la lecture. */}
-        <Pagination page={page} pages={pages} total={demandes?.length ?? 0} onAller={allerA} />
+        <Pagination page={page} pages={pages} total={total} onAller={allerA} />
       </div>
     </>
   );

@@ -1,5 +1,5 @@
 import { formatMontant } from '@kolek/core';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { Icone } from './Icone';
 
@@ -51,17 +51,66 @@ export const TAILLE_PAGE = 50;
 export function usePagination<T>(elements: T[], taille: number = TAILLE_PAGE) {
   const [demandee, setDemandee] = useState(1);
 
+  /**
+   * La taille effective, défendue contre une valeur inutilisable.
+   *
+   * `taille` est un paramètre public, et à zéro `Math.ceil(n / 0)` vaut
+   * `Infinity`. Tant que les nombres s'écrivaient bruts, ça donnait « Page 1 sur
+   * Infinity » — laid, mais l'écran vivait. Depuis qu'ils passent par
+   * `formatMontant`, qui lève sur un nombre non fini, **c'est l'écran entier qui
+   * tombe** : sur le téléphone d'un collecteur, au marché, la pire des pannes.
+   *
+   * Aucun des six appelants ne passe `taille` aujourd'hui. Le paramètre est
+   * exporté quand même, et un défaut qui attend le premier qui s'en servira est
+   * un défaut.
+   *
+   * Le repli est `TAILLE_PAGE` et non 1 : ramener à 1 donnerait mille deux cents
+   * pages d'une ligne — vivant, mais inutilisable. La valeur par défaut rend un
+   * écran dont on peut se servir pendant qu'on cherche l'erreur.
+   */
+  const parPage = Number.isFinite(taille) && taille >= 1 ? Math.trunc(taille) : TAILLE_PAGE;
+
   // `Math.max(1, …)` : une liste vide fait quand même une page. Sans ça,
   // « page 1 sur 0 » s'afficherait, et toute division par ce nombre exploserait.
-  const pages = Math.max(1, Math.ceil(elements.length / taille));
+  const pages = Math.max(1, Math.ceil(elements.length / parPage));
   const page = Math.min(Math.max(1, demandee), pages);
 
   const visibles = useMemo(
-    () => elements.slice((page - 1) * taille, page * taille),
-    [elements, page, taille],
+    () => elements.slice((page - 1) * parPage, page * parPage),
+    [elements, page, parPage],
   );
 
-  return { page, pages, visibles, allerA: setDemandee };
+  /**
+   * N'accepte qu'un numéro de page.
+   *
+   * `setDemandee` était rendu tel quel jusqu'au 2026-09-10, c'est-à-dire un
+   * `Dispatch<SetStateAction<number>>` : le type acceptait donc
+   * `allerA(p => p + 1)`. Et cet appel-là lirait `demandee`, **la page stockée
+   * non bornée**, et non `page`, celle qui est affichée. Après un
+   * rétrécissement de liste les deux diffèrent — c'est tout le sujet de ce
+   * crochet.
+   *
+   * La fermeture est **de typage seul** : à l'exécution, React traite toute
+   * fonction reçue par un `setState` comme une mise à jour fonctionnelle,
+   * enveloppe ou pas. Seul le compilateur ferme la porte, et c'est assez, mais
+   * il faut le savoir.
+   *
+   * `useCallback` parce que `setDemandee` était stable et que cette stabilité
+   * voyage jusqu'à la propriété `onAller` du composant : une enveloppe neuve à
+   * chaque rendu la coûterait sans rien rendre.
+   */
+  const allerA = useCallback((numero: number) => setDemandee(numero), []);
+
+  /**
+   * Le compte total est rendu ici, et non redemandé à l'appelant.
+   *
+   * Il l'a été jusqu'au 2026-09-10, et l'auto-audit de la veille a dit pourquoi
+   * c'était fragile : le crochet connaît déjà `elements.length`, et un appelant
+   * qui paginerait `listeFiltree` en annonçant `collecteurs.length` compilerait,
+   * passerait les tests, et afficherait un compte qui ment. Le rendre supprime
+   * le deuxième nombre, donc le deuxième nombre à se tromper.
+   */
+  return { page, pages, total: elements.length, visibles, allerA };
 }
 
 /**
@@ -126,9 +175,18 @@ export function Pagination({
     <div className="flex items-center justify-between gap-3 px-4 py-3">
       {/* `role="status"` et non un simple texte : sans région vive, un
           utilisateur au lecteur d'écran clique « Suivante » et n'entend rien —
-          le tableau a changé hors de son champ. La région est montée en
-          permanence, sinon le premier changement passe inaperçu : une région
-          vive n'annonce que ce qui bouge **après** son apparition. */}
+          le tableau a changé hors de son champ.
+
+          Une région vive n'annonce que ce qui bouge **après** son apparition :
+          insérée dans le document en même temps que son texte, elle reste
+          muette. Ce qui la sauve ici n'est pas d'être montée en permanence —
+          le `return null` cinq lignes plus haut l'en empêche — mais d'être
+          montée **avant tout changement de page**. Les deux vont ensemble : la
+          seule condition qui la retire, une liste d'une seule page, est aussi
+          celle où aucun changement n'est possible.
+
+          La phrase disait « montée en permanence » jusqu'au 2026-09-10 ; c'était
+          faux, et le résultat juste pour une autre raison que celle écrite. */}
       {/* Les trois nombres passent par `formatMontant`, comme partout ailleurs
           dans le produit — le bandeau de recoupement de l'écran Clients écrit
           « 1 240 clients enregistrés » à quelques pixels d'ici. Sans ça, le même

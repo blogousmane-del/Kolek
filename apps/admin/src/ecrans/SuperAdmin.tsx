@@ -498,7 +498,7 @@ function OngletAbonnements({
    * redemander des pages ajouterait un aller-retour par clic sur des données
    * qu'on a déjà. Même taille de page pour les deux, cela dit.
    */
-  const { page, pages, visibles, allerA } = usePagination(collecteursFiltres);
+  const { page, pages, total, visibles, allerA } = usePagination(collecteursFiltres);
 
   /**
    * Toute nouvelle question se pose depuis le début du tableau.
@@ -848,12 +848,7 @@ function OngletAbonnements({
         {/* Hors du conteneur qui défile latéralement : les commandes restent en
             place même quand le tableau est poussé vers la droite. `total`
             compte tout ce que le filtre laisse passer, et non la page. */}
-        <Pagination
-          page={page}
-          pages={pages}
-          total={collecteursFiltres.length}
-          onAller={allerA}
-        />
+        <Pagination page={page} pages={pages} total={total} onAller={allerA} />
       </Carte>
     </>
   );

@@ -368,7 +368,17 @@ export function Clients({
    * `src/pagination.ts` — dans une application qui travaille hors ligne,
    * demander la page suivante au réseau ne rendrait rien au marché.
    */
-  const { page, pages, visibles: affichees, allerA } = usePagination(visibles);
+  // `total: totalFiltre` et non `total` : une variable du même nom vit déjà
+  // dans la lecture asynchrone plus haut, où elle désigne le compte du serveur.
+  // Deux `total` de sens différents dans un même fichier se confondent à la
+  // relecture, et c'est la relecture qui compte ici.
+  const {
+    page,
+    pages,
+    total: totalFiltre,
+    visibles: affichees,
+    allerA,
+  } = usePagination(visibles);
 
   /**
    * Toute nouvelle question se pose depuis le début de la liste.
@@ -726,7 +736,7 @@ export function Clients({
       {/* Sous la liste, et non au-dessus : la commande se cherche là où le
           pouce arrive en finissant de lire. Elle ne s'affiche pas du tout tant
           que tout tient sur une page. */}
-      <Pagination page={page} pages={pages} total={visibles.length} onAller={allerA} />
+      <Pagination page={page} pages={pages} total={totalFiltre} onAller={allerA} />
 
       <div className="flex-1 min-h-4" />
 
