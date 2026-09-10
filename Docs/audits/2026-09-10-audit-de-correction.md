@@ -154,17 +154,65 @@ de la nuit**, et non parce que ce serait difficile.
 Trois choix de conception, tous documentés, aucun ne bouge sans décision
 produit.
 
-### ⚪️ L'écart entre les migrations et la production
+### ⚪️ → ✅ L'écart entre les migrations et la production — **mesuré, et nul**
 
 L'audit du 2026-09-04 comptait **quatre migrations versionnées et non
 appliquées**. Un `npx supabase db push` a été passé le 2026-09-09 — il applique
-tout ce qui est en attente, donc ces quatre-là ont dû partir avec les deux de
-sécurité.
+tout ce qui est en attente, donc ces quatre-là *avaient dû* partir avec les deux
+de sécurité.
 
-**« Ont dû » n'est pas une mesure.** `verifier:derive` et `supabase migration
-list --linked` demandent tous deux le jeton du projet, que je n'ai pas. Ce point
-reste donc ⚪️, exactement comme dans l'audit précédent, et c'est la première
-chose à mesurer au réveil.
+**« Avaient dû » n'était pas une mesure**, et ce point est resté ⚪️ toute la
+nuit faute du jeton du projet. Mesuré le 2026-09-10 au matin, dès que
+l'exploitant a été là :
+
+```
+supabase migration list --linked   →  48 entrées
+```
+
+| Contrôle | Résultat |
+|---|---|
+| Migrations versionnées **non appliquées** | aucune |
+| Migrations en production **sans fichier local** | aucune |
+| Désaccord entre `local` et `remote` | 0 |
+| Fichiers `.sql` du dépôt | 48, tous présents dans la liste |
+
+Les quatre nommées par l'audit précédent — `20260902160000`, `20260902170000`,
+`20260903120000`, `20260903140000` — sont **toutes appliquées**.
+
+**L'écart est donc nul dans les deux sens**, et le second sens est le plus
+intéressant : aucune migration ne vit en production sans fichier au dépôt.
+
+### Mais « aucun écart de migrations » ne veut pas dire « aucun écart de schéma »
+
+`migration list` compare des **migrations**, pas des **objets**. Le jeton étant
+enfin disponible, `verifier:derive` a tourné dans la foulée, et il dit autre
+chose :
+
+```
+48 fonctions security definer en production, 47 écrites dans les migrations.
+
+Dérive :
+  public.rls_auto_enable() est security definer en production et n'est créée
+  par aucune migration.
+```
+
+Ce n'est pas une découverte — la dérive est connue depuis le 2026-09-09 — mais
+c'est la démonstration que les deux contrôles ne mesurent pas la même chose. Un
+dépôt dont les migrations sont parfaitement synchronisées peut porter un objet
+de production que personne ne peut reconstruire.
+
+**Ce que ça coûte concrètement :** une base remontée depuis les seules
+migrations n'aurait pas cette fonction, et toute passe qui balaie les `security
+definer` — comme celle du 2026-09-09 qui a révoqué `EXECUTE` pour `PUBLIC` — la
+touche sans que rien en local ne l'annonce.
+
+Reste ouvert : l'adopter dans une migration demande de relire sa définition en
+production, puis d'écrire un `CREATE OR REPLACE` idempotent, puis de pousser.
+C'est une écriture en production, donc une décision de l'exploitant.
+
+**Le contournement qui a permis la mesure**, noté parce qu'il resservira : sur
+ce poste, PowerShell refuse `npx.ps1` — politique d'exécution — tandis que le
+shim `npx.cmd` passe sans rien changer au système.
 
 ---
 
@@ -287,4 +335,6 @@ omission.
    « sans risque » excluait ça.
 2. **Aucune Edge Function n'a été touchée**, ce qui écarte mécaniquement deux
    des 🟡 restants. C'était le choix le plus sûr, pas le plus complet.
-3. **L'écart avec la production n'est pas mesuré.** Il demande un jeton.
+3. ~~**L'écart avec la production n'est pas mesuré.**~~ **Mesuré le lendemain
+   matin, et nul** — voir la section correspondante. C'était le dernier ⚪️ du
+   dépôt.
