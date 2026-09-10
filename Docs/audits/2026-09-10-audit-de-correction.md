@@ -121,11 +121,59 @@ la portée du travail de déploiement est calculée sur `supabase/functions` seu
 
 ## Ce qui reste ouvert, et pourquoi je n'y ai pas touché cette nuit
 
-### 🟠 La limite Auth au défaut de la plateforme
+### 🟠 La limite Auth — et sept écarts que personne n'avait ouverts
 
-Ouvert depuis le 25 août. Il se règle dans le tableau de bord Supabase, hors du
-dépôt — **je n'y ai pas accès, et c'est très bien ainsi**. C'est le seul point
-qui demande une main humaine et des identifiants.
+Ouvert depuis le 25 août, et classé six audits d'affilée par la même phrase :
+« la limite Auth reste au défaut de la plateforme ». **Personne ne l'avait
+lue.** C'était une supposition reconduite.
+
+`supabase config diff` la rend en une commande. Relevé le 2026-09-10 :
+
+| Réglage | Dépôt | Production |
+|---|---|---|
+| `auth.minimum_password_length` | **10** | **6** |
+| `auth.email.secure_password_change` | **true** | **false** |
+| `auth.rate_limit.sign_in_sign_ups` | 30 → 5 depuis ce jour | 30 |
+| `auth.oauth_server.enabled` | false | **true** |
+| `auth.sms.twilio.enabled` | false | **true** |
+| `auth.mfa.totp.enroll_enabled` / `verify_enabled` | false | **true** |
+| `api.schemas` | `["public"]` | `["public","graphql_public"]` |
+
+Les deux premiers portent leur intention **écrite dans le dépôt** sans être en
+vigueur. `config.toml` dit, à la ligne du premier : « 10 et non 6 : le compte
+donne accès au registre d'épargne de dizaines de commerçants. »
+
+Le second est le plus tranchant. À `false`, changer de mot de passe ne demande
+pas de reprouver son identité. Avec la session en `localStorage` — 🟡 déjà
+connu, jusqu'ici sans vecteur — un jeton volé ne donne plus un accès temporaire
+mais le compte, définitivement.
+
+Les quatre derniers sont de la surface sans usage : aucun écran n'appelle de
+MFA, aucune connexion par téléphone n'existe (la passerelle SMS du produit est
+un autre dispositif), et `graphql_public` n'est appelé nulle part.
+
+**Ce qui n'est pas mesuré, et qu'il ne faut pas croire mesuré :**
+`auth.oauth_server.allow_dynamic_registration`. L'API ne le compare pas. Une
+première lecture l'avait conclu à `false` en le déduisant de son absence d'un
+autre rapport — deux commandes, deux périmètres, l'absence ne vaut pas égalité.
+À lire dans le tableau de bord avant tout le reste : à `true`, n'importe qui
+enregistre un client OAuth sur le projet.
+
+**Ce que le dépôt porte désormais :** `npm run verifier:config`
+(`scripts/verifier-config.mjs`, 20 épreuves) compare la production à ce que le
+dépôt déclare, sur deux tables — `POSTURE`, où un écart est un reproche, et
+`TOLERES`, où chaque écart classé porte son motif. Un chemin absent des deux
+fait échouer le contrôle.
+
+Et `.github/workflows/veille.yml` le lance chaque lundi, parce que le contrôle
+qui aurait vu `rls_auto_enable` existait déjà sans tourner. Il ne bloque aucune
+poussée : un garde-fou rouge en permanence est un garde-fou qu'on apprend à
+ignorer.
+
+**Ce qui reste une main humaine**, et c'est très bien ainsi : les sept réglages
+se changent un par un dans le tableau de bord. Surtout pas par
+`supabase config push`, qui enverrait `site_url = "http://localhost:5173"` en
+production et casserait les liens de réinitialisation des vrais utilisateurs.
 
 ### 🟡 Le webhook n'appelle pas `consommer_debit`
 
