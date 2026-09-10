@@ -134,11 +134,11 @@ lue.** C'était une supposition reconduite.
 | `auth.minimum_password_length` | **10** | **6** | ✅ **10** |
 | `auth.email.secure_password_change` | **true** | **false** | ✅ **true** |
 | `auth.email.double_confirm_changes` | true | true | ⚠️ voir plus bas |
-| `auth.rate_limit.sign_in_sign_ups` | 30 → 5 depuis ce jour | 30 | ouvert |
-| `auth.oauth_server.enabled` | false | **true** | ouvert |
-| `auth.sms.twilio.enabled` | false | **true** | ouvert |
-| `auth.mfa.totp.enroll_enabled` / `verify_enabled` | false | **true** | ouvert |
-| `api.schemas` | `["public"]` | `["public","graphql_public"]` | ouvert |
+| `auth.rate_limit.sign_in_sign_ups` | 30, puis 10 | 30 | ✅ **10** |
+| `auth.oauth_server.enabled` | false | **true** | ✅ **false** |
+| `auth.sms.twilio.enabled` | false | **true** | reclassé — voir plus bas |
+| `auth.mfa.totp.enroll_enabled` / `verify_enabled` | false | **true** | ✅ **false** |
+| `api.schemas` | `["public"]` | `["public","graphql_public"]` | ✅ `["public"]` |
 
 Les deux premiers portent leur intention **écrite dans le dépôt** sans être en
 vigueur. `config.toml` dit, à la ligne du premier : « 10 et non 6 : le compte
@@ -193,6 +193,36 @@ du projet — `/auth/v1/.well-known/oauth-authorization-server` — rend `200` e
 signale l'enregistrement dynamique ; `/oauth/register` rend `401`, pas `404`.
 Le prouver demanderait un `POST`, c'est-à-dire tenter un vrai enregistrement de
 client en production. Reste donc à lire dans le tableau de bord.
+
+### Le dernier reproche demandait d'éteindre ce qui l'était déjà
+
+`auth.sms.twilio.enabled` restait à `true` alors que le tableau de bord montrait
+*Enable Phone provider* **éteint**. Les deux ne parlent pas de la même chose :
+le champ lu par l'API suit le **choix du fournisseur SMS** dans la liste
+déroulante — « Twilio » y figure — et non l'activation du fournisseur Phone.
+
+Ce qui est mesuré, et qui ferme le sujet : fournisseur Phone éteint,
+identifiants Twilio vides, **0 compte avec téléphone et 0 identité `phone`** en
+base. Personne ne peut se connecter ainsi. Ce qui garde réellement la porte est
+`auth.sms.enable_signup`, tenu à `false` dans `POSTURE` et déjà d'accord entre
+dépôt et production.
+
+**L'avertissement qui resservira :** les libellés du tableau de bord et le
+modèle de la CLI ne se recouvrent pas un pour un. `enable_confirmations`
+s'affiche allumé dans l'interface et se lit `false` par l'API. Ne pas déduire
+l'un de l'autre — c'est l'erreur commise ici, en demandant d'éteindre une
+bascule déjà sur `off`.
+
+### Où en est le contrôle
+
+```
+La production suit le dépôt sur tout ce qui est classé.
+```
+
+Huit écarts au relevé du matin, zéro le soir. Trois fermaient un vecteur réel —
+mot de passe, adresse, longueur — et cinq refermaient de la surface sans usage.
+Deux réglages ont été reclassés plutôt que corrigés, chacun avec le motif qui
+dit pourquoi et ce qui le rouvrirait.
 
 **Ce que le dépôt porte désormais :** `npm run verifier:config`
 (`scripts/verifier-config.mjs`, 20 épreuves) compare la production à ce que le
