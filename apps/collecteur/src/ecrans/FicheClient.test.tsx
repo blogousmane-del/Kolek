@@ -1257,3 +1257,65 @@ describe('la porte vers l’historique complet', () => {
     expect(within(section).getByText('Clôturée')).toBeTruthy();
   });
 });
+
+/**
+ * Le défilement du fond, pendant que l'historique est ouvert.
+ *
+ * `Feuille` pose `document.body.style.overflow = 'hidden'` et le restaure en se
+ * démontant. L'historique **remplace** la `Feuille` — c'est un plein écran, et
+ * l'imbriquer empilerait deux en-têtes — donc son ouverture rendait le
+ * défilement au document derrière l'écran. Sur un téléphone, ça se voit tout de
+ * suite : on fait défiler l'historique, on arrive au bout, et c'est la liste des
+ * clients qui se met à bouger dessous.
+ *
+ * Défaut introduit par le plein écran, corrigé au même endroit. `jsdom`
+ * n'applique pas les styles, mais il tient bien la propriété — c'est elle que
+ * ces deux épreuves lisent.
+ */
+describe('l’historique ne rend pas le défilement au fond', () => {
+  it('bloque le document pendant qu’il est ouvert', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
+
+    render(
+      <FicheClient
+        clientId="cli5"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /historique complet/i }));
+    await screen.findByText(/toutes les cartes/i);
+
+    expect(document.body.style.overflow).toBe('hidden');
+  });
+
+  it('le rend en revenant à la fiche, et pas avant', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
+
+    const { unmount } = render(
+      <FicheClient
+        clientId="cli5"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /historique complet/i }));
+    await screen.findByText(/toutes les cartes/i);
+    fireEvent.click(screen.getByLabelText('Revenir à la fiche'));
+
+    // Toujours bloqué : la `Feuille` est revenue, et c'est elle qui bloque.
+    await screen.findByRole('button', { name: /historique complet/i });
+    expect(document.body.style.overflow).toBe('hidden');
+
+    unmount();
+    expect(document.body.style.overflow).toBe('');
+  });
+});

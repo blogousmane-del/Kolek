@@ -58,10 +58,26 @@ function periode(carte: CarteFiche): string {
 export function HistoriqueClient({
   nomClient,
   cartes,
+  revision,
   onFermer,
 }: {
   nomClient: string;
   cartes: CarteFiche[];
+  /**
+   * Le compteur de relecture de la fiche appelante.
+   *
+   * Obligatoire, et non optionnel à zéro. Le niveau 1 lit `cartes`, que
+   * `FicheClient` relit après chaque écriture ; le niveau 2 passe par le cache,
+   * dont la péremption est de 45 secondes. Sans ce nombre, le collecteur qui
+   * encaisse puis ouvre l'historique dans la minute voit le compteur du niveau
+   * 1 dire 12/31 et la liste du niveau 2 en compter onze — deux nombres qui se
+   * contredisent sur le même écran, celui où un client vient contester une
+   * somme.
+   *
+   * Un défaut à zéro rendrait cet oubli silencieux ; il vaut mieux qu'il ne
+   * compile pas.
+   */
+  revision: number;
   onFermer: () => void;
 }) {
   const [carteOuverte, setCarteOuverte] = useState<string | null>(null);
@@ -74,7 +90,12 @@ export function HistoriqueClient({
 
   if (ouverte) {
     return (
-      <DetailCarte carte={ouverte} nomClient={nomClient} onRetour={() => setCarteOuverte(null)} />
+      <DetailCarte
+        carte={ouverte}
+        nomClient={nomClient}
+        revision={revision}
+        onRetour={() => setCarteOuverte(null)}
+      />
     );
   }
 
@@ -170,16 +191,21 @@ export function HistoriqueClient({
 function DetailCarte({
   carte,
   nomClient,
+  revision,
   onRetour,
 }: {
   carte: CarteFiche;
   nomClient: string;
+  revision: number;
   onRetour: () => void;
 }) {
   const { donnees: evenements, erreur } = useDonnees(
     `historique-carte-${carte.id}`,
     () => chargerHistoriqueCarte(carte.id),
-    { messageErreur: 'Historique de cette carte indisponible. Vérifie le réseau.' },
+    // `revision` jette l'entrée gardée dès que la fiche a été relue. Sans
+    // elle, la péremption de 45 secondes suffirait à montrer une liste d'où
+    // manque la mise que le collecteur vient d'encaisser.
+    { revision, messageErreur: 'Historique de cette carte indisponible. Vérifie le réseau.' },
   );
 
   return (

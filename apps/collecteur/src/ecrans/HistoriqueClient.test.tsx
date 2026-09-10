@@ -60,6 +60,7 @@ describe('HistoriqueClient — la pile', () => {
     render(
       <HistoriqueClient
         nomClient="Konfé Ali"
+        revision={0}
         cartes={[CARTE(3, 'active', 10), CARTE(2, 'cloturee', 31), CARTE(1, 'cloturee', 12)]}
         onFermer={() => {}}
       />,
@@ -72,6 +73,7 @@ describe('HistoriqueClient — la pile', () => {
     render(
       <HistoriqueClient
         nomClient="Konfé Ali"
+        revision={0}
         cartes={[CARTE(2, 'cloturee', MISES_PAR_CYCLE)]}
         onFermer={() => {}}
       />,
@@ -91,6 +93,7 @@ describe('HistoriqueClient — la pile', () => {
     render(
       <HistoriqueClient
         nomClient="Konfé Ali"
+        revision={0}
         cartes={[CARTE(2, 'cloturee', MISES_PAR_CYCLE)]}
         onFermer={() => {}}
       />,
@@ -103,6 +106,7 @@ describe('HistoriqueClient — la pile', () => {
     render(
       <HistoriqueClient
         nomClient="Konfé Ali"
+        revision={0}
         cartes={[CARTE(2, 'cloturee', MISES_PAR_CYCLE), CARTE(1, 'cloturee', 12)]}
         onFermer={() => {}}
       />,
@@ -115,7 +119,7 @@ describe('HistoriqueClient — la pile', () => {
 
   it('dit « Actif » pour une carte encore ouverte', () => {
     render(
-      <HistoriqueClient nomClient="Konfé Ali" cartes={[CARTE(3, 'active', 10)]} onFermer={() => {}} />,
+      <HistoriqueClient nomClient="Konfé Ali" revision={0} cartes={[CARTE(3, 'active', 10)]} onFermer={() => {}} />,
     );
 
     expect(screen.getAllByRole('listitem')[0]?.textContent).toContain('Actif');
@@ -124,14 +128,14 @@ describe('HistoriqueClient — la pile', () => {
   it('montre l’historique d’un client qui n’a qu’une carte', () => {
     // `FicheClient` cachait sa section sous `cartes.length > 1`.
     render(
-      <HistoriqueClient nomClient="Konfé Ali" cartes={[CARTE(1, 'active', 3)]} onFermer={() => {}} />,
+      <HistoriqueClient nomClient="Konfé Ali" revision={0} cartes={[CARTE(1, 'active', 3)]} onFermer={() => {}} />,
     );
 
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
   });
 
   it('dit ce qu’il n’a pas plutôt que de rendre une liste vide', () => {
-    render(<HistoriqueClient nomClient="Konfé Ali" cartes={[]} onFermer={() => {}} />);
+    render(<HistoriqueClient nomClient="Konfé Ali" revision={0} cartes={[]} onFermer={() => {}} />);
 
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
     expect(screen.getByText(/aucune carte/i)).toBeTruthy();
@@ -142,7 +146,7 @@ describe('HistoriqueClient — la pile', () => {
     // barre du navigateur ou après une interruption. Sans le nom, il ne sait
     // pas de qui il lit les cartes.
     render(
-      <HistoriqueClient nomClient="Konfé Ali" cartes={[CARTE(1, 'active', 3)]} onFermer={() => {}} />,
+      <HistoriqueClient nomClient="Konfé Ali" revision={0} cartes={[CARTE(1, 'active', 3)]} onFermer={() => {}} />,
     );
 
     expect(screen.getByText('Konfé Ali')).toBeTruthy();
@@ -154,6 +158,7 @@ describe('HistoriqueClient — la pile', () => {
     render(
       <HistoriqueClient
         nomClient="Konfé Ali"
+        revision={0}
         cartes={[CARTE(3, 'active', 10), CARTE(2, 'cloturee', 31), CARTE(1, 'cloturee', 12)]}
         onFermer={() => {}}
       />,
@@ -172,7 +177,7 @@ describe('HistoriqueClient — la pile', () => {
       id: `c${i}`,
     }));
 
-    render(<HistoriqueClient nomClient="Konfé Ali" cartes={beaucoup} onFermer={() => {}} />);
+    render(<HistoriqueClient nomClient="Konfé Ali" revision={0} cartes={beaucoup} onFermer={() => {}} />);
 
     expect(screen.getAllByRole('listitem')).toHaveLength(50);
     expect(screen.getByLabelText('Aller à la page')).toBeTruthy();
@@ -209,6 +214,7 @@ describe('HistoriqueClient — le détail d’une carte', () => {
     render(
       <HistoriqueClient
         nomClient="Konfé Ali"
+        revision={0}
         cartes={[CARTE(2, 'cloturee', MISES_PAR_CYCLE)]}
         onFermer={() => {}}
       />,
@@ -267,6 +273,7 @@ describe('HistoriqueClient — le détail d’une carte', () => {
     render(
       <HistoriqueClient
         nomClient="Konfé Ali"
+        revision={0}
         cartes={[CARTE(2, 'cloturee', MISES_PAR_CYCLE), CARTE(1, 'cloturee', 12)]}
         onFermer={() => fermetures.push(1)}
       />,
@@ -280,5 +287,68 @@ describe('HistoriqueClient — le détail d’une carte', () => {
     // cran. `onFermer` ne doit pas avoir été appelé.
     await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
     expect(fermetures).toEqual([]);
+  });
+});
+
+/**
+ * Ce que le cache de `useDonnees` garde, et que `revision` doit pouvoir jeter.
+ *
+ * Le niveau 1 lit `cartes`, que `FicheClient` relit après chaque écriture. Le
+ * niveau 2 passe par le cache, dont la péremption est de 45 secondes. Sans
+ * `revision`, le collecteur qui encaisse puis ouvre l'historique dans la
+ * minute verrait le compteur du niveau 1 dire 12/31 et la liste du niveau 2 en
+ * compter onze — deux nombres qui se contredisent sur le même écran, celui où
+ * un client vient contester une somme.
+ */
+describe('HistoriqueClient — la fraîcheur du détail', () => {
+  beforeEach(() => {
+    viderCache();
+    chargerHistoriqueCarte.mockReset();
+    chargerHistoriqueCarte.mockResolvedValue([
+      { id: 'm1', genre: 'mise', montant: MISE, date: '2026-02-01T08:00:00Z', estCommission: true },
+    ]);
+  });
+
+  it('relit le détail quand la fiche a été relue', async () => {
+    const ecran = (revision: number) => (
+      <HistoriqueClient
+        nomClient="Konfé Ali"
+        revision={revision}
+        cartes={[CARTE(2, 'cloturee', MISES_PAR_CYCLE)]}
+        onFermer={() => {}}
+      />
+    );
+
+    const { rerender } = render(ecran(0));
+    fireEvent.click(screen.getAllByRole('listitem')[0]!.querySelector('button')!);
+    await screen.findAllByRole('listitem');
+    expect(chargerHistoriqueCarte).toHaveBeenCalledTimes(1);
+
+    rerender(ecran(1));
+
+    await waitFor(() => expect(chargerHistoriqueCarte).toHaveBeenCalledTimes(2));
+  });
+
+  it('ne relit pas pour un simple aller-retour entre les deux niveaux', async () => {
+    // L'autre moitié du contrat : sans elle, on « corrigerait » la fraîcheur en
+    // rechargeant à chaque ouverture, et le collecteur paierait un
+    // aller-retour réseau à chaque coup d'œil, en 3G, au marché.
+    render(
+      <HistoriqueClient
+        nomClient="Konfé Ali"
+        revision={0}
+        cartes={[CARTE(2, 'cloturee', MISES_PAR_CYCLE)]}
+        onFermer={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole('listitem')[0]!.querySelector('button')!);
+    await screen.findAllByRole('listitem');
+
+    fireEvent.click(screen.getByLabelText('Revenir aux cartes'));
+    fireEvent.click(screen.getAllByRole('listitem')[0]!.querySelector('button')!);
+    await screen.findAllByRole('listitem');
+
+    expect(chargerHistoriqueCarte).toHaveBeenCalledTimes(1);
   });
 });

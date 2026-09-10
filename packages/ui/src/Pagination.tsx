@@ -274,7 +274,19 @@ export function Pagination({
 
           Le libellé de chaque option dit « Page 3 sur 27 » et non « 3 » : le
           déclencheur fermé est tout ce que le collecteur voit tant qu'il n'a
-          pas tapé dessus, et « 3 » seul ne dit pas s'il en reste beaucoup. */}
+          pas tapé dessus, et « 3 » seul ne dit pas s'il en reste beaucoup.
+
+          La taille est `text-champ` (16 px) et non l'échelle courante : Safari
+          sur iPhone zoome la page dès qu'on touche un champ dont la police
+          calculée passe sous 16 px. Le sélecteur grossirait, la page
+          déborderait, et il faudrait repincer pour revenir — au moment précis
+          où le collecteur cherchait seulement à changer de page.
+
+          Ce motif est écrit ici, au-dessus de la balise, et non à l'intérieur :
+          `scripts/verifier-champs.mjs` lit la balise ouvrante **entière**, sans
+          distinguer un commentaire d'une liste de classes. Nommer la taille
+          interdite entre le `<select` et son `>` fait échouer le contrôle sur
+          un texte qui expliquait justement pourquoi on ne l'emploie pas. */}
       <select
         aria-label="Aller à la page"
         value={page}
@@ -283,7 +295,7 @@ export function Pagination({
         onChange={(e) => onAller(Number(e.target.value))}
         className={
           'sm:hidden min-h-11 appearance-none rounded-xl border border-hairline/80 ' +
-          'bg-surface px-3 text-sm font-body text-ink tabular-nums cursor-pointer'
+          'bg-surface px-3 text-champ font-body text-ink tabular-nums cursor-pointer'
         }
       >
         {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (

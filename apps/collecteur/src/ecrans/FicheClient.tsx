@@ -132,6 +132,31 @@ export function FicheClient({
     setHistoriqueOuvert(false);
   }, [clientId]);
 
+  /**
+   * Le défilement du document, pendant que l'historique est ouvert.
+   *
+   * `Feuille` bloque `document.body` et le rend en se démontant. L'historique
+   * **remplace** la feuille — c'est un plein écran, et l'imbriquer empilerait
+   * deux en-têtes — donc son ouverture rendait le défilement au document
+   * derrière lui. Sur un téléphone ça se voit tout de suite : on fait défiler
+   * l'historique, on arrive au bout, et c'est la liste des clients qui se met à
+   * bouger dessous.
+   *
+   * La valeur précédente est restaurée plutôt qu'écrasée par `''`, exactement
+   * comme le fait `Feuille` : deux panneaux imbriqués ne doivent pas se rendre
+   * le défilement par le premier qui ferme.
+   */
+  useEffect(() => {
+    if (!historiqueOuvert) return;
+
+    const precedent = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = precedent;
+    };
+  }, [historiqueOuvert]);
+
   // Le numéro de cycle est une donnée chronologique — la énième carte que ce
   // client a ouverte — et se lit dans la position au sein de `fiche.cartes`,
   // l'ordre d'ouverture décroissant que rend `chargerFicheClient` (la plus
@@ -157,6 +182,7 @@ export function FicheClient({
         <HistoriqueClient
           nomClient={fiche.nom}
           cartes={fiche.cartes}
+          revision={revision}
           onFermer={() => setHistoriqueOuvert(false)}
         />
       </div>
