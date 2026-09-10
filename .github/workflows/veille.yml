@@ -1,0 +1,92 @@
+# Kolek — la production a-t-elle dérivé pendant qu'on regardait ailleurs
+#
+# ## Le trou que ce fichier bouche
+#
+# `verification.yml` regarde le **dépôt** à chaque poussée. Personne ne regarde
+# la **production** entre deux audits.
+#
+# Ce que ça a coûté, deux fois, en trois semaines :
+#
+# - `public.rls_auto_enable()` a vécu en production sans être dans aucune
+#   migration du 25 août au 10 septembre. Elle n'a pas été trouvée par un
+#   contrôle mais par curiosité, en préparant une poussée.
+# - `auth.minimum_password_length` valait 6 en production là où le dépôt écrit
+#   10 avec son motif. Six audits d'affilée ont porté la ligne « la limite Auth
+#   reste au défaut de la plateforme » sans jamais l'ouvrir — une supposition
+#   reconduite, pas une mesure.
+#
+# Dans les deux cas le contrôle qui l'aurait vu existait déjà, ou tenait en une
+# commande. Il ne tournait pas.
+#
+# ## Pourquoi un fichier à part, et pas un job de plus
+#
+# Ces contrôles interrogent la production. Les mettre dans `verification.yml`
+# les ferait échouer sur toute branche dont l'état ne correspond pas encore à ce
+# qui est déployé — c'est-à-dire toute branche en cours de travail. Un garde-fou
+# rouge en permanence est un garde-fou qu'on apprend à ignorer.
+#
+# Ici, rien ne bloque une poussée. Le job échoue, GitHub prévient, et la
+# correction se fait quand elle se fait.
+#
+# ## Ce qui n'est pas ici, et pourquoi
+#
+# `verifier:derive` et `verifier:migrations` passent par la base et demandent
+# son mot de passe, que Supabase n'affiche qu'à la création du projet. Le poser
+# en secret supposerait de le réinitialiser — un geste qui casse temporairement
+# les `db push` locaux, et qui ne se fait pas au détour d'un fichier de CI.
+# `verification.yml` tient déjà ce raisonnement pour son rappel de migrations,
+# et il n'y a pas de raison d'en changer ici.
+#
+# `verifier:config` passe par l'API de gestion : le jeton suffit.
+
+name: Veille
+
+on:
+  # Lundi matin, avant que la semaine ne commence. Assez souvent pour qu'une
+  # dérive ne dorme pas un mois, assez rare pour que l'échec reste un signal.
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  configuration:
+    name: Configuration — la production suit-elle le dépôt
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      # La référence n'est pas un secret : elle est déjà en clair dans la CSP
+      # des trois `netlify.toml`. La mettre en secret donnerait l'illusion de
+      # protéger quelque chose, et ferait échouer le job en silence le jour où
+      # quelqu'un oublie de la poser.
+      PROJET: yfnwmokxkznejotgpfgf
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+
+      - run: npm ci
+
+      # Sans jeton, le contrôle ne peut rien lire. Le dire, plutôt que d'échouer
+      # sur un message de la CLI qui enverrait chercher une dérive inexistante.
+      - name: Y a-t-il de quoi lire ?
+        id: jeton
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::warning title=Veille sautée::SUPABASE_ACCESS_TOKEN n'est pas posé dans les secrets du dépôt. La configuration de production n'a pas été lue — ce n'est pas « aucune dérive », c'est « personne n'a regardé »."
+            echo "lisible=non" >> "$GITHUB_OUTPUT"
+          else
+            echo "lisible=oui" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Lecture seule. `config diff` interroge l'API de gestion et ne modifie
+      # rien. `config push` n'a rien à faire ici et n'y sera pas : il enverrait
+      # `site_url = "http://localhost:5173"` en production, cassant les liens de
+      # réinitialisation de mot de passe des vrais utilisateurs.
+      - name: La configuration du projet suit le dépôt
+        if: steps.jeton.outputs.lisible == 'oui'
+        run: npm run verifier:config

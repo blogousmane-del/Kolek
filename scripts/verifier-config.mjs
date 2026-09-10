@@ -272,13 +272,32 @@ export function reproches(rapport, posture = POSTURE, toleres = TOLERES) {
   return trouves;
 }
 
-/** Le rapport du projet lié. Lecture seule. */
-export function lireRapport() {
-  const sortie = execFileSync(
-    'npx',
-    ['supabase', 'config', 'diff', '--output-format', 'json'],
-    { encoding: 'utf8', shell: process.platform === 'win32', stdio: 'pipe' },
-  );
+/**
+ * Les arguments de la lecture, selon qui l’appelle.
+ *
+ * Sur un poste, `supabase link` a déjà eu lieu et la référence vit dans
+ * `supabase/.temp`, hors du dépôt. Le CI n’a pas ce lien : sans
+ * `--project-ref`, la commande échoue sur « projet non lié » et le contrôle
+ * passe pour cassé alors qu’il est seulement mal adressé.
+ *
+ * La référence n’est pas un secret — elle est déjà en clair dans la CSP des
+ * trois `netlify.toml`, et le workflow de vérification le dit déjà pour son
+ * job de déploiement.
+ */
+export function argumentsDiff(env = process.env) {
+  const base = ['supabase', 'config', 'diff', '--output-format', 'json'];
+  const projet = (env.PROJET ?? '').trim();
+
+  return projet ? [...base, '--project-ref', projet] : base;
+}
+
+/** Le rapport du projet visé. Lecture seule. */
+export function lireRapport(env = process.env) {
+  const sortie = execFileSync('npx', argumentsDiff(env), {
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+    stdio: 'pipe',
+  });
 
   return JSON.parse(sortie);
 }

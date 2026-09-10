@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  argumentsDiff,
   chemin,
   TOLERES,
   POSTURE,
@@ -174,5 +175,25 @@ describe('rapportUtilisable', () => {
 
   it('refuse un rapport qui ne compare aucune portée', () => {
     expect(rapportUtilisable(rapport({ scope: { present: [], missing: [] } }))).toHaveLength(1);
+  });
+});
+
+describe('argumentsDiff', () => {
+  it('vise le projet lié quand rien ne le nomme', () => {
+    // Sur un poste de développement, `supabase link` a déjà été fait et la
+    // référence vit dans `supabase/.temp`, hors du dépôt.
+    expect(argumentsDiff({})).toEqual(['supabase', 'config', 'diff', '--output-format', 'json']);
+  });
+
+  it('nomme le projet quand l’environnement le donne', () => {
+    // Le CI n'a pas de lien local : sans `--project-ref`, la commande échoue
+    // sur « projet non lié » et le contrôle passe pour cassé alors qu'il est
+    // seulement mal adressé.
+    expect(argumentsDiff({ PROJET: 'abcdefghijklmnopqrst' })).toContain('--project-ref');
+    expect(argumentsDiff({ PROJET: 'abcdefghijklmnopqrst' })).toContain('abcdefghijklmnopqrst');
+  });
+
+  it('ignore une référence vide plutôt que de passer un drapeau nu', () => {
+    expect(argumentsDiff({ PROJET: '   ' })).not.toContain('--project-ref');
   });
 });
