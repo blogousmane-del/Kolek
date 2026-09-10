@@ -84,6 +84,11 @@ export function HistoriqueClient({
         titre="Toutes les cartes"
         sousTitre={nomClient}
         onRetour={onFermer}
+        // Écrit en dur, et non passé en propriété : cet écran n'a qu'un seul
+        // point d'entrée, la fiche client. Le jour où il en aura deux, ce
+        // libellé deviendra un paramètre — pas avant, faute de savoir quoi y
+        // mettre.
+        libelleRetour="Revenir à la fiche"
         largeur="liste"
       />
 

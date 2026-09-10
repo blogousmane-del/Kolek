@@ -34,6 +34,9 @@ const chargerProfil = vi.fn(() =>
 vi.mock('../lectures-ecrans', () => ({
   chargerFicheClient: (id: string) => chargerFicheClient(id),
   chargerProfil: () => chargerProfil(),
+  // Monte avec l'historique complet. Le niveau 1 ne l'appelle pas, mais le
+  // module doit l'exporter : sans elle, l'import de `HistoriqueClient` lève.
+  chargerHistoriqueCarte: () => Promise.resolve([]),
 }));
 
 const enregistrerMise = vi.fn();
@@ -1129,5 +1132,128 @@ describe('quand l’écriture ne rend rien du tout', () => {
 
     expect(enregistrerMise).not.toHaveBeenCalled();
     expect(screen.getByText(/Session perdue/)).toBeTruthy();
+  });
+});
+
+/**
+ * L'historique complet, et la pilule dessinée à la main qui le précédait.
+ *
+ * ## Ce que la section « Cartes précédentes » cachait
+ *
+ * Elle vivait sous un `fiche.cartes.length > 1` — donc invisible pour un client
+ * qui n'a qu'une carte, c'est-à-dire la majorité. Un historique court reste un
+ * historique, et le cacher surprend le jour où il compte.
+ *
+ * ## La pilule
+ *
+ * Elle était dessinée à la main, avec ses propres classes et ses propres mots :
+ * « Cycle tenu » et « Rendue avant la fin ». Ni l'un ni l'autre n'est dans
+ * l'union `Statut`, et la règle 4.11 du système de design dit « une seule
+ * table ». Le compte X/31, à deux centimètres de là, porte déjà la nuance que
+ * « Rendue avant la fin » voulait dire.
+ */
+describe('la porte vers l’historique complet', () => {
+  it('mène à l’écran de toutes les cartes', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
+
+    render(
+      <FicheClient
+        clientId="cli5"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /historique complet/i }));
+
+    expect(await screen.findByText(/toutes les cartes/i)).toBeTruthy();
+  });
+
+  it('propose cette porte même à un client qui n’a qu’une carte', async () => {
+    // Le défaut d'origine : la section entière était sous `cartes.length > 1`.
+    chargerFicheClient.mockResolvedValue(FICHE_CARTE_PRESQUE_COMPLETE);
+
+    render(
+      <FicheClient
+        clientId="cli6"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('button', { name: /historique complet/i })).toBeTruthy();
+  });
+
+  it('revient à la fiche sans la refermer', async () => {
+    // La flèche de l'historique remonte d'un cran. `onFermer` de la fiche ne
+    // doit pas être appelé : le collecteur perdrait le client qu'il consultait.
+    const fermetures: number[] = [];
+    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
+
+    render(
+      <FicheClient
+        clientId="cli5"
+        revision={0}
+        collecteurId="col1"
+        onFermer={() => fermetures.push(1)}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /historique complet/i }));
+    await screen.findByText(/toutes les cartes/i);
+
+    fireEvent.click(screen.getByLabelText('Revenir à la fiche'));
+
+    expect(await screen.findByRole('button', { name: /historique complet/i })).toBeTruthy();
+    expect(fermetures).toEqual([]);
+  });
+
+  it('n’écrit plus « Rendue avant la fin » — le statut vient de BadgeStatut', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
+
+    render(
+      <FicheClient
+        clientId="cli5"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    await screen.findByText(/Cartes précédentes/);
+
+    expect(screen.queryByText(/rendue avant la fin/i)).toBeNull();
+    expect(screen.queryByText(/cycle tenu/i)).toBeNull();
+  });
+
+  it('dit les mots de la table commune, et eux seuls', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
+
+    render(
+      <FicheClient
+        clientId="cli5"
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+
+    const section = (await screen.findByText(/Cartes précédentes/)).parentElement!;
+
+    // k9 : 31/31, donc « Cycle terminé ». k8 : 10/31, donc « Clôturée ».
+    expect(within(section).getByText('Cycle terminé')).toBeTruthy();
+    expect(within(section).getByText('Clôturée')).toBeTruthy();
   });
 });

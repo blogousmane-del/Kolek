@@ -1,5 +1,13 @@
 import { MISES_PAR_CYCLE, formatMontant, soldeRestituable } from '@kolek/core';
-import { Bouton, CarrouselCartes, Feuille, Icone, LigneTransaction, type CarteItem } from '@kolek/ui';
+import {
+  BadgeStatut,
+  Bouton,
+  CarrouselCartes,
+  Feuille,
+  Icone,
+  LigneTransaction,
+  type CarteItem,
+} from '@kolek/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { definirConsentementAvis, enregistrerMise, ouvrirCarte } from '../ecritures';
@@ -13,6 +21,7 @@ import {
 import { chargerFicheClient, type CarteFiche, type FicheClient as Fiche } from '../lectures-ecrans';
 import { ActiverCarte } from './ActiverCarte';
 import { ChoixMise } from './ChoixMise';
+import { HistoriqueClient } from './HistoriqueClient';
 import { useEstCollaborateur } from './commission';
 
 /**
@@ -86,6 +95,7 @@ export function FicheClient({
   // — à chaque encaissement, exactement le défaut que ce bouton devait faire
   // disparaître, simplement relogé un niveau plus bas.
   const [visibleId, setVisibleId] = useState<string | null>(null);
+  const [historiqueOuvert, setHistoriqueOuvert] = useState(false);
 
   const relire = useCallback(async () => {
     if (!clientId) return;
@@ -117,6 +127,9 @@ export function FicheClient({
     // bouger — c'est justement ce que l'effet précédent provoque en
     // interne, sans que le collecteur ait rien décidé.
     setVisibleId(null);
+    // L'historique se referme avec le client : rester dedans en changeant de
+    // client montrerait les cartes de l'un sous le nom de l'autre.
+    setHistoriqueOuvert(false);
   }, [clientId]);
 
   // Le numéro de cycle est une donnée chronologique — la énième carte que ce
@@ -132,6 +145,23 @@ export function FicheClient({
     // La plus avancée d'abord : c'est celle dont le cycle se termine en premier,
     // donc celle sur laquelle une décision se présente le plus tôt.
     .sort((a, b) => b.carte.misesEncaissees - a.carte.misesEncaissees);
+
+  // Plein écran, et non dans la `Feuille` : `HistoriqueClient` porte son propre
+  // bandeau et attend toute la hauteur. Le glisser dans un panneau modal lui
+  // ferait empiler deux en-têtes. La fiche, elle, reste montée sous cet
+  // écran — le collecteur la retrouve où il l'avait laissée, carte choisie
+  // comprise.
+  if (historiqueOuvert && fiche) {
+    return (
+      <div className="fixed inset-0 z-50 bg-canvas overflow-y-auto flex flex-col">
+        <HistoriqueClient
+          nomClient={fiche.nom}
+          cartes={fiche.cartes}
+          onFermer={() => setHistoriqueOuvert(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <Feuille
@@ -177,7 +207,21 @@ export function FicheClient({
             />
           )}
 
-          {fiche.cartes.length > 1 && <Historique cartes={fiche.cartes} />}
+          {/* Le `fiche.cartes.length > 1` qui gardait cette section est tombé
+              le 2026-09-10 : il la rendait invisible pour un client qui n'a
+              qu'une carte, c'est-à-dire la majorité. `Historique` se tait déjà
+              seul quand aucune carte n'est close. */}
+          <Historique cartes={fiche.cartes} />
+
+          {fiche.cartes.length > 0 && (
+            <Bouton
+              variante="contour"
+              pleineLargeur
+              onClick={() => setHistoriqueOuvert(true)}
+            >
+              Historique complet
+            </Bouton>
+          )}
 
           {fiche.mises.length > 0 && (
             <section>
@@ -843,15 +887,16 @@ function Historique({ cartes }: { cartes: Fiche['cartes'] }) {
                   })}`}
               </span>
             </span>
-            <span
-              className={`px-2.5 py-1 rounded-pill text-xs font-body font-semibold whitespace-nowrap shrink-0 ${
-                k.misesEncaissees >= MISES_PAR_CYCLE
-                  ? 'bg-positive-tint text-positive'
-                  : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              {k.misesEncaissees >= MISES_PAR_CYCLE ? 'Cycle tenu' : 'Rendue avant la fin'}
-            </span>
+            {/* Pilule dessinée à la main jusqu'au 2026-09-10, avec ses propres
+                classes et ses propres mots — « Cycle tenu », « Rendue avant la
+                fin ». Ni l'un ni l'autre n'est dans l'union `Statut`, et la
+                règle 4.11 du système de design dit « une seule table ». La
+                nuance que « Rendue avant la fin » portait est déjà dite à deux
+                centimètres de là, par le compte X/31. */}
+            <BadgeStatut
+              statut={k.misesEncaissees >= MISES_PAR_CYCLE ? 'Cycle terminé' : 'Clôturée'}
+              className="px-2.5 py-1 shrink-0"
+            />
           </div>
         ))}
       </div>
