@@ -120,7 +120,12 @@ export const POSTURE = {
     'parcours de consentement dont aucun écran ne se sert.',
   'auth.oauth_server.allow_dynamic_registration':
     'À true, n’importe qui enregistre un client OAuth sur le projet. Non lisible par ' +
-    'l’API le 2026-09-10, et une absence du rapport ne vaut pas égalité : à lire ' +
+    'l’API le 2026-09-10, et une absence du rapport ne vaut pas égalité. Indice ' +
+    'rassurant, mesuré le même jour : la découverte du projet ' +
+    '(/auth/v1/.well-known/oauth-authorization-server) rend 200 et n’annonce PAS de ' +
+    'registration_endpoint, qui est la façon dont RFC 8414 signale l’enregistrement ' +
+    'dynamique ; /oauth/register rend 401, pas 404. Un indice n’est pas une preuve — ' +
+    'le prouver demanderait un POST, c’est-à-dire un vrai enregistrement. À lire ' +
     'dans le tableau de bord.',
   'api.schemas':
     'Chaque schéma exposé est une surface d’API. graphql_public n’est appelé par ' +
