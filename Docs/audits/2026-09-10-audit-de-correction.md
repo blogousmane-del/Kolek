@@ -247,8 +247,18 @@ supposé : son droit `PUBLIC` avait été révoqué par la passe du 2026-09-09, 
 révoquer en local, rejouer le `CREATE OR REPLACE`, relire : `=X/postgres` n'est
 pas revenu.
 
-Reste à pousser. C'est une écriture en production, donc une décision de
-l'exploitant — sémantiquement un no-op, ce qui n'en fait pas moins une écriture.
+**Poussée le 2026-09-10** par l'exploitant. Relevé en production après coup,
+parce qu'une mesure locale ne vaut pas pour la vraie base :
+
+| Lecture | Résultat |
+|---|---|
+| ACL de `rls_auto_enable` | `postgres=X/postgres | service_role=X/postgres` — pas de `=X/postgres` |
+| `ensure_rls` | `ddl_command_end`, actif, mêmes étiquettes qu'avant |
+| `verifier:derive` | 48 fonctions en production, **48** écrites dans les migrations |
+| `verifier:migrations` | la base distante porte toutes les migrations du dépôt |
+
+La troisième ligne est celle qui ferme le dossier : elle disait 48 contre 47 le
+matin même.
 
 **Le contournement qui a permis la mesure**, noté parce qu'il resservira : sur
 ce poste, PowerShell refuse `npx.ps1` — politique d'exécution — tandis que le
