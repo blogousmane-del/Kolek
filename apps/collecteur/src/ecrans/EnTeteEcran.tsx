@@ -38,12 +38,26 @@ export function EnTeteEcran({
   titre,
   sousTitre,
   onRetour,
+  libelleRetour = 'Revenir à l’accueil',
   enfants,
   largeur = 'liste',
 }: {
   titre: string;
   sousTitre?: string;
   onRetour: () => void;
+  /**
+   * Ce que la flèche annonce au lecteur d'écran.
+   *
+   * Le libellé était écrit en dur jusqu'au 2026-09-10, et il était juste tant
+   * que tous les écrans secondaires remontaient à l'accueil. L'historique
+   * client a deux niveaux : la flèche du second revient à la pile de cartes, et
+   * annoncer « l'accueil » ferait dire à l'écran le contraire de ce qu'il fait
+   * — un utilisateur au lecteur d'écran sortirait de l'écran en croyant y
+   * rester, ou l'inverse.
+   *
+   * Le défaut par défaut : aucun des appelants existants ne change.
+   */
+  libelleRetour?: string;
   enfants?: ReactNode;
   largeur?: LargeurEcran;
 }) {
@@ -55,7 +69,7 @@ export function EnTeteEcran({
         <button
           type="button"
           onClick={onRetour}
-          aria-label="Revenir à l’accueil"
+          aria-label={libelleRetour}
           className="anim-pression w-10 h-10 rounded-pill bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-md flex items-center justify-center cursor-pointer shrink-0 transition-colors shadow-xs"
         >
           <Icone nom="arrow-left" className="text-white" taille={18} />
