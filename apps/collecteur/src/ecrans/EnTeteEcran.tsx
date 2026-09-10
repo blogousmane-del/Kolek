@@ -97,7 +97,12 @@ export function CorpsEcran({
  * court, et infiniment mieux qu'un chiffre inventé pour meubler.
  */
 export function RienAMontrer({ icone, titre, detail }: {
-  icone: 'receipt' | 'bell' | 'coins' | 'bar-chart-2';
+  // Une liste courte et non `NomIcone` en entier : elle dit lesquelles des
+  // vingt-cinq icônes du produit servent d'illustration d'écran vide. En
+  // élargir un membre est un geste délibéré — `credit-card` est arrivé le
+  // 2026-09-10 avec l'historique client, où le vide porte sur des cartes et où
+  // `coins` aurait mis une icône d'argent devant une absence de carnet.
+  icone: 'receipt' | 'bell' | 'coins' | 'bar-chart-2' | 'credit-card';
   titre: string;
   detail: string;
 }) {
