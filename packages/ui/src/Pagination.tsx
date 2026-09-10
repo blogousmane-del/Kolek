@@ -114,6 +114,47 @@ export function usePagination<T>(elements: T[], taille: number = TAILLE_PAGE) {
 }
 
 /**
+ * Les numéros à montrer autour de la page courante.
+ *
+ * Le premier et le dernier sont toujours là — ce sont les deux sauts les plus
+ * fréquents, « revenir au début » et « aller à la fin ». Entre eux, `rayon`
+ * pages de part et d’autre de la courante, et `…` pour ce qui est sauté.
+ *
+ * ## Le trou d’une seule page
+ *
+ * Une coupure n’est posée que si elle **économise** au moins une page. Sauter
+ * un seul numéro afficherait `1 … 3` là où `1 2 3` est plus court **et** montre
+ * une page atteignable au lieu de la cacher derrière un signe inerte.
+ *
+ * ## Pourquoi une fonction plutôt qu’un calcul dans le rendu
+ *
+ * C’est ici que vivent les décalages d’un rang. Éprouvée seule, une borne
+ * fausse se lit en une ligne ; noyée dans le JSX, elle se cherche une heure
+ * dans un DOM.
+ */
+export function fenetrePages(page: number, pages: number, rayon = 2): Array<number | '…'> {
+  const numeros = new Set<number>([1, pages]);
+  for (let n = page - rayon; n <= page + rayon; n += 1) {
+    if (n >= 1 && n <= pages) numeros.add(n);
+  }
+
+  const tries = [...numeros].sort((a, b) => a - b);
+  const sortie: Array<number | '…'> = [];
+
+  for (let i = 0; i < tries.length; i += 1) {
+    const n = tries[i] as number;
+    const precedent = tries[i - 1];
+
+    if (precedent !== undefined && n - precedent === 2) sortie.push(precedent + 1);
+    else if (precedent !== undefined && n - precedent > 2) sortie.push('…');
+
+    sortie.push(n);
+  }
+
+  return sortie;
+}
+
+/**
  * Le style d'une flèche, éteinte comprise.
  *
  * Les variantes portent sur `aria-disabled` et non sur `:disabled` — voir la

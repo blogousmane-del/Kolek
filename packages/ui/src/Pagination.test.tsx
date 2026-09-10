@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 // harnais.
 afterEach(cleanup);
 
-import { Pagination, TAILLE_PAGE, usePagination } from './Pagination';
+import { fenetrePages, Pagination, TAILLE_PAGE, usePagination } from './Pagination';
 
 /**
  * Ce que `usePagination` ne peut pas garder par un test, et qu'il faut donc
@@ -396,5 +396,65 @@ describe('ce que les six écrans appelants tiennent pour acquis', () => {
     fireEvent.click(screen.getByLabelText('Page précédente'));
     fireEvent.click(screen.getByLabelText('Page suivante'));
     expect(vues).toEqual([2, 4]);
+  });
+});
+
+/**
+ * La fenêtre de numéros — la fonction pure où vivent les erreurs de bornes.
+ *
+ * Elle est éprouvée seule, et non à travers le rendu, parce qu’un décalage d’un
+ * rang se lit ici en une ligne et se cherche une heure dans un DOM.
+ */
+describe('fenetrePages', () => {
+  it('rend tous les numéros quand ils tiennent', () => {
+    expect(fenetrePages(1, 5)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('coupe à droite quand on est au début', () => {
+    expect(fenetrePages(1, 20)).toEqual([1, 2, 3, '…', 20]);
+  });
+
+  it('coupe à gauche quand on est à la fin', () => {
+    expect(fenetrePages(20, 20)).toEqual([1, '…', 18, 19, 20]);
+  });
+
+  it('coupe des deux côtés au milieu', () => {
+    expect(fenetrePages(10, 20)).toEqual([1, '…', 8, 9, 10, 11, 12, '…', 20]);
+  });
+
+  it('comble un trou d’une seule page plutôt que de le couper', () => {
+    // `1 … 3` est plus long que `1 2 3` et cache une page atteignable.
+    expect(fenetrePages(4, 7)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it('ne rend jamais deux coupures adjacentes', () => {
+    for (let p = 1; p <= 12; p += 1) {
+      const f = fenetrePages(p, 12);
+      for (let i = 1; i < f.length; i += 1) {
+        expect(f[i] === '…' && f[i - 1] === '…').toBe(false);
+      }
+    }
+  });
+
+  it('garde toujours le premier et le dernier', () => {
+    for (let p = 1; p <= 40; p += 1) {
+      const f = fenetrePages(p, 40);
+      expect(f[0]).toBe(1);
+      expect(f[f.length - 1]).toBe(40);
+    }
+  });
+
+  it('n’invente jamais de page hors bornes', () => {
+    for (let p = 1; p <= 40; p += 1) {
+      for (const n of fenetrePages(p, 40)) {
+        if (n !== '…') expect(n >= 1 && n <= 40).toBe(true);
+      }
+    }
+  });
+
+  it('rend une seule page quand il n’y en a qu’une', () => {
+    // Le composant rend `null` dans ce cas, mais la fonction est publique et
+    // ne doit pas rendre `[1, 1]` si quelqu’un l’appelle directement.
+    expect(fenetrePages(1, 1)).toEqual([1]);
   });
 });
