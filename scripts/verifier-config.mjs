@@ -107,9 +107,6 @@ export const POSTURE = {
   'auth.sms.enable_signup':
     'Aucun écran n’ouvre de compte par téléphone ; l’activer ferait payer des SMS ' +
     'pour une porte que le produit n’utilise pas.',
-  'auth.sms.twilio.enabled':
-    'La connexion par téléphone d’Auth n’est utilisée nulle part — la passerelle ' +
-    'SMS du produit (passerelle-sms.ts) est un autre dispositif, indépendant.',
   'auth.mfa.totp.enroll_enabled':
     'Aucun écran ne propose l’enrôlement TOTP ; une fonction allumée que personne ' +
     'ne pilote est de la surface sans usage.',
@@ -134,6 +131,16 @@ export const POSTURE = {
  * que ça bloque quoi que ce soit aujourd'hui.
  */
 export const TOLERES = {
+  'auth.sms.twilio.enabled':
+    'non alignable — ce champ suit le **choix du fournisseur** dans la liste ' +
+    'déroulante (« Twilio »), pas la bascule « Enable Phone provider ». Mesuré le ' +
+    '2026-09-10 : le fournisseur Phone est éteint, ses identifiants sont vides, et ' +
+    'la base porte 0 compte avec téléphone et 0 identité phone — personne ne peut ' +
+    'se connecter ainsi. Ce qui garde vraiment la porte est ' +
+    'auth.sms.enable_signup, tenu à false dans POSTURE. Avertissement pour la ' +
+    'suite : les libellés du tableau de bord et le modèle de la CLI ne se ' +
+    'recouvrent pas un pour un — enable_confirmations s’affiche allumé dans ' +
+    'l’interface et se lit false par l’API. Ne pas déduire l’un de l’autre.',
   'auth.oauth_server.allow_dynamic_registration':
     'non lisible — l’API ne rend pas ce champ, donc le tenir pour une posture ' +
     'produirait un reproche perpétuel, et un contrôle toujours rouge finit ignoré. ' +
