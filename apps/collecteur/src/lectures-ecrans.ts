@@ -727,6 +727,99 @@ export async function chargerFicheClient(clientId: string): Promise<FicheClient 
   };
 }
 
+/* ------------------------ Historique d'une carte ------------------------- */
+
+/**
+ * Un événement du passé d'une carte : une mise encaissée, ou sa clôture.
+ *
+ * `estCommission` ne figurait pas dans le plan du 2026-09-10, et son absence
+ * était un défaut. La base porte `mises.est_commission`, posé par un
+ * déclencheur `BEFORE` et garanti unique par carte par un index partiel. Sans
+ * ce drapeau, le niveau 2 de l'écran listerait trente-et-une mises de 5 000
+ * sous un solde restituable de 150 000, et le client compterait 155 000 — sur
+ * l'écran même où il vient contester une somme.
+ *
+ * Le déduire de la position — « la première encaissée » — aurait marché
+ * aujourd'hui et menti le jour où la base en décide autrement. Elle sait ; on
+ * lit.
+ */
+export interface EvenementCarte {
+  id: string;
+  genre: 'mise' | 'retrait';
+  /** Pour une mise, le montant versé. Pour un retrait, ce qui a été rendu. */
+  montant: number;
+  /** ISO 8601, tel que la base l'a écrit. */
+  date: string;
+  /** La seule mise que la base a marquée commission. Toujours faux pour un retrait. */
+  estCommission: boolean;
+}
+
+/**
+ * Le passé d'une carte, mises et clôture mêlées, du plus récent au plus ancien.
+ *
+ * ## Pourquoi il n'y a ni `limit` ni pagination
+ *
+ * Borné par construction : une carte porte `MISES_PAR_CYCLE` cases, donc au
+ * plus 31 mises, et `retraits.carte_id` est unique — donc au plus un retrait.
+ * Trente-deux lignes, pour toujours. C'est tout l'intérêt d'avoir pris la carte
+ * pour unité plutôt que le mois : le mois n'a pas de borne, la carte en a une,
+ * et elle est dans le schéma.
+ *
+ * `chargerFicheClient` ne pouvait pas servir ici : elle lit 40 mises toutes
+ * cartes confondues et **sans `carte_id`**, donc impossibles à rattacher.
+ *
+ * ## Pourquoi cette lecture lève au lieu de rendre une liste vide
+ *
+ * Une erreur PostgREST rend `data: null`. Traitée par `?? []`, elle donne un
+ * écran qui dit « ce client n'a rien versé » — le pire mensonge possible sur un
+ * écran d'historique, et impossible à distinguer d'une carte neuve. Deux autres
+ * lectures de ce fichier lèvent déjà pour la même raison.
+ */
+export async function chargerHistoriqueCarte(carteId: string): Promise<EvenementCarte[]> {
+  const [rMises, rRetraits] = await Promise.all([
+    supabase
+      .from('mises')
+      .select('id, montant, encaisse_le, est_commission')
+      .eq('carte_id', carteId)
+      .order('encaisse_le', { ascending: false }),
+    supabase.from('retraits').select('id, montant_restitue, effectue_le').eq('carte_id', carteId),
+  ]);
+
+  if (rMises.error) throw rMises.error;
+  if (rRetraits.error) throw rRetraits.error;
+
+  const mises: EvenementCarte[] = (
+    (rMises.data ?? []) as Array<Record<string, string | number | boolean>>
+  ).map((m) => ({
+    id: String(m.id),
+    genre: 'mise',
+    montant: Number(m.montant),
+    date: String(m.encaisse_le),
+    estCommission: Boolean(m.est_commission),
+  }));
+
+  const retraits: EvenementCarte[] = (
+    (rRetraits.data ?? []) as Array<Record<string, string | number>>
+  ).map((r) => ({
+    id: String(r.id),
+    genre: 'retrait',
+    montant: Number(r.montant_restitue),
+    date: String(r.effectue_le),
+    estCommission: false,
+  }));
+
+  // Les dates sont des ISO 8601 en UTC, donc l'ordre lexicographique est
+  // l'ordre chronologique — c'est ce que garantit le format, pas une chance.
+  //
+  // Le comparateur rend bien `0` sur l'égalité. Un `a.date < b.date ? 1 : -1`
+  // dirait « a avant b » **et** « b avant a » pour deux horodatages identiques,
+  // et deux mises encaissées dans la même seconde est un cas ordinaire au
+  // marché.
+  return [...mises, ...retraits].sort((a, b) =>
+    a.date < b.date ? 1 : a.date > b.date ? -1 : 0,
+  );
+}
+
 /* ---------------------------- L'équipe (titulaire) ----------------------- */
 
 export interface MembreEquipe {
