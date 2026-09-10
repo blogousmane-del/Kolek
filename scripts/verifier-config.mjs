@@ -118,15 +118,6 @@ export const POSTURE = {
   'auth.oauth_server.enabled':
     'Kolek n’est serveur d’autorisation pour personne. Allumé, le projet expose un ' +
     'parcours de consentement dont aucun écran ne se sert.',
-  'auth.oauth_server.allow_dynamic_registration':
-    'À true, n’importe qui enregistre un client OAuth sur le projet. Non lisible par ' +
-    'l’API le 2026-09-10, et une absence du rapport ne vaut pas égalité. Indice ' +
-    'rassurant, mesuré le même jour : la découverte du projet ' +
-    '(/auth/v1/.well-known/oauth-authorization-server) rend 200 et n’annonce PAS de ' +
-    'registration_endpoint, qui est la façon dont RFC 8414 signale l’enregistrement ' +
-    'dynamique ; /oauth/register rend 401, pas 404. Un indice n’est pas une preuve — ' +
-    'le prouver demanderait un POST, c’est-à-dire un vrai enregistrement. À lire ' +
-    'dans le tableau de bord.',
   'api.schemas':
     'Chaque schéma exposé est une surface d’API. graphql_public n’est appelé par ' +
     'aucune ligne du produit.',
@@ -143,6 +134,13 @@ export const POSTURE = {
  * que ça bloque quoi que ce soit aujourd'hui.
  */
 export const TOLERES = {
+  'auth.oauth_server.allow_dynamic_registration':
+    'non lisible — l’API ne rend pas ce champ, donc le tenir pour une posture ' +
+    'produirait un reproche perpétuel, et un contrôle toujours rouge finit ignoré. ' +
+    'Sans objet tant que auth.oauth_server.enabled est false, ce que POSTURE ' +
+    'vérifie juste au-dessus : un réglage d’un serveur éteint n’ouvre rien. ' +
+    'Si le serveur OAuth est rallumé un jour, le reproche sur enabled reviendra ' +
+    'et celui-ci redeviendra une question — à lire alors dans le tableau de bord.',
   'auth.site_url':
     'local — la pile de développement renvoie sur localhost:5173. Cette valeur ' +
     'poussée en production casserait les liens de réinitialisation.',
