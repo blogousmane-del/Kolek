@@ -62,36 +62,52 @@ export async function demanderReinitialisation(email: string): Promise<Issue> {
   };
 }
 
+/**
+ * Ce qu’un collecteur lit quand GoTrue refuse.
+ *
+ * Pure, donc éprouvable — `poserMotDePasse` parle au réseau, pas elle.
+ *
+ * ## L’ordre des branches, et pourquoi il ne se change pas à la légère
+ *
+ * La réauthentification vient en premier parce qu’elle demande un geste que
+ * les autres messages ne demandent pas : se reconnecter. La longueur passe
+ * avant la faiblesse — un mot de passe trop court porte lui aussi le mot
+ * « weak » selon les versions, et l’ordre inverse annoncerait « il figure dans
+ * une fuite » à quelqu’un qui a simplement tapé six caractères.
+ *
+ * ## Le refus de réauthentification, mesuré
+ *
+ * Avec `secure_password_change` activé, GoTrue refuse tout changement de mot
+ * de passe passé **24 heures** de session — mesuré le 2026-09-10 sur la pile
+ * locale : 23 h passe, 25 h rend `400 Password update requires
+ * reauthentication`.
+ *
+ * Ce chemin-ci arrive par un lien de réinitialisation, donc sur une session
+ * neuve, et ne devrait pas le rencontrer. « Ne devrait pas » n’est pas « ne
+ * peut pas », et le message générique disait « Réessaie » — exactement le
+ * mauvais conseil pour ce refus-là, puisque réessayer échouera pareil.
+ */
+export function refusDePose(message: string): string {
+  if (/reauthentication|reauthenticate/i.test(message)) {
+    return 'Reconnecte-toi, puis recommence : cette session est trop ancienne pour changer le mot de passe.';
+  }
+  if (/at least|too short|should be at least/i.test(message)) {
+    return 'Choisis un mot de passe d’au moins 10 caractères.';
+  }
+  if (/weak|pwned|leaked|breach/i.test(message)) {
+    return 'Ce mot de passe figure dans une fuite connue. Choisis-en un autre.';
+  }
+  if (/session|not authenticated|jwt|expired/i.test(message)) {
+    return 'Ce lien a expiré. Redemande-en un depuis « Mot de passe oublié ».';
+  }
+  return 'Impossible d’enregistrer ce mot de passe. Réessaie.';
+}
+
 export async function poserMotDePasse(motDePasse: string): Promise<Issue> {
   const { error } = await supabase.auth.updateUser({ password: motDePasse });
   if (!error) return { ok: true };
 
-  const message = error.message ?? '';
-
-  // GoTrue répond en anglais. Les trois refus qu'un collecteur peut réellement
-  // rencontrer sont nommés ; le reste passe par un message générique, parce
-  // qu'un détail d'erreur GoTrue ne l'aiderait pas.
-  //
-  // La longueur est testée **avant** la faiblesse : le message d'un mot de
-  // passe trop court porte lui aussi le mot « weak » selon les versions, et
-  // l'ordre inverse annoncerait « il figure dans une fuite » à quelqu'un qui a
-  // simplement tapé six caractères.
-  if (/at least|too short|should be at least/i.test(message)) {
-    return { ok: false, message: 'Choisis un mot de passe d’au moins 10 caractères.' };
-  }
-  if (/weak|pwned|leaked|breach/i.test(message)) {
-    return {
-      ok: false,
-      message: 'Ce mot de passe figure dans une fuite connue. Choisis-en un autre.',
-    };
-  }
-  if (/session|not authenticated|jwt|expired/i.test(message)) {
-    return {
-      ok: false,
-      message: 'Ce lien a expiré. Redemande-en un depuis « Mot de passe oublié ».',
-    };
-  }
-  return { ok: false, message: 'Impossible d’enregistrer ce mot de passe. Réessaie.' };
+  return { ok: false, message: refusDePose(error.message ?? '') };
 }
 
 /**

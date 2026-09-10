@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { masquer } from './reglages';
+import { masquer, messageDeRefus } from './reglages';
 
 /**
  * Le masquage des clés à l'écran.
@@ -42,5 +42,50 @@ describe('masquer', () => {
     // Variable d'environnement non injectée au build : l'écran doit afficher un
     // vide, pas planter la section entière.
     expect(masquer('')).toBe('');
+  });
+});
+
+/**
+ * La traduction des refus de GoTrue, côté administration.
+ *
+ * La retombée du module renvoyait le message anglais **tel quel** — un choix
+ * assumé et écrit : « un refus qu’on ne comprend pas conduit à réessayer la
+ * même chose ». Il tenait tant que les refus non traduits étaient rares et
+ * sans remède.
+ *
+ * Ce n’est plus vrai. Mesuré le 2026-09-10 sur la pile locale, qui porte déjà
+ * `secure_password_change = true` : passé **24 heures** de session, GoTrue rend
+ * `400 — Password update requires reauthentication`. 23 h passe, 25 h non.
+ *
+ * Un administrateur connecté depuis la veille lisait donc une phrase anglaise
+ * sans savoir qu’il lui suffit de se reconnecter — remède mesuré, une session
+ * fraîche passe.
+ */
+describe('messageDeRefus', () => {
+  it('dit quoi faire devant un refus de réauthentification', () => {
+    const message = messageDeRefus('Password update requires reauthentication');
+
+    expect(message).toMatch(/reconnect/i);
+    expect(message).not.toContain('reauthentication');
+  });
+
+  it('nomme la fuite connue', () => {
+    expect(messageDeRefus('This password has been pwned')).toMatch(/fuites de données/i);
+  });
+
+  it('nomme la longueur', () => {
+    expect(messageDeRefus('Password should be at least 10 characters')).toMatch(/trop court/i);
+  });
+
+  it('nomme le mot de passe inchangé', () => {
+    expect(messageDeRefus('New password should be different from the old password')).toMatch(
+      /déjà ton mot de passe/i,
+    );
+  });
+
+  it('laisse passer un refus inconnu plutôt que de le noyer', () => {
+    // Le choix d'origine, garde tel quel : un message générique ferait
+    // réessayer la même chose sans rien apprendre à personne.
+    expect(messageDeRefus('some unmapped gotrue failure')).toBe('some unmapped gotrue failure');
   });
 });

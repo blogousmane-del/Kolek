@@ -123,6 +123,48 @@ export async function mesurerAuth(): Promise<EtatAuth> {
 /* --------------------------- Mon mot de passe ---------------------------- */
 
 /**
+ * Ce qu’un administrateur lit quand GoTrue refuse.
+ *
+ * Pure, donc éprouvable — `changerMotDePasse` parle au réseau, pas elle.
+ *
+ * La retombée rend le message anglais **tel quel**, et c’est délibéré : un
+ * refus générique ferait réessayer la même chose sans rien apprendre à
+ * personne. Ce choix ne tient que si les refus non traduits restent rares et
+ * sans remède.
+ *
+ * La réauthentification en était un, et elle a un remède. Mesuré le 2026-09-10
+ * sur la pile locale, qui porte déjà `secure_password_change = true` : passé
+ * **24 heures** de session, GoTrue rend `400 Password update requires
+ * reauthentication` — 23 h passe, 25 h non. Un administrateur connecté depuis
+ * la veille lisait donc une phrase anglaise sans savoir qu’il lui suffit de se
+ * reconnecter. Une session fraîche passe, c’est mesuré aussi.
+ *
+ * Elle vient en tête parce qu’elle demande un geste que les autres ne
+ * demandent pas.
+ */
+export function messageDeRefus(message: string): string {
+  if (/reauthentication|reauthenticate/i.test(message)) {
+    return (
+      'Cette session est trop ancienne pour changer le mot de passe. ' +
+      'Déconnecte-toi, reconnecte-toi, puis recommence.'
+    );
+  }
+  if (/pwned|leaked|compromised|data breach/i.test(message)) {
+    return (
+      'Ce mot de passe figure dans des fuites de données publiques. ' +
+      'Le serveur le refuse — choisis-en un autre.'
+    );
+  }
+  if (/at least|too short|length/i.test(message)) {
+    return 'Ce mot de passe est trop court pour la politique du serveur.';
+  }
+  if (/same.*password|different from the old/i.test(message)) {
+    return 'C’est déjà ton mot de passe actuel.';
+  }
+  return message;
+}
+
+/**
  * Change le mot de passe du compte connecté.
  *
  * Contrairement à `auth.admin.createUser`, **`updateUser` applique bien la
@@ -138,27 +180,7 @@ export async function changerMotDePasse(
 
   if (!error) return { ok: true };
 
-  const message = error.message ?? '';
-
-  // GoTrue rend ses refus en anglais. Les deux qui comptent sont nommés ; le
-  // reste passe tel quel plutôt que d'être noyé dans un message générique, parce
-  // qu'un refus de changement de mot de passe qu'on ne comprend pas conduit à
-  // réessayer la même chose.
-  if (/pwned|leaked|compromised|data breach/i.test(message)) {
-    return {
-      ok: false,
-      message:
-        'Ce mot de passe figure dans des fuites de données publiques. Le serveur le refuse — choisis-en un autre.',
-    };
-  }
-  if (/at least|too short|length/i.test(message)) {
-    return { ok: false, message: 'Ce mot de passe est trop court pour la politique du serveur.' };
-  }
-  if (/same.*password|different from the old/i.test(message)) {
-    return { ok: false, message: 'C’est déjà ton mot de passe actuel.' };
-  }
-
-  return { ok: false, message };
+  return { ok: false, message: messageDeRefus(error.message ?? '') };
 }
 
 /* ------------------------- Environnement du client ----------------------- */
