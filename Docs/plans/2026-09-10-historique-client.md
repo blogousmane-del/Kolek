@@ -48,7 +48,7 @@ Elles valent pour **toutes** les tâches ; aucune n'est rappelée ensuite.
 fichier. Une sous-vue de 200 lignes de plus en ferait le deuxième plus gros
 fichier du dépôt.
 
-## À trancher avant la tâche 6 — le montant affiché
+## Tranché le 2026-09-10 par le cahier — le montant affiché
 
 **Découvert le 2026-09-10, après l'écriture du plan.** La table `retraits`
 porte `carte_id`, `montant_restitue` **et `commission`** :
@@ -79,11 +79,30 @@ Recommandation : **A**, parce qu'un collecteur qui parcourt la pile cherche
 justement « combien j'ai rendu sur cette carte-là », et le lui faire ouvrir
 chaque carte pour l'obtenir manque le geste.
 
-**Cette décision appartient à l'exploitant** : elle porte sur ce qu'un client
-lit quand il conteste de l'argent. Les tâches 5 et 6 sont écrites pour **B** ;
-retenir **A** demande d'étendre `CarteFiche` d'un champ
-`montantRestitue: number | null` et la requête de `chargerFicheClient` d'une
-lecture de `retraits`.
+### La décision, et ce qui la fonde
+
+Le cahier des charges tranche, et il tranche autrement que mes trois issues :
+
+> **Ligne 137 :** « Le solde restituable n'est **pas stocké** mais calculé à la
+> volée : `(mises_encaissees − 1) × mise` — une seule source de vérité. »
+>
+> **Ligne 57 :** « Commission collecteur — **1 mise par carte.** La 1ʳᵉ mise
+> encaissée est fléchée « commission ». »
+
+**Retenu :** le niveau 1 affiche `soldeRestituable(misesEncaissees, mise)` —
+la formule que le cahier désigne comme source de vérité unique, sans requête
+supplémentaire. Le niveau 2 affiche, sur sa ligne de retrait,
+`montant_restitue` — le fait enregistré, ce que le client a réellement touché.
+
+**Pourquoi les deux plutôt qu'un :** ils doivent concorder. S'ils divergent un
+jour, c'est un défaut de données, et le montrer aux deux niveaux le rend
+**visible** au lieu de l'arbitrer en silence. Choisir l'un des deux reviendrait
+à décider d'avance lequel a raison — sur de l'argent déjà versé, ce n'est pas
+une décision d'écran.
+
+L'étiquette du niveau 1 dit « à restituer » et jamais « collecté » : la somme
+brute des mises comprend la commission, le restituable non, et les confondre
+annonce une mise de trop à quelqu'un qui vient contester.
 
 ---
 
