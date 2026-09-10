@@ -39,6 +39,36 @@ export const TAILLE_PAGE = 1000;
  */
 export const PAGES_MAX = 20;
 
+/**
+ * Combien de lignes l'écran **dessine** à la fois.
+ *
+ * ## À ne pas confondre avec `TAILLE_PAGE`, juste au-dessus
+ *
+ * Les deux nombres répondent à des questions opposées, et c'est pour ça qu'ils
+ * sont écrits l'un sous l'autre plutôt que dans deux fichiers.
+ *
+ * `TAILLE_PAGE = 1000` dit combien de lignes on **demande au serveur** d'un
+ * coup. Il vaut `max_rows` et n'a rien à voir avec l'affichage : le collecteur
+ * travaille hors ligne, et toutes ses lignes sont chargées avant qu'il descende
+ * au marché.
+ *
+ * Celui-ci dit combien de lignes on **met dans le document**. Aucun octet de
+ * réseau n'en dépend.
+ *
+ * ## Pourquoi vingt, et non cinquante comme l'administration
+ *
+ * Cinquante était la valeur d'origine, reprise du journal du Super Admin. Elle
+ * tient sur un tableau de bureau à six colonnes ; elle ne tient pas dans la main
+ * du collecteur. Cinquante fiches de client sur un téléphone d'entrée de gamme,
+ * c'est encore un long défilement — et c'est surtout un seuil que la plupart des
+ * collecteurs n'atteignent jamais, si bien que la pagination restait invisible.
+ * Une commande qui ne se déclenche pour personne ne sert personne.
+ *
+ * L'administration garde cinquante : ses tableaux se lisent sur un grand écran,
+ * et les couper plus court les paginerait sans raison.
+ */
+export const LIGNES_AFFICHEES_PAR_PAGE = 20;
+
 interface Page<T> {
   data: T[] | null;
   error: unknown;

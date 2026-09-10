@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { ClientCible } from '../Coquille';
 import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
-import { chargerTout } from '../pagination';
+import { chargerTout, LIGNES_AFFICHEES_PAR_PAGE } from '../pagination';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { supabase } from '../supabase';
 import { ChoixMise } from './ChoixMise';
@@ -367,6 +367,16 @@ export function Clients({
    * Ce que ça ne change pas : les lignes sont toutes chargées. Voir
    * `src/pagination.ts` — dans une application qui travaille hors ligne,
    * demander la page suivante au réseau ne rendrait rien au marché.
+   *
+   * ## Vingt lignes, et non cinquante comme l'administration
+   *
+   * Cinquante était la valeur d'origine, reprise du journal du Super Admin.
+   * Elle tient sur un tableau de bureau ; elle ne tient pas dans la main du
+   * collecteur, et surtout c'est un seuil que la plupart des collecteurs
+   * n'atteignent jamais — la pagination restait donc invisible en production,
+   * constaté le 2026-09-10. Une commande qui ne se déclenche pour personne ne
+   * sert personne. Voir `LIGNES_AFFICHEES_PAR_PAGE`, écrit à côté de
+   * `TAILLE_PAGE` pour que les deux nombres ne se confondent pas.
    */
   // `total: totalFiltre` et non `total` : une variable du même nom vit déjà
   // dans la lecture asynchrone plus haut, où elle désigne le compte du serveur.
@@ -378,7 +388,7 @@ export function Clients({
     total: totalFiltre,
     visibles: affichees,
     allerA,
-  } = usePagination(visibles);
+  } = usePagination(visibles, LIGNES_AFFICHEES_PAR_PAGE);
 
   /**
    * Toute nouvelle question se pose depuis le début de la liste.

@@ -1,5 +1,4 @@
 import { formatMontant, MISES_PAR_CYCLE } from '@kolek/core';
-import { TAILLE_PAGE } from '@kolek/ui';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,6 +23,7 @@ vi.mock('../supabase', () => ({
 
 vi.mock('./FicheClient', () => ({ FicheClient: () => null }));
 
+const { LIGNES_AFFICHEES_PAR_PAGE } = await import('../pagination');
 const { Clients } = await import('./Clients');
 
 const CLIENTS = [
@@ -525,7 +525,7 @@ describe('pagination de la liste', () => {
     rendre();
     await screen.findByText('Client 001');
 
-    expect(lignesRendues()).toHaveLength(TAILLE_PAGE);
+    expect(lignesRendues()).toHaveLength(LIGNES_AFFICHEES_PAR_PAGE);
   });
 
   it('mene a la page suivante', async () => {
@@ -535,7 +535,7 @@ describe('pagination de la liste', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /page suivante/i }));
 
-    expect(screen.getByText('Client 051')).toBeDefined();
+    expect(screen.getByText('Client 021')).toBeDefined();
     expect(screen.queryByText('Client 001')).toBeNull();
   });
 
