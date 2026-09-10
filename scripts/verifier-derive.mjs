@@ -39,9 +39,25 @@
  * taire.
  *
  * Il ne voit pas non plus les déclencheurs d'événement : aucun dump produit par
- * le CLI ne les rend. C'est précisément pourquoi `rls_auto_enable` n'a pas pu
- * être adoptée dans une migration — on ne recopie pas un câblage qu'on ne peut
- * pas lire.
+ * le CLI ne les rend.
+ *
+ * ## Ce qui a changé le 2026-09-10
+ *
+ * Cette limite a longtemps servi de conclusion : « c'est précisément pourquoi
+ * `rls_auto_enable` n'a pas pu être adoptée dans une migration — on ne recopie
+ * pas un câblage qu'on ne peut pas lire. » C'était vrai du **dump**, et faux du
+ * reste. `supabase db query --linked` interroge `pg_event_trigger` directement,
+ * et rend en une ligne le nom, l'événement, les étiquettes, l'état et le
+ * propriétaire.
+ *
+ * `rls_auto_enable` et son déclencheur `ensure_rls` sont donc adoptés depuis le
+ * 2026-09-10, migration `20260910090000`. La dérive que ce script signalait à
+ * chaque passage est fermée.
+ *
+ * La limite du dump, elle, reste : ce script ne verra pas apparaître un
+ * **prochain** déclencheur d'événement. La lecture qui le montrerait existe —
+ * elle demande simplement une requête plutôt qu'un dump, et personne ne l'a
+ * encore câblée ici.
  */
 
 import { execFileSync } from 'node:child_process';

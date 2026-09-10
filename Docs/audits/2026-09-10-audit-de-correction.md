@@ -206,9 +206,49 @@ migrations n'aurait pas cette fonction, et toute passe qui balaie les `security
 definer` — comme celle du 2026-09-09 qui a révoqué `EXECUTE` pour `PUBLIC` — la
 touche sans que rien en local ne l'annonce.
 
-Reste ouvert : l'adopter dans une migration demande de relire sa définition en
-production, puis d'écrire un `CREATE OR REPLACE` idempotent, puis de pousser.
-C'est une écriture en production, donc une décision de l'exploitant.
+**Fermé le 2026-09-10**, migration `20260910090000_rls_auto_enable_adoptee.sql`.
+
+Ce qui débloquait l'adoption n'était pas la base mais la **lecture**. Le
+commentaire de `verifier-derive.mjs` concluait : « aucun dump produit par le CLI
+ne rend les déclencheurs d'événement — on ne recopie pas un câblage qu'on ne
+peut pas lire. » C'était vrai du dump, et faux du reste : `supabase db query
+--linked` interroge `pg_event_trigger` directement.
+
+```
+ensure_rls · ddl_command_end · CREATE TABLE, CREATE TABLE AS, SELECT INTO
+actif · propriétaire postgres
+```
+
+Le propriétaire est ce qui rend l'adoption possible : un déclencheur d'événement
+demande d'être superutilisateur **ou propriétaire**, et les migrations tournent
+comme `postgres`.
+
+### Ce que la suite de base a rattrapé, et que le md5 ne voyait pas
+
+La première version de la migration recopiait `pg_get_functiondef` à la virgule
+près — md5 identique entre la production et une base locale remontée depuis les
+migrations. Sur cette égalité-là, la migration semblait sans risque.
+
+`supabase/tests/search-path.test.ts` a dit non, à l'assertion « n'en laisse
+aucune atteignable sans session ». Sur une base neuve, l'ACL lue était :
+
+```
+=X/postgres | postgres=X/postgres | service_role=X/postgres
+```
+
+Le premier terme est le droit `PUBLIC` que PostgreSQL accorde à toute fonction
+neuve. Il ne nomme personne, ce qui est précisément ce qui le rend invisible à
+une vérification qui chercherait « anon ». **L'égalité du corps ne disait rien
+des droits.** La migration porte désormais son `revoke all … from public, anon`.
+
+La production n'est concernée dans aucun sens, et c'est mesuré plutôt que
+supposé : son droit `PUBLIC` avait été révoqué par la passe du 2026-09-09, et
+`CREATE OR REPLACE` ne réinitialise pas l'ACL d'une fonction existante —
+révoquer en local, rejouer le `CREATE OR REPLACE`, relire : `=X/postgres` n'est
+pas revenu.
+
+Reste à pousser. C'est une écriture en production, donc une décision de
+l'exploitant — sémantiquement un no-op, ce qui n'en fait pas moins une écriture.
 
 **Le contournement qui a permis la mesure**, noté parce qu'il resservira : sur
 ce poste, PowerShell refuse `npx.ps1` — politique d'exécution — tandis que le
