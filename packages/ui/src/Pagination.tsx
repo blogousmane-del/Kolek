@@ -1,3 +1,4 @@
+import { formatMontant } from '@kolek/core';
 import { useMemo, useState } from 'react';
 
 import { Icone } from './Icone';
@@ -63,10 +64,18 @@ export function usePagination<T>(elements: T[], taille: number = TAILLE_PAGE) {
   return { page, pages, visibles, allerA: setDemandee };
 }
 
+/**
+ * Le style d'une flèche, éteinte comprise.
+ *
+ * Les variantes portent sur `aria-disabled` et non sur `:disabled` — voir la
+ * note du composant sur pourquoi ces boutons ne sont jamais vraiment
+ * désactivés. À l'œil, rien ne change : même opacité, même curseur, même
+ * neutralisation du survol.
+ */
 const FLECHE =
   'min-w-11 min-h-11 inline-flex items-center justify-center rounded-xl border border-hairline/80 ' +
-  'bg-surface text-ink shadow-xs transition-colors hover:border-primary ' +
-  'disabled:opacity-40 disabled:cursor-default disabled:hover:border-hairline/80 cursor-pointer';
+  'bg-surface text-ink shadow-xs transition-colors hover:border-primary cursor-pointer ' +
+  'aria-disabled:opacity-40 aria-disabled:cursor-default aria-disabled:hover:border-hairline/80';
 
 /**
  * Les commandes de page.
@@ -74,6 +83,27 @@ const FLECHE =
  * Rend `null` quand tout tient sur une page : deux flèches inertes sous une
  * liste de six lignes sont du bruit, et le collecteur apprendrait à ne plus les
  * regarder.
+ *
+ * ## Pourquoi les flèches ne sont jamais vraiment `disabled`
+ *
+ * Elles l'ont été, le 2026-09-09, et l'auto-audit du même jour a relevé ce que
+ * ça coûte : **dans un vrai navigateur, un élément qui reçoit `disabled` alors
+ * qu'il a le focus perd le focus**, et celui-ci retombe sur `<body>`.
+ *
+ * Le geste est banal — on tabule jusqu'à « Suivante », on appuie sur Entrée
+ * plusieurs fois de suite pour descendre la liste. Au dernier appui, le bouton
+ * s'éteint sous le doigt : l'utilisateur au clavier se retrouve au début du
+ * document, et celui au lecteur d'écran perd sa place dans le tableau qu'il
+ * était en train de parcourir.
+ *
+ * `aria-disabled` dit l'indisponibilité au lecteur d'écran sans retirer
+ * l'élément de l'ordre de tabulation. Le focus ne bouge donc pas. En
+ * contrepartie le navigateur ne bloque plus le clic, et c'est au gestionnaire
+ * de refuser — d'où le `if` dans chaque `onClick`.
+ *
+ * **Ce défaut est invisible à la suite de tests** : `jsdom` ne modélise pas la
+ * perte de focus sur `disabled`. Les tests gardent donc le moyen —
+ * `aria-disabled` plutôt que `disabled` — faute de pouvoir garder la fin.
  */
 export function Pagination({
   page,
@@ -89,6 +119,9 @@ export function Pagination({
 }) {
   if (pages <= 1) return null;
 
+  const auDebut = page <= 1;
+  const aLaFin = page >= pages;
+
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-3">
       {/* `role="status"` et non un simple texte : sans région vive, un
@@ -96,16 +129,29 @@ export function Pagination({
           le tableau a changé hors de son champ. La région est montée en
           permanence, sinon le premier changement passe inaperçu : une région
           vive n'annonce que ce qui bouge **après** son apparition. */}
+      {/* Les trois nombres passent par `formatMontant`, comme partout ailleurs
+          dans le produit — le bandeau de recoupement de l'écran Clients écrit
+          « 1 240 clients enregistrés » à quelques pixels d'ici. Sans ça, le même
+          nombre s'écrivait de deux façons sur le même écran. Les trois et non le
+          seul total : « Page 1240 sur 1 240 » se lirait comme deux nombres
+          différents. */}
       <p role="status" aria-live="polite" className="text-xs font-body text-muted-foreground">
-        Page {page} sur {pages} — {total} au total
+        Page {formatMontant(page)} sur {formatMontant(pages)} — {formatMontant(total)} au total
       </p>
 
       <div className="flex items-center gap-2">
         <button
           type="button"
           aria-label="Page précédente"
-          disabled={page <= 1}
-          onClick={() => onAller(page - 1)}
+          aria-disabled={auDebut}
+          // Le navigateur ne bloque plus le clic : c'est ici que le geste se
+          // refuse. Sans ce `return`, cliquer à la page 1 demanderait la page 0
+          // — que le crochet ramènerait à 1, donc rien de visible à l'écran,
+          // mais la région vive annoncerait un changement qui n'a pas eu lieu.
+          onClick={() => {
+            if (auDebut) return;
+            onAller(page - 1);
+          }}
           className={FLECHE}
         >
           <Icone nom="chevron-left" taille={18} />
@@ -113,8 +159,11 @@ export function Pagination({
         <button
           type="button"
           aria-label="Page suivante"
-          disabled={page >= pages}
-          onClick={() => onAller(page + 1)}
+          aria-disabled={aLaFin}
+          onClick={() => {
+            if (aLaFin) return;
+            onAller(page + 1);
+          }}
           className={FLECHE}
         >
           <Icone nom="chevron-right" taille={18} />

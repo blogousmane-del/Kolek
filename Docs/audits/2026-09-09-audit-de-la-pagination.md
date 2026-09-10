@@ -26,7 +26,7 @@ Vérifié, et pas seulement cru :
 
 ---
 
-## 🟠 A — Le focus est perdu quand la flèche se désactive
+## 🟠 → ✅ A — Le focus est perdu quand la flèche se désactive
 
 `Pagination.tsx` désactive « Suivante » à la dernière page et « Précédente » à la
 première. Un utilisateur au clavier tabule jusqu'à « Suivante », appuie sur
@@ -48,15 +48,42 @@ APRES CLIC — actif = BUTTON | aria-label = Page suivante | desactive = true
 peut donc pas voir ce défaut, ni garder sa correction.** C'est la raison pour
 laquelle il faut l'écrire ici plutôt que de compter sur un test.
 
-Deux réparations possibles, et elles ne se valent pas. Garder les deux boutons
-toujours actifs et laisser le crochet borner la page — le focus ne bouge alors
-jamais, mais une flèche qui ne mène nulle part redevient cliquable. Ou déplacer
-le focus explicitement sur l'autre flèche au moment où l'une s'éteint. La
-première est plus simple ; la seconde dit mieux ce qui se passe.
-
 Touche les six listes.
 
-## 🟠 B — Les nombres de la pagination ne suivent pas la convention du produit
+### Réparé — et par un troisième chemin
+
+L'audit proposait deux corrections ; aucune n'a été retenue. Garder les boutons
+actifs laisse une flèche qui ne mène nulle part cliquable, sans rien dire au
+lecteur d'écran. Déplacer le focus sur l'autre flèche est pire : l'utilisateur
+qui appuie encore une fois sur Entrée, par réflexe, **repart en arrière**.
+
+Retenu : `aria-disabled` à la place de `disabled`. L'indisponibilité est dite au
+lecteur d'écran, l'élément reste dans l'ordre de tabulation, et le focus ne
+bouge donc jamais. En contrepartie le navigateur ne bloque plus le clic, et le
+refus passe dans le gestionnaire — un `if` par flèche, avec son test.
+
+Les variantes Tailwind suivent : `aria-disabled:opacity-40`,
+`aria-disabled:cursor-default`, `aria-disabled:hover:border-hairline/80`.
+Vérifié dans le CSS bâti, pas seulement dans la source :
+
+```
+aria-disabled\:opacity-40[aria-disabled=true]
+aria-disabled\:cursor-default[aria-disabled=true]
+aria-disabled\:hover\:border-hairline\/80[aria-disabled=true]:hover
+```
+
+Le sélecteur vise la chaîne `"true"` ; React écrit bien `aria-disabled="false"`
+sur une flèche active, donc rien ne déteint. À l'œil, rien ne change.
+
+**Ce que les tests gardent, et ce qu'ils ne gardent pas.** Trois tests exigent
+`aria-disabled` et l'absence de `disabled`, un quatrième exige que le
+gestionnaire refuse le geste en bout de course. Mais `jsdom` restant aveugle à
+la perte de focus, aucun d'eux ne verrait le retour du défaut si quelqu'un
+remettait `disabled` **et** ajustait les tests. Ils gardent le moyen, faute de
+pouvoir garder la fin — c'est écrit dans le fichier, au-dessus des tests
+concernés.
+
+## 🟠 → ✅ B — Les nombres de la pagination ne suivent pas la convention du produit
 
 `Pagination.tsx` écrit `{total}` brut. Sur l'écran Clients, ça donne :
 
@@ -70,7 +97,25 @@ La pagination, non. **Deux écritures du même nombre sur le même écran.**
 
 Le voisinage n'est pas uniforme dans le dépôt : l'en-tête d'`EncoursSoldes`
 écrit déjà « 500 des 1240 cartes » sans séparateur, et sur cet écran-là ma ligne
-s'accorde avec sa voisine. Mais sur Clients, elle jure.
+s'accordait avec sa voisine. Mais sur Clients, elle jurait.
+
+### Réparé
+
+Les **trois** nombres passent par `formatMontant`, pas le seul total : « Page
+1240 sur 1 240 » se lirait comme deux nombres différents.
+
+`packages/ui` dépendait déjà de `@kolek/core` — `CarteCollecte.tsx` en importe
+`MISES_PAR_CYCLE` — donc l'import n'ajoute aucune dépendance.
+
+**Le test a demandé une précaution.** Le séparateur est une espace *insécable*
+(U+00A0), choisie le 2026-09-04 pour qu'un montant ne se coupe pas en deux en
+bout de ligne. Or le normalisateur de Testing Library écrase l'insécable en
+espace ordinaire avant de comparer : un `getByText` serait passé au vert même si
+le composant écrivait une espace ordinaire — c'est-à-dire sur le défaut qu'il
+doit voir. L'assertion porte donc sur `textContent`, qui est brut.
+
+`EncoursSoldes` n'a pas été touché : son en-tête relève d'un autre sujet, et le
+corriger en passant aurait mélangé deux gestes dans un commit.
 
 ## 🟡 C — Un commentaire décrit ce que le code ne fait pas
 
@@ -157,14 +202,16 @@ l'écran du collecteur, comme les autres questions de largeur.
 
 ---
 
-## Ce que je réparerais, dans l'ordre
+## Où ça en est
 
-1. **A**, le focus. C'est le seul qui empêche quelqu'un de se servir de l'écran,
-   et c'est aussi celui qu'aucun test ne rattrapera jamais.
-2. **B**, le formatage. Une ligne, et deux nombres cessent de se contredire.
-3. **C**, **D**, **E** ensemble : le commentaire, l'enrobage d'`allerA`, et
-   `total` rendu par le crochet. Trois petites choses dans le même fichier.
+**A et B sont réparés** — voir les sections « Réparé » ci-dessus. Quatre tests
+ajoutés à `Pagination.test.tsx` (13 → 17), et la variante Tailwind vérifiée dans
+le CSS bâti et non seulement dans la source.
 
-**F** à **I** sont des observations, pas des dettes : elles méritent d'être
-écrites pour que le prochain qui touche à ce composant les connaisse, pas d'être
-corrigées aujourd'hui.
+**C, D, E restent ouverts.** Le commentaire de la région vive, l'enrobage
+d'`allerA`, et `total` rendu par le crochet : trois petites choses dans le même
+fichier, à faire ensemble.
+
+**F à I sont des observations, pas des dettes** : elles méritent d'être écrites
+pour que le prochain qui touche à ce composant les connaisse, pas d'être
+corrigées.
