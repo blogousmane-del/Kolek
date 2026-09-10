@@ -48,6 +48,45 @@ Elles valent pour **toutes** les tâches ; aucune n'est rappelée ensuite.
 fichier. Une sous-vue de 200 lignes de plus en ferait le deuxième plus gros
 fichier du dépôt.
 
+## À trancher avant la tâche 6 — le montant affiché
+
+**Découvert le 2026-09-10, après l'écriture du plan.** La table `retraits`
+porte `carte_id`, `montant_restitue` **et `commission`** :
+
+```
+id · collecteur_id · carte_id · montant_restitue · commission · effectue_le · restitue_par
+```
+
+Pour une carte **clôturée**, le montant rendu au client est donc un **fait
+enregistré**, pas un calcul. Le recalculer par `soldeRestituable` reviendrait à
+afficher un nombre qui peut contredire ce que le client a réellement touché —
+sur l'écran même où il vient contester.
+
+Pour une carte **active**, aucun retrait n'existe encore : seule la projection
+`soldeRestituable(misesEncaissees, mise)` est disponible, et elle doit être
+étiquetée comme telle.
+
+**Ce que ça implique :** le niveau 1 ne dispose aujourd'hui que de
+`CarteFiche`, qui ne porte pas le montant restitué. Trois issues :
+
+| Issue | Ce qu'elle coûte |
+|---|---|
+| **A.** Charger les retraits au niveau 1 | une 4ᵉ requête dans `chargerFicheClient`, bornée par le nombre de cartes |
+| **B.** N'afficher aucun montant au niveau 1 | la pile se lit « carte de mars, 31/31, cycle terminé » ; le montant apparaît au niveau 2 |
+| **C.** Afficher la projection partout | **écarté** — un nombre recalculé qui contredit le versement réel est le pire défaut possible ici |
+
+Recommandation : **A**, parce qu'un collecteur qui parcourt la pile cherche
+justement « combien j'ai rendu sur cette carte-là », et le lui faire ouvrir
+chaque carte pour l'obtenir manque le geste.
+
+**Cette décision appartient à l'exploitant** : elle porte sur ce qu'un client
+lit quand il conteste de l'argent. Les tâches 5 et 6 sont écrites pour **B** ;
+retenir **A** demande d'étendre `CarteFiche` d'un champ
+`montantRestitue: number | null` et la requête de `chargerFicheClient` d'une
+lecture de `retraits`.
+
+---
+
 ---
 
 ### Tâche 1 : figer le comportement actuel de `Pagination`
