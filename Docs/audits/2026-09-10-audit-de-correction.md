@@ -129,15 +129,16 @@ lue.** C'était une supposition reconduite.
 
 `supabase config diff` la rend en une commande. Relevé le 2026-09-10 :
 
-| Réglage | Dépôt | Production |
-|---|---|---|
-| `auth.minimum_password_length` | **10** | **6** |
-| `auth.email.secure_password_change` | **true** | **false** |
-| `auth.rate_limit.sign_in_sign_ups` | 30 → 5 depuis ce jour | 30 |
-| `auth.oauth_server.enabled` | false | **true** |
-| `auth.sms.twilio.enabled` | false | **true** |
-| `auth.mfa.totp.enroll_enabled` / `verify_enabled` | false | **true** |
-| `api.schemas` | `["public"]` | `["public","graphql_public"]` |
+| Réglage | Dépôt | Production au relevé | Depuis |
+|---|---|---|---|
+| `auth.minimum_password_length` | **10** | **6** | ✅ **10** |
+| `auth.email.secure_password_change` | **true** | **false** | ✅ **true** |
+| `auth.email.double_confirm_changes` | true | true | ⚠️ voir plus bas |
+| `auth.rate_limit.sign_in_sign_ups` | 30 → 5 depuis ce jour | 30 | ouvert |
+| `auth.oauth_server.enabled` | false | **true** | ouvert |
+| `auth.sms.twilio.enabled` | false | **true** | ouvert |
+| `auth.mfa.totp.enroll_enabled` / `verify_enabled` | false | **true** | ouvert |
+| `api.schemas` | `["public"]` | `["public","graphql_public"]` | ouvert |
 
 Les deux premiers portent leur intention **écrite dans le dépôt** sans être en
 vigueur. `config.toml` dit, à la ligne du premier : « 10 et non 6 : le compte
@@ -152,12 +153,46 @@ Les quatre derniers sont de la surface sans usage : aucun écran n'appelle de
 MFA, aucune connexion par téléphone n'existe (la passerelle SMS du produit est
 un autre dispositif), et `graphql_public` n'est appelé nulle part.
 
+### Ce que le garde-fou a attrapé dans l'heure
+
+`double_confirm_changes` n'était pas dans le relevé initial : le dépôt et la
+production s'accordaient, tous deux à `true`. **L'enregistrement du formulaire
+« Email » l'a éteint** — un effet de bord que personne ne visait, en corrigeant
+les deux réglages du dessus.
+
+À `false`, changer l'adresse d'un compte ne demande plus qu'une confirmation
+depuis la **nouvelle** boîte. Une session volée suffit donc à déplacer le compte
+vers une adresse tierce, sans que le propriétaire légitime n'ait rien à
+approuver — le vecteur qu'on venait de fermer sur le mot de passe, par une autre
+porte.
+
+`verifier:config` l'a signalé au relevé suivant, comme **écart non classé** :
+ni « grave » ni « bénin », mais « quelqu'un doit regarder ça ». Remis à `true`
+dans la foulée.
+
+C'est la démonstration que ce contrôle n'était pas une précaution de principe.
+Le geste qui referme une faille en ouvre une autre, et sans lecture entre les
+deux, la seconde aurait attendu le prochain audit.
+
+### Ce qui restait après ces trois-là
+
+Six écarts, tous de la surface sans usage plutôt que des portes ouvertes :
+`graphql_public` exposé sans être appelé, TOTP allumé sans écran pour
+l'enrôler, le serveur OAuth allumé sans client, la connexion par téléphone
+d'Auth allumée sans parcours, et la borne d'inscription au défaut de la
+plateforme.
+
 **Ce qui n'est pas mesuré, et qu'il ne faut pas croire mesuré :**
 `auth.oauth_server.allow_dynamic_registration`. L'API ne le compare pas. Une
 première lecture l'avait conclu à `false` en le déduisant de son absence d'un
 autre rapport — deux commandes, deux périmètres, l'absence ne vaut pas égalité.
-À lire dans le tableau de bord avant tout le reste : à `true`, n'importe qui
-enregistre un client OAuth sur le projet.
+
+Sondé autrement le même jour, et c'est un indice, pas une preuve : la découverte
+du projet — `/auth/v1/.well-known/oauth-authorization-server` — rend `200` et
+**n'annonce pas de `registration_endpoint`**, qui est la façon dont RFC 8414
+signale l'enregistrement dynamique ; `/oauth/register` rend `401`, pas `404`.
+Le prouver demanderait un `POST`, c'est-à-dire tenter un vrai enregistrement de
+client en production. Reste donc à lire dans le tableau de bord.
 
 **Ce que le dépôt porte désormais :** `npm run verifier:config`
 (`scripts/verifier-config.mjs`, 20 épreuves) compare la production à ce que le
