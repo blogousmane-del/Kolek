@@ -253,26 +253,29 @@ anonymous_users = 30
 # Number of sessions that can be refreshed in a 5 minute interval per IP address.
 token_refresh = 150
 # Number of sign up and sign-in requests that can be made in a 5 minute interval per IP address (excludes anonymous users).
-# 5 et non 30 : l'audit du 2026-08-28 demandait « environ cinq tentatives par
-# quart d'heure ». 30 par cinq minutes est le defaut de la plateforme, et six
-# audits d'affilee l'ont classe « au defaut » sans jamais l'ouvrir.
+# 10 et non 30, et non 5 : les deux bornes ont ete pesees le 2026-09-10.
 #
-# Ecrire 5 ici ne change rien en production : ce fichier ne pilote que la pile
-# locale. C'est le geste qui rend l'ecart mesurable — `verifier:config` ne lit
-# que les differences entre le depot et le distant, donc tant que les deux
-# valaient 30 il se taisait. Il crie maintenant jusqu'a ce que le tableau de
-# bord suive.
+# 30 par cinq minutes est le defaut de la plateforme. Six audits d'affilee l'ont
+# classe « au defaut » sans jamais l'ouvrir, et l'audit du 2026-08-28 demandait
+# « environ cinq tentatives par quart d'heure ».
+#
+# Pourquoi pas 5. Cette borne compte **par adresse IP**, et a Abidjan les
+# reseaux mobiles partagent massivement une meme IP publique entre abonnes. Le
+# produit comptait 7 collecteurs au moment de ce reglage : un matin ou six
+# demarrent ensemble derriere le meme operateur, le sixieme serait refuse. 10
+# reste trois fois plus strict que le defaut, avec de la marge pour le partage
+# d'IP. A revoir a la hausse si le nombre de collecteurs par operateur grandit.
 #
 # Ce que la pile locale ne peut PAS dire, mesure le 2026-09-10 : la suite de
 # base passe entierement a 5 (65 fichiers, 763 tests), et ca ne prouve rien.
-# `GOTRUE_RATE_LIMIT_HEADER` n'est pas defini sur la pile locale — GoTrue
-# compte par IP en lisant cet en-tete, donc sans lui aucune borne par IP ne
-# s'applique. Sonde : douze `signInWithPassword` d'affilee, douze `400`, aucun
-# `429`. Le compteur n'a jamais tourne.
+# `GOTRUE_RATE_LIMIT_HEADER` n'est pas defini sur la pile locale — GoTrue compte
+# par IP en lisant cet en-tete, donc sans lui aucune borne par IP ne s'applique.
+# Sonde : douze `signInWithPassword` d'affilee, douze `400`, aucun `429`. Le
+# compteur n'a jamais tourne, ni pour dire que la valeur tient, ni qu'elle gene.
 #
-# Consequence a garder en tete : le jour ou cet en-tete sera cable en local, 5
-# pourra gener les epreuves, et personne ne l'aura vu venir depuis ici.
-sign_in_sign_ups = 5
+# Consequence a garder en tete : le jour ou cet en-tete sera cable en local, une
+# valeur basse pourra gener les epreuves, et personne ne l'aura vu venir d'ici.
+sign_in_sign_ups = 10
 # Number of OTP / Magic link verifications that can be made in a 5 minute interval per IP address.
 token_verifications = 30
 # Number of Web3 logins that can be made in a 5 minute interval per IP address.
