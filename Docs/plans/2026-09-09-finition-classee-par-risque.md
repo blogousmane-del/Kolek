@@ -109,11 +109,57 @@ modification.
 **Fini quand** chacune a au moins le triptyque des autres : refus sans jeton,
 refus avec un jeton non-admin, acceptation avec un jeton admin.
 
-## 🟡 D — Un seul morceau de JavaScript par application
+## 🟡 → ✅ D — Le poids d'installation, mesuré puis borné
 
-`collecteur` : 565 ko, 158 ko compressés. Cible déclarée « téléphone d'entrée
-de gamme », et le service worker ne met en cache qu'après le premier chargement
-complet. C'est la seule application qui parte en itinérance.
+> **Le titre de ce point était faux.** « Un seul morceau de JavaScript par
+> application » ne décrit pas le dépôt : les trois `vite.config.ts` portent
+> `manualChunks: decouperLib`, et `dist/` du collecteur contient bien trois
+> morceaux. Le 565/158 cité plus bas était le **total après découpage**, pas la
+> taille d'un morceau unique.
+
+### Ce qui est réellement téléchargé à la première installation
+
+Mesuré le 2026-09-10 sur une reconstruction complète — les empreintes du
+collecteur sont ressorties identiques, donc la mesure porte bien sur le code
+courant.
+
+| Entrée préchargée | Brut | Compressé |
+|---|---|---|
+| `lib-supabase-H6RbKBY9.js` | 208 116 o | 53 226 o |
+| `lib-react-DzH5Pu2p.js` | 189 605 o | 58 838 o |
+| `index-nNqJp2EB.js` | 170 655 o | 45 127 o |
+| `index-BcWeCpco.css` | 58 914 o | 10 442 o |
+| `index.html`, `registerSW.js`, deux icônes, le manifeste | le reste | |
+| **Total — 9 entrées** | **652 486 o** | **188 941 o** |
+
+**Les polices n'y sont pas.** Le CSS les demande à la charge, et le navigateur
+ne prend que le `woff2` de chaque graisse. Le double jeu `woff`/`woff2` ne coûte
+donc rien à l'installation — c'était l'économie que je suis allé chercher en
+premier, et elle n'existe pas.
+
+### Ce que le découpage sert, et ce qu'il ne sert pas
+
+Le commentaire de `apps/collecteur/vite.config.ts` le dit déjà et il a raison :
+le service worker précharge **tout**, donc passer les écrans lourds en
+`import()` ne retire pas un octet à la première installation. Le découpage sert
+les **mises à jour** — un morceau dont l'empreinte n'a pas changé n'est pas
+retéléchargé — et React comme `supabase-js` ne bougent qu'aux montées de
+version.
+
+### Le seul gain matériel restant, et pourquoi il n'est pas pris
+
+`supabase-js` embarque son client `realtime`. Vérifié : **aucun écran du produit
+n'ouvre de canal** — ni `.channel(`, ni `removeChannel`, ni `storage`. Le
+paquet `@supabase/realtime-js` pèse 101 772 o de source, soit de l'ordre de 12 à
+14 ko compressés dans le paquet servi — **environ 7 % du poids d'installation**.
+
+L'enlever demande d'abandonner `createClient` et d'assembler `auth-js` et
+`postgrest-js` à la main. Ça touche l'authentification d'un produit qui porte
+l'épargne de dizaines de commerçants, pour 7 %. Le rapport n'y est pas.
+
+**Ce qui rouvrirait le sujet :** une montée de version de `supabase-js` qui rend
+`realtime` optionnel, ou un besoin produit qui fasse doubler `index.js`. Pas
+avant.
 
 ## 🟡 E — `SuperAdmin.tsx`, 1 634 lignes
 
@@ -208,7 +254,8 @@ un défaut du code. À savoir avant d'aller chercher un bogue qui n'existe pas.
 4. **B** — sur décision de l'exploitant, après `verifier:migrations`.
 5. **D, E, F** — chantiers à part entière, à ouvrir chacun avec son plan.
    **F est fait** — voir sa section, réglé en deux moitiés qui ne se remplacent
-   pas. **D et E restent ouverts.**
+   pas. **D est fermé le 2026-09-10** — mesuré, borné, et le seul gain
+   restant écarté avec son chiffre. **E reste ouvert.**
 
 ---
 
