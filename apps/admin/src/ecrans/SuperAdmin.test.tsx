@@ -917,3 +917,47 @@ describe('la pagination des abonnés', () => {
     expect(screen.queryByRole('button', { name: /page suivante/i })).toBeNull();
   });
 });
+
+/**
+ * Le filtre et la pastille doivent dire la même chose de la même ligne.
+ *
+ * ## Pourquoi ce test existe, et ce qu'il protège
+ *
+ * Écrit le 2026-09-10 en traitant le point F de l'auto-audit, qui proposait de
+ * mémoïser `collecteursFiltres` pour que le `useMemo` de `usePagination` serve
+ * enfin son cache.
+ *
+ * Ça ne se fait pas ici, et voici pourquoi. Le filtre calcule les jours
+ * restants depuis `Date.now()` ; `PastilleStatut` refait **le même calcul**, à
+ * chaque rendu, pour écrire « Expire dans N j ». Mémoïser le filtre le figerait
+ * au dernier changement de dépendance pendant que la pastille resterait vivante.
+ * Au passage d'une frontière de jour, la même ligne serait alors classée
+ * « Actif » par le filtre et annoncée « Expire dans 7 j » par sa pastille — un
+ * écran qui se contredit lui-même, sur la console qui sert à facturer.
+ *
+ * Ces tests passent aujourd'hui : ce sont des tests de caractérisation, et ils
+ * gardent la raison de ne pas mémoïser. Une réécriture qui figerait l'un des
+ * deux calculs les ferait tomber.
+ */
+describe('la pastille d’échéance et le filtre s’accordent', () => {
+  it('« Expirant » garde une ligne dont la pastille annonce l’échéance', () => {
+    rendreAbonnes([collecteur('Cisse', 'actif', echeanceDans(7))]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expirant' }));
+
+    // La ligne est là…
+    expect(screen.getByText('Cisse')).toBeDefined();
+    // …et sa pastille dit la même chose que le filtre.
+    expect(screen.getByText(/Expire dans 7 j/)).toBeDefined();
+  });
+
+  it('« Actif » garde une ligne dont la pastille ne parle pas d’échéance', () => {
+    rendreAbonnes([collecteur('Adjoa', 'actif', echeanceDans(30))]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actif' }));
+
+    expect(screen.getByText('Adjoa')).toBeDefined();
+    // À trente jours, la pastille dit « Actif » et non un compte à rebours.
+    expect(screen.queryByText(/Expire dans/)).toBeNull();
+  });
+});

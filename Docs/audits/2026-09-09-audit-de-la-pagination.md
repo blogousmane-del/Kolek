@@ -198,7 +198,7 @@ totalFiltre`, parce qu'un `total` d'un autre sens — le compte du serveur — v
 déjà dans sa lecture asynchrone. Deux `total` de sens différents dans un même
 fichier se confondent à la relecture, et c'est la relecture qui compte.
 
-## 🟢 F — Le `useMemo` du crochet ne sert à rien sur deux écrans
+## 🟢 → ✅ F — Le `useMemo` du crochet ne sert à rien sur deux écrans
 
 `Collecteurs.tsx` et `SuperAdmin.tsx` recalculent leur liste filtrée à chaque
 rendu (`collecteurs.filter(…)`, sans mémoïsation). Le tableau rendu est donc
@@ -208,6 +208,38 @@ crochet ne peut jamais servir son cache.
 Sans conséquence sur le résultat — la tranche est recalculée, ce qui serait
 arrivé de toute façon. Mais c'est un `useMemo` qui coûte sa comparaison sans
 rien rendre, et qui laisse croire à une optimisation qui n'a pas lieu.
+
+### Réparé sur un écran, refusé sur l'autre — et c'est le refus qui est
+### intéressant
+
+**`Collecteurs.tsx` est mémoïsé.** Son filtre ne lit que ses trois dépendances —
+pas d'horloge, pas d'aléa —, donc le figer entre deux changements n'a aucun
+effet observable. Le `useMemo` du crochet sert enfin son cache, et le filtre
+cesse de reparcourir la liste quand on ouvre le formulaire d'ajout ou qu'on
+déplie les outils de recherche.
+
+**`SuperAdmin.tsx` ne l'est pas, et ne doit pas l'être.** En allant le faire, on
+trouve ceci : ses branches `actif` et `expirant` calculent les jours restants
+depuis `Date.now()`, et `PastilleStatut` refait **le même calcul** à chaque
+rendu pour écrire « Expire dans N j ».
+
+Mémoïser le filtre l'aurait figé au dernier changement de dépendance pendant que
+la pastille serait restée vivante. Au passage d'une frontière de jour, la même
+ligne aurait été classée « Actif » par le filtre et annoncée « Expire dans 7 j »
+par sa pastille — **un écran qui se contredit lui-même, sur la console qui sert
+à facturer.** On aurait échangé une optimisation invisible contre une
+incohérence visible.
+
+Le coût de ne pas mémoïser est nul à l'échelle réelle : quelques centaines de
+lignes reparcourues quand on ouvre le menu d'une ligne.
+
+Deux tests de caractérisation gardent l'accord entre le filtre et la pastille,
+et donc la raison de ne pas mémoïser. Ils passent aujourd'hui — c'est leur objet :
+une réécriture qui figerait l'un des deux calculs les ferait tomber.
+
+Le jour où ce tableau deviendra assez long pour que ça pèse, la sortie n'est pas
+le `useMemo` : c'est de donner **une seule horloge** aux deux calculs. Noté dans
+le fichier, à l'endroit où quelqu'un le cherchera.
 
 ## 🟢 G — Deux régions vives sur l'écran Clients
 
@@ -298,6 +330,11 @@ comme une mise à jour fonctionnelle. Les tests y gardent le moyen retenu, pas l
 fin visée. Un audit qui compterait ces cinq corrections comme également
 protégées se tromperait.
 
-**F à I sont des observations, pas des dettes** : elles méritent d'être écrites
-pour que le prochain qui touche à ce composant les connaisse, pas d'être
+**F est traité** — mémoïsé sur un écran, refusé sur l'autre avec sa raison
+écrite et gardée par deux tests. C'est le deuxième point, après J, où le travail
+a rendu plus que la question posée : chercher à faire marcher un `useMemo` a
+révélé deux horloges indépendantes sur la même ligne d'écran.
+
+**G, H et I restent des observations, pas des dettes** : elles méritent d'être
+écrites pour que le prochain qui touche à ce composant les connaisse, pas d'être
 corrigées.

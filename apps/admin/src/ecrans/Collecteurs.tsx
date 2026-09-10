@@ -10,7 +10,7 @@ import {
   usePagination,
   type Statut,
 } from '@kolek/ui';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { LigneCollecteur as Ligne, VueGlobale } from '../donnees';
 import { dateDuJour, telechargerCsv, versCsv } from '../exporter';
@@ -66,20 +66,38 @@ export function Collecteurs({
   const zonesTriees = [...zones].sort((a, b) => b.encaisse - a.encaisse);
   const zoneMax = zonesTriees[0]?.encaisse ?? 0;
 
-  // Recherche et filtre en mémoire, sans aller-retour serveur : la vue globale
-  // est déjà entièrement chargée, et le nombre de collecteurs est borné par le
-  // modèle d'affaires — ce sont des comptes payants créés à la main par GTCS.
-  const terme = recherche.trim().toLowerCase();
-  const listeFiltree = collecteurs.filter((c) => {
-    if (filtre === 'actifs' && c.abonnement_statut !== 'actif') return false;
-    if (filtre === 'defaut' && c.abonnement_statut === 'actif') return false;
-    if (!terme) return true;
-    return (
-      c.nom.toLowerCase().includes(terme) ||
-      c.telephone.toLowerCase().includes(terme) ||
-      (c.zone ?? '').toLowerCase().includes(terme)
-    );
-  });
+  /**
+   * Recherche et filtre en mémoire, sans aller-retour serveur : la vue globale
+   * est déjà entièrement chargée, et le nombre de collecteurs est borné par le
+   * modèle d'affaires — ce sont des comptes payants créés à la main par GTCS.
+   *
+   * ## Pourquoi mémoïsé
+   *
+   * Point F de l'auto-audit du 2026-09-09. Sans `useMemo`, ce tableau était neuf
+   * à chaque rendu, y compris quand rien de ce qu'il lit n'avait bougé — ouvrir
+   * le formulaire d'ajout, déplier les outils de recherche. Le `useMemo` de
+   * `usePagination`, dont la dépendance est justement ce tableau, ne pouvait
+   * alors jamais servir son cache : une optimisation écrite, jamais exécutée.
+   *
+   * Le filtre ne lit rien d'autre que ses trois dépendances — pas d'horloge, pas
+   * d'aléa —, donc le figer entre deux changements est sans effet observable.
+   * Ce n'est **pas** le cas du tableau équivalent dans `SuperAdmin.tsx`, qui lit
+   * `Date.now()` : voir la note qui y explique pourquoi il n'est pas mémoïsé.
+   */
+  const listeFiltree = useMemo(() => {
+    const terme = recherche.trim().toLowerCase();
+
+    return collecteurs.filter((c) => {
+      if (filtre === 'actifs' && c.abonnement_statut !== 'actif') return false;
+      if (filtre === 'defaut' && c.abonnement_statut === 'actif') return false;
+      if (!terme) return true;
+      return (
+        c.nom.toLowerCase().includes(terme) ||
+        c.telephone.toLowerCase().includes(terme) ||
+        (c.zone ?? '').toLowerCase().includes(terme)
+      );
+    });
+  }, [collecteurs, filtre, recherche]);
 
   /**
    * La page affichée.

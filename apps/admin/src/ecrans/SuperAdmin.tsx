@@ -448,6 +448,33 @@ function OngletAbonnements({
     onRecharger();
   }
 
+  /**
+   * Le tableau filtré — délibérément **pas** mémoïsé.
+   *
+   * ## Ce que le point F de l'auto-audit proposait, et pourquoi ça ne se fait
+   * pas ici
+   *
+   * L'audit du 2026-09-09 relevait que ce tableau, neuf à chaque rendu, empêche
+   * le `useMemo` de `usePagination` de jamais servir son cache. C'est exact, et
+   * `Collecteurs.tsx` a été mémoïsé pour cette raison le 2026-09-10.
+   *
+   * Celui-ci ne peut pas suivre. Ses deux branches `actif` et `expirant`
+   * calculent les jours restants depuis `Date.now()`, et `PastilleStatut` refait
+   * **le même calcul** à chaque rendu pour écrire « Expire dans N j ». Mémoïser
+   * le filtre le figerait au dernier changement de dépendance pendant que la
+   * pastille resterait vivante : au passage d'une frontière de jour, la même
+   * ligne serait classée « Actif » par le filtre et annoncée « Expire dans 7 j »
+   * par sa pastille. Un écran qui se contredit lui-même, sur la console qui sert
+   * à facturer.
+   *
+   * Le coût de ne pas mémoïser est nul à l'échelle réelle : quelques centaines
+   * de lignes reparcourues quand on ouvre le menu d'une ligne. Le coût de
+   * mémoïser serait une incohérence visible. Deux tests gardent l'accord entre
+   * le filtre et la pastille — voir `SuperAdmin.test.tsx`.
+   *
+   * Le jour où ce tableau deviendrait assez long pour que ça pèse, la sortie
+   * n'est pas le `useMemo` : c'est de donner une seule horloge aux deux calculs.
+   */
   const collecteursFiltres = collecteurs.filter((c) => {
     // Recherche textuelle — déclenchée à partir de 3 caractères.
     if (recherche.length >= 3) {
