@@ -35,10 +35,9 @@
  *
  * La conséquence est une méthode, pas une limite subie : **resserrer une valeur
  * commence par la changer dans `config.toml`**. C'est ce geste qui rend l'écart
- * mesurable. Tant que `auth.rate_limit.sign_in_sign_ups` vaut 30 des deux
- * côtés, ce contrôle se tait — et 30 par tranche de cinq minutes est justement
- * le défaut que l'audit du 28 août voulait ramener à cinq. Le jour où le dépôt
- * écrira 5, ce script criera jusqu'à ce que le tableau de bord suive.
+ * mesurable. `auth.rate_limit.sign_in_sign_ups` valait 30 des deux côtés et ce
+ * contrôle se taisait ; le dépôt écrit 5 depuis le 2026-09-10, et il crie
+ * jusqu'à ce que le tableau de bord suive.
  *
  * ## Deux tables plutôt qu'un seuil
  *
@@ -95,8 +94,11 @@ export const POSTURE = {
     'Lier deux identités à la main permettrait de rattacher un compte tiers à un ' +
     'collecteur existant sans repasser par le portillon admin.',
   'auth.rate_limit.sign_in_sign_ups':
-    'C’est la borne qui sépare une tentative distraite d’une attaque par ' +
-    'dictionnaire sur les comptes de collecteurs.',
+    'Supabase la documente comme la borne des inscriptions et des connexions. ' +
+    'Elle se câble en GOTRUE_RATE_LIMIT_OTP, et la pile locale ne permet pas de ' +
+    'vérifier ce qu’elle couvre : sans GOTRUE_RATE_LIMIT_HEADER, aucune borne ' +
+    'par IP ne s’y applique. À resserrer quand même — plus strict ne coûte rien ' +
+    'ici — sans lui prêter une protection non mesurée.',
   'auth.rate_limit.token_verifications':
     'Un code OTP à six chiffres ne tient que par le nombre d’essais permis.',
   'auth.rate_limit.anonymous_users':
@@ -117,8 +119,9 @@ export const POSTURE = {
     'Kolek n’est serveur d’autorisation pour personne. Allumé, le projet expose un ' +
     'parcours de consentement dont aucun écran ne se sert.',
   'auth.oauth_server.allow_dynamic_registration':
-    'À true, n’importe qui enregistre un client OAuth sur le projet. Mesuré à false ' +
-    'le 2026-09-10 — c’est ce qui rendait le serveur OAuth supportable.',
+    'À true, n’importe qui enregistre un client OAuth sur le projet. Non lisible par ' +
+    'l’API le 2026-09-10, et une absence du rapport ne vaut pas égalité : à lire ' +
+    'dans le tableau de bord.',
   'api.schemas':
     'Chaque schéma exposé est une surface d’API. graphql_public n’est appelé par ' +
     'aucune ligne du produit.',
