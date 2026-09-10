@@ -122,6 +122,20 @@ jobs:
       - name: Le manifeste PWA suit ses jetons
         run: npm run verifier:manifeste
 
+      # Contrôle n°6 des vingt — « autorisation côté serveur ». Il a été
+      # recompté à la main dans chaque audit depuis le 18 août : « 16 fonctions
+      # détiennent la clé de service, 14 vérifient leur appelant » le
+      # 2026-09-04, dix-neuf toutes gardées le 2026-09-10. Ces nombres étaient
+      # justes le jour de leur mesure, et le dépôt est passé de treize à
+      # dix-neuf fonctions en trois semaines.
+      #
+      # La question n'a jamais été de savoir si elles sont gardées aujourd'hui,
+      # mais si la vingtième le sera. Une fonction neuve qui n'est pas classée
+      # dans la table fait échouer cette étape, et c'est le seul moment où
+      # quelqu'un se pose la question au bon moment — avant la fusion.
+      - name: Les Edge Functions vérifient leur appelant
+        run: npm run verifier:portillons
+
       # `oxlint` était installé dans les trois applications et câblé à un script
       # `lint` depuis le début. Personne ne le lançait — ni cette vérification,
       # ni `npm run verifier`. Il signalait pourtant, depuis des jours, que
