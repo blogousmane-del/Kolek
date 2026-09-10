@@ -356,3 +356,45 @@ describe('Pagination', () => {
     }
   });
 });
+
+/**
+ * Ce que les six écrans appelants tiennent pour acquis.
+ *
+ * Épreuves de **caractérisation**, écrites le 2026-09-10 avant d’ajouter les
+ * numéros et le sélecteur. Elles ne décrivent aucune intention nouvelle : elles
+ * figent ce que `Clients`, `EncoursSoldes`, `Collecteurs`, `Abonnements`,
+ * `Demandes` et `SuperAdmin` reçoivent aujourd’hui.
+ *
+ * Elles passent donc du premier coup, et c’est leur seul rôle acceptable — une
+ * caractérisation qui échoue à l’écriture veut dire que le plan qui la commande
+ * se trompe sur l’existant.
+ */
+describe('ce que les six écrans appelants tiennent pour acquis', () => {
+  it('ne rend rien quand tout tient sur une page', () => {
+    const { container } = render(<Pagination page={1} pages={1} total={12} onAller={() => {}} />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('garde les deux flèches et leurs libellés', () => {
+    render(<Pagination page={2} pages={5} total={220} onAller={() => {}} />);
+    expect(screen.getByLabelText('Page précédente')).toBeTruthy();
+    expect(screen.getByLabelText('Page suivante')).toBeTruthy();
+  });
+
+  it('garde la région vive qui annonce le changement', () => {
+    render(<Pagination page={2} pages={5} total={220} onAller={() => {}} />);
+    const region = screen.getByRole('status');
+    expect(region.getAttribute('aria-live')).toBe('polite');
+    // `textContent` et non `getByText` : le séparateur est un U+00A0, que le
+    // normaliseur de Testing Library écrase en espace ordinaire.
+    expect(region.textContent).toContain(formatMontant(220));
+  });
+
+  it('mène à la page voisine par ses flèches', () => {
+    const vues: number[] = [];
+    render(<Pagination page={3} pages={5} total={220} onAller={(n) => vues.push(n)} />);
+    fireEvent.click(screen.getByLabelText('Page précédente'));
+    fireEvent.click(screen.getByLabelText('Page suivante'));
+    expect(vues).toEqual([2, 4]);
+  });
+});
