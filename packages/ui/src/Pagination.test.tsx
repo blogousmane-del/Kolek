@@ -218,11 +218,25 @@ describe('Pagination', () => {
     expect(container.firstChild).toBeNull();
   });
 
+  /**
+   * L'assertion a été portée sur la région vive le 2026-09-10.
+   *
+   * Elle interrogeait le document entier — `getByText(/Page 2 sur 5/)` — et
+   * tombait sur « Found multiple elements » dès l'arrivée du sélecteur de page,
+   * dont chaque option porte la même phrase. La phrase existe donc deux fois, et
+   * c'est **voulu** : une fois pour l'œil sur bureau, une fois dans la liste du
+   * système sur mobile.
+   *
+   * Ce que le test voulait dire depuis le début, c'est « la région vive dit où
+   * on en est ». Une requête non portée ne le disait qu'à la faveur d'un
+   * document qui n'avait qu'une seule phrase.
+   */
   it('dit où on en est, en toutes lettres', () => {
     render(<Pagination page={2} pages={5} total={240} onAller={() => {}} />);
 
-    expect(screen.getByText(/Page 2 sur 5/)).toBeDefined();
-    expect(screen.getByText(/240/)).toBeDefined();
+    const dit = screen.getByRole('status').textContent ?? '';
+    expect(dit).toContain('Page 2 sur 5');
+    expect(dit).toContain('240');
   });
 
   /**
@@ -543,5 +557,72 @@ describe('la bande numérotée', () => {
       expect(b.className).toMatch(/min-w-11/);
       expect(b.className).toMatch(/min-h-11/);
     }
+  });
+});
+
+/**
+ * Le sélecteur de page, sous `sm`.
+ *
+ * ## Pourquoi un `<select>` natif et non un menu maison
+ *
+ * La liste du système s’ouvre en plein écran, fait défiler mille pages sans
+ * effort, tient les 44 px sans qu’on les dessine, reste accessible au clavier
+ * et au lecteur d’écran, et ne coûte pas un octet de JavaScript. Sur un
+ * téléphone d’entrée de gamme, au soleil d’un marché d’Abidjan, c’est plus sûr
+ * que tout ce qu’on écrirait à la main.
+ *
+ * Comme la bande, il se cible par son libellé : jsdom n’applique pas les
+ * requêtes média, donc les deux présentations sont montées en même temps ici.
+ */
+describe('le sélecteur de page', () => {
+  const selecteur = () => screen.getByLabelText('Aller à la page') as HTMLSelectElement;
+
+  it('porte une option par page', () => {
+    render(<Pagination page={1} pages={4} total={200} onAller={() => {}} />);
+
+    expect(selecteur().options.length).toBe(4);
+  });
+
+  it('montre la page courante et le total, en toutes lettres', () => {
+    // « 3 » seul ne dit pas s'il en reste beaucoup. Le déclencheur fermé est
+    // tout ce que le collecteur voit tant qu'il n'a pas tapé dessus.
+    render(<Pagination page={3} pages={27} total={1340} onAller={() => {}} />);
+
+    const courante = selecteur().options[selecteur().selectedIndex];
+    expect(courante?.textContent).toBe('Page 3 sur 27');
+  });
+
+  it('mène à la page choisie', () => {
+    const vues: number[] = [];
+    render(<Pagination page={1} pages={4} total={200} onAller={(n) => vues.push(n)} />);
+
+    fireEvent.change(selecteur(), { target: { value: '3' } });
+
+    expect(vues).toEqual([3]);
+  });
+
+  it('rend un nombre et non une chaîne', () => {
+    // `e.target.value` est une chaîne. Sans conversion, `onAller('3')` remonte
+    // aux six écrans appelants, qui comparent ce numéro à des nombres.
+    const vues: unknown[] = [];
+    render(<Pagination page={1} pages={4} total={200} onAller={(n) => vues.push(n)} />);
+
+    fireEvent.change(selecteur(), { target: { value: '3' } });
+
+    expect(vues.map((v) => typeof v)).toEqual(['number']);
+  });
+
+  it('groupe les milliers, comme partout ailleurs', () => {
+    render(<Pagination page={1} pages={1200} total={60_000} onAller={() => {}} />);
+
+    expect(selecteur().options[1199]?.textContent).toBe(
+      `Page ${formatMontant(1200)} sur ${formatMontant(1200)}`,
+    );
+  });
+
+  it('tient les 44 px, comme toute cible de ce produit', () => {
+    render(<Pagination page={1} pages={4} total={200} onAller={() => {}} />);
+
+    expect(selecteur().className).toMatch(/min-h-11/);
   });
 });

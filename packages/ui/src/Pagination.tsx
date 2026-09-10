@@ -262,7 +262,48 @@ export function Pagination({
           nombre s'écrivait de deux façons sur le même écran. Les trois et non le
           seul total : « Page 1240 sur 1 240 » se lirait comme deux nombres
           différents. */}
-      <p role="status" aria-live="polite" className="text-xs font-body text-muted-foreground">
+      {/* Deux présentations, un seul pouvoir. Le sélecteur natif est délibéré :
+          la liste du système s'ouvre en plein écran, fait défiler mille pages
+          sans effort, tient les 44 px sans qu'on les dessine, reste accessible
+          au clavier et au lecteur d'écran, et ne coûte pas un octet de
+          JavaScript. Sur un téléphone d'entrée de gamme au soleil d'un marché,
+          c'est plus sûr qu'un menu maison.
+
+          `appearance-none` habille le déclencheur aux jetons du produit ; la
+          liste, elle, reste celle d'Android, et c'est ce qu'on veut.
+
+          Le libellé de chaque option dit « Page 3 sur 27 » et non « 3 » : le
+          déclencheur fermé est tout ce que le collecteur voit tant qu'il n'a
+          pas tapé dessus, et « 3 » seul ne dit pas s'il en reste beaucoup. */}
+      <select
+        aria-label="Aller à la page"
+        value={page}
+        // `e.target.value` est une chaîne. Sans cette conversion, `'3'` remonte
+        // aux six écrans appelants, qui comparent ce numéro à des nombres.
+        onChange={(e) => onAller(Number(e.target.value))}
+        className={
+          'sm:hidden min-h-11 appearance-none rounded-xl border border-hairline/80 ' +
+          'bg-surface px-3 text-sm font-body text-ink tabular-nums cursor-pointer'
+        }
+      >
+        {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (
+          <option key={n} value={n}>
+            Page {formatMontant(n)} sur {formatMontant(pages)}
+          </option>
+        ))}
+      </select>
+
+      {/* `hidden sm:block` et non un retrait : sous `sm`, le sélecteur ci-dessus
+          porte déjà « Page 3 sur 27 », et deux fois la même phrase à trois
+          pixels d'écart est du bruit. Mais la région vive reste **montée** —
+          c'est elle, et elle seule, qui annonce le changement au lecteur
+          d'écran. La retirer rendrait la pagination muette là où elle sert le
+          plus. `hidden` masque à l'œil sans retirer du document. */}
+      <p
+        role="status"
+        aria-live="polite"
+        className="hidden sm:block text-xs font-body text-muted-foreground"
+      >
         Page {formatMontant(page)} sur {formatMontant(pages)} — {formatMontant(total)} au total
       </p>
 
