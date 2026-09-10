@@ -1,5 +1,5 @@
 import { formatMontant } from '@kolek/core';
-import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 // Sans ça, les rendus s'empilent dans le même document et `getByRole` trouve
@@ -456,5 +456,92 @@ describe('fenetrePages', () => {
     // Le composant rend `null` dans ce cas, mais la fonction est publique et
     // ne doit pas rendre `[1, 1]` si quelqu’un l’appelle directement.
     expect(fenetrePages(1, 1)).toEqual([1]);
+  });
+});
+
+/**
+ * La bande numérotée.
+ *
+ * ## Pourquoi elle se cible par son libellé, jamais par un rôle nu
+ *
+ * `jsdom` n’applique pas les requêtes média. La bande porte `hidden sm:flex`,
+ * et le sélecteur de la tâche suivante portera `sm:hidden` : dans ces épreuves
+ * les deux sont montés **en même temps**, quelle que soit la largeur simulée.
+ * Un `getByRole('button')` nu attraperait donc les deux présentations, et un
+ * test vert ne dirait rien de ce que le collecteur voit.
+ *
+ * D’où le `<nav aria-label="Pages">` : il n’est pas là pour la sémantique
+ * seule, il est là pour qu’une épreuve puisse désigner une présentation.
+ */
+describe('la bande numérotée', () => {
+  const bande = () => screen.getByRole('navigation', { name: 'Pages' });
+
+  it('rend un bouton par numéro de la fenêtre', () => {
+    render(<Pagination page={1} pages={3} total={140} onAller={() => {}} />);
+
+    expect(within(bande()).getAllByRole('button').map((b) => b.textContent)).toEqual([
+      '1',
+      '2',
+      '3',
+    ]);
+  });
+
+  it('marque la page courante pour le lecteur d’écran', () => {
+    render(<Pagination page={2} pages={3} total={140} onAller={() => {}} />);
+
+    expect(within(bande()).getByRole('button', { current: 'page' }).textContent).toBe('2');
+  });
+
+  it('mène à la page demandée', () => {
+    const vues: number[] = [];
+    render(<Pagination page={1} pages={3} total={140} onAller={(n) => vues.push(n)} />);
+
+    fireEvent.click(within(bande()).getByRole('button', { name: 'Page 3' }));
+
+    expect(vues).toEqual([3]);
+  });
+
+  it('refuse le geste sur la page où l’on est déjà', () => {
+    // Sans ce refus, retaper sur le numéro courant redemanderait la même page :
+    // rien ne bougerait à l'écran, mais la région vive annoncerait un
+    // changement qui n'a pas eu lieu. Même raisonnement que les flèches en bout
+    // de course.
+    const vues: number[] = [];
+    render(<Pagination page={2} pages={3} total={140} onAller={(n) => vues.push(n)} />);
+
+    fireEvent.click(within(bande()).getByRole('button', { current: 'page' }));
+
+    expect(vues).toEqual([]);
+  });
+
+  it('rend la coupure sans en faire une cible', () => {
+    // Un bouton inerte apprend au lecteur d'écran à se méfier des autres.
+    render(<Pagination page={1} pages={40} total={2000} onAller={() => {}} />);
+
+    expect(bande().textContent).toContain('…');
+    for (const b of within(bande()).getAllByRole('button')) {
+      expect(b.textContent).not.toBe('…');
+    }
+  });
+
+  it('groupe les milliers du numéro, comme le reste du produit', () => {
+    // `formatMontant` et non un littéral : le séparateur est une espace
+    // insécable (U+00A0), qu'un littéral écrit à la main rate une fois sur deux.
+    render(<Pagination page={1200} pages={1200} total={60_000} onAller={() => {}} />);
+
+    expect(within(bande()).getByRole('button', { current: 'page' }).textContent).toBe(
+      formatMontant(1200),
+    );
+  });
+
+  it('donne à chaque numéro une cible de 44 px', () => {
+    // Règle du dépôt : toute cible tactile fait au moins 44 px. Les numéros
+    // sont côte à côte, et un numéro raté fait sauter une page.
+    render(<Pagination page={2} pages={5} total={240} onAller={() => {}} />);
+
+    for (const b of within(bande()).getAllByRole('button')) {
+      expect(b.className).toMatch(/min-w-11/);
+      expect(b.className).toMatch(/min-h-11/);
+    }
   });
 });

@@ -168,6 +168,34 @@ const FLECHE =
   'aria-disabled:opacity-40 aria-disabled:cursor-default aria-disabled:hover:border-hairline/80';
 
 /**
+ * Un numéro de page. Même gabarit que les flèches — 44 px, même rayon.
+ *
+ * ## Pourquoi la page courante change de fond, et non d'opacité
+ *
+ * Une opacité réduite se confondrait avec l'extinction des flèches, qui dit
+ * l'inverse : « on ne peut pas aller là » contre « on y est déjà ». Dans une
+ * bande de numéros identiques, c'est le seul repère, et il ne peut pas vouloir
+ * dire deux choses.
+ *
+ * ## Pourquoi deux constantes et non une variante `aria-[current=page]:`
+ *
+ * Ce dépôt n'utilise aucune variante arbitraire aujourd'hui — la première
+ * s'appuierait sur un balayage de classes que rien ici n'éprouve. `Bouton.tsx`
+ * choisit déjà ses classes par une table ; le choix se voit alors dans le
+ * rendu, et non dans une chaîne que seul Tailwind sait relire.
+ */
+const NUMERO_BASE =
+  'min-w-11 min-h-11 inline-flex items-center justify-center rounded-xl border ' +
+  'text-sm font-body tabular-nums transition-colors';
+
+const NUMERO =
+  NUMERO_BASE +
+  ' border-hairline/80 bg-surface text-ink shadow-xs hover:border-primary cursor-pointer';
+
+const NUMERO_COURANT =
+  NUMERO_BASE + ' border-primary bg-primary text-primary-foreground cursor-default';
+
+/**
  * Les commandes de page.
  *
  * Rend `null` quand tout tient sur une page : deux flèches inertes sous une
@@ -255,6 +283,51 @@ export function Pagination({
         >
           <Icone nom="chevron-left" taille={18} />
         </button>
+        {/* `hidden sm:flex` : dix numéros à 44 px font 616 px, quand un
+            téléphone d'entrée de gamme en offre 360. La bande n'est donc pas
+            « masquée pour faire propre » — elle ne rentre pas. Le sélecteur qui
+            la remplace en dessous de `sm` est monté juste après.
+
+            Conséquence pour les épreuves : jsdom n'applique pas les requêtes
+            média, donc les deux présentations coexistent dans le DOM de test.
+            D'où le `aria-label` — c'est par lui, et jamais par un rôle nu,
+            qu'une épreuve désigne l'une des deux. */}
+        <nav aria-label="Pages" className="hidden sm:flex items-center gap-2">
+          {fenetrePages(page, pages).map((n, i) =>
+            n === '…' ? (
+              // Pas un bouton : une coupure ne mène nulle part, et un bouton
+              // inerte apprend au lecteur d'écran à se méfier des autres.
+              // `aria-hidden` parce que « points de suspension » lu à voix haute
+              // entre deux numéros n'apprend rien.
+              <span
+                key={`coupure-${i}`}
+                aria-hidden="true"
+                className="px-1 text-sm font-body text-muted-foreground"
+              >
+                …
+              </span>
+            ) : (
+              <button
+                key={n}
+                type="button"
+                // Le libellé porte le numéro brut, le texte le numéro groupé :
+                // « Page 1200 » se dicte, « Page 1 200 » se lit.
+                aria-label={`Page ${n}`}
+                aria-current={n === page ? 'page' : undefined}
+                // Même refus que les flèches en bout de course : sans lui,
+                // retaper le numéro courant redemanderait la même page — rien
+                // ne bougerait, mais la région vive annoncerait un changement.
+                onClick={() => {
+                  if (n === page) return;
+                  onAller(n);
+                }}
+                className={n === page ? NUMERO_COURANT : NUMERO}
+              >
+                {formatMontant(n)}
+              </button>
+            ),
+          )}
+        </nav>
         <button
           type="button"
           aria-label="Page suivante"
