@@ -120,7 +120,7 @@ describe('la barre latérale d’administration', () => {
     expect(screen.getByText('Administrateurs')).toBeDefined();
     expect(screen.getByText('Promotions')).toBeDefined();
     expect(screen.getByText('Sécurité')).toBeDefined();
-    expect(screen.getByText('Plateforme')).toBeDefined();
+    expect(screen.getByText('Santé du système')).toBeDefined();
   });
 
   it('navigue dans le menu de la plateforme', () => {

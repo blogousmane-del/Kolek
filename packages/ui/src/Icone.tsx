@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertCircle,
   ArrowDownRight,
   ArrowLeft,
@@ -57,6 +58,7 @@ import {
  * les écrans dessinent réellement.
  */
 const ICONES = {
+  activity: Activity,
   'alert-circle': AlertCircle,
   'arrow-down-right': ArrowDownRight,
   'arrow-left': ArrowLeft,

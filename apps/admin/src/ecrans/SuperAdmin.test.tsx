@@ -333,6 +333,14 @@ describe('les codes promo', () => {
 });
 
 describe('la plateforme', () => {
+  it('porte le titre « Santé du système »', () => {
+    poser({ statut: 'ok', etat: ETAT });
+
+    rendre('plateforme');
+
+    expect(screen.getAllByText('Santé du système').length).toBeGreaterThan(0);
+  });
+
   it('traduit les noms de tables en libellés lisibles', () => {
     poser({ statut: 'ok', etat: ETAT });
 

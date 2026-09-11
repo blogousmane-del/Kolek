@@ -88,7 +88,7 @@ describe('la coquille d’administration', () => {
     render(<Coquille estSuper />);
 
     allerALaPlateforme();
-    fireEvent.click(screen.getByText('Plateforme'));
+    fireEvent.click(screen.getByText('Santé du système'));
     expect(screen.getByText('console plateforme · plateforme')).toBeDefined();
 
     // Retour au Dashboard, puis retour à la plateforme : l'aller-retour ne coûte

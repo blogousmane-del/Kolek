@@ -114,7 +114,10 @@ const SUPER_SYSTEME: Entree[] = [
   // branchement qu'on vérifie. Aucune clé ne s'y saisit — l'écran répond « est-ce
   // configuré, et est-ce que ça marche », pas « voici la clé ».
   { cle: 'paiement', icone: 'credit-card', libelle: 'Paiement', disponible: true },
-  { cle: 'plateforme', icone: 'bar-chart-2', libelle: 'Plateforme', disponible: true },
+  // « Santé du système » depuis le 2026-09-11 : l'onglet ne se contente plus de
+  // compter des lignes, il dit si ce qui doit tourner tourne. La clé reste
+  // `plateforme` — la renommer toucherait la navigation pour un libellé.
+  { cle: 'plateforme', icone: 'activity', libelle: 'Santé du système', disponible: true },
 ];
 
 interface ConfigEspace {

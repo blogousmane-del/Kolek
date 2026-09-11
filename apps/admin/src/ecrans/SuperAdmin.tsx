@@ -94,8 +94,8 @@ const ONGLETS: ConfigOnglet[] = [
   },
   {
     cle: 'plateforme',
-    filAriane: ['Super Admin', 'Plateforme'],
-    titre: 'Plateforme',
+    filAriane: ['Super Admin', 'Santé du système'],
+    titre: 'Santé du système',
   },
 ];
 
