@@ -4,3 +4,4 @@ export * from './format';
 export * from './paliers';
 export * from './tokens';
 export * from './sante';
+export * from './tendances';
