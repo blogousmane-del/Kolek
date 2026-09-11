@@ -2032,3 +2032,50 @@ drop table public.releves_quotidiens;
 La route tolère l'absence de `sante_systeme` : l'écran dira « santé
 indisponible », rien d'autre ne casse. Aucune donnée métier n'est perdue ; les
 traces pg_cron déjà purgées, elles, ne reviennent pas.
+
+## Écarts
+
+Relevés à l'exécution, le 2026-09-11.
+
+- **Tâche 1, l'épreuve rouge : sept passaient, pas six.** « ferme la table »
+  passait déjà avant la migration : une table absente est refusée, elle aussi.
+  Elle reste, parce qu'après la migration c'est elle qui tombera si une policy
+  ou un droit rouvre la table ; mais son vert d'avant ne prouvait rien.
+- **Tâche 1, la durée du relevé : 43 ms** en local pour `releve_du_jour()`.
+- **Tâche 2, la tolérance prouvée à la main.** Droit d'exécution de
+  `sante_systeme` retiré à `service_role` sur la pile locale : 13 épreuves sur
+  14, seule la neuve tombe, et la route répond toujours, `sante` à `null`. Droit
+  rétabli : 14 sur 14.
+- **Tâches 4 et 6, `noUncheckedIndexedAccess`.** Vitest ne type pas :
+  `CourbeEvolution` passait ses épreuves quand `tsc -b` la refusait (TS2532,
+  TS18048, TS2322, TS2345) sur `points[0]` et `points[points.length - 1]`.
+  Garde `seul` sous deux points, `!` là où le retour anticipé en garantit deux ;
+  même précaution dans `Sante.tsx` (`premierReleve`, `?? null`).
+- **Les insécables littérales.** La séquence d'échappement de l'insécable, tapée
+  dans l'outil d'écriture, arrive dans le fichier comme le caractère U+00A0
+  lui-même, invisible. Huit lignes de `lisible.ts`, `lisible.test.ts` et
+  `Sante.tsx` ont été reconverties en séquences par un script qui construit les
+  caractères par leur code ; chacune était dans une chaîne. Ce plan en portait
+  aussi, corrigées avant l'exécution — dont un `getByText` qui n'aurait jamais
+  rien trouvé, puisqu'il normalise les espaces du rendu.
+- **Tâche 7, la chaîne.** `verifier exit=0` lu dans le journal ; quinze
+  commandes ; core 86, ui 150, admin 140, collecteur 266, site 41, scripts 198,
+  `test:db` 803 épreuves en 68 fichiers ; bundles sans fuite.
+- **Tâche 7, le serveur local.** `tr -d '\r'` ajouté à la lecture de la clé
+  anonyme, contre une fin de ligne CRLF dans `.env.test`. Le module servi en
+  5176 porte `127.0.0.1:54321` une fois, l'hôte de production zéro fois.
+- **Tâche 7, le regard, fait d'abord par la machine.** Avant l'écran, la route
+  appelée avec le compte local rend `sante` : un relevé, drainage à 14
+  exécutions sur 24 h sans échec, 5 connexions sur 100, cache à 99,96 %. Puis
+  Chrome sans interface, profil jetable hors dépôt, piloté par son protocole de
+  débogage sur l'admin local : connexion, bascule en Super Admin, « Santé du
+  système ». Rendu : « 1 point en alerte » — les 2 rejets laissés par
+  `test:db` —, cinq pastilles dont chacune dit sa raison, quatre cartes, « La
+  courbe se dessine à partir du deuxième relevé. », aucune exception, pas de
+  débordement horizontal à 390 px. Le regard de l'exploitant reste proposé.
+- **Un défaut trouvé par ce regard, corrigé (`58422bb`).** « Premier relevé :
+  17 Mo, le 11 sept.. » : l'abréviation fr-FR du mois porte déjà son point, et
+  la phrase en ajoutait un — de même pour janv., févr., avr., juil., oct.,
+  nov., déc. Épreuve rouge d'abord (deux tombées), puis la phrase finit sur la
+  valeur : « Premier relevé le 11 sept. : 17 Mo. ». Un second regard, après
+  le correctif, le lit ainsi à l'écran.
