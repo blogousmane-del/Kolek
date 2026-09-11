@@ -35,9 +35,14 @@ vi.mock('./supabase', () => ({
   supabase: { from: (table: string) => from(table) },
 }));
 
-const { chargerAlertes, chargerCartesCloturables, chargerRapprochement } = await import(
-  './lectures-ecrans'
-);
+const {
+  chargerAlertes,
+  chargerCartesCloturables,
+  chargerEtatAvis,
+  chargerProfil,
+  chargerRapprochement,
+  chargerRecus,
+} = await import('./lectures-ecrans');
 
 /** L'instant des épreuves. Seul `Date` est figé : les promesses tournent. */
 const MAINTENANT = '2026-09-11T10:00:00.000Z';
@@ -223,5 +228,42 @@ describe('l’écran Retrait au-delà de mille cartes', () => {
 
     expect(cloturables).toHaveLength(1001);
     expect(cloturables.find((c) => c.carteId === 'k1000')?.clientNom).toBe('Dernière');
+  });
+});
+
+describe('les comptes et les noms au-delà de mille lignes', () => {
+  it('chargerProfil compte tous les clients et toutes les cartes actives', async () => {
+    const { clients, cartes } = parc(1001);
+    tables = { clients, cartes };
+
+    const profil = await chargerProfil();
+
+    expect(profil.clients).toBe(1001);
+    expect(profil.cartesActives).toBe(1001);
+  });
+
+  it('chargerRecus nomme le client d’une carte au-delà de la millième', async () => {
+    const { clients, cartes } = parc(1001);
+    tables = {
+      clients,
+      cartes,
+      mises: [
+        { id: 'm1', carte_id: 'k1000', montant: 500, est_commission: false, encaisse_le: MAINTENANT },
+      ],
+    };
+
+    const [recu] = await chargerRecus();
+
+    // Coupé à mille, ce reçu disait « Client inconnu », pour une mise de 0.
+    expect(recu?.clientNom).toBe('Dernière');
+    expect(recu?.mise).toBe(500);
+  });
+
+  it('chargerEtatAvis compte tous les clients qui acceptent les avis', async () => {
+    tables = { clients: parc(1001).clients };
+
+    const etat = await chargerEtatAvis();
+
+    expect(etat.clientsConsentants).toBe(1001);
   });
 });

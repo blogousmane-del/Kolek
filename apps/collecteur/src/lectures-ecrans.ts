@@ -201,8 +201,14 @@ export async function chargerRecus(limite = 50): Promise<Recu[]> {
       .select('id, carte_id, montant, est_commission, encaisse_le')
       .order('encaisse_le', { ascending: false })
       .limit(limite),
-    supabase.from('cartes').select('id, client_id, mise'),
-    supabase.from('clients').select('id, nom'),
+    // Cartes et clients servent à nommer les reçus : coupés, un reçu récent
+    // s'afficherait « Client inconnu », à une mise de 0. Voir `chargerBilan`.
+    chargerTout((debut, fin) =>
+      supabase.from('cartes').select('id, client_id, mise').order('id').range(debut, fin),
+    ),
+    chargerTout((debut, fin) =>
+      supabase.from('clients').select('id, nom').order('id').range(debut, fin),
+    ),
   ]);
 
   const cartes = new Map(
@@ -502,8 +508,13 @@ export async function chargerProfil(): Promise<Profil> {
       .from('collecteurs')
       .select('nom, telephone, zone, palier, abonnement_statut, abonnement_echeance, titulaire_id')
       .maybeSingle(),
-    supabase.from('clients').select('id'),
-    supabase.from('cartes').select('id, statut'),
+    // Deux comptes, épuisés par pages : ils plafonneraient à 1000 sinon.
+    chargerTout((debut, fin) =>
+      supabase.from('clients').select('id').order('id').range(debut, fin),
+    ),
+    chargerTout((debut, fin) =>
+      supabase.from('cartes').select('id, statut').order('id').range(debut, fin),
+    ),
   ]);
 
   const c = (rCollecteur.data ?? {}) as Record<string, string | null>;
@@ -634,7 +645,14 @@ export async function chargerEtatAvis(limite = 30): Promise<EtatAvis> {
       .select('id, client_id, destinataire, corps, statut, cree_le, envoye_le')
       .order('cree_le', { ascending: false })
       .limit(limite),
-    supabase.from('clients').select('id, nom, avis_actifs, telephone'),
+    // Épuisés par pages : le compte des clients consentants plafonnerait à 1000.
+    chargerTout((debut, fin) =>
+      supabase
+        .from('clients')
+        .select('id, nom, avis_actifs, telephone')
+        .order('id')
+        .range(debut, fin),
+    ),
   ]);
 
   const r = (rReglages.data ?? null) as Record<string, unknown> | null;
