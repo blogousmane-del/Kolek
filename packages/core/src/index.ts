@@ -3,3 +3,4 @@ export * from './calcul';
 export * from './format';
 export * from './paliers';
 export * from './tokens';
+export * from './sante';
