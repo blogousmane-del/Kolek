@@ -235,7 +235,13 @@ begin
       from public.collecteurs c
       left join derniere_mise d on d.collecteur_id = c.id
       where c.abonnement_statut = 'actif'
-        and (d.jour is null or d.jour < v_fin - 7)
+        -- Un collecteur inscrit ce matin n'a pas décroché : il n'a pas encore
+        -- commencé. Sans cette seconde borne, tout compte neuf entrait dans la
+        -- liste avec « jamais » et zéro jour de silence — et l'écran aurait
+        -- annoncé un abandon le jour d'une inscription.
+        and (
+          case when d.jour is null then c.cree_le::date else d.jour end < v_fin - 7
+        )
     ), '[]'::jsonb)
   )
   into v_resultat;

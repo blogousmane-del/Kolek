@@ -30,6 +30,17 @@ import { TARIFS, tarifParCle } from '../_shared/paliers.ts';
  * `data` nulle, jeton illisible. Un portillon qui s'ouvre quand il ne sait pas
  * n'est pas un portillon — même règle que côté interface, et pour la même
  * raison.
+ *
+ * ## Les tendances, une clé de plus et rien d'autre
+ *
+ * Depuis le 2026-09-11, la réponse porte aussi `tendances` : les flux datés de
+ * la période demandée, rendus par `admin_tendances(p_jours)`. Les clés
+ * existantes ne bougent pas — six écrans lisent cet appel, et leur donner un
+ * sens dépendant d'une période changerait Encours & Soldes, Abonnements,
+ * Collecteurs et la fiche d'un collecteur sans que personne l'ait demandé.
+ *
+ * `partie=tendances` ne rend que cette clé : un changement de période ne doit
+ * pas retélécharger cinq cents cartes pour recalculer un total.
  */
 
 const ORIGINES_AUTORISEES = listerOrigines(Deno.env.get('ORIGINES_ADMIN'));
@@ -128,7 +139,11 @@ Deno.serve(async (requete) => {
   //
   // Trouvé par `supabase/tests/portillons-admin.test.ts`, qui éprouve les sept
   // par table plutôt qu'une par une.
-  if (requete.method !== 'GET') {
+  // `POST` accepté depuis le 2026-09-11, et pour une seule raison :
+  // `functions.invoke` pose un corps JSON et ne sait pas construire de chaîne
+  // de requête. Sans lui, l'écran ne pourrait jamais demander une autre période
+  // que celle par défaut. Rien d'autre n'écrit ici : les deux verbes lisent.
+  if (requete.method !== 'GET' && requete.method !== 'POST') {
     return reponse({ erreur: 'METHODE_NON_AUTORISEE' }, 405, requete);
   }
 
@@ -174,11 +189,58 @@ Deno.serve(async (requete) => {
     return reponse({ erreur: 'ACCES_RESERVE' }, 403, requete);
   }
 
+  // --- La période demandée ---
+  //
+  // Deux formes pour le même paramètre : la chaîne de requête reste lisible
+  // dans un journal de serveur ou une commande `curl`, le corps est la seule
+  // que `functions.invoke` sache poser. Même montage que `super-admin-journal`.
+  const parametres = new URL(requete.url).searchParams;
+  let corpsRecu: Record<string, unknown> = {};
+  if (requete.method === 'POST') {
+    try {
+      corpsRecu = ((await requete.json()) ?? {}) as Record<string, unknown>;
+    } catch {
+      // Un POST sans corps est une demande par défaut, pas une erreur.
+    }
+  }
+  const lire = (cle: string): string | null => {
+    const duCorps = corpsRecu[cle];
+    if (duCorps !== undefined && duCorps !== null) return String(duCorps);
+    return parametres.get(cle);
+  };
+
+  // Trois valeurs, et rien d'autre. Un repli silencieux sur sept jours ferait
+  // afficher une période que personne n'a demandée — et c'est exactement le
+  // genre de chiffre qu'on finit par citer.
+  const PERIODES = [1, 7, 30];
+  const demande = lire('jours');
+  const jours = demande === null ? 7 : Number(demande);
+  if (!PERIODES.includes(jours)) {
+    return reponse({ erreur: 'PERIODE_INVALIDE' }, 400, requete);
+  }
+  const tendancesSeules = lire('partie') === 'tendances';
+
   // --- Passé ce point seulement, la clé de service sort ---
 
   const clientService = createClient(url, cleService, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // Un échec ici ne prive pas l'administration de son tableau de bord : les
+  // tendances sont une clé de plus, pas le cœur de l'écran. `null` voyage
+  // jusqu'à l'écran, qui dit « tendances indisponibles » plutôt que d'afficher
+  // des zéros qui se liraient « aucune activité ».
+  let tendances: unknown = null;
+  const lues = await clientService.rpc('admin_tendances', { p_jours: jours });
+  if (lues.error) {
+    console.error('admin_tendances a échoué :', lues.error.message);
+  } else {
+    tendances = lues.data;
+  }
+
+  if (tendancesSeules) {
+    return reponse({ tendances }, 200, requete);
+  }
 
   const { data, error } = await clientService.rpc('admin_vue_globale');
   if (error) {
@@ -227,5 +289,9 @@ Deno.serve(async (requete) => {
     paiements = lus;
   }
 
-  return reponse({ ...brut, genereLe: brut.genere_le, abonnements, paiements }, 200, requete);
+  return reponse(
+    { ...brut, genereLe: brut.genere_le, abonnements, paiements, tendances },
+    200,
+    requete,
+  );
 });

@@ -18,6 +18,7 @@ const MISE = 1000;
 
 let collecteur: CollecteurTest;
 let carte: string;
+let jetonAdmin: string;
 
 /** Le jour d'Abidjan — UTC+0, sans heure d'été. */
 function jour(decalage: number): string {
@@ -85,6 +86,20 @@ beforeAll(async () => {
   await poserMise(0);
   await poserMise(0);
   await poserMise(-2);
+
+  // Un compte administrateur, pour appeler la route sous une vraie identité :
+  // le portillon interroge `est_admin()` avec le jeton de l'appelant.
+  // `creerCollecteur` rend un client déjà connecté, d'où la session lisible
+  // juste après. Le niveau vaut « admin » ou « super », et rien d'autre :
+  // `admins_niveau_check` refuse toute autre valeur.
+  const patron = await creerCollecteur(`Patron ${MARQUE}`, `+225076${MARQUE}`);
+  exigerSucces(
+    'droit admin',
+    (await admin.from('admins').insert({ user_id: patron.id, niveau: 'admin' })).error,
+  );
+  const { data: session, error: erreurSession } = await patron.client.auth.getSession();
+  exigerSucces('session du patron', erreurSession);
+  jetonAdmin = session.session!.access_token;
 });
 
 afterAll(async () => {
@@ -204,5 +219,47 @@ describe('ce qu’elle compte', () => {
     for (const c of t.collecteurs_sans_mise) {
       expect(c.jours_sans).toBeGreaterThan(7);
     }
+  });
+});
+
+describe('la route', () => {
+  const URL_FONCTION = `${process.env.SUPABASE_URL}/functions/v1/admin-vue-globale`;
+
+  async function appeler(
+    suffixe: string,
+  ): Promise<{ statut: number; corps: Record<string, any> }> {
+    const reponse = await fetch(`${URL_FONCTION}${suffixe}`, {
+      headers: {
+        apikey: process.env.SUPABASE_ANON_KEY!,
+        Authorization: `Bearer ${jetonAdmin}`,
+      },
+    });
+    return { statut: reponse.status, corps: await reponse.json() };
+  }
+
+  it('ajoute la clé tendances sans toucher aux clés existantes', async () => {
+    const { statut, corps } = await appeler('');
+    expect(statut).toBe(200);
+    for (const cle of ['totaux', 'zones', 'mouvements', 'collecteurs', 'tendances']) {
+      expect(corps).toHaveProperty(cle);
+    }
+    expect(corps.tendances.periode.jours).toBe(7);
+  });
+
+  it('rend la période demandée', async () => {
+    const { corps } = await appeler('?jours=1');
+    expect(corps.tendances.periode.jours).toBe(1);
+  });
+
+  it('ne rend que les tendances quand on ne demande qu’elles', async () => {
+    const { corps } = await appeler('?partie=tendances&jours=30');
+    expect(corps.tendances.periode.jours).toBe(30);
+    expect(corps.totaux).toBeUndefined();
+  });
+
+  it('refuse une période hors liste, sans repli silencieux', async () => {
+    const { statut, corps } = await appeler('?jours=3');
+    expect(statut).toBe(400);
+    expect(corps.erreur).toBe('PERIODE_INVALIDE');
   });
 });
