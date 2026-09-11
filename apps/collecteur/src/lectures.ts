@@ -1,5 +1,6 @@
 import { soldeRestituable } from '@kolek/core';
 
+import { chargerTout } from './pagination';
 import { supabase } from './supabase';
 
 /**
@@ -68,8 +69,19 @@ function debutDeJournee(): string {
 
 export async function chargerTableauCollecteur(): Promise<TableauCollecteur> {
   const [reponseClients, reponseCartes, reponseMises] = await Promise.all([
-    supabase.from('clients').select('id, nom'),
-    supabase.from('cartes').select('id, client_id, mise, statut, mises_encaissees'),
+    // Clients et cartes épuisent leurs pages : `max_rows = 1000` tronque sans
+    // erreur, et l'encours affiché plus bas — ce que le collecteur doit à ses
+    // clients — se mettrait à mentir vers le bas. Voir `pagination.ts`.
+    chargerTout((debut, fin) =>
+      supabase.from('clients').select('id, nom').order('id').range(debut, fin),
+    ),
+    chargerTout((debut, fin) =>
+      supabase
+        .from('cartes')
+        .select('id, client_id, mise, statut, mises_encaissees')
+        .order('id')
+        .range(debut, fin),
+    ),
     // Les vingt dernières suffisent à l'écran ; en tirer davantage ferait payer
     // au collecteur, en 3G, des lignes que personne ne regarde.
     supabase
