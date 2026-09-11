@@ -1,6 +1,8 @@
 import { MISES_PAR_CYCLE } from '@kolek/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { tableFactice, type Ligne } from './postgrest-factice';
+
 /**
  * Ce que les alertes disent d'une carte arrivée au bout de son cycle.
  *
@@ -19,6 +21,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * est un compte de 31 mises, pas 31 jours de calendrier ; les alertes de jours
  * sans mise restent des repères de tournée, pas des reproches, et leurs textes
  * disent déjà des faits.
+ *
+ * ## Et ce que les lectures font au-delà de mille lignes
+ *
+ * Le client Supabase est remplacé par `tableFactice`, qui coupe à mille lignes
+ * sans `range` — comme le vrai. Les épreuves « au-delà de mille » échouent donc
+ * sur un code qui oublie de paginer, pour la raison exacte de la production.
  */
 
 const from = vi.fn();
@@ -29,42 +37,69 @@ vi.mock('./supabase', () => ({
 
 const { chargerAlertes } = await import('./lectures-ecrans');
 
-const CLIENTS = [{ id: 'cli1', nom: 'Hj' }];
+/** L'instant des épreuves. Seul `Date` est figé : les promesses tournent. */
+const MAINTENANT = '2026-09-11T10:00:00.000Z';
 
-/** Une seule carte, pleine, et toujours active : la base ne clôture qu'au retrait. */
-const CARTES = [
-  {
-    id: 'k1',
-    client_id: 'cli1',
-    mise: 1000,
-    statut: 'active',
-    mises_encaissees: MISES_PAR_CYCLE,
-    ouverte_le: '2026-07-01T08:00:00.000Z',
-  },
-];
-
-const MISES = [{ carte_id: 'k1', encaisse_le: new Date().toISOString() }];
+let tables: Record<string, Ligne[]> = {};
 
 beforeEach(() => {
-  from.mockImplementation((table: string) => {
-    if (table === 'cartes') return { select: () => Promise.resolve({ data: CARTES, error: null }) };
-    if (table === 'clients') return { select: () => Promise.resolve({ data: CLIENTS, error: null }) };
-    if (table === 'mises') {
-      return {
-        select: () => ({
-          gte: () => ({ order: () => Promise.resolve({ data: MISES, error: null }) }),
-        }),
-      };
-    }
-    return { select: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) };
-  });
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(MAINTENANT));
+  tables = {};
+  from.mockImplementation((table: string) => tableFactice(tables[table] ?? []));
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   from.mockReset();
 });
 
+const rang = (i: number) => String(i).padStart(4, '0');
+
+/**
+ * `n` clients, une carte active chacun, rangés par identifiant.
+ *
+ * Le dernier — le 1 001e quand `n` vaut 1 001 — est celui que PostgREST coupe
+ * sans `range`. Son client s'appelle « Dernière » et sa carte est pleine : une
+ * épreuve peut demander « l'a-t-on vu ? » en une ligne.
+ */
+function parc(n: number) {
+  const clients = Array.from({ length: n }, (_, i) => ({
+    id: `c${rang(i)}`,
+    nom: i === n - 1 ? 'Dernière' : `Client ${rang(i)}`,
+    avis_actifs: true,
+    telephone: '+2250700000000',
+  }));
+  const cartes = Array.from({ length: n }, (_, i) => ({
+    id: `k${rang(i)}`,
+    client_id: `c${rang(i)}`,
+    mise: 500,
+    statut: 'active',
+    mises_encaissees: i === n - 1 ? MISES_PAR_CYCLE : 1,
+    ouverte_le: MAINTENANT,
+  }));
+  return { clients, cartes };
+}
+
 describe('alerte d’une carte au bout de son cycle', () => {
+  beforeEach(() => {
+    tables = {
+      clients: [{ id: 'cli1', nom: 'Hj' }],
+      // Une seule carte, pleine, et toujours active : la base ne clôture qu'au retrait.
+      cartes: [
+        {
+          id: 'k1',
+          client_id: 'cli1',
+          mise: 1000,
+          statut: 'active',
+          mises_encaissees: MISES_PAR_CYCLE,
+          ouverte_le: '2026-07-01T08:00:00.000Z',
+        },
+      ],
+      mises: [{ id: 'm1', carte_id: 'k1', encaisse_le: MAINTENANT }],
+    };
+  });
+
   it('ne présente plus le retrait comme une obligation', async () => {
     const alertes = await chargerAlertes();
     const complete = alertes.find((a) => a.cle === 'complete-k1');
@@ -93,5 +128,62 @@ describe('alerte d’une carte au bout de son cycle', () => {
 
     // 31 mises de 1 000, moins la première qui est la commission du collecteur.
     expect(complete?.detail).toContain('30 000');
+  });
+});
+
+describe('les alertes d’un collecteur au-delà de mille lignes', () => {
+  it('ne déclare pas endormie une carte dont la mise tombe après la millième', async () => {
+    // Mille mises d'aujourd'hui sur une carte, une seule d'hier sur une autre,
+    // ouverte il y a trente jours. Du plus récent au plus ancien, celle d'hier
+    // est la 1 001e : c'est elle que `max_rows` coupe.
+    tables = {
+      clients: [
+        { id: 'cli1', nom: 'Awa' },
+        { id: 'cli2', nom: 'Hier' },
+      ],
+      cartes: [
+        {
+          id: 'k1',
+          client_id: 'cli1',
+          mise: 500,
+          statut: 'active',
+          mises_encaissees: 5,
+          ouverte_le: '2026-09-01T08:00:00.000Z',
+        },
+        {
+          id: 'k2',
+          client_id: 'cli2',
+          mise: 500,
+          statut: 'active',
+          mises_encaissees: 3,
+          ouverte_le: '2026-08-12T08:00:00.000Z',
+        },
+      ],
+      mises: [
+        ...Array.from({ length: 1000 }, (_, i) => ({
+          id: `m${rang(i)}`,
+          carte_id: 'k1',
+          encaisse_le: '2026-09-11T09:00:00.000Z',
+        })),
+        { id: 'm1000', carte_id: 'k2', encaisse_le: '2026-09-10T09:00:00.000Z' },
+      ],
+    };
+
+    const alertes = await chargerAlertes();
+
+    // Coupée, la mise d'hier disparaît : la carte retombe sur sa date
+    // d'ouverture, et l'écran dit « Hier — 30 jours sans mise ».
+    expect(alertes.find((a) => a.cle === 'dormante-k2')).toBeUndefined();
+  });
+
+  it('signale la carte pleine d’un client au-delà du millième, et le nomme', async () => {
+    const { clients, cartes } = parc(1001);
+    tables = { clients, cartes, mises: [] };
+
+    const alertes = await chargerAlertes();
+
+    expect(alertes.find((a) => a.cle === 'complete-k1000')?.titre).toBe(
+      'Dernière — cycle terminé',
+    );
   });
 });

@@ -258,14 +258,35 @@ export async function chargerAlertes(): Promise<Alerte[]> {
   // date d'ouverture sert de repli pour celles qui n'ont aucune mise dedans.
   const fenetre = new Date(Date.now() - 90 * 86_400_000).toISOString();
 
+  // Chaque liste épuise ses pages : `max_rows = 1000` tronque sans erreur (voir
+  // `chargerBilan`). Ici la troncature ne se contente pas de manquer, elle
+  // invente : une mise coupée fait retomber sa carte sur la date d'ouverture, et
+  // l'écran annonce « 30 jours sans mise » d'un client passé hier. Mesuré le
+  // 2026-09-11 : 579 mises en trente jours pour le plus actif des collecteurs.
+  //
+  // Les mises gardent leur tri décroissant — la boucle plus bas retient la
+  // première vue par carte — et prennent `id` en second : deux mises peuvent
+  // partager l'instant, et une pagination sur un ordre non total saute des lignes.
   const [rCartes, rClients, rMises, rCollecteur] = await Promise.all([
-    supabase.from('cartes').select('id, client_id, mise, statut, mises_encaissees, ouverte_le'),
-    supabase.from('clients').select('id, nom'),
-    supabase
-      .from('mises')
-      .select('carte_id, encaisse_le')
-      .gte('encaisse_le', fenetre)
-      .order('encaisse_le', { ascending: false }),
+    chargerTout((debut, fin) =>
+      supabase
+        .from('cartes')
+        .select('id, client_id, mise, statut, mises_encaissees, ouverte_le')
+        .order('id')
+        .range(debut, fin),
+    ),
+    chargerTout((debut, fin) =>
+      supabase.from('clients').select('id, nom').order('id').range(debut, fin),
+    ),
+    chargerTout((debut, fin) =>
+      supabase
+        .from('mises')
+        .select('carte_id, encaisse_le')
+        .gte('encaisse_le', fenetre)
+        .order('encaisse_le', { ascending: false })
+        .order('id')
+        .range(debut, fin),
+    ),
     supabase.from('collecteurs').select('abonnement_statut, abonnement_echeance').maybeSingle(),
   ]);
 
