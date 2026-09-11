@@ -842,8 +842,8 @@ git commit -m "feat(collecteur): corriger la fiche d'un client depuis sa fiche"
 
 - [ ] **Étape 2 : l'essayer à la main, sur la pile locale**
 
-Les épreuves ne voient pas ce qu'un doigt voit. Sur `localhost:5173`, contre la
-**base locale** :
+Les épreuves ne voient pas ce qu'un doigt voit. Sur `localhost:5175` — **jamais
+5173**, voir la recette plus bas —, contre la **base locale** :
 
 1. Ouvrir la fiche d'un client, cliquer « Corriger la fiche ».
 2. Changer le seul nom, enregistrer. La fiche se relit, le titre change,
@@ -877,8 +877,11 @@ reste sur le disque ensuite. `gardeEnv()` accepte `http://127.0.0.1:54321`
 cd apps/collecteur && \
   VITE_SUPABASE_URL=http://127.0.0.1:54321 \
   VITE_SUPABASE_ANON_KEY="$(cd ../.. && npx supabase status -o env 2>/dev/null | sed -n 's/^ANON_KEY="\(.*\)"$/\1/p')" \
-  npx vite --port 5175
+  npx vite --port 5175 --strictPort
 ```
+
+`--strictPort` : sans lui, un 5175 déjà pris fait glisser Vite sur 5176 en
+silence, et l'adresse notée n'est plus celle de l'essai.
 
 Trois précautions, chacune pour une raison :
 
@@ -955,6 +958,44 @@ dans `Champ.tsx`.
    `expected '0709201790' to be '0700000009'`.
 2. *L'avertissement était muet.* Inséré avec son texte, il n'était pas annoncé.
    La région vive est désormais montée avec le formulaire.
+
+**Tâche 4 — deux chaînes rouges avant la verte.**
+
+1. *114 échecs `503`, aucun dans le code.* Le runtime des Edge Functions était
+   arrêté : `Stopped services: [...]`, en tête de `db:env`, le nommait. Remède :
+   `npx supabase stop`, puis le `start` avec la liste d'exclusions. Rien d'autre
+   n'a changé entre ce passage et le suivant.
+2. *7 erreurs TS2345, dans les épreuves de la tâche 3.* L'assistant
+   `ouvrirLeFormulaire` était annoté `typeof FICHE_UNE_CARTE_EN_COURS`, dont
+   `telephone` et `marche` sont le littéral `null` ; `FICHE_AVEC_AVIS` porte
+   `string | null`. Vitest ne type pas, et l'étape `typecheck` de la chaîne ne
+   couvre que `core` et `ui` : seul le `tsc -b` du build du collecteur l'a vu,
+   en quatorzième position. Corrigé en `95402c9`, avec la réindentation des
+   enfants de la région vive (blancs seuls). **Pour une app, lancer
+   `npx tsc -b` dans son dossier avant la chaîne.**
+
+Troisième passage : `SORTIE_NPM=0`, quatorze étapes lues une à une — 774
+épreuves de base, 254 du collecteur, trois builds, `verifier:bundles` propre.
+
+**L'essai à la main a été piloté**, par Chrome sans tête et le protocole
+DevTools, en 360 × 780, sur `localhost:5175` servi contre `127.0.0.1:54321`.
+L'URL avait été relue dans le module `/src/supabase.ts` servi par Vite avant
+toute connexion. Le pilote **bloquait** toute requête vers `supabase.co` et
+échouait s'il en voyait une : il n'en a vu aucune.
+
+- Nom seul changé : aucun avertissement.
+- Numéro changé sur un client aux avis actifs : l'avertissement paraît avant
+  l'enregistrement, avec l'icône `bell-off`.
+- Marché vidé, puis enregistré.
+- Ligne relue en base : `marche` `null`, `avis_actifs` `false`.
+- Journal : une ligne `update`, dont l'acteur est le collecteur.
+- Après l'enregistrement, `Coordonnees` affiche « Non prévenu » et propose
+  « Prévenir ».
+
+Écart : les trois changements sont partis en **un** enregistrement et non en
+trois. Le cas « nom seul » a été contrôlé avant l'enregistrement, pas par une
+écriture à part ; l'épreuve unitaire « ne prévient pas quand seul le nom
+change » le couvre.
 
 **Limites connues, laissées en l'état.**
 
