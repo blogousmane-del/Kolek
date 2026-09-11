@@ -398,17 +398,32 @@ export interface Rapprochement {
 export async function chargerRapprochement(): Promise<Rapprochement> {
   const date = dateUtcDuJour();
 
+  // Les mises et les retraits du jour épuisent leurs pages : ils font une somme,
+  // et une somme tronquée ment vers le bas sans rien casser (voir `chargerBilan`).
+  // Mesuré le 2026-09-11 : 250 mises en une journée pour le plus actif des
+  // collecteurs, le quart de `max_rows`.
   const [rCaisse, rMises, rRetraits] = await Promise.all([
     supabase
       .from('caisses_jour')
       .select('id, cash_attendu, cash_declare, ecart')
       .eq('date', date)
       .maybeSingle(),
-    supabase.from('mises').select('montant, encaisse_le').gte('encaisse_le', `${date}T00:00:00Z`),
-    supabase
-      .from('retraits')
-      .select('montant_restitue, effectue_le')
-      .gte('effectue_le', `${date}T00:00:00Z`),
+    chargerTout((debut, fin) =>
+      supabase
+        .from('mises')
+        .select('montant, encaisse_le')
+        .gte('encaisse_le', `${date}T00:00:00Z`)
+        .order('id')
+        .range(debut, fin),
+    ),
+    chargerTout((debut, fin) =>
+      supabase
+        .from('retraits')
+        .select('montant_restitue, effectue_le')
+        .gte('effectue_le', `${date}T00:00:00Z`)
+        .order('id')
+        .range(debut, fin),
+    ),
   ]);
 
   const ligne = rCaisse.data as {
@@ -539,9 +554,19 @@ export interface CarteCloturable {
  * Le client garde son solde tant qu'il ne l'a pas repris.
  */
 export async function chargerCartesCloturables(): Promise<CarteCloturable[]> {
+  // Épuisées par pages : une carte coupée ici disparaît de l'écran Retrait, et
+  // le collecteur ne peut plus rendre son argent à ce client. Voir `chargerBilan`.
   const [rCartes, rClients] = await Promise.all([
-    supabase.from('cartes').select('id, client_id, mise, statut, mises_encaissees'),
-    supabase.from('clients').select('id, nom'),
+    chargerTout((debut, fin) =>
+      supabase
+        .from('cartes')
+        .select('id, client_id, mise, statut, mises_encaissees')
+        .order('id')
+        .range(debut, fin),
+    ),
+    chargerTout((debut, fin) =>
+      supabase.from('clients').select('id, nom').order('id').range(debut, fin),
+    ),
   ]);
 
   const noms = new Map(
