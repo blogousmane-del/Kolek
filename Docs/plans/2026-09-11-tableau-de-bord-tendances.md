@@ -120,8 +120,19 @@ function exigerSucces(etiquette: string, erreur: { message: string } | null) {
   if (erreur) throw new Error(`Préparation « ${etiquette} » : ${erreur.message}`);
 }
 
-/** Une mise posée à midi, au jour voulu — midi évite tout effet de bord d'heure. */
-async function poserMise(decalage: number, montant: number, commission = false) {
+/** La mise de la carte d'essai. Le déclencheur refuse tout autre montant. */
+const MISE = 1000;
+
+/**
+ * Une mise posée à midi, au jour voulu — midi évite tout effet de bord d'heure.
+ *
+ * Trois champs ne se posent pas ici : `mises_avant_insert` impose
+ * `montant = cartes.mise` (sinon `MONTANT_INVALIDE`), décide lui-même
+ * `est_commission` — vrai pour la première mise de la carte, quelle que soit sa
+ * date — et réécrit `collecteur_id` depuis la carte. C'est l'ordre des
+ * insertions qui fait la commission, pas leur jour.
+ */
+async function poserMise(decalage: number) {
   exigerSucces(
     `mise ${decalage}`,
     (
@@ -129,8 +140,7 @@ async function poserMise(decalage: number, montant: number, commission = false) 
         id: crypto.randomUUID(),
         collecteur_id: collecteur.id,
         carte_id: carte,
-        montant,
-        est_commission: commission,
+        montant: MISE,
         encaisse_le: `${jour(decalage)}T12:00:00Z`,
       })
     ).error,
@@ -162,11 +172,12 @@ beforeAll(async () => {
     ).error,
   );
 
-  // Aujourd'hui : la commission puis une mise ordinaire. Hier : rien, pour que
-  // le jour creux se voie dans la série. Avant-hier : une mise.
-  await poserMise(0, 1000, true);
-  await poserMise(0, 2000);
-  await poserMise(-2, 3000);
+  // Aujourd'hui : la première mise — que le serveur marque commission — puis
+  // une seconde. Hier : rien, pour que le jour creux se voie dans la série.
+  // Avant-hier : une troisième.
+  await poserMise(0);
+  await poserMise(0);
+  await poserMise(-2);
 });
 
 afterAll(async () => {
@@ -211,10 +222,10 @@ describe('ce qu’elle compte', () => {
     expect(t.periode.jours).toBe(1);
     expect(t.periode.debut).toBe(jour(0));
     expect(t.periode.fin).toBe(jour(0));
-    // 1 000 de commission et 2 000 de mise aujourd'hui ; les 3 000
-    // d'avant-hier n'y sont pas.
-    expect(t.flux.encaisse).toBeGreaterThanOrEqual(3000);
-    expect(t.flux.commissions).toBeGreaterThanOrEqual(1000);
+    // Deux mises de 1 000 aujourd'hui, dont la commission ; celle
+    // d'avant-hier n'y est pas.
+    expect(t.flux.encaisse).toBeGreaterThanOrEqual(2 * MISE);
+    expect(t.flux.commissions).toBeGreaterThanOrEqual(MISE);
     expect(t.flux.mises).toBeGreaterThanOrEqual(2);
   });
 
@@ -1871,9 +1882,16 @@ const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-const { data: cartes, error } = await admin.from('cartes').select('id, collecteur_id').limit(3);
+// `mises_avant_insert` impose montant = cartes.mise : le montant se lit sur la
+// carte, il ne se choisit pas. Les cartes closes sont exclues, elles refusent
+// toute mise.
+const { data: cartes, error } = await admin
+  .from('cartes')
+  .select('id, collecteur_id, mise')
+  .eq('statut', 'active')
+  .limit(3);
 if (error) throw error;
-if (!cartes?.length) throw new Error('Aucune carte en base locale : lancer db:reset avec ses graines.');
+if (!cartes?.length) throw new Error('Aucune carte active en base locale : lancer db:reset.');
 
 const jour = (d) => {
   const j = new Date();
@@ -1881,27 +1899,31 @@ const jour = (d) => {
   return j.toISOString().slice(0, 10);
 };
 
-// Des montants différents d'un jour à l'autre : une courbe plate ne montrerait
-// pas si la série est bien lue.
+// Un nombre de mises différent d'un jour à l'autre : une courbe plate ne
+// montrerait pas si la série est bien lue. Le -1 reste vide, pour le jour creux.
 const poses = [
-  [-9, 5000],
-  [-6, 3000],
-  [-3, 8000],
-  [-1, 2000],
-  [0, 6000],
+  [-9, 1],
+  [-6, 2],
+  [-3, 3],
+  [0, 2],
 ];
 
-for (const [decalage, montant] of poses) {
-  const { error: e } = await admin.from('mises').insert({
-    id: crypto.randomUUID(),
-    collecteur_id: cartes[0].collecteur_id,
-    carte_id: cartes[0].id,
-    montant,
-    encaisse_le: `${jour(decalage)}T12:00:00Z`,
-  });
-  if (e) throw e;
+let posees = 0;
+for (const [decalage, combien] of poses) {
+  for (let i = 0; i < combien; i += 1) {
+    const carte = cartes[i % cartes.length];
+    const { error: e } = await admin.from('mises').insert({
+      id: crypto.randomUUID(),
+      collecteur_id: carte.collecteur_id,
+      carte_id: carte.id,
+      montant: carte.mise,
+      encaisse_le: `${jour(decalage)}T12:00:00Z`,
+    });
+    if (e) throw e;
+    posees += 1;
+  }
 }
-console.log(`${poses.length} mises posees, du ${jour(-9)} au ${jour(0)}.`);
+console.log(`${posees} mises posees, du ${jour(-9)} au ${jour(0)}, jour -1 laisse vide.`);
 ```
 
 Run : `node <répertoire temporaire>/mises-datees-local.mjs`
