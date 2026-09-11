@@ -1996,3 +1996,78 @@ drop function public.admin_tendances(integer);
 La route tolère l'absence : `tendances` vaut `null`, l'écran affiche « tendances
 indisponibles » et garde ses totaux. Côté écran, un `git revert` des tâches 4 à
 6 suffit. Aucune donnée n'est écrite par ce chantier, à aucun moment.
+
+## Écarts
+
+Relevés à l'exécution, le 2026-09-11.
+
+- **Le plan aurait échoué à la préparation de sa propre épreuve.**
+  `mises_avant_insert` impose `montant = cartes.mise`, décide lui-même
+  `est_commission` — vrai pour la première mise de la carte, quelle que soit sa
+  date — et réécrit `collecteur_id`. Le jeu d'essai posait 1 000, 2 000 et
+  3 000 sur une carte à 1 000, et le script local de la tâche 7 choisissait ses
+  montants de même. Corrigé avant la première ligne de code (`b13e6df`) : le
+  montant se lit sur la carte, et c'est le **nombre** de mises qui varie d'un
+  jour à l'autre.
+- **Douze épreuves de base, pas treize.** Le compte du plan était faux ; le
+  contenu, non.
+- **Le verrou passait déjà en rouge**, comme au chantier précédent : une
+  fonction absente est refusée elle aussi. Ces deux épreuves ne prouvent quelque
+  chose qu'après la migration.
+- **Un défaut trouvé par l'épreuve de la route, dans ma propre migration.** Le
+  compte administrateur créé pour l'épreuve est un collecteur actif, inscrit le
+  jour même, qui n'a jamais encaissé : il entrait dans la liste des décrochages
+  avec zéro jour de silence. Un collecteur inscrit ce matin n'a pas décroché, il
+  n'a pas commencé. La condition exige désormais que le compte **lui-même** ait
+  plus de sept jours.
+- **`POST` accepté par la route**, ce que le plan n'avait pas dit :
+  `functions.invoke` ne sait pas construire de chaîne de requête, donc sans lui
+  l'écran ne pourrait jamais demander une autre période que celle par défaut.
+- **La fenêtre locale des mouvements est retirée dès la tâche 5**, alors que le
+  plan la gardait jusqu'à la tâche 6. Entre les deux, l'écran aurait porté deux
+  boutons « 7 j » : les épreuves n'auraient plus su lequel viser, et deux
+  commandes de temps auraient coexisté.
+- **Deux épreuves anciennes réécrites, pas rapiécées.** Elles encodaient
+  l'ancien contrat — « aucune comparaison à l'écran », « la fenêtre ne déplace
+  aucun montant ». Le fichier a été repris en entier, et son commentaire d'en-tête
+  dit maintenant ce qui est vérifié à la place, en connaissance de cause.
+- **Deux pièges d'épreuve, tous deux dus à des noms ou des formes qui se
+  ressemblent.** Des commissions proportionnelles à l'encaissé affichaient deux
+  fois « +14 % » : l'épreuve trouvait deux éléments pour un, et ne prouvait plus
+  que chaque carte lit son propre couple — le jeu d'essai porte désormais +14 %
+  et +30 %. Et compter les `<circle>` de la page entière en trouvait **huit** au
+  lieu de trois : les icônes lucide en portent aussi. L'épreuve vise la
+  `<figure>` de la courbe.
+- **Un avertissement de lint fondé**, apparu à la tâche 6 : `tendances?.mouvements
+  ?? []` rend un tableau neuf à chaque rendu, et le `useMemo` qui en dépendait ne
+  mémorisait rien. Mémorisé sur `tendances`.
+- **Tolérance prouvée autrement qu'au chantier précédent.** Retirer le droit
+  d'exécution à `service_role` aurait fait tomber dix épreuves de base, qui
+  appellent la fonction directement : la fonction a été **renommée**, ce qui la
+  rend introuvable comme si elle n'existait pas. Résultat : la route répond 200,
+  toutes ses clés existantes intactes, `tendances` à `null`, et
+  `partie=tendances` rend `{ tendances: null }` plutôt qu'une erreur.
+- **La chaîne, tâche 7.** `verifier exit=0` lu dans le journal ; quinze
+  commandes ; core 96, ui 154, admin 150, collecteur 266, site 41, scripts 198,
+  `test:db` 819 épreuves en 69 fichiers ; bundles sans fuite.
+- **Le regard, fait par la machine.** Chrome sans interface, profil jetable
+  hors dépôt, sur l'admin local en 5176 dont le module servi porte
+  `127.0.0.1:54321` une fois et l'hôte de production zéro fois. Vu : le
+  sélecteur à trois périodes, les quatre cartes dont deux à pastille, la courbe
+  à 81 points, la répartition qui affiche la période choisie, les zones avec
+  leur nombre de mises, « 200 mouvements sur 249 » — le bornage se dit —, aucune
+  exception JavaScript, aucun débordement horizontal à 390 px. En 30 jours, les
+  deux cartes de flux passent à « pas de comparaison possible » : la période
+  précédente est vide dans le jeu local, et l'écran le dit au lieu d'inventer.
+- **Le décrochage a dû être provoqué pour être vu.** Tous les collecteurs du jeu
+  local avaient encaissé récemment : la carte affichait zéro et la liste
+  n'existait pas. Trois comptes actifs sans mise ont été vieillis en base
+  **locale** pour que le bloc se montre — il affiche alors « 3 collecteurs
+  actifs sur 65 », trois noms suivis de « jamais », et le bouton vers l'écran
+  Collecteurs.
+- **Un défaut antérieur trouvé par ce regard, corrigé (`f169dd5`).** Chaque
+  ligne de mouvement affichait « +5 000 FCFA FCFA » : `LigneTransaction` écrit
+  l'unité lui-même — les deux écrans du collecteur lui passent un montant nu —
+  et le tableau de bord la joignait quand même. Aucune épreuve ne pouvait le
+  voir : il n'en existait aucune sur le rendu d'une ligne. Épreuve rouge
+  d'abord, puis correction, puis confirmation à l'écran.
