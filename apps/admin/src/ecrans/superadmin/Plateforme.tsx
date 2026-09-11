@@ -1,6 +1,7 @@
 import { Carte } from '@kolek/ui';
 
 import type { EtatSuperAdmin } from '../../superadmin';
+import { Sante } from './Sante';
 
 /**
  * Les libellés des tables, repris de l'écran Réglages d'où cette section vient.
@@ -21,8 +22,11 @@ export function Plateforme({ etat }: { etat: EtatSuperAdmin }) {
   const rejets = etat.volumes.rejets_non_traites ?? 0;
 
   return (
+    <div className="flex flex-col gap-6">
+      <Sante sante={etat.sante} />
+
     <section>
-      <h2 className="font-headings font-bold text-xl text-ink mb-1">Plateforme</h2>
+      <h2 className="font-headings font-bold text-xl text-ink mb-1">Volumes et journal</h2>
       <p className="font-body text-sm text-muted-foreground mb-3">
         Mesuré à l'instant, côté serveur — ce n'est pas ce que le dépôt déclare, c'est ce que la
         base répond. Comptes exacts et non estimations du planificateur : sur des tables de cette
@@ -77,5 +81,6 @@ export function Plateforme({ etat }: { etat: EtatSuperAdmin }) {
       </Carte>
       </div>
     </section>
+    </div>
   );
 }

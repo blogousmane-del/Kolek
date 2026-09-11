@@ -23,3 +23,38 @@ export function dateLisible(iso: string): string {
 export function mrrLisible(mrr: number): string {
   return mrr === 0 ? '—' : `${formatMontant(mrr)} FCFA`;
 }
+
+const UNITES = ['o', 'Ko', 'Mo', 'Go', 'To'] as const;
+
+/**
+ * 19 922 944 → « 19 Mo ». Une décimale sous dix, aucune au-delà, et une
+ * insécable avant l'unité : « 19 » et « Mo » ne se séparent pas en fin de
+ * ligne.
+ */
+export function tailleLisible(octets: number): string {
+  let valeur = octets;
+  let rang = 0;
+  while (valeur >= 1024 && rang < UNITES.length - 1) {
+    valeur /= 1024;
+    rang += 1;
+  }
+  const nombre =
+    rang === 0 || valeur >= 10
+      ? Math.round(valeur).toString()
+      : Number(valeur.toFixed(1)).toString().replace('.', ',');
+  return `${nombre}\u00a0${UNITES[rang]}`;
+}
+
+/**
+ * « 2026-09-12 » → « 12 sept. 2026 ». Lu en UTC, qui est l'heure d'Abidjan :
+ * `dateLisible` lirait minuit dans le fuseau du navigateur, et un poste réglé
+ * à l'ouest afficherait la veille.
+ */
+export function jourLisible(jour: string): string {
+  return new Date(`${jour}T00:00:00Z`).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}

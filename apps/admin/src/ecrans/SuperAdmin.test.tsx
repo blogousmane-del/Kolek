@@ -341,6 +341,15 @@ describe('la plateforme', () => {
     expect(screen.getAllByText('Santé du système').length).toBeGreaterThan(0);
   });
 
+  it('dit la santé indisponible quand la route ne la rend pas, et garde les volumes', () => {
+    poser({ statut: 'ok', etat: ETAT });
+
+    rendre('plateforme');
+
+    expect(screen.getByText(/Santé indisponible/)).toBeDefined();
+    expect(screen.getByTestId('plateforme')).toBeDefined();
+  });
+
   it('traduit les noms de tables en libellés lisibles', () => {
     poser({ statut: 'ok', etat: ETAT });
 

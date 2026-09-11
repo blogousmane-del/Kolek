@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import type { MesuresSante } from '@kolek/core';
+
 import { supabase } from './supabase';
 
 /**
@@ -72,6 +74,26 @@ export interface EtatPaiement {
   boutique: 'joignable' | 'refusee' | 'injoignable' | 'non_configuree';
 }
 
+/** Un relevé quotidien, tel que `sante_systeme()` le rend. */
+export interface ReleveQuotidien {
+  jour: string;
+  taille_base: number;
+  volumes: Record<string, number>;
+  encours_clients: number;
+}
+
+/**
+ * La santé du système, telle que la base la mesure.
+ *
+ * Les seuils ne sont pas ici : `evaluerSante` (`@kolek/core`) juge ces
+ * mesures, et l'écran affiche son jugement.
+ */
+export interface SanteSysteme extends MesuresSante {
+  mesure_le: string;
+  /** Du plus ancien au plus récent, quatre-vingt-dix au plus. */
+  releves: ReleveQuotidien[];
+}
+
 export interface EtatSuperAdmin {
   genere_le: string;
   /** Qui regarde, pour marquer « c'est toi » sans redemander la session. */
@@ -87,6 +109,9 @@ export interface EtatSuperAdmin {
   /** Absent tant que la fonction `super-admin-etat` déployée est antérieure à
       cet écran — d'où le `| null`, et le message que la section affiche alors. */
   paiement?: EtatPaiement | null;
+  /** Nulle quand `sante_systeme()` a échoué ; absente quand la route déployée
+      est antérieure à cet écran. L'écran traite les deux de la même façon. */
+  sante?: SanteSysteme | null;
 }
 
 const MESSAGES: Record<string, string> = {
