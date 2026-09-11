@@ -32,8 +32,18 @@ describe('CourbeEvolution', () => {
       <CourbeEvolution libelle="Taille" points={[TROIS[0]!]} formater={formater} />,
     );
 
-    expect(screen.getByText(/Premier relevé : 10 u/)).toBeDefined();
+    expect(screen.getByText(/Premier relevé le 11\ssept\.\s: 10 u\.$/)).toBeDefined();
     expect(container.querySelector('path')).toBeNull();
+  });
+
+  it('ne double pas le point d’un mois abrégé', () => {
+    // « sept. », « oct. », « déc. »… finissent déjà par un point : la phrase
+    // finit donc sur la valeur, jamais sur le jour.
+    const { container } = render(
+      <CourbeEvolution libelle="Taille" points={[TROIS[0]!]} formater={formater} />,
+    );
+
+    expect(container.textContent).not.toMatch(/\.\./);
   });
 
   it('pose un point par relevé, reliés par une seule ligne', () => {

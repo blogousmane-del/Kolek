@@ -46,10 +46,12 @@ export function CourbeEvolution({ libelle, points, formater }: Props) {
 
   if (points.length < 2) {
     const seul = points[0];
+    // La phrase finit sur la valeur : le mois abrégé (« sept. ») porte déjà
+    // son point, et un point final le doublerait.
     return (
       <p className="font-body text-sm text-muted-foreground">
         La courbe se dessine à partir du deuxième relevé.
-        {seul && ` Premier relevé : ${formater(seul.valeur)}, le ${jourCourt(seul.jour)}.`}
+        {seul && ` Premier relevé le ${jourCourt(seul.jour)} : ${formater(seul.valeur)}.`}
       </p>
     );
   }
