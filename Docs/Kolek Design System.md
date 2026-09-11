@@ -144,7 +144,6 @@ Deux conséquences pratiques.
 | Token | Usage |
 |---|---|
 | `--degrade-carte` | Carte de collecte (héros). |
-| `--degrade-promo` | Carte d'upsell en pied de barre latérale. |
 | `--degrade-zone-0…3` | Bandeau de tête des cartes de zone, par index. |
 
 ### 3.2 Typographie
@@ -279,7 +278,7 @@ Tous vivent dans **`packages/ui/src`** et sont partagés par les deux applicatio
 | `Filet` | `Filet.tsx` | Frontière d'erreur de rendu. |
 
 ### 4.2 Navigation
-- **Admin (web) — barre latérale gauche.** En-tête de contexte (« Kolek · Admin »). Items icône + label, groupés par overline gris (« Pilotage », « Raccourcis »). **État actif :** fond `bg-white/10`, filet gauche `border-chart-mint`, icône menthe. **Entrée à venir :** contraste réduit, `disabled`, attribut `title`. Pas d'étiquette « à venir » visible — elle volait la largeur du libellé et le faisait passer sur deux lignes. Carte promo en bas, sortie de session juste au-dessus.
+- **Admin (web) — barre latérale gauche.** En-tête de contexte (« Kolek · Admin »). Items icône + label, groupés par overline gris (« Pilotage », « Monétisation », « Système »). **État actif :** fond `bg-white/10`, filet gauche `border-chart-mint`, icône menthe. **Entrée à venir :** contraste réduit, `disabled`, attribut `title`. Pas d'étiquette « à venir » visible — elle volait la largeur du libellé et le faisait passer sur deux lignes. Sortie de session seule en pied : la carte promo de la maquette a été retirée le 2026-09-11, GTCS vendant les paliers et n'en souscrivant aucun.
 - **Collecteur (mobile) — barre du bas.** Cinq onglets à grandes cibles. L'onglet **Encaisser** sort de la barre : pastille pleine de 56 px, ombre `shadow-action`. La barre est `sticky bottom-0` : une liste de clients dépasse la hauteur d'un téléphone, et une barre qui part au défilement oblige à remonter avant chaque encaissement.
 
 ### 4.3 Barre supérieure & fil d'Ariane

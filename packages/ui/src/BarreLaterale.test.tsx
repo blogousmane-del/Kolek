@@ -113,8 +113,8 @@ describe('la barre latérale d’administration', () => {
     // autre console.
     expect(screen.queryByText('Tableau de bord')).toBeNull();
     expect(screen.queryByText('Collecteurs')).toBeNull();
-    // Et la promotion d'offre avec lui : la plateforme n'est l'abonnée de
-    // personne.
+    // Pas de promotion d'offre non plus. Elle a quitté les deux espaces le
+    // 2026-09-11 ; cette assertion garde qu'elle ne revienne pas par celui-ci.
     expect(screen.queryByText('Passer à Pro')).toBeNull();
 
     expect(screen.getByText('Administrateurs')).toBeDefined();
@@ -177,5 +177,14 @@ describe('le menu de Kolek · Admin', () => {
     expect(screen.getByText('Tableau de bord')).toBeDefined();
     expect(screen.getByText('Collecteurs')).toBeDefined();
     expect(screen.getByText('Encours & Soldes')).toBeDefined();
+  });
+
+  it('ne propose pas Pro à GTCS, qui le vend', () => {
+    render(<BarreLaterale {...props} />);
+
+    expect(screen.queryByText('Passer à Pro')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Voir les offres' })).toBeNull();
+    // Le pied de la barre ne garde que la sortie de session.
+    expect(screen.getByText('Déconnexion')).toBeDefined();
   });
 });

@@ -72,7 +72,6 @@
   --shadow-lg: 0 12px 32px rgba(6,20,14,.14);
   --shadow-action: 0 4px 12px rgba(20,64,44,.25);
   --degrade-carte: linear-gradient(135deg, #8FC79E 0%, #6FA3C9 60%, #8A96C4 100%);
-  --degrade-promo: linear-gradient(135deg, #1C5A3D 0%, #0E2E1F 100%);
   --degrade-zone-0: linear-gradient(135deg, #D1E8D4 0%, #82ACCC 100%);
   --degrade-zone-1: linear-gradient(135deg, #82ACCC 0%, #8D8AC0 100%);
   --degrade-zone-2: linear-gradient(135deg, #9ACDBE 0%, #D1E8D4 100%);

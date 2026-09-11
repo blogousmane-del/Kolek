@@ -342,7 +342,6 @@ export const elevations = {
  */
 export const degrades = {
   degradeCarte: 'linear-gradient(135deg, #8FC79E 0%, #6FA3C9 60%, #8A96C4 100%)',
-  degradePromo: 'linear-gradient(135deg, #1C5A3D 0%, #0E2E1F 100%)',
   // Réalignés le 2026-09-04 sur la nouvelle échelle `chart*`. Ils en étaient
   // tirés à l'origine ; les laisser sur les anciennes valeurs aurait fait
   // diverger la carte de zone de la liste « Top zones » qui décrit les mêmes

@@ -346,9 +346,12 @@ export function BarreLaterale({
   const surPlateforme = espace === 'super';
 
   return (
-    // `overflow-y-auto` : la barre porte huit entrées, deux raccourcis et un
-    // encart de promotion. Sur un portable en 768 px de haut, le bas était
-    // coupé sans possibilité d'y accéder.
+    // `overflow-y-auto` : la barre a porté huit entrées, deux raccourcis et un
+    // encart de promotion, et sur un portable en 768 px de haut le bas était
+    // coupé sans possibilité d'y accéder. Elle n'en porte plus que sept, sans
+    // raccourci ni encart, depuis le 2026-09-11 — mais un tiroir ouvert sur un
+    // téléphone couché n'a que 400 px de haut, et le défilement reste la seule
+    // garantie d'atteindre la déconnexion.
     //
     // Le fond plus sombre de la console de plateforme n'est pas une décoration :
     // c'est le seul repère permanent qui dit dans quel espace on se trouve, et
@@ -430,7 +433,7 @@ export function BarreLaterale({
       {/* Sortie de session. Absente de la maquette, indispensable au produit :
           un poste d'administration partagé sans déconnexion est une session
           ouverte pour le suivant. */}
-      <div className="px-4 mb-2">
+      <div className="px-4 mb-6">
         <button
           type="button"
           onClick={onDeconnexion}
@@ -440,29 +443,6 @@ export function BarreLaterale({
           <span className="text-base font-body font-medium text-white/60">Déconnexion</span>
         </button>
       </div>
-
-      {/* Promotion d'offre. Absente de la console de plateforme : elle propose à
-          une organisation de passer à Pro, et la plateforme n'est l'abonnée de
-          personne. */}
-      {!surPlateforme && (
-        <div className="mx-4 mb-6 rounded-xl p-4 border border-white/8 bg-[image:var(--degrade-promo)]">
-          <p className="text-white font-body font-semibold text-base mb-1">Passer à Pro</p>
-          <p className="text-white/60 text-sm font-body mb-3">
-            Collecteurs illimités, rapports avancés.
-          </p>
-          {/* Sans gestionnaire tant que la page d'offres n'existe pas. Désactivé
-              plutôt qu'inerte : la même convention que les entrées « à venir »
-              au-dessus, sinon il se lit comme un bouton cassé. */}
-          <button
-            type="button"
-            disabled
-            title="Page des offres à venir"
-            className="w-full rounded-md bg-chart-mint text-sidebar text-sm font-body font-semibold py-2 opacity-60 cursor-default"
-          >
-            Voir les offres
-          </button>
-        </div>
-      )}
     </div>
   );
 }
