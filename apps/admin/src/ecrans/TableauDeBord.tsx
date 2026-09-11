@@ -605,11 +605,16 @@ export function TableauDeBord({
                   </p>
                 ) : (
                   mouvementsFiltres.map((m, i) => (
+                    /* Montant nu : `LigneTransaction` écrit « FCFA » lui-même,
+                       et les deux écrans du collecteur le lui passent ainsi.
+                       Cet écran ajoutait l'unité par-dessus depuis toujours —
+                       « +5 000 FCFA FCFA » sur chaque ligne, vu au premier
+                       regard porté sur cet écran. */
                     <LigneTransaction
                       key={`${m.survenu_le}-${m.client}-${i}`}
                       nom={m.client}
                       meta={libelleMouvement(m)}
-                      montant={`${m.montant >= 0 ? '+' : ''}${formatMontant(m.montant)} FCFA`}
+                      montant={`${m.montant >= 0 ? '+' : ''}${formatMontant(m.montant)}`}
                       type={typeLigne(m)}
                       derniere={i === mouvementsFiltres.length - 1}
                     />

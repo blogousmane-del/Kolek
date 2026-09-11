@@ -350,4 +350,15 @@ describe('TableauDeBord — les montants viennent de la vue, pas de l’écran',
     expect(screen.getByText('Koffi Amenan')).toBeTruthy();
     expect(screen.queryByText('Touré Bakary')).toBeNull();
   });
+
+  it('n’écrit pas deux fois l’unité sur un montant', () => {
+    rendreAvecTendances();
+
+    // `LigneTransaction` ajoute « FCFA » lui-même — c'est son contrat, et les
+    // deux écrans du collecteur lui passent un montant nu. Le tableau de bord
+    // le joignait quand même : « +5 000 FCFA FCFA » sur chaque ligne, vu à
+    // l'écran le 2026-09-11.
+    expect(screen.getByText('+5 000 FCFA')).toBeTruthy();
+    expect(screen.queryByText(/FCFA\s+FCFA/)).toBeNull();
+  });
 });
