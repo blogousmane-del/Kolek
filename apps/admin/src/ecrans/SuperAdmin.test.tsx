@@ -961,3 +961,88 @@ describe('la pastille d’échéance et le filtre s’accordent', () => {
     expect(screen.queryByText(/Expire dans/)).toBeNull();
   });
 });
+
+/**
+ * L'export CSV des abonnés — le seul chemin de ce fichier qu'aucune épreuve ne
+ * touchait avant le 2026-09-11.
+ *
+ * Il sort le nom, le téléphone, la zone, le palier, le prix, le statut,
+ * l'échéance et le nombre de clients de **tous** les collecteurs. `versCsv` ne
+ * vérifie aucune arité : en-têtes et cellules sont assemblés séparément.
+ * Ajouter une colonne à l'un sans l'autre rend un CSV valide dont les colonnes
+ * sont décalées — les téléphones sous « Zone ». Rien ne se voit à l'écran, et
+ * le fichier part par courriel.
+ *
+ * Cette épreuve est écrite **avant** le découpage de ce fichier, et c'est tout
+ * son intérêt : c'est pendant un déplacement de code qu'une colonne se perd.
+ */
+describe('l’export CSV des abonnés', () => {
+  /** Rend le contenu du fichier produit par un clic sur « Exporter ». */
+  function csvApresClic(vue: VueGlobale = VUE): string {
+    // `jsdom` n'implémente ni l'un ni l'autre, et `telechargerCsv` les appelle.
+    const url = URL as unknown as Record<string, unknown>;
+    url.createObjectURL = vi.fn(() => 'blob:faux');
+    url.revokeObjectURL = vi.fn();
+
+    // Le `Blob` est le seul endroit où le contenu du fichier passe en clair.
+    const contenus: string[] = [];
+    const vraiBlob = globalThis.Blob;
+    globalThis.Blob = class extends vraiBlob {
+      constructor(parts: BlobPart[], options?: BlobPropertyBag) {
+        super(parts, options);
+        contenus.push(parts.map(String).join(''));
+      }
+    } as unknown as typeof Blob;
+
+    try {
+      poser({ statut: 'ok', etat: ETAT });
+      render(<SuperAdmin vue={vue} onglet="abonnements" onRecharger={rechargerVue} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Exporter' }));
+      return contenus.join('');
+    } finally {
+      globalThis.Blob = vraiBlob;
+    }
+  }
+
+  it('aligne chaque cellule sous son en-tête', () => {
+    // Le contrôle que `versCsv` ne fait pas : autant de cellules que d'en-têtes,
+    // sur chaque ligne. Un décalage rend un fichier valide et faux.
+    const lignes = csvApresClic()
+      .split('\r\n')
+      .filter((l) => l.length > 0);
+    const colonnes = lignes[0]!.split(';').length;
+
+    expect(colonnes).toBe(8);
+    expect(lignes).toHaveLength(1 + VUE.collecteurs.length);
+    for (const ligne of lignes) {
+      expect(ligne.split(';')).toHaveLength(colonnes);
+    }
+  });
+
+  it('nomme ses huit colonnes, dans cet ordre', () => {
+    // L'ordre est le contrat : un tableur ouvre le fichier sans rien demander,
+    // et une colonne déplacée se lit comme une donnée fausse. `\uFEFF` est la
+    // marque d'ordre des octets que `telechargerCsv` pose en tête — sans elle,
+    // Excel lit « Téléphone » comme « TÃ©lÃ©phone ».
+    expect(csvApresClic().split('\r\n')[0]).toBe(
+      '\uFEFFCollecteur;Téléphone;Zone;Palier;Prix mensuel;Statut;Échéance;Clients',
+    );
+  });
+
+  it('exporte tous les collecteurs, pas la page affichée', () => {
+    // Même défaut que celui gardé par `Collecteurs.test.tsx` : un fichier d'une
+    // page que l'administrateur croirait complet. Deux collecteurs ne le
+    // montreraient pas — il en faut plus qu'une page.
+    const nombreux = Array.from({ length: TAILLE_PAGE + 5 }, (_, i) => ({
+      ...VUE.collecteurs[0]!,
+      id: `c${i}`,
+      nom: `Collecteur ${String(i + 1).padStart(3, '0')}`,
+    }));
+
+    const csv = csvApresClic({ ...VUE, collecteurs: nombreux } as VueGlobale);
+
+    expect(csv).toContain('Collecteur 001');
+    expect(csv).toContain(`Collecteur ${String(TAILLE_PAGE + 5).padStart(3, '0')}`);
+    expect(csv.split('\r\n').filter((l) => l.length > 0)).toHaveLength(1 + TAILLE_PAGE + 5);
+  });
+});
