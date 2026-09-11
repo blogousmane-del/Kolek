@@ -1,5 +1,3 @@
-import { Icone } from './Icone';
-
 export interface PartRepartition {
   libelle: string;
   pourcentage: number;
@@ -35,11 +33,13 @@ export function BarreEmpilee({
             <span className="text-lg font-body font-medium text-muted-foreground">FCFA</span>
           </p>
         </div>
-        <div className="flex items-center gap-1 border border-hairline rounded-pill px-3 py-1.5 flex-shrink-0">
+        {/* Un libellé, pas un bouton. Le chevron d'origine promettait un menu
+            que ce composant n'a jamais ouvert ; la période se choisit
+            maintenant en tête d'écran, une seule fois. */}
+        <div className="border border-hairline rounded-pill px-3 py-1.5 flex-shrink-0">
           <span className="text-sm font-body font-medium text-ink whitespace-nowrap">
             {periode}
           </span>
-          <Icone nom="chevron-down" taille={13} className="text-muted-foreground" />
         </div>
       </div>
 
