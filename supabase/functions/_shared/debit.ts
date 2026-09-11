@@ -32,3 +32,38 @@ export function empreinteRequete(route: string, entetes: Headers): string {
 
   return `${route}:${adresse}`.slice(0, EMPREINTE_MAX);
 }
+
+/**
+ * L'empreinte sous laquelle `chariow-webhook` compte les Pulses : **par vente**.
+ *
+ * La signature de Chariow ne porte ni horodatage ni nonce — un Pulse capturé se
+ * rejoue tel quel, et chaque rejeu fait lire une vente chez Chariow sur notre
+ * quota. Un rejeu vise **toujours la même vente** : on ne signe que ce qu’on a
+ * capturé. Une vague de paiements légitimes, elle, touche **beaucoup** de
+ * ventes. Compter par vente borne le premier sans jamais toucher la seconde ;
+ * une borne globale aurait fait l'inverse.
+ *
+ * La vente d’abord, parce que c’est elle que le rejeu ne peut pas changer ; à
+ * défaut le collecteur, puis la demande. Le genre est écrit par nous, avant
+ * l’identifiant : un identifiant qui contiendrait « collecteur: » reste rangé
+ * sous « vente: ». Voir `Docs/plans/2026-09-11-webhook-chariow-borne.md`.
+ */
+export function empreintePulse(cible: {
+  vente: string | null;
+  collecteur: string | null;
+  demande: string | null;
+}): string {
+  if (cible.vente) return `chariow-webhook:vente:${cible.vente}`.slice(0, EMPREINTE_MAX);
+  if (cible.collecteur) {
+    return `chariow-webhook:collecteur:${cible.collecteur}`.slice(0, EMPREINTE_MAX);
+  }
+  if (cible.demande) return `chariow-webhook:demande:${cible.demande}`.slice(0, EMPREINTE_MAX);
+  return 'chariow-webhook:sans-cible';
+}
+
+/** Vingt Pulses par heure et par vente. Chariow en émet trois au plus pour une
+    vente réglée (`successful`, `settled`, `completed`), plus ses réessais sur
+    nos 500 : six fois de marge. Mesuré le 2026-09-11 en production — six
+    paiements, six ventes, sur sept jours. */
+export const PULSE_PLAFOND = 20;
+export const PULSE_FENETRE_SECONDES = 3600;
