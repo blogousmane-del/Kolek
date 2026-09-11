@@ -396,12 +396,18 @@ Attendu : **`6 passed`, aucune empreinte écrite.**
 - [ ] **Étape 4 : le filet et le compilateur**
 
 ```bash
-cd apps/admin && npx vitest run
-cd ../.. && npx tsc --noEmit -p apps/admin/tsconfig.json && npx oxlint apps/admin/src
+cd apps/admin && npx vitest run && npx tsc -b && npx oxlint
 ```
 
 Attendu : toutes les épreuves d'`apps/admin` vertes, `tsc` muet, `oxlint` sans
 reproche **nouveau**.
+
+> **`tsc -b`, et non `tsc --noEmit -p apps/admin/tsconfig.json`** — corrigé le
+> 2026-09-11. Le `tsconfig.json` d'`apps/admin` est une coquille
+> (`"files": []` et deux `references`) : la forme `-p` sort muette **sans rien
+> avoir vérifié**. Seul `tsc -b` suit les références. Et l'étape `typecheck`
+> de la chaîne ne couvre que `core` et `ui` : les apps ne sont typées qu'au
+> `build`, en fin de chaîne.
 
 - [ ] **Étape 5 : commit**
 
@@ -642,6 +648,81 @@ Comparer à `apps/admin/dist/assets/index-*.js`.
 > identique n'est **pas** une preuve de déploiement — et une empreinte
 > différente n'est pas une alerte. Ce contrôle ne sert qu'à vérifier que le site
 > répond et sert un bundle valide.
+
+---
+
+## Écarts d'exécution — 2026-09-11
+
+Ce qui a été fait autrement que ce plan ne l'écrivait, et pourquoi. Chaque
+écart est dans le commit qui porte son motif.
+
+**Tâche 1.** L'épreuve écrite ici n'aurait pas tourné : sans `poser()`,
+`utiliserEtat()` rend `undefined` et la coquille plante sur `etat.statut`
+avant qu'« Exporter » n'existe. Ajouté. L'épreuve « tous les collecteurs, pas
+la page » est jouée sur `TAILLE_PAGE + 5` collecteurs — deux n'auraient rien
+prouvé. L'espion de `createElement` est retiré : il ne faisait que laisser
+passer. L'épreuve a été vue échouer une fois, exprès, avec une neuvième
+colonne posée dans `exporter()` : `expected 9 to be 8`.
+
+**Tâche 2.** Sept empreintes et non six : l'onglet Paiement **configuré** en
+plus, l'onglet vide ne rendant presque rien de ce qui se déplace aux tâches 4
+et 5. Vue échouer une fois, exprès (« Administrateurz ») : une seule
+empreinte tombe, le fichier d'empreintes garde son md5.
+
+**La carte des usages, relevée avant la tâche 4, corrige ce plan sur six
+points.** Suivis à la lettre, chacun aurait fait importer à un onglet extrait
+un nom resté dans `SuperAdmin.tsx` — qui importe cet onglet. Une boucle.
+
+| Nom | Ce plan disait | Le code montrait | Parti à |
+|---|---|---|---|
+| `Pastille` | partagée avec `Journal` | appelée par `Paiement` seul | tâche 4, locale |
+| `TAILLE_PAGE` | — | `Journal` seul | tâche 5 |
+| `CHAMP`, `ETIQUETTE` | — | `CodesPromo` seul | tâche 7 |
+| `COLONNES_ABONNES` | — | le tableau des abonnés seul | tâche 8 |
+| `PastillePalier`, `PastilleStatut` | restent dans la coquille | `OngletAbonnements` seul | tâche 8 |
+| `dateLisible`, `mrrLisible` | restent, exportés | trois onglets, **pas** la coquille | `superadmin/lisible.ts` |
+
+Le dernier point est devenu **une étape de plus**, entre les tâches 5 et 6,
+dans son propre commit. Exporter ces deux fonctions depuis `SuperAdmin.tsx`
+aurait aussi fait lever `only-export-components` à oxlint — un reproche
+nouveau, que ce plan interdisait.
+
+**L'outillage.** Les coupes se sont faites par script, sur des **ancres de
+texte exactes** et jamais sur les numéros de ligne de ce plan, qui glissaient
+à chaque extraction. Chaque ancre devait paraître une seule fois, sans quoi le
+script s'arrêtait avant d'écrire. Les tâches 7 et 8 ont recâblé leurs imports
+par un outil qui garde octet pour octet toute instruction inchangée.
+`SuperAdmin.tsx` est en CRLF sur ce poste : lu en LF, réécrit en CRLF pur,
+contrôlé à chaque écriture.
+
+**Une preuve de plus que ce plan n'en demandait.** Les empreintes voient le
+rendu, les épreuves le comportement ; aucune ne voit une ligne perdue dans une
+branche que rien ne rend. Après la tâche 8, les lignes de l'original — hors
+imports, bandeaux de section, lignes vides et mot `export` — ont été
+comptées contre celles des huit fichiers d'arrivée : **1 566 de chaque côté,
+aucune manquante, aucune en trop.**
+
+**Ce qui a été mesuré à l'arrivée.**
+
+| Fichier | Lignes | Annoncé |
+|---|---|---|
+| `SuperAdmin.tsx` | 277 | ~250 |
+| `superadmin/Abonnements.tsx` | 664 | ~610 — il a pris les deux pastilles |
+| `superadmin/Promos.tsx` | 282 | ~275 |
+| `superadmin/Paiement.tsx` | 161 | ~135 |
+| `superadmin/Journal.tsx` | 138 | ~165 |
+| `superadmin/Administrateurs.tsx` | 95 | ~95 |
+| `superadmin/Plateforme.tsx` | 81 | ~75 |
+| `superadmin/lisible.ts` | 25 | — |
+
+À chaque extraction : sept empreintes identiques (md5 du fichier inchangé),
+136 épreuves d'`apps/admin` vertes, `tsc -b` muet, oxlint sans reproche
+nouveau.
+
+**Tâche 9.** Dernier passage des empreintes : 7/7. Échafaudage retiré ;
+`apps/admin` passe à 129 épreuves (136 moins les sept empreintes). Chaîne
+complète sur l'état final : `SORTIE_NPM=0`, quatorze étapes lues une à une —
+base 774/774, trois builds, `verifier:bundles` propre.
 
 ---
 
