@@ -141,6 +141,16 @@ describe('l’état', () => {
     const corps = await (await etat(jetonPatron)).json();
     expect(corps.appelant).toBe(patron.id);
   });
+
+  it('rend la santé du système, avec au moins le relevé de la migration', async () => {
+    const corps = await (await etat(jetonPatron)).json();
+
+    expect(corps.sante).toBeTruthy();
+    expect(typeof corps.sante.base?.taille).toBe('number');
+    expect(typeof corps.sante.drainage?.executions_24h).toBe('number');
+    expect(Array.isArray(corps.sante.releves)).toBe(true);
+    expect(corps.sante.releves.length).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe('les actions', () => {

@@ -50,6 +50,10 @@ async function sonderBoutique(
  * Les deux partent en parallèle : elles ne dépendent pas l'une de l'autre, et
  * l'écran attend la plus lente de toute façon.
  *
+ * Un troisième appel, `sante_systeme()`, rend l'état de la base et des tâches
+ * automatiques pour l'onglet « Santé du système ». C'est le seul dont l'échec
+ * est toléré — voir plus bas.
+ *
  * ## Ce qui n'est pas repris de `admin_reglages`
  *
  * Sa clé `administrateurs`, qui ignore les niveaux. Les clés sont donc choisies
@@ -75,9 +79,15 @@ Deno.serve(async (requete) => {
   if (ouverture instanceof Response) return ouverture;
   const { appelant, service } = ouverture;
 
-  const [etat, reglages] = await Promise.all([
+  // `sante_systeme` part avec les deux autres, mais son échec ne fait pas
+  // échouer la route. La poussée de `main` redéploie cette fonction ; la
+  // migration, elle, part à la main. Dans le mauvais ordre, une erreur ici
+  // mettrait tout le Super Admin en panne pour un seul onglet : l'écran dira
+  // « santé indisponible », et le reste s'affichera.
+  const [etat, reglages, sante] = await Promise.all([
     service.rpc('super_admin_etat'),
     service.rpc('admin_reglages'),
+    service.rpc('sante_systeme'),
   ]);
 
   if (etat.error || !etat.data) {
@@ -87,6 +97,9 @@ Deno.serve(async (requete) => {
   if (reglages.error || !reglages.data) {
     console.error('admin_reglages a échoué :', reglages.error?.message);
     return reponse({ erreur: 'AGREGATION_IMPOSSIBLE' }, 500, requete);
+  }
+  if (sante.error) {
+    console.error('sante_systeme a échoué :', sante.error.message);
   }
 
   const plateforme = reglages.data as Record<string, unknown>;
@@ -108,6 +121,7 @@ Deno.serve(async (requete) => {
       journal: plateforme.journal,
       postgres: plateforme.postgres,
       paiement: { ...paiement, boutique },
+      sante: sante.error ? null : (sante.data ?? null),
       // L'appelant, pour que l'écran marque « c'est toi » dans la liste des
       // administrateurs sans redemander la session — et parce que c'est la
       // seule ligne sur laquelle aucune action n'est proposée.
