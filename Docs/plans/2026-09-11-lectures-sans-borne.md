@@ -1380,4 +1380,45 @@ git commit -m "docs: les lectures sans borne fermees, et un commentaire perime c
 
 ## Écarts
 
-(à remplir pendant l'exécution)
+Exécuté le 2026-09-11. Cinq écarts, tous dans le jeu d'essai ou dans la
+méthode ; le code de production est celui écrit ci-dessus, mot pour mot.
+
+**1. Une espace insécable perdue à la réécriture.** L'épreuve ancienne
+« rappelle toujours le montant en jeu » attend `30 000` avec une espace
+insécable U+00A0 (ce que rend `formatMontant`). Le code de la tâche 1, étape 5,
+a été recopié d'un affichage qui la montre comme une espace ordinaire : la
+réécriture a cassé une épreuve qu'elle ne devait pas toucher. Rétablie par
+Node, octet par octet ; inventaire des espaces spéciales identique à
+l'original (une U+00A0). **Le bloc de code de l'étape 5 porte encore l'espace
+ordinaire — ne pas le recopier tel quel.**
+
+**2. Une mise de 100 n'existe pas.** `validerMise` exige un entier d'au moins
+`MISE_MIN = 500`, et `soldeRestituable` lève `RangeError` sur 100. Le rouge de
+la tâche 1 était authentique (la carte k1000 coupée n'était jamais évaluée) ;
+le vert, lui, butait sur le jeu d'essai une fois la carte lue. Les mises des
+cartes passent à 500 dans `parc`, dans l'épreuve de dormance et dans
+`lectures.test.ts` (`soldeRestituable(2, 500)`) ; le reçu de la tâche 4 attend
+`mise` 500. Les montants du rapprochement (100 et 10) restent : ce chemin ne
+valide rien. Le rouge a été reprouvé sur le code d'origine avec le jeu
+d'essai corrigé.
+
+**3. `core.autocrlf=true`, et ce que ça change aux contrôles de fins de
+ligne.** Les objets Git sont en LF ; « LF seules 93 » ne décrit que la copie
+de travail. Un `git stash` passé pour comparer oxlint à `main` a réécrit quatre
+fichiers en CRLF d'un bloc — contenu intact, historique intact. Remis depuis
+une copie exacte (`cp`, puis `cmp`). En conséquence, le désarmement de la
+tâche 5 s'est fait par copie et non par `git checkout`, qui aurait eu le même
+effet.
+
+**4. La sonde de la tâche 4, étape 7, par Node et non par `grep`.** Sous Git
+Bash, `grep` retire les `\r` : sur un fichier CRLF, le motif pouvait ne rien
+trouver sans rien prouver. La sonde Node tolère le `\r` et a été vue trouver
+avant de conclure : 2 + 9 lectures sans borne sur le code d'origine, 0 + 0
+après.
+
+**5. oxlint sort à 0 avec un avertissement**, `react(only-export-components)`
+dans `src/ecrans/ChoixMise.tsx:48`. Il existe tel quel sur `main` : ce plan ne
+touche pas ce fichier.
+
+**Épreuve en base (tâche 5)** : 3/3 armée ; désarmée, la prémisse passe et les
+deux autres tombent sur 1000 au lieu de 1001.

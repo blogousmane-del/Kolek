@@ -459,6 +459,17 @@ sont simulées dans sept fichiers de test dont les faux imitent la chaîne court
 Les changer toutes en une fois aurait produit une vague d'échecs sans rapport
 avec le défaut, et un lot qu'on ne peut plus relire.
 
+### Fermé le 2026-09-11
+
+Les sept fonctions de l'application collecteur qui lisaient une liste sans
+`range` épuisent leurs pages (`Docs/plans/2026-09-11-lectures-sans-borne.md`) :
+l'accueil, les alertes, le rapprochement, l'écran Retrait, le profil, les
+reçus et l'état des avis. Celles qui restent sans `range` sont bornées par le
+métier — une carte, un client — et ce plan le dit chiffres de production à
+l'appui. La relève du 2026-09-11 a trouvé la plus exposée hors de la liste
+ci-dessus : `chargerAlertes`, dont la fenêtre de 90 jours dépassait mille
+mises en quelques semaines.
+
 ---
 
 ## 🟡 E — Le filet avant le découpage

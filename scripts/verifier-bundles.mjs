@@ -128,9 +128,10 @@ export function chercherCopiesDEnv(racine) {
 // dernier échoue sous Windows (séparateurs `\`, absence d'encodage URL), ce
 // qui empêche silencieusement le bloc CLI de s'exécuter.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  // Toute application publiée entre ici. Le site public n'appelle aucune API
-  // aujourd'hui, mais un artefact non contrôlé est un artefact où une clé peut
-  // arriver sans que personne ne le voie.
+  // Toute application publiée entre ici. Le site public poste vers
+  // `demander-ouverture` depuis le 2026-08-23 : ses artefacts portent l'adresse
+  // du projet et la clé publique, comme les deux autres — et une clé privée
+  // pourrait y arriver par le même chemin sans que personne ne le voie.
   const dossiers = ['apps/collecteur/dist', 'apps/admin/dist', 'apps/site/dist'];
 
   const manquants = dossiers.filter((dossier) => !existsSync(dossier));
