@@ -29,6 +29,74 @@ import type { VueGlobale } from './donnees';
  * commissions. Une démonstration dont les totaux ne tombent pas juste se
  * remarque, et ce qu'elle démontre alors est l'inverse de ce qu'on voulait.
  */
+/**
+ * Les mouvements de la démonstration, déclarés à part.
+ *
+ * Deux endroits les lisent : `mouvements`, que la fiche d'un collecteur filtre,
+ * et `tendances.mouvements`, que le tableau de bord affiche depuis le
+ * 2026-09-11. Les recopier en ferait deux listes qui divergeraient, et une
+ * démonstration dont deux écrans se contredisent démontre l'inverse de ce
+ * qu'on voulait.
+ */
+const VUE_DEMO_MOUVEMENTS: VueGlobale['mouvements'] = [
+  {
+    type: 'mise',
+    client: 'Koffi Amenan Chantal',
+    collecteur_id: 'col-1',
+    collecteur: 'Kouassi Jean-Baptiste',
+    montant: 5000,
+    survenu_le: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+  },
+  {
+    type: 'mise',
+    client: 'Touré Bakary',
+    collecteur_id: 'col-2',
+    collecteur: 'Yao Adjoua Marie',
+    montant: 2000,
+    survenu_le: new Date(Date.now() - 42 * 60 * 1000).toISOString(),
+  },
+  {
+    type: 'commission',
+    client: 'Ouattara Fatou',
+    collecteur_id: 'col-3',
+    collecteur: 'Diallo Souleymane',
+    montant: 1000,
+    survenu_le: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
+  },
+  {
+    type: 'restitution',
+    client: 'N’Dri Yao Pascal',
+    collecteur_id: 'col-5',
+    collecteur: 'Bamba Balla',
+    montant: -150000,
+    survenu_le: new Date(Date.now() - 140 * 60 * 1000).toISOString(),
+  },
+  {
+    type: 'mise',
+    client: 'Soro Gnenema',
+    collecteur_id: 'col-4',
+    collecteur: 'Kone Awa',
+    montant: 10000,
+    survenu_le: new Date(Date.now() - 210 * 60 * 1000).toISOString(),
+  },
+  {
+    type: 'mise',
+    client: 'Diomandé Massandjé',
+    collecteur_id: 'col-1',
+    collecteur: 'Kouassi Jean-Baptiste',
+    montant: 5000,
+    survenu_le: new Date(Date.now() - 300 * 60 * 1000).toISOString(),
+  },
+  {
+    type: 'restitution',
+    client: 'Coulibaly Ibrahim',
+    collecteur_id: 'col-3',
+    collecteur: 'Diallo Souleymane',
+    montant: -90000,
+    survenu_le: new Date(Date.now() - 450 * 60 * 1000).toISOString(),
+  },
+];
+
 export const VUE_DEMO: VueGlobale = {
   genereLe: new Date().toISOString(),
   abonnements: {
@@ -177,64 +245,7 @@ export const VUE_DEMO: VueGlobale = {
       encours: 1450000,
     },
   ],
-  mouvements: [
-    {
-      type: 'mise',
-      client: 'Koffi Amenan Chantal',
-      collecteur_id: 'col-1',
-      collecteur: 'Kouassi Jean-Baptiste',
-      montant: 5000,
-      survenu_le: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    },
-    {
-      type: 'mise',
-      client: 'Touré Bakary',
-      collecteur_id: 'col-2',
-      collecteur: 'Yao Adjoua Marie',
-      montant: 2000,
-      survenu_le: new Date(Date.now() - 42 * 60 * 1000).toISOString(),
-    },
-    {
-      type: 'commission',
-      client: 'Ouattara Fatou',
-      collecteur_id: 'col-3',
-      collecteur: 'Diallo Souleymane',
-      montant: 1000,
-      survenu_le: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
-    },
-    {
-      type: 'restitution',
-      client: 'N’Dri Yao Pascal',
-      collecteur_id: 'col-5',
-      collecteur: 'Bamba Balla',
-      montant: -150000,
-      survenu_le: new Date(Date.now() - 140 * 60 * 1000).toISOString(),
-    },
-    {
-      type: 'mise',
-      client: 'Soro Gnenema',
-      collecteur_id: 'col-4',
-      collecteur: 'Kone Awa',
-      montant: 10000,
-      survenu_le: new Date(Date.now() - 210 * 60 * 1000).toISOString(),
-    },
-    {
-      type: 'mise',
-      client: 'Diomandé Massandjé',
-      collecteur_id: 'col-1',
-      collecteur: 'Kouassi Jean-Baptiste',
-      montant: 5000,
-      survenu_le: new Date(Date.now() - 300 * 60 * 1000).toISOString(),
-    },
-    {
-      type: 'restitution',
-      client: 'Coulibaly Ibrahim',
-      collecteur_id: 'col-3',
-      collecteur: 'Diallo Souleymane',
-      montant: -90000,
-      survenu_le: new Date(Date.now() - 450 * 60 * 1000).toISOString(),
-    },
-  ],
+  mouvements: VUE_DEMO_MOUVEMENTS,
   cartes: [],
   cartes_total_lignes: 1280,
   paiements: {
@@ -246,6 +257,54 @@ export const VUE_DEMO: VueGlobale = {
         dernier_le: '2026-08-30T10:00:00Z',
         dernier_montant: 25000,
         derniere_devise: 'XOF',
+      },
+    ],
+  },
+  // Sept jours contre les sept précédents : +12,5 % d'encaissé, et des
+  // restitutions en baisse. Les commissions ne suivent pas l'encaissé au
+  // dixième près — deux variations identiques sur deux cartes voisines se
+  // liraient comme une seule mesure recopiée.
+  tendances: {
+    periode: { jours: 7, debut: '2026-09-05', fin: '2026-09-11' },
+    depuis: '2026-07-01',
+    flux: {
+      encaisse: 3_150_000,
+      commissions: 315_000,
+      restitutions: 480_000,
+      mises: 630,
+      retraits: 12,
+    },
+    flux_precedent: {
+      encaisse: 2_800_000,
+      commissions: 245_000,
+      restitutions: 520_000,
+      mises: 560,
+      retraits: 14,
+    },
+    serie: [
+      { jour: '2026-09-05', encaisse: 420_000, commissions: 42_000, restitutions: 60_000, mises: 84 },
+      { jour: '2026-09-06', encaisse: 455_000, commissions: 45_500, restitutions: 0, mises: 91 },
+      { jour: '2026-09-07', encaisse: 390_000, commissions: 39_000, restitutions: 120_000, mises: 78 },
+      { jour: '2026-09-08', encaisse: 505_000, commissions: 50_500, restitutions: 0, mises: 101 },
+      { jour: '2026-09-09', encaisse: 470_000, commissions: 47_000, restitutions: 90_000, mises: 94 },
+      { jour: '2026-09-10', encaisse: 440_000, commissions: 44_000, restitutions: 60_000, mises: 88 },
+      { jour: '2026-09-11', encaisse: 470_000, commissions: 47_000, restitutions: 150_000, mises: 94 },
+    ],
+    zones: [
+      { zone: 'Adjamé', encaisse: 1_180_000, mises: 236, collecteurs: 5 },
+      { zone: 'Yopougon', encaisse: 940_000, mises: 188, collecteurs: 4 },
+      { zone: 'Cocody', encaisse: 620_000, mises: 124, collecteurs: 3 },
+      { zone: 'Abobo', encaisse: 410_000, mises: 82, collecteurs: 2 },
+    ],
+    mouvements: VUE_DEMO_MOUVEMENTS,
+    mouvements_total: 630,
+    collecteurs_sans_mise: [
+      {
+        id: 'col-7',
+        nom: 'Traoré Aminata',
+        zone: 'Abobo',
+        derniere_mise: '2026-08-28',
+        jours_sans: 14,
       },
     ],
   },

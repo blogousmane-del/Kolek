@@ -1,4 +1,4 @@
-import { formatMontant } from '@kolek/core';
+import { formatMontant, variation } from '@kolek/core';
 import {
   ActionsRapides,
   BarreEmpilee,
@@ -12,31 +12,36 @@ import {
 } from '@kolek/ui';
 import { useId, useMemo, useState } from 'react';
 
-import type { Mouvement, VueGlobale } from '../donnees';
+import { chargerTendances, type Periode, type Tendances, type VueGlobale } from '../donnees';
 
 /**
- * Fenêtre de lecture du flux des mouvements.
+ * Le tableau de bord, et les deux temps qu'il fait cohabiter.
  *
- * **Elle ne s'applique qu'aux mouvements, et c'est tout ce qu'elle peut faire.**
- * `VueGlobale.totaux` est un agrégat sans dimension temporelle : la base ne rend
- * ni l'encaissé des sept derniers jours, ni celui d'hier. Seuls les mouvements
- * portent une date, `survenu_le`, donc seuls les mouvements se filtrent.
+ * **Les flux se lisent sur une période, les stocks à l'instant.** Les mises et
+ * les retraits portent une date : encaissé, commissions, restitutions et
+ * mouvements se calculent donc sur la fenêtre choisie, et se comparent à la
+ * fenêtre précédente de même longueur. L'encours, les collecteurs actifs et les
+ * abonnements à échoir n'en ont pas : ce sont des états, pas des flux, et
+ * chaque carte dit lequel des deux elle porte.
  *
- * La version du 2026-09-05 faisait autrement : elle multipliait les totaux réels
- * par 0,12 / 0,35 / 0,85 selon la période choisie, et affichait le produit comme
- * un montant. « 7 derniers jours » rendait 35 % de l'encaissé depuis l'ouverture
- * — un nombre qui ne mesurait rien. Sur une plateforme qui manipule l'argent
- * d'autrui, un chiffre inventé qui a l'air d'un chiffre lu est le pire des deux
- * mondes : il se croit, et il se cite.
+ * **Un seul sélecteur de temps sur l'écran.** La version du 2026-09-05 en avait
+ * un qui multipliait les totaux par des coefficients écrits à la main — 0,35
+ * pour « 7 derniers jours » —, et l'audit du 2026-09-06 l'a remplacé par une
+ * fenêtre locale sur la seule liste datée. Depuis que la base sait rendre une
+ * période, la fenêtre locale disparaît : deux commandes de temps sur un même
+ * écran, c'est une de trop, et c'est ce qui avait rendu la multiplication
+ * crédible.
+ *
+ * **Aucun montant n'est calculé ici.** Le serveur tranche, l'écran affiche —
+ * `variation()` ne fait que juger deux nombres qu'il a reçus.
  */
-type FenetreMouvements = 'tout' | '30j' | '7j' | 'aujourdhui';
+
 type FiltreTypeMouvement = 'tous' | 'mise' | 'commission' | 'restitution';
 
-const FENETRES: { cle: FenetreMouvements; libelle: string; jours: number | null }[] = [
-  { cle: 'tout', libelle: 'Tout', jours: null },
-  { cle: '30j', libelle: '30 j', jours: 30 },
-  { cle: '7j', libelle: '7 j', jours: 7 },
-  { cle: 'aujourdhui', libelle: "Aujourd'hui", jours: 1 },
+const PERIODES: { cle: Periode; libelle: string; phrase: string }[] = [
+  { cle: 1, libelle: "Aujourd'hui", phrase: "aujourd'hui" },
+  { cle: 7, libelle: '7 j', phrase: '7 derniers jours' },
+  { cle: 30, libelle: '30 j', phrase: '30 derniers jours' },
 ];
 
 const TYPES: { id: FiltreTypeMouvement; libelle: string }[] = [
@@ -48,7 +53,7 @@ const TYPES: { id: FiltreTypeMouvement; libelle: string }[] = [
 
 const COULEURS_ZONES = ['bg-chart-mint', 'bg-chart-blue', 'bg-chart-teal', 'bg-chart-slate'];
 
-function libelleMouvement(m: Mouvement): string {
+function libelleMouvement(m: { survenu_le: string; type: string; collecteur: string }): string {
   const dateObj = new Date(m.survenu_le);
   const quand = dateObj.toLocaleDateString('fr-FR', {
     day: 'numeric',
@@ -61,53 +66,63 @@ function libelleMouvement(m: Mouvement): string {
   return `${quand} · ${quoi} (${m.collecteur})`;
 }
 
-function typeLigne(m: Mouvement): 'positive' | 'negative' | 'neutre' {
+function typeLigne(m: { type: string }): 'positive' | 'negative' | 'neutre' {
   if (m.type === 'restitution') return 'negative';
   if (m.type === 'commission') return 'neutre';
   return 'positive';
-}
-
-/** Le début de la fenêtre. `aujourdhui` compte depuis minuit local, pas depuis
-    « il y a vingt-quatre heures » : c'est ce que l'administrateur entend par
-    aujourd'hui, et c'est aussi la journée que le collecteur déclare en caisse. */
-function debutFenetre(jours: number | null): number | null {
-  if (jours === null) return null;
-  const debut = new Date();
-  debut.setHours(0, 0, 0, 0);
-  if (jours > 1) debut.setDate(debut.getDate() - (jours - 1));
-  return debut.getTime();
 }
 
 export function TableauDeBord({
   vue,
   onNaviguer,
   onRecharger,
+  /** Remplacée dans les épreuves. Par défaut, la vraie route. */
+  charger = chargerTendances,
 }: {
   vue: VueGlobale;
   onNaviguer: (cle: CleNavAdmin) => void;
   onRecharger?: () => void;
+  charger?: (jours: Periode) => Promise<Tendances>;
 }) {
   const { totaux, abonnements, zones, mouvements } = vue;
 
-  const [fenetre, setFenetre] = useState<FenetreMouvements>('tout');
+  const [periode, setPeriode] = useState<Periode>(7);
+  const [tendances, setTendances] = useState<Tendances | null | undefined>(vue.tendances);
   const [rechercheMvt, setRechercheMvt] = useState('');
   const [filtreTypeMvt, setFiltreTypeMvt] = useState<FiltreTypeMouvement>('tous');
   const idRecherche = useId();
 
+  // La première période arrive avec la vue ; les suivantes se demandent seules,
+  // et seules — `partie=tendances` évite de retélécharger cinq cents cartes
+  // pour recalculer un total.
+  function choisirPeriode(jours: Periode) {
+    if (jours === periode) return;
+    setPeriode(jours);
+    charger(jours)
+      .then((t) => setTendances(t))
+      // Une période qu'on n'a pas pu lire ne doit pas laisser les chiffres de
+      // la précédente sous un libellé neuf : c'est ainsi qu'un écran ment.
+      .catch(() => setTendances(null));
+  }
+
+  const phrase = PERIODES.find((p) => p.cle === periode)!.phrase;
+  const varEncaisse = tendances
+    ? variation(tendances.flux.encaisse, tendances.flux_precedent.encaisse)
+    : null;
+  const varCommissions = tendances
+    ? variation(tendances.flux.commissions, tendances.flux_precedent.commissions)
+    : null;
+  const sansMise = tendances?.collecteurs_sans_mise ?? [];
+
   const mouvementsFiltres = useMemo(() => {
-    const jours = FENETRES.find((f) => f.cle === fenetre)?.jours ?? null;
-    const seuil = debutFenetre(jours);
     const terme = rechercheMvt.trim().toLowerCase();
 
     return mouvements.filter((m) => {
-      if (seuil !== null && new Date(m.survenu_le).getTime() < seuil) return false;
       if (filtreTypeMvt !== 'tous' && m.type !== filtreTypeMvt) return false;
       if (terme === '') return true;
-      return (
-        m.client.toLowerCase().includes(terme) || m.collecteur.toLowerCase().includes(terme)
-      );
+      return m.client.toLowerCase().includes(terme) || m.collecteur.toLowerCase().includes(terme);
     });
-  }, [mouvements, rechercheMvt, filtreTypeMvt, fenetre]);
+  }, [mouvements, rechercheMvt, filtreTypeMvt]);
 
   // Répartition des flux, sur les totaux tels qu'ils sortent de la base. La
   // somme des trois parts vaut l'encaissé plus les restitutions : la commission
@@ -148,11 +163,6 @@ export function TableauDeBord({
   const zoneMax = zonesTriees[0]?.encaisse ?? 1;
   const totalEncaisseZones = useMemo(() => zones.reduce((acc, z) => acc + z.encaisse, 0), [zones]);
 
-  const tauxActifs =
-    abonnements.collecteurs_total > 0
-      ? Math.round((abonnements.collecteurs_actifs / abonnements.collecteurs_total) * 100)
-      : 0;
-
   return (
     <>
       <BarreHaute
@@ -172,41 +182,78 @@ export function TableauDeBord({
       />
 
       <div className="px-4 sm:px-6 lg:px-8 pb-8 flex-1 flex flex-col gap-5">
-        {/* Grille des cartes statistiques synthétiques.
+        {/* Le seul sélecteur de temps de l'écran. Il commande les flux — cartes
+            de période, mouvements — et rien d'autre : les stocks n'ont pas de
+            période, et le dire est plus honnête que de les faire varier. */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div role="group" aria-label="Période" className="flex flex-wrap gap-2">
+            {PERIODES.map((p) => (
+              <button
+                key={p.cle}
+                type="button"
+                aria-pressed={periode === p.cle}
+                onClick={() => choisirPeriode(p.cle)}
+                className={`px-3 py-1.5 rounded-pill border font-body text-sm font-medium cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                  periode === p.cle
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'border-hairline text-ink'
+                }`}
+              >
+                {p.libelle}
+              </button>
+            ))}
+          </div>
+          <span className="font-body text-sm text-muted-foreground">
+            Les flux suivent cette période ; les stocks sont à l'instant.
+          </span>
+        </div>
 
-            **Aucune `tendance` n'est passée, sur aucune des quatre cartes.**
-            `CarteStat` documente la règle en toutes lettres — la base ne garde
-            aucun instantané d'hier, donc aucun pourcentage de variation n'est
-            calculable — et le composant fait plus que porter le chiffre : il
-            écrit « vs période précédente » sous le badge. Y glisser un taux
-            d'activité, qui est un rapport et non une variation, produirait donc
-            une phrase fausse à partir d'un nombre juste. Le rapport se dit dans
-            `precision`, où rien ne prétend le comparer à hier. */}
+        {!tendances && (
+          <Carte className="p-5">
+            <p className="font-body text-sm text-muted-foreground">
+              Tendances indisponibles : la base n'a pas rendu les flux de la période. Les totaux
+              ci-dessous restent à jour.
+            </p>
+          </Carte>
+        )}
+
+        {/* Deux cartes de flux, deux cartes d'état.
+
+            Les deux premières portent une variation parce qu'une période
+            précédente existe pour s'y comparer. Les deux dernières n'en portent
+            aucune : `CarteStat` écrit « vs période précédente » sous chaque
+            pastille, et y glisser un rapport — ou un stock — produirait une
+            phrase fausse à partir d'un nombre juste. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <CarteStat
+            libelle="Encaissé"
+            valeur={formatMontant(tendances?.flux.encaisse ?? 0)}
+            unite="FCFA"
+            tendance={varEncaisse?.libelle}
+            tendancePositive={varEncaisse?.positive ?? true}
+            precision={varEncaisse ? undefined : `${phrase} · pas de comparaison possible`}
+            icone="coins"
+          />
+          <CarteStat
+            libelle="Commissions GTCS"
+            valeur={formatMontant(tendances?.flux.commissions ?? 0)}
+            unite="FCFA"
+            tendance={varCommissions?.libelle}
+            tendancePositive={varCommissions?.positive ?? true}
+            precision={varCommissions ? undefined : `${phrase} · pas de comparaison possible`}
+            icone="trending-up"
+          />
           <CarteStat
             libelle="Encours clients"
             valeur={formatMontant(totaux.encours_clients)}
             unite="FCFA"
-            precision="Dû aux clients, restitutions déduites"
+            precision="Dû aux clients, à l’instant"
             icone="wallet"
           />
           <CarteStat
-            libelle="Commissions GTCS"
-            valeur={formatMontant(totaux.commissions)}
-            unite="FCFA"
-            precision="Rétribution brute de la plateforme"
-            icone="trending-up"
-          />
-          <CarteStat
-            libelle="Collecteurs actifs"
-            valeur={String(abonnements.collecteurs_actifs)}
-            precision={`${tauxActifs} % des ${abonnements.collecteurs_total} inscrits au catalogue`}
-            icone="users"
-          />
-          <CarteStat
-            libelle="Abonnements à échoir"
-            valeur={String(abonnements.expirations_a_venir_30j)}
-            precision="Expiration dans les 30 jours"
+            libelle="Sans mise depuis 7 jours"
+            valeur={String(sansMise.length)}
+            precision={`sur ${abonnements.collecteurs_actifs} collecteurs actifs`}
             icone="alert-circle"
           />
         </div>
@@ -217,14 +264,13 @@ export function TableauDeBord({
           <div className="flex flex-col gap-5">
             <Carte className="p-6">
               <div className="flex items-center justify-between gap-3 mb-2">
+                {/* Le cumul de toute la vie de la plateforme, et il le dit dans
+                    son intitulé : sans cela, deux chiffres nommés « encaissé »
+                    cohabiteraient sur un même écran sans qu'on sache lequel
+                    parle de quoi. Aucune tendance ici — un cumul depuis
+                    l'ouverture n'a rien à quoi se comparer. */}
                 <span className="text-sm font-body font-semibold text-muted-foreground uppercase tracking-wider">
-                  Total encaissé
-                </span>
-                {/* Une date, pas un jugement. « Activité saine » était un avis
-                    en dur, affiché quels que soient les chiffres — un badge qui
-                    dit toujours la même chose ne dit rien. */}
-                <span className="text-xs font-body text-muted-foreground shrink-0">
-                  Depuis l'ouverture
+                  Total encaissé depuis l'ouverture
                 </span>
               </div>
 
@@ -320,6 +366,15 @@ export function TableauDeBord({
                   </div>
                 ))}
               </div>
+              {/* Les échéances parlent d'abonnements : elles vivent ici, avec le
+                  revenu récurrent, plutôt qu'en carte de tête où elles
+                  voisinaient des flux du terrain. */}
+              <div className="flex items-center justify-between gap-3 text-xs font-body pt-2 mt-2 border-t border-hairline">
+                <span className="text-muted-foreground">Abonnements à échoir sous 30 jours</span>
+                <span className="font-semibold text-ink tabular-nums">
+                  {abonnements.expirations_a_venir_30j}
+                </span>
+              </div>
             </Carte>
           </div>
 
@@ -378,10 +433,9 @@ export function TableauDeBord({
             </Carte>
           </div>
 
-          {/* Colonne droite : le flux des mouvements — le seul endroit de l'écran
-              où une fenêtre temporelle a un sens, puisque c'est le seul jeu de
-              données qui porte une date. Les trois commandes sont donc ici, et
-              nulle part ailleurs. */}
+          {/* Colonne droite : le flux des mouvements. La fenêtre de temps qui
+              vivait ici est remontée en tête d'écran : elle commande désormais
+              tout ce qui est daté, et plus seulement cette liste. */}
           <div className="flex flex-col gap-5">
             <Carte className="overflow-hidden flex flex-col h-full">
               <div className="p-4 border-b border-hairline">
@@ -421,30 +475,7 @@ export function TableauDeBord({
 
                   {/* `aria-pressed` plutôt qu'une simple classe active : la
                       couleur dit l'état à l'œil, elle ne le dit à personne
-                      d'autre. Deux groupes, deux `aria-label` — sans quoi huit
-                      boutons se suivent sans qu'on sache lesquels vont ensemble. */}
-                  <div
-                    role="group"
-                    aria-label="Fenêtre de temps"
-                    className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none"
-                  >
-                    {FENETRES.map((f) => (
-                      <button
-                        key={f.cle}
-                        type="button"
-                        aria-pressed={fenetre === f.cle}
-                        onClick={() => setFenetre(f.cle)}
-                        className={`px-2 py-1 rounded text-xs font-body transition-colors shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
-                          fenetre === f.cle
-                            ? 'bg-primary text-primary-foreground font-semibold'
-                            : 'bg-canvas text-muted-foreground font-medium hover:text-ink'
-                        }`}
-                      >
-                        {f.libelle}
-                      </button>
-                    ))}
-                  </div>
-
+                      d'autre. */}
                   <div
                     role="group"
                     aria-label="Type de mouvement"

@@ -1,3 +1,4 @@
+import type { FluxPeriode } from '@kolek/core';
 import { useCallback, useEffect, useState } from 'react';
 
 import { supabase } from './supabase';
@@ -81,6 +82,47 @@ export interface LigneCarte {
   encours: number;
 }
 
+/** Les trois seules fenêtres proposées. Le serveur refuse toute autre valeur. */
+export type Periode = 1 | 7 | 30;
+
+export interface PointSerieJour {
+  jour: string;
+  encaisse: number;
+  commissions: number;
+  restitutions: number;
+  mises: number;
+}
+
+export interface ZonePeriode {
+  zone: string;
+  encaisse: number;
+  mises: number;
+  collecteurs: number;
+}
+
+export interface CollecteurSansMise {
+  id: string;
+  nom: string;
+  zone: string | null;
+  /** `null` quand ce collecteur n'a jamais encaissé. */
+  derniere_mise: string | null;
+  jours_sans: number;
+}
+
+/** Ce que `admin_tendances(p_jours)` rend, tel quel. */
+export interface Tendances {
+  periode: { jours: Periode; debut: string; fin: string };
+  /** Jour de la première mise en base. `null` si la base n'en a aucune. */
+  depuis: string | null;
+  flux: FluxPeriode;
+  flux_precedent: FluxPeriode;
+  serie: PointSerieJour[];
+  zones: ZonePeriode[];
+  mouvements: Mouvement[];
+  mouvements_total: number;
+  collecteurs_sans_mise: CollecteurSansMise[];
+}
+
 export interface VueGlobale {
   genereLe: string;
   abonnements: {
@@ -121,6 +163,10 @@ export interface VueGlobale {
       derniere_devise: string;
     }>;
   } | null;
+  /** `null` quand `admin_tendances` a échoué : l'écran le dit et garde le
+      reste. Facultatif, parce qu'une réponse d'avant le 2026-09-11 n'en a
+      pas. */
+  tendances?: Tendances | null;
 }
 
 export type EtatVue =
@@ -135,7 +181,32 @@ const MESSAGES: Record<string, string> = {
   PALIER_INCONNU: 'Un collecteur porte un palier absent de la grille tarifaire.',
   CONFIGURATION: 'Le serveur est mal configuré.',
   JETON_ABSENT: 'Session expirée. Reconnecte-toi.',
+  PERIODE_INVALIDE: 'Cette période n’est pas proposée.',
 };
+
+/**
+ * Le code d'erreur que l'Edge Function a posé dans le corps de sa réponse.
+ *
+ * Le corps d'une réponse non-2xx voyage dans `error.context`. Sans cette
+ * lecture, un refus légitime — « ce compte n'est pas administrateur » —
+ * s'afficherait comme un « Edge Function returned a non-2xx status code », et
+ * personne ne saurait quoi en faire.
+ *
+ * Extraite le 2026-09-11 : deux fonctions appellent maintenant la même route,
+ * et recopier cette lecture en ferait deux versions à corriger le jour où la
+ * forme change.
+ */
+async function codeErreur(error: unknown): Promise<string | undefined> {
+  try {
+    const contexte = (error as { context?: Response }).context;
+    if (contexte && typeof contexte.json === 'function') {
+      return ((await contexte.json()) as { erreur?: string }).erreur;
+    }
+  } catch {
+    // Corps illisible : l'appelant garde son message générique.
+  }
+  return undefined;
+}
 
 export async function chargerVueGlobale(): Promise<VueGlobale> {
   // `functions.invoke` joint le jeton de la session en cours. C'est ce jeton que
@@ -144,23 +215,34 @@ export async function chargerVueGlobale(): Promise<VueGlobale> {
   const { data, error } = await supabase.functions.invoke('admin-vue-globale', { method: 'GET' });
 
   if (error) {
-    // Le corps d'une réponse non-2xx voyage dans `error.context`. Sans cette
-    // lecture, un refus légitime — « ce compte n'est pas administrateur » —
-    // s'afficherait comme un « Edge Function returned a non-2xx status code »,
-    // et personne ne saurait quoi en faire.
-    let code: string | undefined;
-    try {
-      const contexte = (error as { context?: Response }).context;
-      if (contexte && typeof contexte.json === 'function') {
-        code = ((await contexte.json()) as { erreur?: string }).erreur;
-      }
-    } catch {
-      // Corps illisible : on garde le message générique ci-dessous.
-    }
+    const code = await codeErreur(error);
     throw new Error(code ? (MESSAGES[code] ?? code) : error.message);
   }
 
   return data as VueGlobale;
+}
+
+/**
+ * Les seules tendances, pour un changement de période.
+ *
+ * `partie=tendances` évite de retélécharger cinq cents cartes et toute la liste
+ * des collecteurs pour recalculer un total. Le corps plutôt que la chaîne de
+ * requête : `functions.invoke` ne sait pas construire la seconde, et la route
+ * lit les deux.
+ */
+export async function chargerTendances(jours: Periode): Promise<Tendances> {
+  const { data, error } = await supabase.functions.invoke('admin-vue-globale', {
+    body: { jours, partie: 'tendances' },
+  });
+
+  if (error) {
+    const code = await codeErreur(error);
+    throw new Error(code ? (MESSAGES[code] ?? code) : error.message);
+  }
+
+  const tendances = (data as { tendances: Tendances | null }).tendances;
+  if (!tendances) throw new Error('La base n’a pas rendu les tendances.');
+  return tendances;
 }
 
 /**
