@@ -1,5 +1,4 @@
 import {
-  BandeauOffre,
   BarreLaterale,
   Bouton,
   Icone,
@@ -191,14 +190,6 @@ export function Coquille({
                 {TITRE_ESPACE[espace]}
               </span>
             </div>
-
-            {/* La maquette omettait ce bandeau sur la fiche collecteur. L'état de
-                l'abonnement ne dépend pas de la page où l'on se trouve.
-
-                Il ne dépend en revanche que de l'espace : la console de plateforme
-                n'est l'abonnée de personne, et y afficher une échéance de palier
-                parlerait de l'organisation qu'on vient de quitter. */}
-            {espace === 'admin' && <BandeauOffre />}
 
           {erreurSortie && (
             <p

@@ -2,7 +2,7 @@ export { ActionsCarte, type ActionCarte } from './ActionsCarte';
 export { ActionsRapides, type ActionRapide } from './ActionsRapides';
 export { Avatar, fondPour, initiales } from './Avatar';
 export { BadgeStatut, type Statut } from './BadgeStatut';
-export { BandeauHorsLigne, BandeauOffre, useEnLigne } from './Bandeaux';
+export { BandeauHorsLigne, useEnLigne } from './Bandeaux';
 export { BarreEmpilee, type PartRepartition } from './BarreEmpilee';
 export { BarreHaute, type ActionBarre } from './BarreHaute';
 export {

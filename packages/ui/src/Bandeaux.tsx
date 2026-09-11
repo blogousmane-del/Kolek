@@ -2,38 +2,6 @@ import { useEffect, useState } from 'react';
 
 import { Icone } from './Icone';
 
-/** Bandeau d'offre, en tête du Dashboard. */
-export function BandeauOffre({
-  etiquette = 'Essai gratuit',
-  detail = '30 jours restants',
-}: {
-  etiquette?: string;
-  detail?: string;
-}) {
-  return (
-    <div className="bg-secondary flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 py-2 flex-shrink-0">
-      <div className="flex items-center gap-2">
-        <span className="px-3 py-0.5 rounded-pill bg-primary text-primary-foreground text-xs font-body font-semibold">
-          {etiquette}
-        </span>
-        <span className="text-sm font-body text-secondary-foreground">{detail}</span>
-      </div>
-      {/* Aucune page d'offres n'existe encore dans l'application. Désactivé avec
-          sa raison plutôt que laissé cliquable : un bouton qui ne répond pas
-          apprend à l'utilisateur que l'interface ne réagit pas, et il cesse
-          d'essayer ailleurs. */}
-      <button
-        type="button"
-        disabled
-        title="Page des offres à venir"
-        className="text-sm font-body font-medium text-primary opacity-50 cursor-default"
-      >
-        Voir les offres →
-      </button>
-    </div>
-  );
-}
-
 /**
  * Le message change selon ce qu'on sait réellement. Annoncer « 2 mises en
  * attente » quand aucune file n'existe encore serait un mensonge d'interface,

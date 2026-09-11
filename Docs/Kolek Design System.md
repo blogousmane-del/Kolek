@@ -272,7 +272,7 @@ Tous vivent dans **`packages/ui/src`** et sont partagés par les deux applicatio
 | `BarreHaute` | `BarreHaute.tsx` | Fil d'Ariane + titre + actions en pilules. |
 | `NavMobile` | `NavMobile.tsx` | Barre du bas, onglet d'encaissement saillant. |
 | `ActionsRapides` | `ActionsRapides.tsx` | Grille d'icônes rondes, variante compacte. |
-| `BandeauOffre`, `BandeauHorsLigne`, `useEnLigne` | `Bandeaux.tsx` | Palier d'abonnement, état réseau. |
+| `BandeauHorsLigne`, `useEnLigne` | `Bandeaux.tsx` | État réseau. |
 | `EcranConnexion` | `EcranConnexion.tsx` | Formulaire de connexion partagé. |
 | `EcranMessage` | `EcranMessage.tsx` | Écran de blocage : filet, portillon, indisponibilité. |
 | `Filet` | `Filet.tsx` | Frontière d'erreur de rendu. |

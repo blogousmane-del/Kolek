@@ -100,4 +100,14 @@ describe('la coquille d’administration', () => {
     allerALaPlateforme();
     expect(screen.getByText('console plateforme · plateforme')).toBeDefined();
   });
+
+  it('ne montre pas de bandeau d’essai : GTCS n’est en essai chez personne', () => {
+    render(<Coquille />);
+
+    // « 30 jours restants » et non « Essai gratuit » : l'écran Demandes affiche
+    // ce second libellé à bon droit, pour le palier gratuit d'un prospect.
+    expect(screen.queryByText('30 jours restants')).toBeNull();
+    expect(screen.queryByText('Voir les offres →')).toBeNull();
+    expect(screen.getByText('écran tableau')).toBeDefined();
+  });
 });
