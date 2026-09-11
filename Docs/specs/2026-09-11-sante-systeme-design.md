@@ -186,9 +186,12 @@ seuil honnête sans le plafond du forfait.
   cache, journal du planificateur (taille et lignes). « vs mois dernier »
   seulement si un relevé d'au moins 30 jours existe — le plus récent d'entre
   eux sert de référence ; sinon la précision dit « premier relevé le … ».
-  `CarteStat` écrit aujourd'hui « vs période précédente » en dur : elle gagne
-  une propriété facultative `comparaison`, dont la valeur par défaut garde ce
-  texte, pour que la carte dise exactement à quoi elle se compare.
+  La comparaison s'écrit **dans la précision**, en texte neutre
+  (« +3 Mo vs mois dernier ») et non dans le badge de tendance de `CarteStat` :
+  ce badge colore une hausse en vert et une baisse en rouge, et une base qui
+  grossit n'est ni une bonne ni une mauvaise nouvelle. `CarteStat` ne change
+  donc pas. *(Corrigé au plan, le 2026-09-11 : la version approuvée lui
+  ajoutait une propriété `comparaison`.)*
 - **La courbe d'évolution** : un composant SVG, **`CourbeEvolution`**, dans
   `packages/ui`, sans bibliothèque. Une série à la fois, choisie parmi taille
   de la base, mises, clients, cartes actives, lignes de journal. Au survol ou
@@ -213,7 +216,6 @@ seuil honnête sans le plafond du forfait.
 | `packages/core/src/sante.ts` (+ épreuve) | `evaluerSante`, types `MesuresSante`, `Voyant`, `NiveauSante`. Exporté par l'index de `core`. |
 | `packages/ui/src/CourbeEvolution.tsx` (+ épreuve) | Neuf. Exporté par l'index de `ui`. |
 | `packages/ui/src/Icone.tsx` | `activity`. |
-| `packages/ui/src/CarteStat.tsx` | Propriété facultative `comparaison`, « vs période précédente » par défaut : les usages existants ne changent pas. |
 | `packages/ui/src/BarreLaterale.tsx` (+ épreuve) | Libellé et icône de l'entrée `plateforme`. |
 | `apps/admin/src/superadmin.ts` | Type `SanteSysteme`, champ `sante`. |
 | `apps/admin/src/ecrans/superadmin/Sante.tsx` | Neuf : synthèse, pastilles, cartes, courbe. |
