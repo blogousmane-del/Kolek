@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import { signatureChariowValide } from '../_shared/chariow.ts';
+import { PULSE_FENETRE_SECONDES, PULSE_PLAFOND, empreintePulse } from '../_shared/debit.ts';
 import { chargerPaiementsRattrapables, creerDepot, type Cible } from '../_shared/depot-chariow.ts';
 import { ouvrirCompteDepuisDemande } from '../_shared/ouvrir-compte.ts';
 import { reconcilier } from '../_shared/reconciliation.ts';
@@ -16,7 +17,7 @@ import { secretValide } from '../_shared/secret.ts';
  * partagé voyage dans l'URL. `supabase/config.toml` porte donc, pour cette
  * fonction et pour elle seule, `verify_jwt = false`.
  *
- * Quatre garde-fous en contrepartie :
+ * Cinq garde-fous en contrepartie :
  *
  * 1. **Le secret est comparé en temps constant.** Une comparaison de chaînes
  *    s'arrête au premier caractère différent et fuit la longueur du préfixe
@@ -31,6 +32,12 @@ import { secretValide } from '../_shared/secret.ts';
  * 3. **Aucun en-tête CORS.** Aucun navigateur n'appelle cette adresse.
  * 4. **200 même sur un événement inconnu**, pour ne pas provoquer de vagues de
  *    réessais ; 401 sur secret invalide, sans autre détail.
+ * 5. **Vingt Pulses par heure et par vente, pas un de plus.** La signature ne
+ *    porte ni horodatage ni nonce : un Pulse capturé se rejoue tel quel, et
+ *    chaque rejeu ferait lire la vente chez Chariow. Au-delà, `429` — Chariow
+ *    réessaie plus tard ce qu'il n'a pas vu accepté, le rejeu n'obtient rien.
+ *    Par vente et non globalement : une vague de paiements légitimes touche
+ *    beaucoup de ventes, un rejeu toujours la même (`empreintePulse`).
  *
  * ## Ce que l'amendement « payer vaut accord » ajoute ici
  *
@@ -55,6 +62,34 @@ function reponse(corps: unknown, statut: number): Response {
 /** Une chaîne non vide, ou rien. Les métadonnées viennent du corps reçu. */
 function texte(valeur: unknown): string | null {
   return typeof valeur === 'string' && valeur ? valeur : null;
+}
+
+/**
+ * Vrai seulement quand le compteur répond, et répond « au-delà ».
+ *
+ * En panne — erreur rendue ou levée —, faux : on laisse passer. Ici, un refus
+ * à tort coûte un paiement non reconnu ; un passage à tort, une lecture
+ * d’API. C’est l’inverse des formulaires publics, qui ferment en panne.
+ */
+async function pulseEnTrop(client: ReturnType<typeof createClient>, cle: string): Promise<boolean> {
+  try {
+    const { data, error } = await client.rpc('consommer_debit', {
+      cle,
+      plafond: PULSE_PLAFOND,
+      fenetre_secondes: PULSE_FENETRE_SECONDES,
+    });
+    if (error) {
+      console.error('[Abonnement] compteur du webhook indisponible :', error.message);
+      return false;
+    }
+    return data === false;
+  } catch (cause) {
+    console.error(
+      '[Abonnement] compteur du webhook indisponible :',
+      cause instanceof Error ? cause.message : cause,
+    );
+    return false;
+  }
 }
 
 Deno.serve(async (requete) => {
@@ -90,7 +125,9 @@ Deno.serve(async (requete) => {
   const cleApi = Deno.env.get('CHARIOW_CLE_API');
   const racine = Deno.env.get('CHARIOW_API_URL') ?? 'https://api.chariow.com/v1';
 
-  if (!url || !cleService || !cleApi) {
+  // `cleApi` ne se contrôle plus ici : elle ne sert qu’à relire les ventes, et
+  // la borne doit pouvoir répondre sans elle. Voir plus bas, avant `creerDepot`.
+  if (!url || !cleService) {
     console.error('Configuration incomplète.');
     return reponse({ erreur: 'CONFIGURATION' }, 500);
   }
@@ -121,6 +158,16 @@ Deno.serve(async (requete) => {
   const collecteurMeta = texte(metadonnees.collecteurId);
   const demandeMeta = texte(metadonnees.demandeId);
 
+  // --- Combien de fois cette vente ---
+  //
+  // Après la signature : un appel non signé ne coûte toujours ni lecture ni
+  // écriture. Avant toute lecture de `paiements_abonnement` : un rejeu ne coûte
+  // plus qu’une écriture de compteur. Voir le cinquième garde-fou.
+  const cleDebit = empreintePulse({ vente: venteId, collecteur: collecteurMeta, demande: demandeMeta });
+  if (await pulseEnTrop(clientService, cleDebit)) {
+    return reponse({ erreur: 'TROP_DE_PULSES' }, 429);
+  }
+
   let cible: Cible | null = collecteurMeta
     ? { collecteur: collecteurMeta }
     : demandeMeta
@@ -144,6 +191,11 @@ Deno.serve(async (requete) => {
     // personne.
     console.error('[Abonnement] webhook sans rattachement identifiable');
     return reponse({ recu: true }, 200);
+  }
+
+  if (!cleApi) {
+    console.error('Configuration incomplète.');
+    return reponse({ erreur: 'CONFIGURATION' }, 500);
   }
 
   try {
