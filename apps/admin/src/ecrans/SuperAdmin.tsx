@@ -19,6 +19,7 @@ import { FicheModifiable } from './FicheModifiable';
 import { Journal } from './superadmin/Journal';
 import { Paiement } from './superadmin/Paiement';
 import { Plateforme } from './superadmin/Plateforme';
+import { dateLisible, mrrLisible } from './superadmin/lisible';
 import {
   agirSuperAdmin,
   useEtatSuperAdmin,
@@ -146,20 +147,6 @@ const COLONNES_ABONNES = '1fr 100px 110px 120px 120px 110px 60px';
 const LARGEUR_MINIMALE_ABONNES = 'min-w-[860px]';
 
 /* ========================== Fonctions utilitaires ======================== */
-
-function dateLisible(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
-/** Un MRR nul se lit « — » et non « 0 FCFA » : le collecteur est en essai, il ne
-    paie pas encore ; zéro laisserait croire à un impayé. */
-function mrrLisible(mrr: number): string {
-  return mrr === 0 ? '—' : `${formatMontant(mrr)} FCFA`;
-}
 
 function PastillePalier({ palier }: { palier: string }) {
   const description = PALIERS.find((p) => p.cle === palier);
