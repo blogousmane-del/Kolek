@@ -103,7 +103,15 @@ export function FicheClient({
   // disparaître, simplement relogé un niveau plus bas.
   const [visibleId, setVisibleId] = useState<string | null>(null);
   const [historiqueOuvert, setHistoriqueOuvert] = useState(false);
-  const [correction, setCorrection] = useState(false);
+  // Le brouillon de correction vit ici, et non dans `CorrigerFiche` — même
+  // raison que `visibleId` ci-dessus. La mise différée de `CartesEnCours`
+  // part six secondes après l'appui et appelle `onEcriture` ; la coquille
+  // fait monter `revision`, la fiche repasse par `null`, et le formulaire se
+  // démonte. Un brouillon logé dedans s'effaçait sous les doigts du
+  // collecteur — au moment exact où l'on corrige : il vient d'encaisser, et
+  // le client lui dit que son numéro a changé. Constaté en relisant, le
+  // 2026-09-11, avant toute mise en ligne.
+  const [brouillon, setBrouillon] = useState<CorrectionClient | null>(null);
 
   const relire = useCallback(async () => {
     if (!clientId) return;
@@ -138,9 +146,9 @@ export function FicheClient({
     // L'historique se referme avec le client : rester dedans en changeant de
     // client montrerait les cartes de l'un sous le nom de l'autre.
     setHistoriqueOuvert(false);
-    // Le formulaire de correction aussi : rester dedans en changeant de client
+    // Le brouillon de correction aussi : le garder en changeant de client
     // corrigerait la fiche de l'un avec la saisie de l'autre.
-    setCorrection(false);
+    setBrouillon(null);
   }, [clientId]);
 
   /**
@@ -219,15 +227,22 @@ export function FicheClient({
 
       {fiche && (
         <>
-          {correction ? (
+          {brouillon ? (
             <CorrigerFiche
               fiche={fiche}
+              saisie={brouillon}
+              // Par fonction, et non `{ ...brouillon, … }` : deux frappes
+              // rapprochées liraient sinon le même brouillon, et la seconde
+              // effacerait la première.
+              onChamp={(cle, valeur) =>
+                setBrouillon((b) => (b ? { ...b, [cle]: valeur } : b))
+              }
               onFini={async () => {
-                setCorrection(false);
+                setBrouillon(null);
                 await relire();
                 onEcriture();
               }}
-              onAnnuler={() => setCorrection(false)}
+              onAnnuler={() => setBrouillon(null)}
             />
           ) : (
             <>
@@ -235,7 +250,11 @@ export function FicheClient({
               {/* Une faute de frappe faite au marché était définitive jusqu'au
                   2026-09-11 : aucun écran, collecteur ou administration, ne
                   modifiait un client. */}
-              <Bouton variante="fantome" pleineLargeur onClick={() => setCorrection(true)}>
+              <Bouton
+                variante="fantome"
+                pleineLargeur
+                onClick={() => setBrouillon(origineDe(fiche))}
+              >
                 Corriger la fiche
               </Bouton>
             </>
@@ -403,6 +422,16 @@ function Coordonnees({
   );
 }
 
+/** Les quatre champs corrigibles, tels que la fiche les porte en base. */
+function origineDe(fiche: Fiche): CorrectionClient {
+  return {
+    nom: fiche.nom,
+    telephone: fiche.telephone ?? '',
+    marche: fiche.marche ?? '',
+    activite: fiche.activite ?? '',
+  };
+}
+
 /**
  * Le formulaire de correction d'une fiche client.
  *
@@ -434,21 +463,23 @@ function Coordonnees({
  */
 function CorrigerFiche({
   fiche,
+  saisie,
+  onChamp,
   onFini,
   onAnnuler,
 }: {
   fiche: Fiche;
+  /** Tenu par `FicheClient`, qui survit aux relectures — voir la note sur
+      `brouillon`. */
+  saisie: CorrectionClient;
+  onChamp: (cle: keyof CorrectionClient, valeur: string) => void;
   onFini: () => Promise<void>;
   onAnnuler: () => void;
 }) {
-  const origine: CorrectionClient = {
-    nom: fiche.nom,
-    telephone: fiche.telephone ?? '',
-    marche: fiche.marche ?? '',
-    activite: fiche.activite ?? '',
-  };
-
-  const [saisie, setSaisie] = useState<CorrectionClient>(origine);
+  // La référence est la fiche **telle que relue**, pas telle qu'à l'ouverture :
+  // si une relecture survient pendant la correction, c'est à l'état présent
+  // en base que la saisie se compare.
+  const origine = origineDe(fiche);
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -473,8 +504,7 @@ function CorrigerFiche({
     await onFini();
   }
 
-  const poser = (cle: keyof CorrectionClient) => (valeur: string) =>
-    setSaisie((s) => ({ ...s, [cle]: valeur }));
+  const poser = (cle: keyof CorrectionClient) => (valeur: string) => onChamp(cle, valeur);
 
   return (
     <form
@@ -508,6 +538,11 @@ function CorrigerFiche({
         autoComplete="off"
       />
 
+      {/* Montée avec le formulaire, vide, et non insérée avec son texte : une
+          région vive n'annonce que ce qui change **après** son apparition.
+          Insérée en même temps que l'avertissement, elle resterait muette —
+          la leçon est écrite dans `Pagination.tsx`. */}
+      <div aria-live="polite">
       {numeroChange && fiche.avisActifs && (
         <p className="flex items-start gap-2 bg-surface border border-hairline rounded-md p-3 m-0 font-body text-xs text-ink">
           <Icone nom="bell-off" taille={15} className="text-muted-foreground shrink-0 mt-px" />
@@ -517,6 +552,7 @@ function CorrigerFiche({
           </span>
         </p>
       )}
+      </div>
 
       <div className="flex gap-2">
         <Bouton type="submit" disabled={envoi}>

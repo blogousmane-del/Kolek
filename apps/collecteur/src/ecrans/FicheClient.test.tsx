@@ -1488,3 +1488,84 @@ describe('corriger la fiche d’un client', () => {
     }
   });
 });
+
+/**
+ * Deux défauts trouvés en relisant la tâche 3, le 2026-09-11.
+ *
+ * ## La saisie qui s'efface sous les doigts
+ *
+ * `CartesEnCours` écrit la mise différée six secondes après l'appui — ou tout de
+ * suite quand l'application passe en arrière-plan — puis appelle
+ * `onEcriture`. La coquille fait alors monter `revision`, la fiche repasse par
+ * `null` avant de se relire, et tout le bloc `{fiche && (…)}` se démonte.
+ *
+ * La scène est celle où l'on corrige : le collecteur encaisse, le client dit
+ * « au fait, mon numéro a changé », le collecteur ouvre la correction et tape.
+ * Six secondes plus tard, un brouillon logé dans le formulaire disparaissait.
+ * `visibleId` a été remonté d'un cran pour la même raison ; le brouillon aussi.
+ *
+ * ## L'avertissement muet
+ *
+ * Une région vive n'annonce que ce qui change **après** son apparition :
+ * insérée dans le document en même temps que son texte, elle reste muette.
+ * C'est la leçon de `Pagination.tsx`. L'avertissement sur les avis était
+ * inséré avec son texte ; la région qui le porte est désormais montée avec le
+ * formulaire.
+ */
+describe('la correction résiste à ce qui se passe autour', () => {
+  beforeEach(() => {
+    modifierClient.mockReset().mockResolvedValue({ ok: true, ecrit: true });
+  });
+
+  it('garde la saisie quand la fiche est relue pendant la correction', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_AVEC_AVIS);
+    const proprietes = {
+      clientId: FICHE_AVEC_AVIS.id,
+      collecteurId: 'col1',
+      onFermer: vi.fn(),
+      onEcriture: vi.fn(),
+      onRetrait: vi.fn(),
+    };
+    const { rerender } = render(<FicheClient {...proprietes} revision={0} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Corriger la fiche' }));
+    const formulaire = () => within(screen.getByRole('form', { name: 'Corriger la fiche' }));
+    fireEvent.change(formulaire().getByLabelText('Téléphone'), { target: { value: '0700000009' } });
+
+    // Ce que fait la coquille quand la mise différée vient de partir.
+    rerender(<FicheClient {...proprietes} revision={1} />);
+
+    const champ = (await screen.findByRole('form', { name: 'Corriger la fiche' })).querySelector(
+      'input[type="tel"]',
+    ) as HTMLInputElement;
+    expect(champ.value).toBe('0700000009');
+  });
+
+  it('annonce l’avertissement par une région vive montée avant lui', async () => {
+    chargerFicheClient.mockResolvedValue(FICHE_AVEC_AVIS);
+    render(
+      <FicheClient
+        clientId={FICHE_AVEC_AVIS.id}
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={vi.fn()}
+        onRetrait={vi.fn()}
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Corriger la fiche' }));
+    const form = screen.getByRole('form', { name: 'Corriger la fiche' });
+
+    // Avant toute saisie : la région existe déjà, vide.
+    const region = form.querySelector('[aria-live="polite"]');
+    expect(region).not.toBeNull();
+    expect(region!.textContent).toBe('');
+
+    fireEvent.change(within(form).getByLabelText('Téléphone'), { target: { value: '0700000009' } });
+
+    // Après : c'est bien dans **cette** région, et non dans une nouvelle, que
+    // l'avertissement arrive.
+    expect(form.querySelector('[aria-live="polite"]')).toBe(region);
+    expect(region!.textContent).toMatch(/avis seront coupés/i);
+  });
+});
