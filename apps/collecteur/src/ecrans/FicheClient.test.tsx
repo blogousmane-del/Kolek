@@ -1358,7 +1358,7 @@ describe('corriger la fiche d’un client', () => {
   const formulaire = () => within(screen.getByRole('form', { name: 'Corriger la fiche' }));
 
   async function ouvrirLeFormulaire(
-    fiche: typeof FICHE_UNE_CARTE_EN_COURS = FICHE_UNE_CARTE_EN_COURS,
+    fiche: typeof FICHE_UNE_CARTE_EN_COURS | typeof FICHE_AVEC_AVIS = FICHE_UNE_CARTE_EN_COURS,
   ) {
     const onEcriture = vi.fn();
     chargerFicheClient.mockResolvedValue(fiche);

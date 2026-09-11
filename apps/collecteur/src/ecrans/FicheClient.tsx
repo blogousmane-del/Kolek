@@ -543,15 +543,15 @@ function CorrigerFiche({
           Insérée en même temps que l'avertissement, elle resterait muette —
           la leçon est écrite dans `Pagination.tsx`. */}
       <div aria-live="polite">
-      {numeroChange && fiche.avisActifs && (
-        <p className="flex items-start gap-2 bg-surface border border-hairline rounded-md p-3 m-0 font-body text-xs text-ink">
-          <Icone nom="bell-off" taille={15} className="text-muted-foreground shrink-0 mt-px" />
-          <span>
-            Les avis seront coupés : {fiche.nom} avait accepté de les recevoir sur son ancien
-            numéro. Après l’enregistrement, redemande-lui son accord pour le nouveau.
-          </span>
-        </p>
-      )}
+        {numeroChange && fiche.avisActifs && (
+          <p className="flex items-start gap-2 bg-surface border border-hairline rounded-md p-3 m-0 font-body text-xs text-ink">
+            <Icone nom="bell-off" taille={15} className="text-muted-foreground shrink-0 mt-px" />
+            <span>
+              Les avis seront coupés : {fiche.nom} avait accepté de les recevoir sur son ancien
+              numéro. Après l’enregistrement, redemande-lui son accord pour le nouveau.
+            </span>
+          </p>
+        )}
       </div>
 
       <div className="flex gap-2">
