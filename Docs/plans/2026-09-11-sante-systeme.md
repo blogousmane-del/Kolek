@@ -2079,3 +2079,42 @@ Relevés à l'exécution, le 2026-09-11.
   nov., déc. Épreuve rouge d'abord (deux tombées), puis la phrase finit sur la
   valeur : « Premier relevé le 11 sept. : 17 Mo. ». Un second regard, après
   le correctif, le lit ainsi à l'écran.
+
+### Mise en production — 2026-09-11
+
+- **L'état d'avant**, en lecture seule et en agrégats : pas de table
+  `releves_quotidiens`, un seul travail (`kolek-avis-drainage`, chaque minute),
+  27 636 traces pg_cron, aucune de plus de 30 jours. La plus ancienne date du
+  2026-08-23 : la purge ne supprimera rien avant le 2026-09-22, puis environ
+  1 440 traces par jour, et le journal se stabilisera vers 43 000 lignes.
+- **La migration**, accord n° 1. `migration list --linked` : seule
+  `20260911120000` manquait. `db push --dry-run` : elle seule, ni graine ni
+  rôle. `db push` : garde passée. Après : `releves = 1` (2026-09-11), trois
+  travaux aux horaires prévus, RLS active, table et trois fonctions fermées à
+  `anon` et à `authenticated`, ouvertes à `service_role`. `sante_systeme()` lit
+  un relevé, 0 échec de drainage sur 24 h, 0 rejet. 50 migrations sur 50
+  alignées.
+- **Écart sur ce plan : le job des fonctions déploie tout.** Le plan disait
+  « `super-admin-etat` (et elle seule) ». `verification.yml` lance
+  `supabase functions deploy` sans nom, exprès : chaque fonction embarque sa
+  copie de `_shared/`. Au déploiement précédent (2026-09-11 vers 12 h 16 UTC),
+  seules les trois fonctions dont le regroupement avait changé ont pourtant
+  reçu une version neuve. Les 19 fonctions en production venaient toutes du CI
+  (`/home/runner/work/Kolek/…`), aucune d'un poste.
+- **Les fronts, avant la poussée**, comparés au build local de `7760bf3` : les
+  trois changent de nom. L'admin, pour l'écran. Le collecteur et le site, pour
+  5 règles CSS de la courbe (`fill-*`, `stroke-primary`, `h-auto`, `min-h-5`)
+  et l'icône `activity` entrée dans la table partagée d'`Icone` (+182 et
+  +177 octets de JS) ; le reste de l'écart JS est le renommage du minificateur.
+- **La poussée**, accord n° 2 : `210507d..7760bf3`. Netlify sert le build local
+  sur les trois fronts vers 21 h 53 UTC — `admin.kolek.cash`
+  `index-eLEeInjb.js` et `index-BYzEcFPa.css`, `app.kolek.cash`
+  `index-DIDGJsab.js` et `index-Da6QQP7H.css`, `kolek.cash`
+  `index-BFnMfbiZ.js` et `index-D_T0DKer.css`, mêmes empreintes que `dist/`.
+  CI `34651426498` : quatre jobs verts. `super-admin-etat` passe de la
+  version 22 à la 23 (21 h 56 UTC, `ezbr_sha256` `d3f244909ee8…` puis
+  `a28099147a52…`) ; les 18 autres gardent leur version : la commande prend
+  tout, seule la fonction changée en reçoit une neuve.
+- **Reste à voir** : le 2026-09-12, `releves = 2` en production (le travail de
+  23 h 55 a tourné) ; après le 2026-09-22, plus aucune trace de plus de 30 jours
+  dans `cron.job_run_details`.
