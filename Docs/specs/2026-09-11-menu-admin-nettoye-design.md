@@ -41,6 +41,7 @@ Alternatives écartées :
 |---|---|
 | `packages/ui/src/BarreLaterale.tsx` | `'encaisser'` sort de `CleNavAdmin` et de `PILOTAGE`. La carte « Passer à Pro » sort du rendu, avec son commentaire. Le commentaire de `overflow-y-auto`, qui compte « deux raccourcis et un encart de promotion », est remis d'accord avec ce qui reste. |
 | `packages/ui/src/BarreLaterale.test.tsx` | L'épreuve de l'espace plateforme garde son assertion sur « Passer à Pro » mais son commentaire change de raison. Deux épreuves neuves pour l'espace admin : aucune entrée « Encaisser », aucune carte « Passer à Pro ». |
+| `apps/admin/src/Coquille.test.tsx` | Une épreuve neuve : la coquille de l'admin ne montre plus « 30 jours restants ». Le texte cherché est celui-là et non « Essai gratuit », que l'écran Demandes affiche à bon droit pour le palier gratuit. |
 | `packages/ui/src/Bandeaux.tsx` | `BandeauOffre` est supprimé. `BandeauHorsLigne` et `useEnLigne` restent : l'application collecteur s'en sert. |
 | `packages/ui/src/index.ts` | L'export de `BandeauOffre` disparaît. |
 | `apps/admin/src/Coquille.tsx` | L'import et le rendu de `BandeauOffre` disparaissent, avec leur commentaire. L'import d'`EncaisserMise` et la route `page === 'encaisser'` aussi. |
@@ -53,7 +54,10 @@ Alternatives écartées :
 - **Le reste du menu admin** : Tableau de bord, Collecteurs, Encours & Soldes ;
   Abonnements, Demandes ; Avis clients, Réglages.
 - **Le Super Admin**, son menu et ses écrans (chantier D).
-- **L'application collecteur** : son « Encaisser » est le vrai, il reste.
+- **L'application collecteur** : son « Encaisser » est le vrai, il reste. Il
+  vit dans deux autres types de `packages/ui` — `CleNavCollecteur`
+  (`NavMobile.tsx`) et `CleNavBureau` (`NavBureau.tsx`) — que ce chantier ne
+  touche pas. Seul `CleNavAdmin` perd sa clé.
 - **La base, les Edge Functions, les migrations** : rien.
 
 ## Après
@@ -79,10 +83,10 @@ Alternatives écartées :
 
 ## Vérification
 
-- Épreuves de `packages/ui` et de l'admin, dont les deux neuves, vues rouges
+- Épreuves de `packages/ui` et de l'admin, dont les trois neuves, vues rouges
   avant le retrait.
 - `tsc -b` dans `apps/admin`, `oxlint`.
-- La chaîne complète, `npm run verifier`, quatorze étapes lues.
+- La chaîne complète, `npm run verifier`, quinze commandes lues.
 - Après une poussée consentie : empreinte servie par `admin.kolek.cash` égale
   au build local ; empreintes des deux autres fronts relevées et expliquées ;
   job des fonctions : « Aucune Edge Function touchée ».
