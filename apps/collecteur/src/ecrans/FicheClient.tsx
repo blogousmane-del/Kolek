@@ -3,6 +3,7 @@ import {
   BadgeStatut,
   Bouton,
   CarrouselCartes,
+  Champ,
   Feuille,
   Icone,
   LigneTransaction,
@@ -10,7 +11,13 @@ import {
 } from '@kolek/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { definirConsentementAvis, enregistrerMise, ouvrirCarte } from '../ecritures';
+import {
+  definirConsentementAvis,
+  enregistrerMise,
+  modifierClient,
+  ouvrirCarte,
+  type CorrectionClient,
+} from '../ecritures';
 import {
   estRattrapee,
   misesAffichees,
@@ -96,6 +103,7 @@ export function FicheClient({
   // disparaître, simplement relogé un niveau plus bas.
   const [visibleId, setVisibleId] = useState<string | null>(null);
   const [historiqueOuvert, setHistoriqueOuvert] = useState(false);
+  const [correction, setCorrection] = useState(false);
 
   const relire = useCallback(async () => {
     if (!clientId) return;
@@ -130,6 +138,9 @@ export function FicheClient({
     // L'historique se referme avec le client : rester dedans en changeant de
     // client montrerait les cartes de l'un sous le nom de l'autre.
     setHistoriqueOuvert(false);
+    // Le formulaire de correction aussi : rester dedans en changeant de client
+    // corrigerait la fiche de l'un avec la saisie de l'autre.
+    setCorrection(false);
   }, [clientId]);
 
   /**
@@ -208,7 +219,27 @@ export function FicheClient({
 
       {fiche && (
         <>
-          <Coordonnees fiche={fiche} onChange={onEcriture} onRelire={relire} />
+          {correction ? (
+            <CorrigerFiche
+              fiche={fiche}
+              onFini={async () => {
+                setCorrection(false);
+                await relire();
+                onEcriture();
+              }}
+              onAnnuler={() => setCorrection(false)}
+            />
+          ) : (
+            <>
+              <Coordonnees fiche={fiche} onChange={onEcriture} onRelire={relire} />
+              {/* Une faute de frappe faite au marché était définitive jusqu'au
+                  2026-09-11 : aucun écran, collecteur ou administration, ne
+                  modifiait un client. */}
+              <Bouton variante="fantome" pleineLargeur onClick={() => setCorrection(true)}>
+                Corriger la fiche
+              </Bouton>
+            </>
+          )}
 
           {actives.length > 0 ? (
             <CartesEnCours
@@ -369,6 +400,133 @@ function Coordonnees({
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * Le formulaire de correction d'une fiche client.
+ *
+ * ## Pourquoi il vit dans la fiche et non dans un écran à lui
+ *
+ * La fiche est l'endroit où le collecteur constate l'erreur — c'est là qu'il
+ * lit « GSM T · BLE ZOKOU · 0709201790 ». Le faire voyager vers un autre écran
+ * pour réparer ce qu'il regarde est un détour que rien ne justifie. Le
+ * formulaire prend la place du bloc `Coordonnees`, et rien d'autre ne bouge.
+ *
+ * ## Pourquoi un vrai `<form>`
+ *
+ * La touche « OK » du clavier Android envoie le formulaire : le collecteur
+ * corrige un numéro sans chercher le bouton sous le clavier ouvert. Et le
+ * formulaire nommé donne aux épreuves une portée — la fiche porte d'autres
+ * « Annuler », dont celui du sursis d'encaissement.
+ *
+ * ## L'avertissement sur les avis
+ *
+ * Il paraît **avant** d'enregistrer, dès que le numéro saisi diffère de celui
+ * en base, et seulement si les avis étaient actifs. L'apprendre après coup,
+ * c'est laisser le collecteur croire que les avis continuent — sur un numéro
+ * que personne n'a accepté.
+ *
+ * Mesuré en production le 2026-09-11 : 68 clients sur 81 ont les avis actifs.
+ * C'est le message que cet écran affichera le plus souvent. Il porte donc
+ * l'icône `bell-off`, celle que `Coordonnees` montrera juste après
+ * l'enregistrement : le collecteur reconnaît le même état aux deux endroits.
+ */
+function CorrigerFiche({
+  fiche,
+  onFini,
+  onAnnuler,
+}: {
+  fiche: Fiche;
+  onFini: () => Promise<void>;
+  onAnnuler: () => void;
+}) {
+  const origine: CorrectionClient = {
+    nom: fiche.nom,
+    telephone: fiche.telephone ?? '',
+    marche: fiche.marche ?? '',
+    activite: fiche.activite ?? '',
+  };
+
+  const [saisie, setSaisie] = useState<CorrectionClient>(origine);
+  const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  const numeroChange = saisie.telephone.trim() !== origine.telephone.trim();
+
+  async function enregistrer() {
+    // Un double appui sur « OK » enverrait deux fois la même correction. La
+    // seconde ne changerait rien en base, mais laisserait une seconde ligne au
+    // journal d'audit pour un seul geste.
+    if (envoi) return;
+    setEnvoi(true);
+    setErreur(null);
+    const resultat = await modifierClient(fiche.id, saisie, origine);
+    setEnvoi(false);
+
+    if (!resultat.ok) {
+      // La saisie reste à l'écran : la retaper au marché, debout, serait la
+      // seconde erreur.
+      setErreur(resultat.echec.message);
+      return;
+    }
+    await onFini();
+  }
+
+  const poser = (cle: keyof CorrectionClient) => (valeur: string) =>
+    setSaisie((s) => ({ ...s, [cle]: valeur }));
+
+  return (
+    <form
+      aria-label="Corriger la fiche"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void enregistrer();
+      }}
+      className="bg-canvas rounded-md p-3 space-y-3"
+    >
+      {erreur && (
+        <p role="alert" className="bg-negative-tint text-negative text-sm font-body p-3 rounded-md m-0">
+          {erreur}
+        </p>
+      )}
+
+      <Champ libelle="Nom" valeur={saisie.nom} onChange={poser('nom')} requis autoComplete="off" />
+      <Champ
+        libelle="Téléphone"
+        type="tel"
+        inputMode="tel"
+        valeur={saisie.telephone}
+        onChange={poser('telephone')}
+        autoComplete="off"
+      />
+      <Champ libelle="Marché" valeur={saisie.marche} onChange={poser('marche')} autoComplete="off" />
+      <Champ
+        libelle="Activité"
+        valeur={saisie.activite}
+        onChange={poser('activite')}
+        autoComplete="off"
+      />
+
+      {numeroChange && fiche.avisActifs && (
+        <p className="flex items-start gap-2 bg-surface border border-hairline rounded-md p-3 m-0 font-body text-xs text-ink">
+          <Icone nom="bell-off" taille={15} className="text-muted-foreground shrink-0 mt-px" />
+          <span>
+            Les avis seront coupés : {fiche.nom} avait accepté de les recevoir sur son ancien
+            numéro. Après l’enregistrement, redemande-lui son accord pour le nouveau.
+          </span>
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <Bouton type="submit" disabled={envoi}>
+          {envoi ? 'Enregistrement…' : 'Enregistrer'}
+        </Bouton>
+        <Bouton variante="contour" onClick={onAnnuler} disabled={envoi}>
+          Annuler
+        </Bouton>
+      </div>
+    </form>
   );
 }
 

@@ -1,6 +1,6 @@
 import { formatMontant, MISES_PAR_CYCLE } from '@kolek/core';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * La fiche client, qui n'affichait qu'une carte sur plusieurs.
@@ -40,12 +40,15 @@ vi.mock('../lectures-ecrans', () => ({
 }));
 
 const enregistrerMise = vi.fn();
+const modifierClient = vi.fn();
 
 vi.mock('../ecritures', () => ({
   definirConsentementAvis: vi.fn(),
   ouvrirCarte: vi.fn(),
   enregistrerMise: (collecteurId: string, carteId: string, montant: number) =>
     enregistrerMise(collecteurId, carteId, montant),
+  modifierClient: (id: string, correction: unknown, origine: unknown) =>
+    modifierClient(id, correction, origine),
 }));
 
 vi.mock('../supabase', () => ({
@@ -237,6 +240,21 @@ const FICHE_CARTE_PRESQUE_COMPLETE = {
     },
   ],
   mises: [],
+};
+
+/**
+ * Un client joignable **et** consentant : le seul cas où corriger le numéro
+ * coupe quelque chose. Les sept autres fiches de ce fichier ont
+ * `avisActifs: false` — relevé en relisant le plan, le 2026-09-10 : sans cette
+ * fiche, l'épreuve de l'avertissement passerait au vert sans rien voir.
+ */
+const FICHE_AVEC_AVIS = {
+  ...FICHE_UNE_CARTE_EN_COURS,
+  id: 'cli8',
+  nom: 'Konaté',
+  telephone: '0709201790' as string | null,
+  marche: 'BLE ZOKOU' as string | null,
+  avisActifs: true,
 };
 
 afterEach(() => {
@@ -1317,5 +1335,156 @@ describe('l’historique ne rend pas le défilement au fond', () => {
 
     unmount();
     expect(document.body.style.overflow).toBe('');
+  });
+});
+
+/**
+ * La correction d'une fiche.
+ *
+ * Une faute de frappe faite au marché était définitive jusqu'au 2026-09-11 :
+ * le collecteur n'écrivait dans `clients` qu'à l'inscription, et aucun écran
+ * d'administration ne touche cette table.
+ *
+ * Le formulaire est un `<form>` nommé, et ces épreuves visent ses boutons par
+ * `within`. La fiche porte d'autres « Annuler » — celui du sursis
+ * d'encaissement, notamment — et une requête sur tout l'écran pourrait cliquer
+ * le mauvais.
+ */
+describe('corriger la fiche d’un client', () => {
+  beforeEach(() => {
+    modifierClient.mockReset().mockResolvedValue({ ok: true, ecrit: true });
+  });
+
+  const formulaire = () => within(screen.getByRole('form', { name: 'Corriger la fiche' }));
+
+  async function ouvrirLeFormulaire(
+    fiche: typeof FICHE_UNE_CARTE_EN_COURS = FICHE_UNE_CARTE_EN_COURS,
+  ) {
+    const onEcriture = vi.fn();
+    chargerFicheClient.mockResolvedValue(fiche);
+    render(
+      <FicheClient
+        clientId={fiche.id}
+        revision={0}
+        collecteurId="col1"
+        onFermer={vi.fn()}
+        onEcriture={onEcriture}
+        onRetrait={vi.fn()}
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Corriger la fiche' }));
+    return { onEcriture };
+  }
+
+  it('ouvre les quatre champs, remplis de ce qui est en base', async () => {
+    await ouvrirLeFormulaire(FICHE_AVEC_AVIS);
+
+    expect((formulaire().getByLabelText('Nom') as HTMLInputElement).value).toBe('Konaté');
+    expect((formulaire().getByLabelText('Téléphone') as HTMLInputElement).value).toBe('0709201790');
+    expect((formulaire().getByLabelText('Marché') as HTMLInputElement).value).toBe('BLE ZOKOU');
+    expect((formulaire().getByLabelText('Activité') as HTMLInputElement).value).toBe('');
+  });
+
+  it('envoie la correction et la valeur d’origine', async () => {
+    await ouvrirLeFormulaire(FICHE_AVEC_AVIS);
+
+    fireEvent.change(formulaire().getByLabelText('Nom'), { target: { value: 'Konaté Ali' } });
+    fireEvent.click(formulaire().getByRole('button', { name: 'Enregistrer' }));
+
+    await waitFor(() => expect(modifierClient).toHaveBeenCalledTimes(1));
+    const [id, correction, origine] = modifierClient.mock.calls[0]!;
+    expect(id).toBe('cli8');
+    expect(correction).toMatchObject({ nom: 'Konaté Ali', telephone: '0709201790' });
+    expect(origine).toEqual({
+      nom: 'Konaté',
+      telephone: '0709201790',
+      marche: 'BLE ZOKOU',
+      activite: '',
+    });
+  });
+
+  it('referme le formulaire et relit la fiche après l’enregistrement', async () => {
+    const { onEcriture } = await ouvrirLeFormulaire(FICHE_AVEC_AVIS);
+    const lecturesAvant = chargerFicheClient.mock.calls.length;
+
+    fireEvent.change(formulaire().getByLabelText('Nom'), { target: { value: 'Konaté Ali' } });
+    fireEvent.click(formulaire().getByRole('button', { name: 'Enregistrer' }));
+
+    // La fiche relue est la seule preuve à l'écran que la correction a pris :
+    // sans relecture, le titre garderait l'ancien nom au-dessus d'un
+    // formulaire refermé.
+    await waitFor(() =>
+      expect(screen.queryByRole('form', { name: 'Corriger la fiche' })).toBeNull(),
+    );
+    expect(chargerFicheClient.mock.calls.length).toBeGreaterThan(lecturesAvant);
+    expect(onEcriture).toHaveBeenCalled();
+  });
+
+  it('prévient que les avis seront coupés, avant d’enregistrer', async () => {
+    // Le collecteur doit savoir qu'il devra redemander le consentement. Le lui
+    // apprendre après coup, c'est le laisser croire que les avis continuent.
+    // 68 clients sur 81 ont les avis actifs en production : c'est le message
+    // que cet écran affichera le plus souvent.
+    await ouvrirLeFormulaire(FICHE_AVEC_AVIS);
+
+    fireEvent.change(formulaire().getByLabelText('Téléphone'), { target: { value: '0700000009' } });
+
+    expect(formulaire().getByText(/avis seront coupés/i)).toBeTruthy();
+    expect(modifierClient).not.toHaveBeenCalled();
+  });
+
+  it('ne prévient pas quand seul le nom change', async () => {
+    await ouvrirLeFormulaire(FICHE_AVEC_AVIS);
+
+    fireEvent.change(formulaire().getByLabelText('Nom'), { target: { value: 'Konaté Ali' } });
+
+    expect(formulaire().queryByText(/avis seront coupés/i)).toBeNull();
+  });
+
+  it('ne prévient pas un client qui n’avait pas accepté les avis', async () => {
+    // Rien à couper : annoncer une coupure serait une phrase fausse, et sur cet
+    // écran une phrase fausse coûte un appel au client pour rien.
+    await ouvrirLeFormulaire();
+
+    fireEvent.change(formulaire().getByLabelText('Téléphone'), { target: { value: '0700000009' } });
+
+    expect(formulaire().queryByText(/avis seront coupés/i)).toBeNull();
+  });
+
+  it('montre le refus du serveur et garde la saisie', async () => {
+    modifierClient.mockResolvedValue({
+      ok: false,
+      echec: {
+        code: 'RIEN_ECRIT',
+        message: 'Le serveur n’a rien changé. Reconnecte-toi et réessaie.',
+      },
+    });
+    await ouvrirLeFormulaire(FICHE_AVEC_AVIS);
+
+    fireEvent.change(formulaire().getByLabelText('Nom'), { target: { value: 'Konaté Ali' } });
+    fireEvent.click(formulaire().getByRole('button', { name: 'Enregistrer' }));
+
+    expect(await formulaire().findByRole('alert')).toBeTruthy();
+    // La saisie reste : la retaper au marché, debout, serait la seconde erreur.
+    expect((formulaire().getByLabelText('Nom') as HTMLInputElement).value).toBe('Konaté Ali');
+  });
+
+  it('revient à la fiche sans écrire quand on annule', async () => {
+    await ouvrirLeFormulaire(FICHE_AVEC_AVIS);
+
+    fireEvent.change(formulaire().getByLabelText('Nom'), { target: { value: 'Perdu' } });
+    fireEvent.click(formulaire().getByRole('button', { name: 'Annuler' }));
+
+    expect(modifierClient).not.toHaveBeenCalled();
+    expect(screen.queryByRole('form', { name: 'Corriger la fiche' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Corriger la fiche' })).toBeTruthy();
+  });
+
+  it('donne aux deux boutons une cible de 44 px', async () => {
+    await ouvrirLeFormulaire();
+
+    for (const nom of ['Enregistrer', 'Annuler']) {
+      expect(formulaire().getByRole('button', { name: nom }).className).toMatch(/min-h-11/);
+    }
   });
 });
