@@ -47,6 +47,48 @@ Copiées du dessin. Elles s'appliquent à **toutes** les tâches.
 
 ---
 
+## Vérification préalable en production — 2026-09-11
+
+Faite **avant** la première ligne de code, parce que ce travail touche des
+clients réels. Lecture seule, par `supabase db query --linked` ; des comptes
+agrégés uniquement, aucun nom ni numéro affiché.
+
+| Ce que le plan suppose | Mesuré en production |
+|---|---|
+| `clients_update` borne à `collecteur_id = auth.uid()` | ✅ identique au local, `USING` et `WITH CHECK` |
+| `UPDATE` accordé sur `nom`, `telephone`, `marche`, `activite` | ✅ six colonnes, les mêmes qu'en local |
+| Un seul déclencheur sur `clients` | ✅ `clients_journal`, actif (`O`) |
+| Le journal garde l'ancienne valeur | ❌ **faux** — `to_jsonb(new)` seulement. Dessin corrigé |
+
+**Les données réelles, et ce qu'elles changent :**
+
+| | |
+|---|---|
+| Clients | **81** |
+| Avec numéro | 81 |
+| **Avis actifs** | **68 — 84 %** |
+| Numéro vide `''` ou marché vide `''` | 0 — l'inscription écrit bien `null` |
+| Nom ou numéro avec espaces autour | 0 |
+| Avis actifs sans numéro | 0 — l'invariant de l'inscription tient |
+| Insertions au journal | 80 pour 81 clients |
+
+**Conséquence directe : la coupure du consentement n'est pas un cas limite.**
+Quatre clients sur cinq ont les avis actifs ; presque toute correction de numéro
+les coupera. L'avertissement de la tâche 3 n'est donc pas une précaution de
+bord — c'est le message que le collecteur lira le plus souvent sur cet écran,
+et il doit dire clairement quoi faire ensuite.
+
+**Les collaborateurs.** Un titulaire agit sur les clients de ses collaborateurs
+(dessin du 2026-09-02), mais par des fonctions `security definer`
+(`equipe_clients`) et l'écran `EquipeClients` — jamais par `FicheClient`, que
+seul `Clients.tsx` monte, sur les clients propres. Le bouton « Corriger la
+fiche » n'apparaîtra donc que là où la correction peut aboutir. Un titulaire ne
+peut pas corriger le client d'un collaborateur : c'est le collaborateur qui le
+fait. L'isolation d'`isolation.test.ts` — « A ne modifie pas un client de B » —
+ne bouge pas.
+
+---
+
 ## Structure de fichiers
 
 | Fichier | Rôle |
@@ -192,22 +234,38 @@ describe('modifierClient', () => {
     if (!r.ok) expect(r.echec.code).toBe('RIEN_ECRIT');
   });
 
-  it('traduit un refus du serveur', async () => {
-    majSelect.mockReset().mockResolvedValue({ data: null, error: { code: '42501' } });
+  it('traduit un refus de privilège en DROIT_REFUSE', async () => {
+    // Un privilège de colonne refusé : `modifierClient` n'envoie que des colonnes
+    // accordées, donc ce refus signalerait un défaut de l'application.
+    majSelect.mockReset().mockResolvedValue({
+      data: null,
+      error: { code: '42501', message: 'permission denied for table clients' },
+    });
 
     const r = await modifierClient(CLIENT, { ...ORIGINE, nom: 'GSM Traoré' }, ORIGINE);
 
     expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.echec.code).toBe('DROIT_REFUSE');
   });
 });
 ```
 
-> **`beforeEach` :** ce fichier ne l'importe peut-être pas encore. Vérifier la
-> ligne 1 et l'ajouter à l'import de `vitest` si besoin.
+> **`beforeEach` :** vérifier la ligne 1 du fichier et l'ajouter à l'import de
+> `vitest` si besoin.
 
-> **`42501` :** `insufficient_privilege`. Vérifier dans `phraseEcriture` que ce
-> SQLSTATE est bien traité et corriger le code attendu si la table en décide
-> autrement — ne pas deviner.
+> **Pourquoi `DROIT_REFUSE` et jamais `ABONNEMENT_INACTIF`.** Relevé le
+> 2026-09-11 dans `codeDErreur` : un 42501 dont le message cite
+> `row-level security policy for table "clients"` est traduit en
+> `ABONNEMENT_INACTIF` — « Ton abonnement n'est plus actif… ». C'est juste pour
+> une **insertion**, dont la politique porte la condition d'abonnement. Pour une
+> **correction**, ce serait faux : `clients_update` ne la porte pas.
+>
+> Ce chemin est inatteignable ici, et c'est pourquoi le plan ne touche pas à
+> `codeDErreur` : sur un `UPDATE`, RLS écarte la ligne **en silence** (zéro ligne,
+> donc `RIEN_ECRIT`), et le `WITH CHECK` ne peut échouer que si `collecteur_id`
+> change — or cette colonne n'est pas accordée et `modifierClient` ne l'envoie
+> jamais. Si un jour elle l'était, la phrase d'abonnement mentirait : c'est ce
+> que cette note est là pour empêcher d'oublier.
 
 - [ ] **Étape 2 : les voir échouer**
 
@@ -801,9 +859,43 @@ npx supabase db query --local "select nom, telephone, marche, activite, avis_act
 
 `marche` doit être `null`, et non une chaîne vide.
 
-> **Ne pas faire cet essai contre la production.** Les serveurs de
-> développement pointent sur le projet de production par défaut : vérifier
-> `apps/collecteur/.env` avant de cliquer sur « Enregistrer ».
+> **Ne pas faire cet essai contre la production.** Mesuré le 2026-09-11 :
+> `apps/collecteur/.env` porte `VITE_SUPABASE_URL=https://yfnwmokxkznejotgpfgf.supabase.co`.
+> Un `npm run dev` nu ouvre donc l'application **sur les 81 clients réels**, et
+> « Enregistrer » y corrigerait une vraie fiche.
+
+**La recette qui ne touche à aucun fichier `.env` :**
+
+Vite donne la priorité aux variables **déjà présentes dans l'environnement** du
+processus sur celles des fichiers `.env`. Les passer en ligne suffit, et rien ne
+reste sur le disque ensuite. `gardeEnv()` accepte `http://127.0.0.1:54321`
+(motif `ADRESSES` de `scripts/garde-env.mjs`).
+
+```bash
+# Depuis la racine, pile locale démarrée. La clé anonyme locale est lue et
+# passée sans jamais être affichée.
+cd apps/collecteur && \
+  VITE_SUPABASE_URL=http://127.0.0.1:54321 \
+  VITE_SUPABASE_ANON_KEY="$(cd ../.. && npx supabase status -o env 2>/dev/null | sed -n 's/^ANON_KEY="\(.*\)"$/\1/p')" \
+  npx vite --port 5175
+```
+
+Trois précautions, chacune pour une raison :
+
+- **Port 5175, pas 5173.** Le 5173 est celui du serveur habituel, branché sur
+  la production. Un onglet resté ouvert sur 5173 ressemble exactement à celui
+  de l'essai. Un port distinct rend la confusion visible dans la barre d'adresse.
+- **Vérifier la cible avant de se connecter** : dans la console du navigateur,
+  les requêtes doivent partir vers `127.0.0.1:54321`. Une seule requête vers
+  `supabase.co` : fermer l'onglet, tout arrêter.
+- **Jamais de copie de `.env`** (`.env.bak`, `.env.old`…) pour « basculer »
+  temporairement : `verifier:bundles` les refuse, et une copie oubliée est
+  exactement la fuite de 2026-09-02 à 2026-09-09.
+
+Le compte d'essai se crée sur la **pile locale uniquement**, par l'API
+d'administration locale — même geste que `creerCollecteur` dans
+`supabase/tests/harnais.ts`, qui passe par `npm run db:env` et donc par
+`scripts/garde-base-locale.mjs`. Il disparaît au prochain `npm run db:reset`.
 
 - [ ] **Étape 3 : après la poussée**
 

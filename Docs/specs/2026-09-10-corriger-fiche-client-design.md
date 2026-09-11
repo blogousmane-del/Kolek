@@ -161,9 +161,35 @@ délai, pour un geste que la base autorise déjà au collecteur.
 étrangères de `mises` sont en `restrict`. Un client qui a versé une seule fois
 ne peut plus être supprimé, et c'est l'invariant du journal d'audit.
 
-**Journaliser la correction dans une table dédiée.** Inutile :
-`clients_journal` enregistre déjà chaque `UPDATE`, avec l'ancienne et la
-nouvelle valeur. Une seconde trace serait une seconde vérité.
+**Journaliser la correction dans une table dédiée.** Inutile, mais pas pour la
+raison que ce dessin donnait le 2026-09-10.
+
+> **Corrigé le 2026-09-11.** Ce paragraphe affirmait que `clients_journal`
+> enregistre « l'ancienne et la nouvelle valeur ». C'est faux, et le corps de la
+> fonction en production le dit :
+>
+> ```sql
+> ligne jsonb := to_jsonb(case when tg_op = 'DELETE' then old else new end);
+> ```
+>
+> Sur un `UPDATE`, seul l'état **nouveau** est écrit. L'affirmation avait été
+> déduite de l'existence du déclencheur, pas lue dans son corps.
+
+Ce qui rend quand même une table dédiée inutile : **chaque insertion est
+journalisée aussi.** L'état d'avant une correction est donc l'entrée précédente
+du journal pour le même `ligne_id` — l'insertion, ou la correction d'avant.
+L'historique complet se reconstitue par la séquence, sans seconde trace.
+
+Mesuré en production le 2026-09-11 : **80 insertions journalisées pour 81
+clients**. Un client est antérieur au journal, ou a été inscrit hors de lui :
+pour celui-là, et pour lui seul, l'état d'origine n'est écrit nulle part, et sa
+première correction effacera la seule valeur connue. Ce dessin l'accepte — une
+fiche corrigée l'est parce qu'elle était fausse — mais il le dit, pour que
+personne ne compte sur un historique qui n'existe pas.
+
+Stocker `old` à côté de `new` dans `journaliser()` fermerait ce trou. C'est une
+migration sur une fonction `security definer` appelée par **toutes** les tables
+journalisées : hors de ce travail, et à ne pas faire au détour d'un formulaire.
 
 ## Ce que ce dessin ne fait pas
 
@@ -177,6 +203,14 @@ nouvelle valeur. Une seconde trace serait une seconde vérité.
   Traoré.
 - **Aucun historique des corrections visible à l'écran.** Il est au journal,
   lisible par le Super Admin. L'exposer au collecteur est un autre travail.
+- **Un titulaire ne corrige pas le client d'un collaborateur.** Ajouté le
+  2026-09-11. Le titulaire agit sur les clients d'équipe par `equipe_clients` et
+  l'écran `EquipeClients`, tous deux en `security definer` ; `clients_update`,
+  elle, ne connaît que `auth.uid()`. Ce n'est pas un piège pour autant :
+  `FicheClient`, qui porte le bouton, n'est monté que par `Clients.tsx`, sur les
+  clients propres. Le bouton n'apparaît donc que là où la correction peut
+  aboutir. Ouvrir la correction aux clients d'équipe demanderait une fonction
+  `security definer` de plus — une décision d'isolation, pas un détail d'écran.
 
 ## Épreuves qui décident
 
