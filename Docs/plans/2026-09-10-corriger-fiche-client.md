@@ -913,6 +913,63 @@ node -e '(async()=>{
 
 ---
 
+## Écarts d'exécution — 2026-09-11
+
+Ce qui a été fait autrement que ce plan ne l'écrivait, et pourquoi. Chaque
+écart est dans un commit qui porte son motif.
+
+**Les fins de ligne.** `ecritures.ts`, `FicheClient.tsx` et
+`FicheClient.test.tsx` sont en **CRLF** ; `ecritures-collecteur.test.ts` est en
+LF. Sous Git Bash, `grep` retire les `\r` en fin de ligne par défaut, et
+`cat -A` ne les montre pas davantage : les deux disaient « LF » sur un fichier
+à 374 retours chariot pour 374 lignes. Seul Node lit les octets bruts. Deux
+ancres d'insertion ont échoué avant que la cause soit trouvée. Toutes les
+poses ont ensuite été faites en LF en mémoire et réécrites dans la convention
+du fichier, contrôlées par Node. `core.autocrlf=true` normalisait déjà au
+commit : aucun fichier mêlé n'est entré dans le dépôt, et `git diff` vide sur
+le fichier remis d'aplomb le prouve.
+
+**Tâche 1.** Une épreuve de plus — « écrit la valeur débarrassée de ses
+espaces ». L'épreuve du 42501 vise `DROIT_REFUSE` (voir la note de la tâche).
+
+**Tâche 2.** Six épreuves au lieu de quatre. Ajoutées : l'écriture combinée
+numéro + `avis_actifs: false` acceptée par la base (le contrat de
+`modifierClient`, qu'un bouchon ne peut pas prouver), et la trace au journal,
+qui fixe le fait corrigé dans le dessin — le journal porte l'état nouveau.
+Cette dernière filtre sur `donnees->>marche` au lieu de trier par `id` : rien
+ne garantit qu'un identifiant de journal soit chronologique.
+
+**Tâche 3.** Le formulaire est un vrai `<form aria-label="Corriger la fiche">`
+et non un `<div>` : la touche « OK » du clavier Android l'envoie, et les
+épreuves visent ses boutons par `within` — la fiche porte d'autres « Annuler ».
+`verifier:champs` compte toujours **36** champs et non 40 comme ce plan
+l'annonçait : il lit les balises `<input>`, et celle-ci vit une seule fois,
+dans `Champ.tsx`.
+
+**Relecture après la tâche 3 — deux défauts, corrigés avant la mise en ligne.**
+
+1. *La saisie s'effaçait.* La mise différée de `CartesEnCours` part six
+   secondes après l'appui et appelle `onEcriture` ; la fiche repasse par `null`
+   et le formulaire se démonte. Le brouillon remonte dans `FicheClient`, sur le
+   modèle de `visibleId`. Reproduit d'abord par une épreuve :
+   `expected '0709201790' to be '0700000009'`.
+2. *L'avertissement était muet.* Inséré avec son texte, il n'était pas annoncé.
+   La région vive est désormais montée avec le formulaire.
+
+**Limites connues, laissées en l'état.**
+
+- Un numéro seulement **reformaté** — `0709201790` devenu `07 09 20 17 90` —
+  compte comme un numéro changé et coupe les avis. Comparer les seuls chiffres
+  ne suffirait pas (`+2250709201790` est le même numéro avec d'autres
+  chiffres) ; il faudrait normaliser les numéros, ce que le dessin écarte
+  explicitement. Le collecteur verra l'avertissement avant d'enregistrer, et
+  pourra annuler.
+- Le bouton « Ne plus prévenir » du bloc `Coordonnees` fait `py-1.5` en
+  `text-xs`, bien sous les 44 px. Défaut antérieur à ce travail, hors de son
+  périmètre.
+
+---
+
 ## Ce qui reste après ce plan
 
 - **Le journal des corrections n'est pas montré au collecteur.** Il est en base,
