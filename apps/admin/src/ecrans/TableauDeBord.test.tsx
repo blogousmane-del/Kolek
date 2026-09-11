@@ -1,5 +1,5 @@
 import { formatMontant } from '@kolek/core';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { Tendances, VueGlobale } from '../donnees';
@@ -264,6 +264,77 @@ describe('TableauDeBord — les montants viennent de la vue, pas de l’écran',
     expect(screen.getByRole('group', { name: 'Type de mouvement' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '7 j' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByRole('button', { name: '30 j' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('trace la courbe de la série, jour creux compris', () => {
+    const { container } = rendreAvecTendances();
+
+    // Compter les cercles de la page entière en trouvait huit : les icônes
+    // lucide de l'écran — `alert-circle`, `check-circle` — en portent aussi.
+    // La courbe est la seule `<figure>` du tableau de bord.
+    const courbe = container.querySelector('figure');
+    expect(courbe).not.toBeNull();
+
+    // Trois points : deux jours actifs et le jour creux entre eux. Un jour sans
+    // mise qui disparaîtrait de la courbe comprimerait le temps.
+    expect(courbe!.querySelectorAll('circle')).toHaveLength(3);
+  });
+
+  it('change de série sans changer de période', () => {
+    rendreAvecTendances();
+
+    // Les séries se cherchent dans leur groupe : « Commissions » et « Mises »
+    // nomment aussi des filtres de type de mouvement, et une recherche globale
+    // trouverait deux boutons.
+    const series = within(screen.getByRole('group', { name: 'Série affichée' }));
+    fireEvent.click(series.getByRole('button', { name: 'Commissions' }));
+
+    expect(series.getByRole('button', { name: 'Commissions' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    expect(screen.getByRole('button', { name: '7 j' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('répartit les flux de la période, pas ceux de l’ouverture', () => {
+    rendreAvecTendances();
+
+    // 1 140 000 encaissés plus 90 000 restitués : la commission est prélevée
+    // dans l'encaissé, elle ne s'y ajoute pas.
+    expect(screen.getByText('7 derniers jours')).toBeTruthy();
+    expect(screen.getByText(montantAffiche(1_230_000))).toBeTruthy();
+    // L'encaissement net : 1 140 000 moins 130 000 de commission.
+    expect(screen.getByText(`${montantAffiche(1_010_000)} FCFA`)).toBeTruthy();
+  });
+
+  it('classe les zones sur la période', () => {
+    rendreAvecTendances();
+
+    expect(screen.getByText('Cocody')).toBeTruthy();
+    expect(screen.getByText(/140 mises/)).toBeTruthy();
+  });
+
+  it('dit combien de mouvements sont montrés sur combien', () => {
+    rendreAvecTendances();
+
+    expect(screen.getByText(/2 mouvements sur 228/)).toBeTruthy();
+  });
+
+  it('liste les collecteurs qui décrochent, et mène à leur écran', () => {
+    const pages: string[] = [];
+    render(
+      <TableauDeBord
+        vue={{ ...VUE, tendances: TENDANCES }}
+        onNaviguer={(cle) => pages.push(cle)}
+        onRecharger={() => {}}
+        charger={async () => TENDANCES}
+      />,
+    );
+
+    expect(screen.getByText('Yao Adjoua')).toBeTruthy();
+    expect(screen.getByText(/12 jours/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /Voir les collecteurs/ }));
+    expect(pages).toEqual(['collecteurs']);
   });
 
   it('la recherche filtre les mouvements', () => {

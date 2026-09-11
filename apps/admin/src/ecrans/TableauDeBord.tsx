@@ -5,10 +5,12 @@ import {
   BarreHaute,
   Carte,
   CarteStat,
+  CourbeEvolution,
   EnteteCarte,
   Icone,
   LigneTransaction,
   type CleNavAdmin,
+  type PointCourbe,
 } from '@kolek/ui';
 import { useId, useMemo, useState } from 'react';
 
@@ -51,6 +53,14 @@ const TYPES: { id: FiltreTypeMouvement; libelle: string }[] = [
   { id: 'restitution', libelle: 'Restitutions' },
 ];
 
+type SerieCourbe = 'encaisse' | 'commissions' | 'mises';
+
+const SERIES: { cle: SerieCourbe; libelle: string }[] = [
+  { cle: 'encaisse', libelle: 'Encaissé' },
+  { cle: 'commissions', libelle: 'Commissions' },
+  { cle: 'mises', libelle: 'Mises' },
+];
+
 const COULEURS_ZONES = ['bg-chart-mint', 'bg-chart-blue', 'bg-chart-teal', 'bg-chart-slate'];
 
 function libelleMouvement(m: { survenu_le: string; type: string; collecteur: string }): string {
@@ -84,10 +94,14 @@ export function TableauDeBord({
   onRecharger?: () => void;
   charger?: (jours: Periode) => Promise<Tendances>;
 }) {
-  const { totaux, abonnements, zones, mouvements } = vue;
+  // `vue.zones` et `vue.mouvements` ne sont plus lus ici : tout ce qui est daté
+  // vient désormais de la période. Ils restent dans la vue globale pour la
+  // fiche d'un collecteur, qui n'a pas de période.
+  const { totaux, abonnements } = vue;
 
   const [periode, setPeriode] = useState<Periode>(7);
   const [tendances, setTendances] = useState<Tendances | null | undefined>(vue.tendances);
+  const [serie, setSerie] = useState<SerieCourbe>('encaisse');
   const [rechercheMvt, setRechercheMvt] = useState('');
   const [filtreTypeMvt, setFiltreTypeMvt] = useState<FiltreTypeMouvement>('tous');
   const idRecherche = useId();
@@ -114,22 +128,32 @@ export function TableauDeBord({
     : null;
   const sansMise = tendances?.collecteurs_sans_mise ?? [];
 
+  // Mémorisé : `tendances?.mouvements ?? []` rend un tableau neuf à chaque
+  // rendu, et le `useMemo` qui en dépend ne mémoriserait alors rien.
+  const mouvementsPeriode = useMemo(() => tendances?.mouvements ?? [], [tendances]);
   const mouvementsFiltres = useMemo(() => {
     const terme = rechercheMvt.trim().toLowerCase();
 
-    return mouvements.filter((m) => {
+    return mouvementsPeriode.filter((m) => {
       if (filtreTypeMvt !== 'tous' && m.type !== filtreTypeMvt) return false;
       if (terme === '') return true;
       return m.client.toLowerCase().includes(terme) || m.collecteur.toLowerCase().includes(terme);
     });
-  }, [mouvements, rechercheMvt, filtreTypeMvt]);
+  }, [mouvementsPeriode, rechercheMvt, filtreTypeMvt]);
 
-  // Répartition des flux, sur les totaux tels qu'ils sortent de la base. La
-  // somme des trois parts vaut l'encaissé plus les restitutions : la commission
-  // est prélevée *dans* l'encaissé, elle ne s'y ajoute pas.
-  const sommeParts = totaux.total_encaisse + totaux.restitutions;
+  /** Un point par jour de la série, jours creux compris. */
+  const points: PointCourbe[] = (tendances?.serie ?? []).map((p) => ({
+    jour: p.jour,
+    valeur: p[serie],
+  }));
+  const libelleSerie = SERIES.find((s) => s.cle === serie)!.libelle;
+
+  // Répartition des flux **de la période**. La somme des trois parts vaut
+  // l'encaissé plus les restitutions : la commission est prélevée *dans*
+  // l'encaissé, elle ne s'y ajoute pas.
+  const sommeParts = (tendances?.flux.encaisse ?? 0) + (tendances?.flux.restitutions ?? 0);
   const part = (valeur: number) => (sommeParts > 0 ? Math.round((valeur / sommeParts) * 100) : 0);
-  const encaisseNet = totaux.total_encaisse - totaux.commissions;
+  const encaisseNet = (tendances?.flux.encaisse ?? 0) - (tendances?.flux.commissions ?? 0);
 
   const repartition = [
     {
@@ -140,28 +164,26 @@ export function TableauDeBord({
     },
     {
       libelle: 'Commissions',
-      pourcentage: part(totaux.commissions),
+      pourcentage: part(tendances?.flux.commissions ?? 0),
       couleur: 'bg-chart-slate',
-      valeur: formatMontant(totaux.commissions),
+      valeur: formatMontant(tendances?.flux.commissions ?? 0),
     },
     {
       libelle: 'Restitutions',
-      pourcentage: part(totaux.restitutions),
+      pourcentage: part(tendances?.flux.restitutions ?? 0),
       couleur: 'bg-chart-blue',
-      valeur: formatMontant(totaux.restitutions),
+      valeur: formatMontant(tendances?.flux.restitutions ?? 0),
     },
   ];
 
-  // Les zones les plus actives, barre proportionnelle à la plus forte. On n'en
-  // montre que ce que la palette sait distinguer : une cinquième zone reprendrait
-  // la couleur de la première, et deux pastilles identiques dans une même liste
-  // se lisent comme une même chose.
-  const zonesTriees = useMemo(
-    () => [...zones].sort((a, b) => b.encaisse - a.encaisse).slice(0, COULEURS_ZONES.length),
-    [zones],
-  );
+  // Les zones les plus actives **de la période**, déjà classées par la base.
+  // On n'en montre que ce que la palette sait distinguer : une cinquième zone
+  // reprendrait la couleur de la première, et deux pastilles identiques dans
+  // une même liste se lisent comme une même chose.
+  const zonesPeriode = tendances?.zones ?? [];
+  const zonesTriees = zonesPeriode.slice(0, COULEURS_ZONES.length);
   const zoneMax = zonesTriees[0]?.encaisse ?? 1;
-  const totalEncaisseZones = useMemo(() => zones.reduce((acc, z) => acc + z.encaisse, 0), [zones]);
+  const totalEncaisseZones = zonesPeriode.reduce((acc, z) => acc + z.encaisse, 0);
 
   return (
     <>
@@ -343,6 +365,44 @@ export function TableauDeBord({
               />
             </Carte>
 
+            {sansMise.length > 0 && (
+              <Carte className="p-5">
+                <h3 className="font-headings font-bold text-base text-ink mb-1">
+                  Sans mise depuis 7 jours
+                </h3>
+                {/* Un abonnement actif qui n'encaisse plus est un client qui
+                    part. C'est le seul signal de cet écran qui appelle un geste
+                    hors de l'écran. */}
+                <p className="font-body text-xs text-muted-foreground mb-3">
+                  {sansMise.length} collecteur{sansMise.length > 1 ? 's' : ''} actif
+                  {sansMise.length > 1 ? 's' : ''} sur {abonnements.collecteurs_actifs}
+                </p>
+                <ul className="flex flex-col gap-2">
+                  {sansMise.slice(0, 5).map((c) => (
+                    <li
+                      key={c.id}
+                      className="flex items-center justify-between gap-3 text-xs font-body"
+                    >
+                      <span className="min-w-0 truncate text-ink font-semibold">
+                        {c.nom}
+                        {c.zone && <span className="text-muted-foreground"> · {c.zone}</span>}
+                      </span>
+                      <span className="text-muted-foreground tabular-nums shrink-0">
+                        {c.derniere_mise ? `${c.jours_sans} jours` : 'jamais'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => onNaviguer('collecteurs')}
+                  className="mt-3 font-body text-sm font-semibold text-primary cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  Voir les collecteurs
+                </button>
+              </Carte>
+            )}
+
             {/* Revenu récurrent par palier */}
             <Carte className="p-5">
               <div className="flex items-center justify-between gap-3 mb-3">
@@ -381,9 +441,37 @@ export function TableauDeBord({
           {/* Colonne centrale : répartition et zones */}
           <div className="flex flex-col gap-5">
             <Carte className="p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <h3 className="font-headings font-bold text-lg text-ink">Évolution</h3>
+                {/* Les séries portent les mêmes mots que les filtres de
+                    mouvement — « Commissions », « Mises ». Le groupe les
+                    sépare, pour l'assistance comme pour les épreuves. */}
+                <div role="group" aria-label="Série affichée" className="flex flex-wrap gap-2">
+                  {SERIES.map((s) => (
+                    <button
+                      key={s.cle}
+                      type="button"
+                      aria-pressed={serie === s.cle}
+                      onClick={() => setSerie(s.cle)}
+                      className={`px-3 py-1.5 rounded-pill border font-body text-sm font-medium cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                        serie === s.cle
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'border-hairline text-ink'
+                      }`}
+                    >
+                      {s.libelle}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <CourbeEvolution libelle={libelleSerie} points={points} formater={formatMontant} />
+            </Carte>
+
+            <Carte className="p-5">
               <BarreEmpilee
                 titre="Répartition des flux financiers"
-                periode="Depuis l'ouverture"
+                periode={phrase}
                 total={formatMontant(sommeParts)}
                 parts={repartition}
               />
@@ -423,7 +511,7 @@ export function TableauDeBord({
 
                         <div className="flex items-center justify-between gap-3 text-xs font-body text-muted-foreground">
                           <span>{z.collecteurs} collecteurs sur le terrain</span>
-                          <span>{z.clients} clients rattachés</span>
+                          <span>{formatMontant(z.mises)} mises</span>
                         </div>
                       </div>
                     );
@@ -444,9 +532,13 @@ export function TableauDeBord({
                     <Icone nom="history" taille={16} className="text-primary" />
                     Flux et transactions
                   </h3>
+                  {/* « N sur M » : la base borne la liste à deux cents lignes,
+                      et un écran qui montre une partie sans le dire laisse
+                      croire qu'il montre tout. */}
                   <span className="text-xs font-body text-muted-foreground tabular-nums shrink-0">
                     {mouvementsFiltres.length}
-                    {mouvementsFiltres.length > 1 ? ' mouvements' : ' mouvement'}
+                    {mouvementsFiltres.length > 1 ? ' mouvements' : ' mouvement'} sur{' '}
+                    {formatMontant(tendances?.mouvements_total ?? 0)}
                   </span>
                 </div>
 
@@ -507,8 +599,8 @@ export function TableauDeBord({
               <div className="flex-1 min-h-0 overflow-y-auto">
                 {mouvementsFiltres.length === 0 ? (
                   <p className="px-5 py-8 text-center text-sm font-body text-muted-foreground">
-                    {mouvements.length === 0
-                      ? 'Aucun mouvement enregistré.'
+                    {mouvementsPeriode.length === 0
+                      ? 'Aucun mouvement sur cette période.'
                       : 'Aucun mouvement ne correspond à ces critères.'}
                   </p>
                 ) : (
