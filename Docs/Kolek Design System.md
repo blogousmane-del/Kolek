@@ -352,7 +352,7 @@ Cette maquette **est** notre Dashboard Admin. Son contenu de démonstration se t
 
 | Bloc de la maquette | Équivalent Kolek |
 |---|---|
-| « Free Plan Mode » | Indicateur de **palier** (Essai / Standard / Pro / Illimité). |
+| « Free Plan Mode » | **Sans équivalent.** La console est celle de GTCS, qui vend les paliers et n'en souscrit aucun : un indicateur de palier y serait faux pour tout le monde. Retiré le 2026-09-11. |
 | Carte bancaire VISA | **Carte de collecte** d'un client (progression 31 cases). |
 | Available Balance / Withdraw | **Solde restituable** + action **Retrait / clôture**. |
 | Total Earnings + tendance | **Commissions du mois** (admin) / **Encaissé du jour** (collecteur). |
@@ -360,7 +360,7 @@ Cette maquette **est** notre Dashboard Admin. Son contenu de démonstration se t
 | Stock Index International | **Top zones / marchés** (encaissé du jour, objectif). |
 | Recently Completed (barres) | **Répartition** encaissements / commissions / restitutions. |
 | Transactions | **Mises & retraits récents** (dépôt vert, commission neutre, sortie corail). |
-| Subscribe now | **Upsell de palier** (passer à Pro / Illimité). |
+| Subscribe now | **Sans équivalent**, pour la même raison. La carte « Passer à Pro » a été retirée le 2026-09-11. |
 
 **Données & langue.** Tout en français, montants en FCFA sans centimes, dates au format local, noms de marchés/zones ivoiriens. Les libellés parlent le métier : mise, carte, cycle, collecteur, rapprochement.
 

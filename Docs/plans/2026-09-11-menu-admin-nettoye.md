@@ -417,3 +417,27 @@ PowerShell. Ensuite :
   `theme.css` a perdu une variable, leur feuille de style change donc
   d'empreinte, sans effet visible ;
 - job des fonctions : « Aucune Edge Function touchée ».
+
+## Écarts
+
+Relevés à l'exécution, le 2026-09-11.
+
+- **Deux ajouts au regard de la spec, prévus dès ce plan.** La ligne 282 du
+  Design System décrivait encore la « carte promo en bas » et des sections
+  « Pilotage », « Raccourcis » qui n'existent plus : la spec ne la citait pas,
+  la tâche 2 l'a remise d'accord. La marge basse de la déconnexion est passée
+  de `mb-2` à `mb-6`, celle qu'avait la carte : sans elle, le dernier bouton
+  de la barre collait au bord.
+- **`theme.css` sort du générateur en LF**, là où la copie de travail était en
+  CRLF. Le fichier reste pur, `autocrlf` normalise au `git add`, et son diff ne
+  porte qu'une ligne. Rien à reprendre.
+- **La recherche de `degradePromo` a d'abord remonté `apps/admin/dist/`** :
+  des builds anciens, hors dépôt. Relancée hors `dist`, elle ne trouve plus
+  que la spec, ce plan et un audit du 2026-09-04 — de l'histoire.
+- **Aucune épreuve n'a été vue verte avant son retrait**, aucune n'a demandé
+  plus d'une implémentation : trois rouges, trois verts.
+- **La chaîne complète**, `npm run verifier`, sort en code 0 : quatorze
+  scripts racine et le `typecheck` des espaces de travail, soit les quinze
+  commandes. `core` 69, `ui` 144, admin 130, collecteur 266, site 41,
+  `test:scripts` 198, `test:db` 789 sur 67 fichiers ; les trois builds typent ;
+  `verifier:bundles` : « Aucune fuite dans les artefacts ».
