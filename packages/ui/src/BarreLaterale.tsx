@@ -7,7 +7,6 @@ export type CleNavAdmin =
   | 'tableau'
   | 'collecteurs'
   | 'encours'
-  | 'encaisser'
   | 'abonnements'
   | 'demandes'
   | 'avis'
@@ -51,7 +50,6 @@ const PILOTAGE: Entree[] = [
   { cle: 'tableau', icone: 'layout-dashboard', libelle: 'Tableau de bord', disponible: true },
   { cle: 'collecteurs', icone: 'users', libelle: 'Collecteurs', disponible: true },
   { cle: 'encours', icone: 'wallet', libelle: 'Encours & Soldes', disponible: true },
-  { cle: 'encaisser', icone: 'circle-dollar-sign', libelle: 'Encaisser', disponible: true },
   // « Transactions » et « Zones & Marchés » ont été retirées le 2026-08-21.
   // Elles n'étaient pas en attente d'être construites : leur contenu existe
   // déjà ailleurs — les mouvements sur le tableau de bord, les zones dans

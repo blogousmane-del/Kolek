@@ -159,3 +159,23 @@ describe('la barre latérale d’administration', () => {
     expect(onChangerEspace).toHaveBeenCalledWith('admin');
   });
 });
+
+/**
+ * Le menu de Kolek · Admin ne montre que ce que l'administrateur peut faire.
+ *
+ * Nettoyé le 2026-09-11 (`Docs/specs/2026-09-11-menu-admin-nettoye-design.md`) :
+ * une entrée « Encaisser » pour un geste que la base refuse à l'administrateur,
+ * et une carte « Passer à Pro » proposée à GTCS, qui vend Pro.
+ */
+describe('le menu de Kolek · Admin', () => {
+  it('n’offre pas d’encaisser : l’argent passe par le collecteur', () => {
+    render(<BarreLaterale {...props} />);
+
+    // La politique `mises_insert` n'accepte que `collecteur_id = auth.uid()`.
+    expect(screen.queryByText('Encaisser')).toBeNull();
+    // Le reste du pilotage est intact : une entrée en moins, pas un menu refait.
+    expect(screen.getByText('Tableau de bord')).toBeDefined();
+    expect(screen.getByText('Collecteurs')).toBeDefined();
+    expect(screen.getByText('Encours & Soldes')).toBeDefined();
+  });
+});

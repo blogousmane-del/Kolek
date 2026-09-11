@@ -13,7 +13,6 @@ import { Abonnements } from './ecrans/Abonnements';
 import { Avis } from './ecrans/Avis';
 import { Collecteurs } from './ecrans/Collecteurs';
 import { DetailCollecteur } from './ecrans/DetailCollecteur';
-import { EncaisserMise } from './ecrans/EncaisserMise';
 import { EncoursSoldes } from './ecrans/EncoursSoldes';
 import { Demandes } from './ecrans/Demandes';
 import { Reglages } from './ecrans/Reglages';
@@ -261,7 +260,6 @@ export function Coquille({
                 />
               )}
               {page === 'encours' && <EncoursSoldes vue={donnees.vue} />}
-              {page === 'encaisser' && <EncaisserMise />}
               {page === 'abonnements' && <Abonnements vue={donnees.vue} />}
               {page === 'demandes' && <Demandes />}
               {page === 'avis' && <Avis />}
