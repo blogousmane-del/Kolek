@@ -17,6 +17,7 @@ export { CarteCollecte } from './CarteCollecte';
 export { CarrouselCartes, type CarteItem } from './CarrouselCartes';
 export { CarteStat } from './CarteStat';
 export { CarteZone } from './CarteZone';
+export { CourbeEvolution, type PointCourbe } from './CourbeEvolution';
 export { Champ } from './Champ';
 export { Pagination, TAILLE_PAGE, usePagination } from './Pagination';
 export {
