@@ -215,6 +215,41 @@ l'épreuve possible sans Chariow.
 
 ---
 
+## Écarts d'exécution — 2026-09-11
+
+**L'ordre : tâche 1, puis 3, puis 2.** Les épreuves de la borne ont été
+posées avant le code, pour les voir échouer. Elles ont échoué deux fois, et
+**aucune fois pour la raison qu'on attendait** :
+
+1. `401 SECRET_INVALIDE` partout. `docker restart` ne relit pas
+   `supabase/functions/.env` : le CLI le passe au conteneur **à sa création**.
+   `docker inspect … {{.Config.Env}}` ne listait que `DRAINAGE_SECRET`.
+   Remède : `supabase stop`, puis le `start` avec la liste d'exclusions. La
+   mémoire de la pile locale le dit désormais.
+2. `500 CONFIGURATION`. Le contrôle d'entrée exigeait `CHARIOW_CLE_API`,
+   absente en local — exactement ce que la tâche 2 déplace. Le corps a été
+   relu par une sonde avant de poser le code, pour ne pas le supposer.
+
+Après la tâche 2 : `200 {"recu":true}` pour un Pulse signé d'une vente
+inconnue ; 27 épreuves vertes (webhook 9, `debit` 15, `secret` 3). Le code est
+commité **avant** les épreuves (`a726873` puis `9423d8b`) : aucun commit rouge
+dans l'historique.
+
+**`pulseEnTrop` plutôt qu'un bloc en ligne.** L'appel au compteur est
+enveloppé : il laisse passer quand le compteur **rend** une erreur, et aussi
+quand l'appel **lève** — une coupure réseau ne fait pas perdre un paiement.
+
+**Pas de préfixe `whsec_`** dans les secrets locaux : c'est celui des secrets
+de webhook Stripe, qu'un détecteur de secrets aurait pu prendre au sérieux.
+
+**Aucun contrôle de types Deno sur ce poste.** Le conteneur du runtime
+n'embarque que `edge-runtime`, pas `deno`, et le runtime exécute le TypeScript
+sans le vérifier. Les deux chemins neufs — `200` sous la borne, `429` au-delà
+— ont été **exécutés** par les épreuves ; une faute de type sans effet à
+l'exécution passerait inaperçue.
+
+---
+
 ## Ce qui reste après ce plan
 
 - **Le rejeu reste possible sous la borne** : vingt lectures par heure et par

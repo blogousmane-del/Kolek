@@ -240,7 +240,7 @@ se changent un par un dans le tableau de bord. Surtout pas par
 `supabase config push`, qui enverrait `site_url = "http://localhost:5173"` en
 production et casserait les liens de réinitialisation des vrais utilisateurs.
 
-### 🟡 Le webhook n'appelle pas `consommer_debit`
+### 🟡 → ✅ Le webhook n'appelle pas `consommer_debit` — **fermé le 2026-09-11**
 
 Toujours vrai. L'audit classait ce point en durcissement pour une bonne raison,
 qui tient encore : un webhook légitime arrive **en rafale** après une vague de
@@ -252,7 +252,16 @@ Et sa conséquence reste bornée : le secret qui fuit permet de déclencher des
 relectures chez Chariow, **pas d'obtenir un abonnement**, puisque la fonction ne
 crédite jamais sur la foi du corps reçu.
 
-### 🟡 Le secret de webhook n'a pas de longueur minimale à l'exécution
+**Fermé le 2026-09-11** (`a726873`). La lecture ci-dessus oubliait la
+signature, vérifiée depuis le 2026-09-04 (`ce440bc`) : un secret d'URL volé
+seul ne passe plus. Restait le rejeu d'un Pulse signé, que la signature —
+sans horodatage ni nonce — n'empêche pas. La borne compte **par vente**,
+vingt par heure, ce qui lève l'objection du seuil : une vague de paiements
+touche beaucoup de ventes, un rejeu toujours la même. Au-delà, `429`, que
+Chariow réessaie ; compteur en panne, on laisse passer. Voir
+`Docs/plans/2026-09-11-webhook-chariow-borne.md`.
+
+### 🟡 → ✅ Le secret de webhook n'a pas de longueur minimale à l'exécution — **reclassé le 2026-09-11, sans code**
 
 `etat-paiement.ts` exige 32 caractères pour **afficher** la passerelle comme
 configurée ; la fonction, elle, accepte tout secret non vide. L'écart est
@@ -261,6 +270,12 @@ notifications de paiement — et l'audit le disait déjà.
 
 Le corriger demanderait de toucher une Edge Function. **Écarté par la contrainte
 de la nuit**, et non parce que ce serait difficile.
+
+**Reclassé le 2026-09-11, par décision de l'exploitant.** Depuis la
+signature, le secret d'URL ne répond plus de l'origine : il écarte le bruit
+sans calcul. Un secret court ne fait plus entrer personne ; l'imposer à
+l'exécution n'ajouterait que le risque de couper les notifications de
+paiement.
 
 ### 🟡 Téléphones en clair, `localStorage`, absence de CAPTCHA
 

@@ -246,6 +246,13 @@ Appelée par le retour user, le webhook ET le cron. Pour chaque `Payment` du use
 
 ## 7. Webhook « Pulse » (optionnel mais recommandé)
 
+> **Pour Kolek, le 2026-09-11 :** ce document décrit une autre application
+> (communautés, Express). Deux corrections s'imposent ici : Chariow **signe**
+> ses Pulses (`x-chariow-signature`, HMAC-SHA256 du corps brut) et
+> `chariow-webhook` le vérifie depuis le 2026-09-04 ; il borne aussi le
+> rejeu, vingt Pulses par heure et par vente. La référence est
+> `supabase/functions/chariow-webhook/index.ts`, pas cette section.
+
 - **URL par communauté** (affichée toute prête dans Admin → Monétisation → Chariow → Webhook) :
   ```
   https://api.votre-domaine.com/payments/webhooks/mobile-money/chariow?secret=<SECRET>
