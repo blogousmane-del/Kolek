@@ -311,6 +311,97 @@ export async function definirConsentementAvis(
   return { ok: true };
 }
 
+/** Les quatre champs qu'un collecteur peut corriger sur la fiche d'un client. */
+export interface CorrectionClient {
+  nom: string;
+  telephone: string;
+  marche: string;
+  activite: string;
+}
+
+/**
+ * Corrige la fiche d'un client.
+ *
+ * ## Pourquoi seuls les champs changés partent
+ *
+ * Envoyer tout le formulaire écraserait le marché d'un client avec une chaîne
+ * vide si le champ n'avait pas été rechargé — et ce genre d'effacement ne se
+ * remarque que le jour où on cherche par marché. C'est le geste que
+ * `FicheModifiable` tient déjà côté administration, pour la même raison.
+ *
+ * Corollaire : quand rien n'a changé, **rien ne part**. Pas de requête, pas de
+ * ligne au journal d'audit, et `ecrit: false` pour que l'écran n'annonce pas un
+ * succès d'écriture qui n'a pas eu lieu.
+ *
+ * ## Pourquoi le numéro emporte le consentement
+ *
+ * Le déclencheur de notification lit `client.telephone` **au moment de la
+ * mise**. Corriger le numéro d'un client aux avis actifs enverrait son solde
+ * d'épargne à un numéro que personne n'a accepté, et une faute de frappe dans
+ * la correction l'enverrait à un inconnu.
+ *
+ * `inscrireClient` a déjà tranché la question symétrique — « sinon un numéro
+ * ajouté plus tard déclencherait des avis que personne n'a acceptés à ce
+ * moment-là ». La règle est la même, dans l'autre sens.
+ *
+ * `avis_actifs: false` part **dans la même requête** que le numéro. Deux
+ * écritures successives laisseraient une fenêtre — courte, mais réelle — où le
+ * nouveau numéro est en base avec l'ancien consentement, et une mise encaissée
+ * dedans partirait au mauvais endroit.
+ *
+ * Mesuré en production le 2026-09-11 : 68 clients sur 81 ont les avis actifs.
+ * Presque toute correction de numéro coupera donc quelque chose.
+ *
+ * ## Pourquoi `.select('id')`
+ *
+ * Un `update().eq()` nu ne rend aucune erreur quand RLS ou un privilège de
+ * colonne écarte la ligne : PostgREST répond 204, zéro ligne touchée, `error` à
+ * null. Le collecteur croirait avoir corrigé un numéro qu'il n'a pas corrigé,
+ * et continuerait d'appeler le mauvais. Constaté le 2026-08-24 sur le
+ * consentement aux avis ; même remède ici.
+ */
+export async function modifierClient(
+  clientId: string,
+  correction: CorrectionClient,
+  origine: CorrectionClient,
+): Promise<{ ok: true; ecrit: boolean } | { ok: false; echec: EchecEcriture }> {
+  const nom = correction.nom.trim();
+  if (!nom) {
+    return { ok: false, echec: { code: 'NOM_VIDE', message: 'Le nom du client est obligatoire.' } };
+  }
+
+  const champs: Record<string, string | boolean | null> = {};
+
+  if (nom !== origine.nom.trim()) champs.nom = nom;
+
+  // `|| null` et non la chaîne vide : le journal d'audit doit lire « le champ
+  // était vide » plutôt que « le champ contenait rien ». La production n'a
+  // aucune chaîne vide dans ces colonnes (mesuré le 2026-09-11) ; ce
+  // formulaire ne sera pas le premier à en écrire.
+  for (const cle of ['telephone', 'marche', 'activite'] as const) {
+    const valeur = correction[cle].trim();
+    if (valeur !== origine[cle].trim()) champs[cle] = valeur || null;
+  }
+
+  // Dans la même requête, jamais dans une seconde — voir la note ci-dessus.
+  if ('telephone' in champs) champs.avis_actifs = false;
+
+  if (Object.keys(champs).length === 0) return { ok: true, ecrit: false };
+
+  const { data, error } = await supabase
+    .from('clients')
+    .update(champs)
+    .eq('id', clientId)
+    .select('id');
+
+  if (error) return { ok: false, echec: echec(error) };
+  if (!data || data.length === 0) {
+    return { ok: false, echec: { code: 'RIEN_ECRIT', message: PHRASES.RIEN_ECRIT! } };
+  }
+
+  return { ok: true, ecrit: true };
+}
+
 /**
  * Ouvre une nouvelle carte pour un client qui en avait déjà une.
  *

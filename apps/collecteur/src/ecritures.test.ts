@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Ce que voit le collecteur quand le serveur refuse.
@@ -33,7 +33,13 @@ vi.mock('./supabase', () => ({
   },
 }));
 
-const { codeDErreur, creerClientAvecCarte, definirConsentementAvis, enregistrerMise } =
+const {
+  codeDErreur,
+  creerClientAvecCarte,
+  definirConsentementAvis,
+  enregistrerMise,
+  modifierClient,
+} =
   await import('./ecritures');
 
 const COLLECTEUR = '11111111-1111-4111-8111-111111111111';
@@ -318,5 +324,126 @@ describe('reprise après un nouveau déploiement', () => {
     expect(reload).not.toHaveBeenCalled();
 
     vi.unstubAllGlobals();
+  });
+});
+
+/**
+ * La correction d'une fiche client.
+ *
+ * ## Ce que ces épreuves gardent, et que rien d'autre ne garde
+ *
+ * Le déclencheur de notification lit `client.telephone` **au moment de la
+ * mise**. Corriger le numéro d'un client aux avis actifs enverrait son solde
+ * d'épargne à un numéro que personne n'a accepté — et une faute de frappe dans
+ * la correction, à un inconnu. `avis_actifs` doit donc retomber, et retomber
+ * **dans la même requête** : deux écritures successives laisseraient une
+ * fenêtre où le nouveau numéro cohabite avec l'ancien consentement, et une mise
+ * encaissée dedans partirait au mauvais endroit.
+ *
+ * Mesuré en production le 2026-09-11 : 68 clients sur 81 ont les avis actifs.
+ * Ce n'est pas un cas limite, c'est le cas courant.
+ */
+describe('modifierClient', () => {
+  const ORIGINE = { nom: 'GSM T', telephone: '0709201790', marche: 'BLE ZOKOU', activite: '' };
+
+  beforeEach(() => {
+    majChamps.mockReset();
+    majSelect.mockReset().mockResolvedValue({ data: [{ id: CLIENT }], error: null });
+  });
+
+  it('n’envoie que le champ changé', async () => {
+    await modifierClient(CLIENT, { ...ORIGINE, nom: 'GSM Traoré' }, ORIGINE);
+
+    expect(majChamps).toHaveBeenCalledWith({ nom: 'GSM Traoré' });
+  });
+
+  it('n’écrit rien quand rien n’a changé', async () => {
+    // Un formulaire ouvert puis refermé ne doit laisser aucune ligne au journal
+    // d'audit, ni annoncer un succès qui mentirait.
+    const r = await modifierClient(CLIENT, { ...ORIGINE }, ORIGINE);
+
+    expect(majChamps).not.toHaveBeenCalled();
+    expect(r).toEqual({ ok: true, ecrit: false });
+  });
+
+  it('coupe les avis dès que le numéro change, dans la même requête', async () => {
+    await modifierClient(CLIENT, { ...ORIGINE, telephone: '0709201799' }, ORIGINE);
+
+    expect(majChamps).toHaveBeenCalledTimes(1);
+    expect(majChamps).toHaveBeenCalledWith({ telephone: '0709201799', avis_actifs: false });
+  });
+
+  it('coupe les avis quand le numéro est retiré', async () => {
+    await modifierClient(CLIENT, { ...ORIGINE, telephone: '' }, ORIGINE);
+
+    expect(majChamps).toHaveBeenCalledWith({ telephone: null, avis_actifs: false });
+  });
+
+  it('ne touche pas aux avis quand seul le nom change', async () => {
+    // Punir une correction sans rapport serait un défaut, pas une précaution.
+    await modifierClient(CLIENT, { ...ORIGINE, nom: 'GSM Traoré' }, ORIGINE);
+
+    expect(majChamps.mock.calls[0]?.[0]).not.toHaveProperty('avis_actifs');
+  });
+
+  it('écrit null et non une chaîne vide quand un champ est vidé', async () => {
+    // Le journal d'audit doit lire « le champ était vide », pas « le champ
+    // contenait rien ». C'est le geste que `inscrireClient` fait déjà, et la
+    // production n'a aucune chaîne vide dans ces colonnes — mesuré le
+    // 2026-09-11. Ce formulaire ne doit pas être le premier à en écrire.
+    await modifierClient(CLIENT, { ...ORIGINE, marche: '' }, ORIGINE);
+
+    expect(majChamps).toHaveBeenCalledWith({ marche: null });
+  });
+
+  it('ignore les espaces autour d’une valeur inchangée', async () => {
+    await modifierClient(CLIENT, { ...ORIGINE, nom: '  GSM T  ' }, ORIGINE);
+
+    expect(majChamps).not.toHaveBeenCalled();
+  });
+
+  it('écrit la valeur débarrassée de ses espaces', async () => {
+    await modifierClient(CLIENT, { ...ORIGINE, nom: '  GSM Traoré  ' }, ORIGINE);
+
+    expect(majChamps).toHaveBeenCalledWith({ nom: 'GSM Traoré' });
+  });
+
+  it('refuse un nom vide, avec la phrase de l’inscription', async () => {
+    const r = await modifierClient(CLIENT, { ...ORIGINE, nom: '   ' }, ORIGINE);
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.echec.code).toBe('NOM_VIDE');
+      expect(r.echec.message).toBe('Le nom du client est obligatoire.');
+    }
+    expect(majChamps).not.toHaveBeenCalled();
+  });
+
+  it('rend un échec quand le serveur n’a touché aucune ligne', async () => {
+    // Le défaut du 2026-08-24 : PostgREST rend 204 et `error: null` quand RLS
+    // ou un privilège de colonne écarte la ligne. Sans ce contrôle, le
+    // collecteur croit avoir corrigé un numéro qu'il n'a pas corrigé, et
+    // continue d'appeler le mauvais.
+    majSelect.mockReset().mockResolvedValue({ data: [], error: null });
+
+    const r = await modifierClient(CLIENT, { ...ORIGINE, nom: 'GSM Traoré' }, ORIGINE);
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.echec.code).toBe('RIEN_ECRIT');
+  });
+
+  it('traduit un refus de privilège en DROIT_REFUSE', async () => {
+    // Un privilège de colonne refusé : `modifierClient` n'envoie que des colonnes
+    // accordées, donc ce refus signalerait un défaut de l'application — jamais
+    // un abonnement inactif, que `clients_update` ne vérifie pas.
+    majSelect.mockReset().mockResolvedValue({
+      data: null,
+      error: { code: '42501', message: 'permission denied for table clients' },
+    });
+
+    const r = await modifierClient(CLIENT, { ...ORIGINE, nom: 'GSM Traoré' }, ORIGINE);
+
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.echec.code).toBe('DROIT_REFUSE');
   });
 });
