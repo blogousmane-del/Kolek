@@ -158,6 +158,27 @@ describe('la barre latérale d’administration', () => {
 
     expect(onChangerEspace).toHaveBeenCalledWith('admin');
   });
+
+  /**
+   * Deux ecrans differents portaient le meme libelle : « Abonnements » dans le
+   * menu du Dashboard, et « Abonnements » dans celui de la plateforme. La cle
+   * `abonnements` existe des deux cotes a dessein — la renommer toucherait la
+   * navigation pour un libelle — donc seul le libelle change.
+   */
+  it('ne porte pas deux fois « Abonnements » dans la plateforme', () => {
+    render(
+      <BarreLaterale
+        {...props}
+        espace="super"
+        actif="abonnements"
+        estSuper
+        onChangerEspace={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Facturation')).toBeDefined();
+    expect(screen.queryByText('Abonnements')).toBeNull();
+  });
 });
 
 /**

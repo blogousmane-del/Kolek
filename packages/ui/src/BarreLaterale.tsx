@@ -102,7 +102,7 @@ const SYSTEME: Entree[] = [
  * et le menu entier change avec.
  */
 const SUPER_PILOTAGE: Entree[] = [
-  { cle: 'abonnements', icone: 'credit-card', libelle: 'Abonnements', disponible: true },
+  { cle: 'abonnements', icone: 'credit-card', libelle: 'Facturation', disponible: true },
   { cle: 'administrateurs', icone: 'users', libelle: 'Administrateurs', disponible: true },
   { cle: 'promos', icone: 'coins', libelle: 'Promotions', disponible: true },
 ];
@@ -113,7 +113,7 @@ const SUPER_SYSTEME: Entree[] = [
   // sous « Pilotage » : ce n'est pas une recette qu'on regarde, c'est un
   // branchement qu'on vérifie. Aucune clé ne s'y saisit — l'écran répond « est-ce
   // configuré, et est-ce que ça marche », pas « voici la clé ».
-  { cle: 'paiement', icone: 'credit-card', libelle: 'Paiement', disponible: true },
+  { cle: 'paiement', icone: 'receipt', libelle: 'Paiement', disponible: true },
   // « Santé du système » depuis le 2026-09-11 : l'onglet ne se contente plus de
   // compter des lignes, il dit si ce qui doit tourner tourne. La clé reste
   // `plateforme` — la renommer toucherait la navigation pour un libellé.

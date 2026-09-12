@@ -69,8 +69,8 @@ interface ConfigOnglet {
 const ONGLETS: ConfigOnglet[] = [
   {
     cle: 'abonnements',
-    filAriane: ['Super Admin', 'Abonnements'],
-    titre: 'Gestion des abonnements',
+    filAriane: ['Super Admin', 'Facturation'],
+    titre: 'Facturation des collecteurs',
   },
   {
     cle: 'administrateurs',
