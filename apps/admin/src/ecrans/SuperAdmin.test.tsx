@@ -380,6 +380,33 @@ describe('la plateforme', () => {
 
     expect(screen.getByRole('alert').textContent).toMatch(/arbitrage/i);
   });
+
+  it('sort les deux signaux opérationnels de la grille des comptages', () => {
+    poser({ statut: 'ok', etat: ETAT });
+
+    rendre('plateforme');
+
+    expect(screen.getByText('Rejets de synchro non traités')).toBeDefined();
+    expect(screen.getByText('Journées de caisse')).toBeDefined();
+    expect(screen.getByText('Détail technique')).toBeDefined();
+  });
+
+  /**
+   * L'ancienne alerte vivait dans la grille des comptages. Elle remonte
+   * au-dessus du repli : elle se déplace, elle ne se duplique pas. La
+   * `precision` de la carte porte bien le mot « arbitrage », mais dans un
+   * `span` sans rôle — le compte reste à une.
+   */
+  it('ne lève qu’une seule alerte quand des rejets attendent', () => {
+    poser({
+      statut: 'ok',
+      etat: { ...ETAT, volumes: { ...ETAT.volumes, rejets_non_traites: 3 } },
+    });
+
+    rendre('plateforme');
+
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+  });
 });
 
 describe('le paiement des abonnements', () => {
