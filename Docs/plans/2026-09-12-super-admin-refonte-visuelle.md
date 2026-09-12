@@ -523,19 +523,27 @@ chiffre. Rien de tel n'existe dans `@kolek/core`.
 
 **Fichiers :**
 - Modifier : `packages/core/src/format.ts` (fin du fichier)
-- Modifier : `packages/core/src/format.test.ts` (créer s'il n'existe pas)
+- Modifier : `packages/core/src/format.test.ts` (existe : 45 lignes, LF, sept insécables)
 
 **Interfaces :**
 - Produit : `export function ilYaLisible(iso: string, maintenant?: Date): string`.
 
 - [ ] **Étape 1 : écrire l'épreuve rouge**
 
-Ajouter à `packages/core/src/format.test.ts` :
+Étendre l'import de `./format` en tête du fichier, puis ajouter le bloc à la
+fin. Le fichier est en **LF** — sept fichiers du dépôt le sont, tous les
+autres en CRLF — donc l'outil d'édition y est sûr.
 
 ```ts
-import { describe, expect, it } from 'vitest';
-
-import { ilYaLisible } from './format';
+// `describe`, `expect` et `it` sont deja importes par le fichier : ne pas
+// ajouter un second import. Seul l'import de `./format` s'etend.
+import {
+  formatDateLocale,
+  formatFCFA,
+  formatHeureLocale,
+  formatMontant,
+  ilYaLisible,
+} from './format';
 
 /**
  * L'âge d'un chiffre, pas l'heure qu'il était. Au-delà d'une heure le relatif
