@@ -2099,3 +2099,43 @@ d'après poussée n'ait rien à reconstituer.
 - **La base, avant** : `releves_quotidiens` porte une seule ligne
   (2026-09-11) ; la courbe de la santé restera donc à un point tant que le
   relevé du 2026-09-12 ne sera pas écrit, à 23 h 55.
+
+## Mise en production — 2026-09-12
+
+Les deux gestes, chacun sur accord explicite, et ce qu’ils ont donné.
+
+- **Accord n° 1, la migration.** `db push --dry-run` annonce une seule
+  migration, aucun seed, aucun rôle ; `db push` applique
+  `20260911210000_admin_tendances.sql`. `migration list --linked` aligne
+  ensuite 51 migrations sur 51.
+- **Les droits, vérifiés depuis la production** : `anon` fermé,
+  `authenticated` fermé, `service_role` ouvert. Le garde-fou de la migration
+  n'a rien levé.
+- **Les chiffres, recoupés à la main.** La fonction rend 668 mises sur la
+  période (2026-09-06 au 2026-09-12) et 40 sur la précédente (2026-08-30 au
+  2026-09-05). Un comptage indépendant, jour par jour et par `encaisse_le`,
+  redonne exactement 31 + 32 + 181 + 253 + 74 + 97 = 668, et
+  11 + 3 + 8 + 4 + 8 + 6 = 40. Le bond est donc réel — une pointe les 8 et
+  9 septembre — et non un défaut de bornes.
+- **Écart sur ce plan : l'attente de « 42 mises par jour » était fausse.** Le
+  plan en déduisait environ 294 mises sur sept jours ; la production en
+  compte 668. C'est la mesure du 2026-09-11 qui ne valait que pour son jour,
+  pas le code. Rien à corriger, mais l'ordre de grandeur annoncé au plan ne
+  devait pas servir de critère.
+- **La série** : 24 points, soit du 2026-08-20 — première mise de la
+  production — à aujourd’hui inclus. Le fond de courbe à 90 jours ne mord
+  donc pas encore. Quatre collecteurs en décrochage.
+- **Accord n° 2, la poussée.** `7760bf3..5837eb4`, 14 commits, dont la
+  documentation du chantier B restée locale. CI `34670314790` : quatre jobs
+  verts.
+- **Les fonctions** : `admin-vue-globale` passe de la version 37
+  (`f183d42890c2…`) à la **38** (`98085f0c772f…`). Les 18 autres gardent leur
+  version — le job déploie tout, seule la fonction changée en reçoit une
+  neuve, comme au chantier précédent.
+- **Les fronts** : `admin.kolek.cash` sert `index-Dq0yNqAj.js` et
+  `index-D50uipf_.css`, les empreintes du build local. `app.kolek.cash` et
+  `kolek.cash` gardent les leurs : aucun des deux ne touche au tableau de
+  bord.
+- **Reste à voir** : le 2026-09-13, l’écran compare deux journées réelles, ce
+  qu'aucun jeu d'essai ne prouve ; et `releves = 2` une fois le relevé du
+  2026-09-12 écrit à 23 h 55.
