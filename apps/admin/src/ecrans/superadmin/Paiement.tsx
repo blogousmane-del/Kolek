@@ -32,6 +32,20 @@ const LIBELLE_BOUTIQUE: Record<EtatPaiement['boutique'], string> = {
   non_configuree: 'Non configurée',
 };
 
+/**
+ * Combien de paliers ne peuvent pas être payés, dit au bon nombre.
+ *
+ * La version figée au singulier annonçait « un palier ne peut pas être payé »
+ * sous un « 0 / 3 », pendant que l’alerte trois centimètres plus bas comptait
+ * « 3 paliers n’ont pas de produit déclaré ». Deux chiffres pour un seul fait,
+ * sur un écran dont tout le propos est de dire ce qui est vrai.
+ */
+function precisionManquants(combien: number): string {
+  if (combien === 0) return 'tous les paliers';
+  if (combien === 1) return 'un palier ne peut pas être payé';
+  return `${combien} paliers ne peuvent pas être payés`;
+}
+
 function Pastille({ ok, libelle }: { ok: boolean; libelle: string }) {
   return (
     <span
@@ -94,7 +108,7 @@ export function Paiement({ paiement }: { paiement: EtatPaiement | null }) {
         <CarteStat
           libelle="Produits déclarés"
           valeur={`${paiement.produits.filter((p) => p.configure).length} / ${paiement.produits.length}`}
-          precision={manquants.length > 0 ? 'un palier ne peut pas être payé' : 'tous les paliers'}
+          precision={precisionManquants(manquants.length)}
           icone="receipt"
           alerte={manquants.length > 0}
         />

@@ -1162,4 +1162,52 @@ describe('les têtes d’onglet', () => {
 
     expect(screen.getByText('Produits déclarés')).toBeDefined();
   });
+
+  /**
+   * La précision de la carte et l’alerte juste dessous énoncent le même
+   * fait. Elles doivent donc compter pareil : « un palier ne peut pas être
+   * payé », sous un « 0 / 3 », contredisait « 3 paliers n’ont pas de produit
+   * déclaré » écrit à trois centimètres de là.
+   */
+  it('accorde la précision au nombre de paliers sans produit', () => {
+    poser({
+      statut: 'ok',
+      etat: {
+        ...ETAT,
+        paiement: {
+          ...COMPLET,
+          produits: [
+            { palier: 'standard', configure: false },
+            { palier: 'pro', configure: false },
+            { palier: 'illimite', configure: false },
+          ],
+        },
+      },
+    });
+
+    rendre('paiement');
+
+    expect(screen.getByText('3 paliers ne peuvent pas être payés')).toBeDefined();
+
+    cleanup();
+
+    poser({
+      statut: 'ok',
+      etat: {
+        ...ETAT,
+        paiement: {
+          ...COMPLET,
+          produits: [
+            { palier: 'standard', configure: true },
+            { palier: 'pro', configure: false },
+            { palier: 'illimite', configure: true },
+          ],
+        },
+      },
+    });
+
+    rendre('paiement');
+
+    expect(screen.getByText('un palier ne peut pas être payé')).toBeDefined();
+  });
 });
