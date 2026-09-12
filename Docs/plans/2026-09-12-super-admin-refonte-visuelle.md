@@ -1618,12 +1618,18 @@ reçoit les deux clés. Ajouter au describe `le journal de sécurité` :
     rendre('securite');
     fireEvent.click(screen.getByText('Afficher le journal'));
 
-    expect(await screen.findByText(/par Awa Traoré/)).toBeDefined();
+    expect(await screen.findByText(/par Aya Konan/)).toBeDefined();
   });
 ```
 
-Le jeu d'essai de la page de journal doit porter `acteur_nom: 'Awa Traoré'` et
-`cible_nom: null` sur au moins une ligne.
+Le jeu d'essai `LIGNE` reçoit `acteur_nom: 'Aya Konan'` — le nom de `MOI`,
+qui est déjà son `acteur_id` — et `cible_nom: 'Bakary Touré'`, celui de
+`AUTRE`, qui est déjà son `collecteur_id`.
+
+**Pas `cible_nom: null`.** Un `collecteur_id` non nul produit toujours un nom,
+au pire « Compte sans fiche » : un jeu d'essai qui poserait `null` à côté d'un
+`collecteur_id` renseigné décrirait un état que le serveur ne peut pas
+produire, et mentirait sur le contrat qu'il est censé vérifier.
 
 - [ ] **Étape 7 : la chaîne**
 
