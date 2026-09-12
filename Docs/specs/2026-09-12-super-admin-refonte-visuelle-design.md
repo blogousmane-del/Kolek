@@ -19,8 +19,10 @@ Relevé le 2026-09-12, avant toute décision. Chaque ligne est vérifiable.
 - **Un écran est écrit deux fois.** `Abonnements.tsx:248` côté Admin et
   `superadmin/Abonnements.tsx:369` rendent la même grille de paliers — même
   structure, mêmes classes, même source `PALIERS` et même `parPalier` — à
-  l'apostrophe près. Les deux écrans servent le même public : l'entrée Admin
-  vit sous une section commentée « La monétisation est le métier de GTCS ».
+  deux détails près : la version Admin porte un commentaire de trois lignes,
+  et les deux titres n'ont pas la même apostrophe. Les deux écrans servent
+  le même public : l'entrée Admin vit sous une section commentée
+  « La monétisation est le métier de GTCS ».
 - **`estSuper` ne filtre pas la section Monétisation.** Lignes 416 et 419, les
   sections `PILOTAGE` et `MONETISATION` sont rendues sans condition ;
   `estSuper` ne garde que le sélecteur d'espace (`:395`). Un administrateur
@@ -183,10 +185,31 @@ quelle.
   chantiers précédents ont chacun trouvé par là un défaut qu'aucune épreuve ne
   voyait.
 
+## Amendements — relevés en préparant le plan
+
+Deux faits que la première lecture avait manqués, et qui changent le travail
+sans changer les décisions.
+
+- **`mrrLisible` est dupliquée elle aussi.** Elle vit dans
+  `apps/admin/src/ecrans/Abonnements.tsx:51` et dans
+  `apps/admin/src/ecrans/superadmin/lisible.ts:23`, au mot près. La grille
+  partagée en a besoin : elle descend donc avec le composant. `packages/ui`
+  dépend déjà de `@kolek/core` — c'est déclaré dans ses dépendances et trois
+  de ses fichiers l'importent — donc `PALIERS` et `formatMontant` y sont
+  atteignables.
+- **`CarteStat` n'a pas d'état d'alerte, et l'onglet Facturation en a un.**
+  Ses quatre indicateurs faits main passent la valeur en rouge quand des
+  expirations ou des défauts existent. Les autres propriétés — `libelle`,
+  `valeur`, `unite`, `precision` — se transposent une pour une. `CarteStat`
+  reçoit donc un `alerte` facultatif : additif, sans effet sur ses appelants
+  actuels, et sans quoi la montée au standard ferait **perdre** un signal.
+
 ## Les risques
 
-- **Le déplacement de `LignePalier`** touche deux écrans, le mode démonstration
-  et leurs épreuves. C'est mécanique, mais large.
+- **Le déplacement de `LignePalier`** ne touche que `donnees.ts`, où le type
+  est déclaré puis employé une seule fois. Les écrans passent
+  `abonnements.parPalier` sans jamais le nommer : le déplacement est
+  mécanique et étroit.
 - **La migration est la seule pièce qui atteint la production.** Son retour
   arrière est une migration neuve qui rétablit la version précédente de la
   fonction ; aucune donnée n'est écrite par ce chantier.
