@@ -1,4 +1,4 @@
-import type { FluxPeriode } from '@kolek/core';
+import type { FluxPeriode, LignePalier } from '@kolek/core';
 import { useCallback, useEffect, useState } from 'react';
 
 import { supabase } from './supabase';
@@ -54,16 +54,6 @@ export interface Mouvement {
   /** Négatif pour une restitution — le signe vient du serveur, pas de l'écran. */
   montant: number;
   survenu_le: string;
-}
-
-export interface LignePalier {
-  palier: string;
-  nom: string;
-  prix: number;
-  limiteClients: number | null;
-  total: number;
-  actifs: number;
-  mrr: number;
 }
 
 export interface LigneCarte {

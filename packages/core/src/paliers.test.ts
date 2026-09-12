@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { PALIERS, PALIER_RECOMMANDE, palierParCle } from './paliers';
+import { PALIERS, PALIER_RECOMMANDE, palierParCle, type LignePalier } from './paliers';
 import type { Palier } from './types';
 
 describe('grille tarifaire', () => {
@@ -93,5 +93,28 @@ describe('grille tarifaire', () => {
       expect(haut.prix).toBeGreaterThan(bas.prix);
       expect(haut.limiteClients === null || haut.limiteClients > bas.limiteClients!).toBe(true);
     }
+  });
+});
+
+/**
+ * `DescriptionPalier` dit l'offre ; `LignePalier` dit le réel — combien de
+ * comptes portent le palier, combien paient, ce qu'il rapporte. La forme vivait
+ * dans l'application ; le composant partagé de la grille en a besoin, et
+ * `packages/ui` ne peut pas importer d'une application.
+ */
+describe('LignePalier', () => {
+  it('décrit un palier vendu, et se compose avec la grille tarifaire', () => {
+    const ligne: LignePalier = {
+      palier: 'pro',
+      nom: 'Pro',
+      prix: 5000,
+      limiteClients: null,
+      total: 12,
+      actifs: 9,
+      mrr: 45000,
+    };
+
+    expect(PALIERS.some((p) => p.cle === ligne.palier)).toBe(true);
+    expect(ligne.actifs).toBeLessThanOrEqual(ligne.total);
   });
 });

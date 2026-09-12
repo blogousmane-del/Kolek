@@ -177,3 +177,22 @@ export function palierParCle(cle: Palier): DescriptionPalier {
   if (!trouve) throw new RangeError(`Palier inconnu : ${cle}`);
   return trouve;
 }
+
+/**
+ * Ce que la base sait d'un palier **vendu** : combien de comptes le portent,
+ * combien paient, ce qu'il rapporte. `DescriptionPalier` dit l'offre ;
+ * celle-ci dit le réel. Les deux voyagent ensemble jusqu'à l'écran.
+ *
+ * `palier` reste une chaîne et non `Palier` : la valeur vient du serveur, et un
+ * palier retiré de la grille ne doit pas casser le typage d'une réponse déjà
+ * en vol.
+ */
+export interface LignePalier {
+  palier: string;
+  nom: string;
+  prix: number;
+  limiteClients: number | null;
+  total: number;
+  actifs: number;
+  mrr: number;
+}
