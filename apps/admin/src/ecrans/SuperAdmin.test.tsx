@@ -536,6 +536,8 @@ describe('le journal de sécurité', () => {
     ligne_id: AUTRE,
     acteur_id: MOI,
     collecteur_id: AUTRE,
+    acteur_nom: 'Aya Konan',
+    cible_nom: 'Bakary Touré',
     donnees: { palier: 'pro' },
   };
 
@@ -600,6 +602,20 @@ describe('le journal de sécurité', () => {
     fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
 
     expect(await screen.findByText(/n\u2019a pas pu produire/)).toBeDefined();
+  });
+
+  /**
+   * Une console de securite qui affiche « acteur 3f2a… » ne dit pas qui a
+   * agi, et c'est sa seule raison d'etre.
+   */
+  it('nomme l’acteur plutôt que d’afficher son identifiant', async () => {
+    poser({ statut: 'ok', etat: ETAT });
+    chargerJournal.mockResolvedValue({ lignes: [LIGNE], a_suivre: false, page: 1, taille: 50 });
+
+    rendre('securite');
+    fireEvent.click(screen.getByRole('button', { name: /afficher le journal/i }));
+
+    expect(await screen.findByText(/par Aya Konan/)).toBeDefined();
   });
 });
 

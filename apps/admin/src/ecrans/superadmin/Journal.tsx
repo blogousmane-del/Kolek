@@ -137,8 +137,12 @@ export function Journal({
                     {' · '}
                     <span className="text-muted-foreground">{horodatage(l.survenu_le)}</span>
                   </p>
-                  <p className="font-body text-xs text-muted-foreground break-all">
-                    acteur {l.acteur_id ?? 'inconnu'} · ligne {l.ligne_id ?? '—'}
+                  {/* « non attribue » et non « inconnu » : le libelle que
+                      20260830090000_journal_acteur.sql prescrit pour les
+                      lignes anterieures a l'ajout de la colonne. */}
+                  <p className="font-body text-xs text-muted-foreground">
+                    par {l.acteur_nom ?? 'non attribué'}
+                    {l.cible_nom && ` · sur ${l.cible_nom}`}
                   </p>
                 </div>
               ))}

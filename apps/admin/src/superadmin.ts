@@ -230,9 +230,14 @@ export interface LigneJournal {
   ligne_id: string | null;
   /** Qui a agi. Nul pour les lignes écrites avant la migration du 2026-08-30. */
   acteur_id: string | null;
+  /** Nomme par la migration `20260912090000`. Nul quand `acteur_id` l’est —
+      une ligne anterieure au 2026-08-30 n'a pas d'acteur du tout. */
+  acteur_nom: string | null;
   /** Sur qui. Ce n'est pas le même que `acteur_id`, et confondre les deux
       était exactement le défaut que cette colonne a corrigé. */
   collecteur_id: string | null;
+  /** Sur qui portait le geste. Nul quand `collecteur_id` l’est. */
+  cible_nom: string | null;
   donnees: Record<string, unknown> | null;
 }
 
