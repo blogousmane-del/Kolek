@@ -49,3 +49,29 @@ export function formatDateLocale(d: Date): string {
 export function formatHeureLocale(d: Date): string {
   return `${formatDateLocale(d)} à ${deuxChiffres(d.getHours())}:${deuxChiffres(d.getMinutes())}`;
 }
+
+/**
+ * L'âge d'une mesure : « il y a 3 min ».
+ *
+ * Au-delà d'une heure, le relatif cesse d'informer — « il y a 97 min » se
+ * recompte de tête — et l'heure absolue reprend la main. Une date à venir
+ * (horloge du poste en avance sur le serveur) se lit « à l'instant » plutôt que
+ * de compter à rebours.
+ *
+ * `maintenant` est un paramètre et non un appel direct à l'horloge : sans lui,
+ * aucune épreuve ne pourrait fixer un résultat.
+ *
+ * **Une date illisible se lit aussi « à l'instant ».** `new Date('n'importe
+ * quoi').getTime()` vaut `NaN`, que le contrôle de finitude renvoie sur la même
+ * branche que « moins d'une minute ». C'est le comportement le plus doux, et
+ * c'est aussi le plus discutable : un horodatage cassé s'annonce alors comme
+ * une mesure fraîche. Aucun appelant ne passe aujourd'hui autre chose qu'un
+ * `timestamptz` venu de la base ; le jour où l'un le fait, cette ligne est
+ * l'endroit à revoir.
+ */
+export function ilYaLisible(iso: string, maintenant: Date = new Date()): string {
+  const minutes = Math.floor((maintenant.getTime() - new Date(iso).getTime()) / 60000);
+  if (!Number.isFinite(minutes) || minutes < 1) return 'à l’instant';
+  if (minutes < 60) return `il y a ${minutes} min`;
+  return formatHeureLocale(new Date(iso));
+}
