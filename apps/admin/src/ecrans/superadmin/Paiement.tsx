@@ -18,6 +18,20 @@ const BOUTIQUE: Record<EtatPaiement['boutique'], { ton: 'ok' | 'ko' | 'neutre'; 
   non_configuree: { ton: 'neutre', texte: 'Aucune clé posée : rien n’a été demandé à la boutique.' },
 };
 
+/** Ce que chaque etat s'appelle a l'ecran.
+ *
+ * Quatre etats, quatre libelles. Les ecraser en « Joignable / Injoignable »
+ * faisait dire « Injoignable » a `non_configuree`, qui signifie exactement
+ * l'inverse : aucune cle posee, donc rien n'a ete demande, donc rien n'a
+ * echoue. Annoncer un echec qui n'a pas eu lieu vaut moins que ne rien dire.
+ */
+const LIBELLE_BOUTIQUE: Record<EtatPaiement['boutique'], string> = {
+  joignable: 'Joignable',
+  refusee: 'Clé refusée',
+  injoignable: 'Injoignable',
+  non_configuree: 'Non configurée',
+};
+
 function Pastille({ ok, libelle }: { ok: boolean; libelle: string }) {
   return (
     <span
@@ -52,7 +66,6 @@ export function Paiement({ paiement }: { paiement: EtatPaiement | null }) {
   if (!paiement) {
     return (
       <section>
-        <h2 className="font-headings font-bold text-xl text-ink mb-1">Paiement des abonnements</h2>
         <Carte className="p-5">
           <p className="font-body text-sm text-muted-foreground">
             La fonction <code>super-admin-etat</code> en ligne ne rend pas encore l’état du
@@ -68,7 +81,6 @@ export function Paiement({ paiement }: { paiement: EtatPaiement | null }) {
 
   return (
     <section>
-      <h2 className="font-headings font-bold text-xl text-ink mb-1">Paiement des abonnements</h2>
       <p className="font-body text-sm text-muted-foreground mb-3">
         Aucune clé ne se saisit ici, et il n’y a pas de champ pour ça. Une clé qui encaisse vit dans
         les secrets des Edge Functions — <code>npx supabase secrets set</code>, voir{' '}
@@ -88,7 +100,7 @@ export function Paiement({ paiement }: { paiement: EtatPaiement | null }) {
         />
         <CarteStat
           libelle="Boutique"
-          valeur={paiement.boutique === 'joignable' ? 'Joignable' : 'Injoignable'}
+          valeur={LIBELLE_BOUTIQUE[paiement.boutique]}
           precision={boutique.texte}
           icone="landmark"
           alerte={boutique.ton === 'ko'}

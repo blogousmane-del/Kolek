@@ -20,7 +20,6 @@ export function Administrateurs({
 
   return (
     <section>
-      <h2 className="font-headings font-bold text-xl text-ink mb-1">Administrateurs</h2>
       <p className="font-body text-sm text-muted-foreground mb-3">
         Un super administrateur voit et modifie cet écran. Un administrateur ordinaire ne le voit
         pas.

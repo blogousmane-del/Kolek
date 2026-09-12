@@ -54,7 +54,6 @@ export function Journal({
 
   return (
     <section>
-      <h2 className="font-headings font-bold text-xl text-ink mb-1">Journal de sécurité</h2>
       <p className="font-body text-sm text-muted-foreground mb-3">
         Qui a fait quoi, sur quelle ligne, et quand. Le journal est en écriture seule : un
         déclencheur refuse toute modification, y compris par la clé de service.{' '}
