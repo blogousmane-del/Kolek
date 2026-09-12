@@ -336,7 +336,11 @@ describe('mrrLisible', () => {
   });
 
   it('écrit le montant suivi de son unité', () => {
-    expect(mrrLisible(45000)).toBe('45 000 FCFA');
+    // Le separateur de milliers de `formatMontant` est une insecable
+    // U+00A0. Une espace ordinaire ici ferait echouer l’epreuve, et une
+    // sequence d’echappement tapee a la main deviendrait le caractere.
+    const INSECABLE = String.fromCharCode(160);
+    expect(mrrLisible(45000)).toBe(`45${INSECABLE}000 FCFA`);
   });
 });
 
