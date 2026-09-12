@@ -1115,8 +1115,17 @@ describe('les têtes d’onglet', () => {
     expect(screen.getByText('Afficher le journal')).toBeDefined();
   });
 
+  /**
+   * **`ETAT` ne porte aucune clé `paiement`.** Avec lui seul, l’écran rend
+   * sa branche de repli — « la fonction en ligne ne rend pas encore l’état
+   * du paiement » — et « Produits déclarés » n’existe pas : l’épreuve serait
+   * rouge pour toujours, y compris après une implémentation correcte.
+   *
+   * Le jeu `COMPLET` existe déjà, mais il est déclaré **dans** le `describe`
+   * du paiement. Le remonter à la portée du module plutôt que le dupliquer.
+   */
   it('Paiement annonce les produits déclarés', () => {
-    poser({ statut: 'ok', etat: ETAT });
+    poser({ statut: 'ok', etat: { ...ETAT, paiement: COMPLET } });
 
     rendre('paiement');
 
@@ -1128,7 +1137,12 @@ describe('les têtes d’onglet', () => {
 - [ ] **Étape 2 : constater la rougeur**
 
 Commande : `npm run test -w @kolek/admin -- SuperAdmin`
-Attendu : les cinq épreuves échouent.
+Attendu : **quatre** épreuves échouent, pas cinq. Celle de Facturation passe
+déjà : `superadmin/Abonnements.tsx` rend déjà `ind.libelle`, donc « MRR total »
+et « En défaut » sont à l’écran avant tout changement, et troquer `Carte`
+contre `CarteStat` ne modifie pas une recherche par texte. Elle vaut comme
+garde de non-régression, pas comme moteur — ce que `CarteStat` ajoute ici, la
+pastille d’icône, n’est asserté par aucune épreuve.
 
 - [ ] **Étape 3 : Facturation**
 
@@ -1154,8 +1168,8 @@ indicateurs (lignes 337 à 365) par :
 Le tableau `indicateurs` (lignes 228 à 257) reçoit une icône par entrée :
 `icone: 'wallet'` pour « MRR total », `'users'` pour « Collecteurs actifs »,
 `'calendar'` pour « Expirations ce mois », `'alert-circle'` pour « En défaut ».
-Ajouter `CarteStat` à l'import `@kolek/ui` et retirer `Carte` s'il n'y sert
-plus.
+Ajouter `CarteStat` à l'import `@kolek/ui`. **Garder `Carte`** : mesuré le
+2026-09-12, il sert encore deux fois ailleurs dans ce fichier.
 
 - [ ] **Étape 4 : Administrateurs**
 
@@ -1271,8 +1285,8 @@ après le paragraphe d'explication :
       </div>
 ```
 
-Déplacer le calcul de `manquants` et `boutique` **avant** ce bloc s'il vient
-après. Ajouter `CarteStat` à l'import `@kolek/ui`.
+`manquants` et `boutique` sont **déjà** calculés avant le `return` — rien à
+déplacer. Ajouter `CarteStat` à l'import `@kolek/ui`.
 
 - [ ] **Étape 8 : constater la verdeur**
 
