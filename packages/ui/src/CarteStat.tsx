@@ -21,6 +21,15 @@ interface Props {
   tendancePositive?: boolean;
   /** Précision factuelle sous la valeur, quand une tendance n'est pas calculable. */
   precision?: string;
+  /**
+   * La valeur porte-t-elle une mauvaise nouvelle : elle passe alors en négatif.
+   *
+   * Distinct de `tendance`, qui compare à une période précédente. Ici rien
+   * n'est comparé — c'est l'état présent qui alerte, et il se lit sans
+   * historique : des abonnements qui expirent, des paliers sans produit
+   * déclaré, une boutique injoignable.
+   */
+  alerte?: boolean;
   icone: NomIcone;
 }
 
@@ -31,6 +40,7 @@ export function CarteStat({
   tendance,
   tendancePositive = true,
   precision,
+  alerte = false,
   icone,
 }: Props) {
   return (
@@ -58,7 +68,11 @@ export function CarteStat({
           L'unité peut, elle, descendre d'une ligne : « FCFA » sous le montant se
           lit encore ; « 000 FCFA » sous « 345 », non. */}
       <div className="flex flex-wrap items-baseline gap-x-2">
-        <span className="font-headings font-bold text-3xl 2xl:text-4xl text-ink tabular-nums whitespace-nowrap">
+        <span
+          className={`font-headings font-bold text-3xl 2xl:text-4xl tabular-nums whitespace-nowrap ${
+            alerte ? 'text-negative' : 'text-ink'
+          }`}
+        >
           {valeur}
         </span>
         {unite && (
