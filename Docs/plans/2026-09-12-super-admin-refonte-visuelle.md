@@ -28,8 +28,17 @@ Supabase Postgres.
 - **Le jeu d'icônes est une union close** (`packages/ui/src/Icone.tsx`). Seuls
   les 46 noms déclarés existent ; une icône absente est une erreur de
   compilation.
-- **Fins de ligne :** tous les fichiers du dépôt touchés ici sont en LF sauf
-  indication contraire. Vérifier avec Node, jamais avec `cat`.
+- **Fins de ligne : le dépôt est en CRLF, à sept exceptions près.** Recensé
+  le 2026-09-12 sur les 33 fichiers de ce chantier : 26 en CRLF pur, 7 en LF
+  — `packages/core/src/paliers.test.ts`, `packages/core/src/format.ts`,
+  `packages/core/src/format.test.ts`, `packages/ui/src/CarteStat.tsx`,
+  `packages/ui/src/BarreHaute.tsx`, `packages/ui/src/Pagination.tsx` et
+  `supabase/migrations/20260830120000_journal_lisible_et_consultations.sql`.
+  **Vérifier chaque fichier avec Node avant de l'éditer** : `cat` et `grep`
+  masquent les `\r` sous Git Bash, seul Node dit la vérité. Un ajout
+  multi-lignes par l'outil d'édition pose des LF — sans danger dans un
+  fichier LF, il mêle les fins de ligne dans un fichier CRLF, où il faut
+  passer par Node. **Tout fichier créé par ce chantier est en CRLF.**
 - **Les épreuves d'abord.** Chaque étape de code est précédée d'une épreuve
   rouge, et la rougeur est constatée avant d'écrire l'implémentation.
 - **La chaîne complète** est `npm run verifier`. Une tâche ne se commite pas
