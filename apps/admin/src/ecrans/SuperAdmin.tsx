@@ -157,6 +157,9 @@ export function SuperAdmin({
     );
   }
 
+  // Plus de « Rafraichir » : recharger est le travail du navigateur, et le
+  // bouton masquait de quand datent ces chiffres. L'age passe a la barre
+  // haute, qui le rend cliquable.
   const actions =
     onglet === 'abonnements'
       ? [
@@ -166,25 +169,21 @@ export function SuperAdmin({
             onActiver: exporter,
             disponible: vue.collecteurs.length > 0,
           },
-          {
-            icone: 'history' as NomIcone,
-            libelle: 'Rafraîchir',
-            onActiver: etat.recharger,
-            disponible: etat.statut !== 'chargement',
-          },
         ]
-      : [
-          {
-            icone: 'history' as NomIcone,
-            libelle: 'Rafraîchir',
-            onActiver: etat.recharger,
-            disponible: etat.statut !== 'chargement',
-          },
-        ];
+      : [];
 
   return (
     <>
-      <BarreHaute filAriane={configOnglet.filAriane} titre={configOnglet.titre} actions={actions} />
+      <BarreHaute
+        filAriane={configOnglet.filAriane}
+        titre={configOnglet.titre}
+        actions={actions}
+        mesure={
+          etat.statut === 'ok'
+            ? { iso: etat.etat.genere_le, onRecharger: etat.recharger }
+            : undefined
+        }
+      />
 
       <div className="px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 overflow-y-auto">
         {etat.statut === 'chargement' && (

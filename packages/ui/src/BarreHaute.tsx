@@ -1,3 +1,5 @@
+import { ilYaLisible } from '@kolek/core';
+
 import { Icone, type NomIcone } from './Icone';
 
 export interface ActionBarre {
@@ -22,9 +24,21 @@ interface Props {
   filAriane: string[];
   titre: string;
   actions: ActionBarre[];
+  /**
+   * L'âge des chiffres affichés, et de quoi les redemander.
+   *
+   * Remplace le bouton « Rafraîchir » qui coiffait les six onglets du Super
+   * Admin : recharger est le travail du navigateur, et ce bouton masquait la
+   * seule chose qu'on venait chercher — de quand datent ces chiffres. Une
+   * affordance au lieu de deux, et c'est celle qui informe.
+   *
+   * **Facultative, et il faut qu'elle le reste.** Un onglet qui ne sait pas de
+   * quand datent ses chiffres n'annonce rien plutôt que de deviner.
+   */
+  mesure?: { iso: string; onRecharger: () => void };
 }
 
-export function BarreHaute({ filAriane, titre, actions }: Props) {
+export function BarreHaute({ filAriane, titre, actions, mesure }: Props) {
   return (
     <div className="bg-canvas px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-4 flex-shrink-0">
       <div className="flex items-center gap-1.5 mb-2">
@@ -50,6 +64,19 @@ export function BarreHaute({ filAriane, titre, actions }: Props) {
       <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-headings font-bold text-2xl sm:text-3xl text-ink">{titre}</h1>
         <div className="flex items-center flex-wrap gap-2">
+          {/* L'horodatage précède les actions : c'est un état, pas un geste, et
+              il se lit avant qu'on décide d'agir. Le clic recharge — la seule
+              affordance qui subsiste, et elle porte l'information que
+              « Rafraîchir » masquait. */}
+          {mesure && (
+            <button
+              type="button"
+              onClick={mesure.onRecharger}
+              className="min-h-11 px-3 rounded-md font-body text-sm text-muted-foreground border border-hairline bg-surface cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              Mesuré {ilYaLisible(mesure.iso)}
+            </button>
+          )}
           {actions.map((action) => {
             const disponible = action.disponible ?? Boolean(action.onActiver);
             return (
