@@ -1,5 +1,3 @@
-import { formatMontant } from '@kolek/core';
-
 /**
  * Les mises en forme partagées par les onglets du Super Admin.
  *
@@ -16,12 +14,6 @@ export function dateLisible(iso: string): string {
     month: 'short',
     year: 'numeric',
   });
-}
-
-/** Un MRR nul se lit « — » et non « 0 FCFA » : le collecteur est en essai, il ne
-    paie pas encore ; zéro laisserait croire à un impayé. */
-export function mrrLisible(mrr: number): string {
-  return mrr === 0 ? '—' : `${formatMontant(mrr)} FCFA`;
 }
 
 const UNITES = ['o', 'Ko', 'Mo', 'Go', 'To'] as const;

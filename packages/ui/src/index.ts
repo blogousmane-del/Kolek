@@ -34,6 +34,7 @@ export { EcranConnexion } from './EcranConnexion';
 export { EcranMessage } from './EcranMessage';
 export { Feuille } from './Feuille';
 export { Filet } from './Filet';
+export { GrillePaliers, mrrLisible } from './GrillePaliers';
 export { Icone, type NomIcone } from './Icone';
 export { LigneCollecteur } from './LigneCollecteur';
 export { LigneTransaction, type TypeMontant } from './LigneTransaction';
