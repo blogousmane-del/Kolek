@@ -2012,9 +2012,11 @@ git commit -m "docs: la sante du systeme, ecarts et verification"
    fonctions déploie `super-admin-etat` (et elle seule) ; `admin.kolek.cash`
    sert l'empreinte du build local ; les deux autres fronts, relevés et
    expliqués.
-5. **Le lendemain** : `releves = 2` en production — le travail de 23 h 55 a
-   tourné. **Après le 2026-09-22** : plus aucune trace de plus de 30 jours dans
-   `cron.job_run_details`.
+5. **Le surlendemain, le 2026-09-13** : `releves = 2` en production. Pas le
+   lendemain : le travail de 23 h 55 écrit le jour qui s'achève, et la
+   migration a déjà posé la ligne de ce jour-là ; le compteur ne monte qu'au
+   premier relevé d'un jour neuf. **Après le 2026-09-22** : plus aucune trace
+   de plus de 30 jours dans `cron.job_run_details`.
 
 ## Retour arrière — sur décision seulement
 
@@ -2115,6 +2117,18 @@ Relevés à l'exécution, le 2026-09-11.
   version 22 à la 23 (21 h 56 UTC, `ezbr_sha256` `d3f244909ee8…` puis
   `a28099147a52…`) ; les 18 autres gardent leur version : la commande prend
   tout, seule la fonction changée en reçoit une neuve.
-- **Reste à voir** : le 2026-09-12, `releves = 2` en production (le travail de
-  23 h 55 a tourné) ; après le 2026-09-22, plus aucune trace de plus de 30 jours
-  dans `cron.job_run_details`.
+- **Écart sur ce plan : `releves` ne monte pas le lendemain.** Contrôle du
+  2026-09-12 à 00 h 20 UTC : `releves = 1`, un seul jour distinct
+  (2026-09-11), `releve_le` à 23 h 55 00,045 ; `kolek-releve-quotidien`
+  compte une exécution, zéro échec. Le mécanisme est juste — c'est l'attente
+  qui comptait faux. La migration appelle `releve_du_jour()` à son
+  déploiement (ligne 231) et pose la ligne du 2026-09-11 ; à 23 h 55 UTC,
+  `v_jour` vaut encore 2026-09-11, Abidjan étant à UTC+0, donc
+  `on conflict (jour) do update` remplace cette ligne au lieu d’en ajouter
+  une — ce que le code annonce : « deux points le même jour fausseraient la
+  courbe ». Le compteur passera à 2 au relevé du 2026-09-12 à 23 h 55, donc
+  visible le 2026-09-13.
+- **Reste à voir** : après le 2026-09-22, plus aucune trace de plus de
+  30 jours dans `cron.job_run_details`. `kolek-purge-journal-cron` a tourné
+  une fois, le 2026-09-12 à 00 h 10, sans échec ; le journal porte alors
+  27 850 exécutions du drainage, soit environ 19 jours à une par minute.
