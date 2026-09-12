@@ -112,8 +112,14 @@ describe('LignePalier', () => {
 
 - [ ] **Étape 2 : constater la rougeur**
 
-Commande : `npm run test -w @kolek/core`
-Attendu : échec, `LignePalier` n'est pas exporté par `./paliers`.
+Commande : `npm run typecheck -w @kolek/core`
+Attendu : échec —
+`error TS2305: Module '"./paliers"' has no exported member 'LignePalier'`.
+
+**Pas `npm run test`.** Vitest ne type-vérifie pas : l'import de type et
+l'annotation s'effacent à l'exécution, et l'épreuve passe au vert alors même
+que l'export n'existe pas — constaté le 2026-09-12, 97 succès. La porte rouge
+d'une tâche qui ne livre qu'un type est `tsc`, jamais Vitest.
 
 - [ ] **Étape 3 : poser le type**
 
@@ -142,8 +148,8 @@ export interface LignePalier {
 
 - [ ] **Étape 4 : constater la verdeur**
 
-Commande : `npm run test -w @kolek/core`
-Attendu : succès.
+Commande : `npm run typecheck -w @kolek/core && npm run test -w @kolek/core`
+Attendu : les deux au vert.
 
 - [ ] **Étape 5 : déplacer l'usage de l'application**
 
