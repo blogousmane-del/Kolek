@@ -621,7 +621,7 @@ chiffres.
 **Fichiers :**
 - Modifier : `packages/ui/src/BarreHaute.tsx`
 - Créer : `packages/ui/src/BarreHaute.test.tsx`
-- Modifier : `apps/admin/src/ecrans/SuperAdmin.tsx:160-187`
+- Modifier : `apps/admin/src/ecrans/SuperAdmin.tsx:160-183` (le bloc `const actions`)
 
 **Interfaces :**
 - Consomme : `ilYaLisible` de `@kolek/core` (tâche 4).
@@ -788,7 +788,7 @@ rendre ses enfants** : deux épreuves lisent les libellés de volumes à travers
 **Fichiers :**
 - Créer : `packages/ui/src/Repli.tsx`
 - Créer : `packages/ui/src/Repli.test.tsx`
-- Modifier : `packages/ui/src/index.ts` (après la ligne `Pagination`)
+- Modifier : `packages/ui/src/index.ts` (entre `NavMobile` et `Squelette`)
 
 **Interfaces :**
 - Produit : `export function Repli({ titre, children, ouvertParDefaut }: { titre: string; children: ReactNode; ouvertParDefaut?: boolean })`.
@@ -903,7 +903,11 @@ export function Repli({
 
 - [ ] **Étape 4 : exporter**
 
-Dans `packages/ui/src/index.ts`, après la ligne `export { Pagination, TAILLE_PAGE, usePagination } from './Pagination';` :
+Dans `packages/ui/src/index.ts`, entre la ligne `NavMobile` et la ligne
+`Squelette`. **Pas après `Pagination`** : cette ligne-là est justement la
+ligne mal classée du fichier — elle s'est glissée entre `Champ` et
+`ChampTelephone`. À partir de `EcranConnexion` le fichier est alphabétique,
+et `Repli` y a sa place.
 
 ```ts
 export { Repli } from './Repli';
@@ -1055,7 +1059,12 @@ dans l'état : aucun n'est calculé pour l'occasion, aucune tendance n'est
 affichée — il n'existe pas de période précédente pour ces valeurs.
 
 **Fichiers :**
-- Modifier : `apps/admin/src/ecrans/superadmin/Abonnements.tsx` (bloc `indicateurs`, `:228-257`, et son rendu `:337-365`)
+- Modifier : `apps/admin/src/ecrans/superadmin/Abonnements.tsx` — le bloc
+  `const indicateurs = [` et son rendu `{indicateurs.map((ind) => (`.
+  **Chercher ces deux ancres, ne pas se fier à un numéro de ligne :** la
+  tâche 3 a élargi l'import de ce fichier de dix lignes, et les bornes que ce
+  plan portait (`:228-257` et `:337-365`) étaient déjà fausses avant que la
+  tâche 8 ne commence.
 - Modifier : `apps/admin/src/ecrans/superadmin/Administrateurs.tsx`
 - Modifier : `apps/admin/src/ecrans/superadmin/Promos.tsx`
 - Modifier : `apps/admin/src/ecrans/superadmin/Journal.tsx`
