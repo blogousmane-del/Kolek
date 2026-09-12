@@ -1,4 +1,4 @@
-import { Bouton, Carte } from '@kolek/ui';
+import { Bouton, Carte, CarteStat } from '@kolek/ui';
 import { useState } from 'react';
 
 import type { VueGlobale } from '../../donnees';
@@ -54,6 +54,23 @@ export function CodesPromo({
         Un code réduit le prix du palier d'un collecteur jusqu'à sa date de fin. Seul le Super
         Admin l'applique : le collecteur ne saisit rien.
       </p>
+
+      {/* `codesApplicables` existe deja au-dessus : on le reutilise plutot
+          que de refiltrer la meme liste. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <CarteStat
+          libelle="Codes en cours"
+          valeur={String(codesApplicables.length)}
+          precision={`sur ${etat.codes_promo.length} créés`}
+          icone="coins"
+        />
+        <CarteStat
+          libelle="Remises qui courent"
+          valeur={String(etat.remises.length)}
+          precision="collecteurs à tarif réduit"
+          icone="circle-dollar-sign"
+        />
+      </div>
 
       <Carte className="divide-y divide-hairline mb-4">
         {etat.codes_promo.length === 0 && (

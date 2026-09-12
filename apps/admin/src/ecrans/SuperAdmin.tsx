@@ -263,7 +263,9 @@ export function SuperAdmin({
               </>
             )}
 
-            {onglet === 'securite' && <Journal />}
+            {onglet === 'securite' && (
+              <Journal volumes={etat.etat.volumes} journal={etat.etat.journal} />
+            )}
 
             {onglet === 'paiement' && <Paiement paiement={etat.etat.paiement ?? null} />}
 

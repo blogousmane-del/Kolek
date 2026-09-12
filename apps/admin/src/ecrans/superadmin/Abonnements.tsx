@@ -4,8 +4,10 @@ import {
   BadgeStatut,
   Bouton,
   Carte,
+  CarteStat,
   GrillePaliers,
   Icone,
+  type NomIcone,
   Pagination,
   mrrLisible,
   usePagination,
@@ -238,6 +240,7 @@ export function OngletAbonnements({
   const indicateurs = [
     {
       libelle: 'MRR total',
+      icone: 'wallet' as NomIcone,
       valeur: formatMontant(abonnements.mrr),
       unite: 'FCFA',
       precision: `${abonnements.collecteurs_actifs} abonnement${abonnements.collecteurs_actifs > 1 ? 's' : ''} actif${abonnements.collecteurs_actifs > 1 ? 's' : ''}`,
@@ -245,6 +248,7 @@ export function OngletAbonnements({
     },
     {
       libelle: 'Collecteurs actifs',
+      icone: 'users' as NomIcone,
       valeur: String(abonnements.collecteurs_actifs),
       unite: '',
       precision: `sur ${abonnements.collecteurs_total} inscrits`,
@@ -252,6 +256,7 @@ export function OngletAbonnements({
     },
     {
       libelle: 'Expirations ce mois',
+      icone: 'calendar' as NomIcone,
       valeur: String(abonnements.expirations_ce_mois),
       unite: '',
       precision: abonnements.expirations_ce_mois > 0 ? 'À traiter' : 'Aucune expiration',
@@ -259,6 +264,7 @@ export function OngletAbonnements({
     },
     {
       libelle: 'En défaut',
+      icone: 'alert-circle' as NomIcone,
       valeur: String(abonnements.suspendus + abonnements.expires),
       unite: '',
       precision: `${abonnements.suspendus} suspendu${abonnements.suspendus > 1 ? 's' : ''}, ${abonnements.expires} expiré${abonnements.expires > 1 ? 's' : ''}`,
@@ -347,30 +353,15 @@ export function OngletAbonnements({
       {/* Indicateurs clés */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {indicateurs.map((ind) => (
-          <Carte key={ind.libelle} className="p-5">
-            <span className="text-sm font-body font-medium text-muted-foreground block mb-1">
-              {ind.libelle}
-            </span>
-            <p
-              className={`font-headings font-bold text-2xl sm:text-3xl tabular-nums ${
-                ind.alerte ? 'text-negative' : 'text-ink'
-              }`}
-            >
-              {ind.valeur}
-              {ind.unite && (
-                <span className="text-lg font-body font-medium text-muted-foreground ml-1">
-                  {ind.unite}
-                </span>
-              )}
-            </p>
-            <span
-              className={`text-sm font-body mt-2 block ${
-                ind.alerte ? 'text-negative font-medium' : 'text-muted-foreground'
-              }`}
-            >
-              {ind.precision}
-            </span>
-          </Carte>
+          <CarteStat
+            key={ind.libelle}
+            libelle={ind.libelle}
+            valeur={ind.valeur}
+            unite={ind.unite}
+            precision={ind.precision}
+            icone={ind.icone}
+            alerte={ind.alerte}
+          />
         ))}
       </div>
 

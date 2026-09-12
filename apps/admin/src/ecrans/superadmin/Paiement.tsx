@@ -1,4 +1,4 @@
-import { Carte } from '@kolek/ui';
+import { Carte, CarteStat } from '@kolek/ui';
 
 import type { EtatPaiement } from '../../superadmin';
 
@@ -75,6 +75,25 @@ export function Paiement({ paiement }: { paiement: EtatPaiement | null }) {
         <code>Docs/deploiement.md</code> §7. Cet écran dit ce qui est posé et si la boutique
         l’accepte, jamais ce que valent les secrets.
       </p>
+
+      {/* `manquants` et `boutique` sont calcules au-dessus du `return` : rien
+          a deplacer. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <CarteStat
+          libelle="Produits déclarés"
+          valeur={`${paiement.produits.filter((p) => p.configure).length} / ${paiement.produits.length}`}
+          precision={manquants.length > 0 ? 'un palier ne peut pas être payé' : 'tous les paliers'}
+          icone="receipt"
+          alerte={manquants.length > 0}
+        />
+        <CarteStat
+          libelle="Boutique"
+          valeur={paiement.boutique === 'joignable' ? 'Joignable' : 'Injoignable'}
+          precision={boutique.texte}
+          icone="landmark"
+          alerte={boutique.ton === 'ko'}
+        />
+      </div>
 
       <div data-testid="paiement">
         <Carte className="p-5 space-y-5">

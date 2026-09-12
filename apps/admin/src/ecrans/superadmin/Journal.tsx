@@ -1,4 +1,5 @@
-import { Bouton, Carte } from '@kolek/ui';
+import { formatMontant, ilYaLisible } from '@kolek/core';
+import { Bouton, Carte, CarteStat } from '@kolek/ui';
 import { useState } from 'react';
 
 import { chargerJournal, type PageJournal } from '../../superadmin';
@@ -20,7 +21,13 @@ function horodatage(iso: string): string {
  *
  * Il faut donc le demander. C'est un clic de plus, assumé.
  */
-export function Journal() {
+export function Journal({
+  volumes,
+  journal,
+}: {
+  volumes: Record<string, number>;
+  journal: { derniere_ecriture: string | null; tables: string[] };
+}) {
   const [page, setPage] = useState<PageJournal | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
@@ -54,6 +61,30 @@ export function Journal() {
         <strong className="font-semibold text-ink">Le consulter s'enregistre</strong> — c'est
         pourquoi il ne s'affiche pas de lui-même.
       </p>
+
+      {/* La taille du journal, sans le lire : la lecture s’y enregistre, et
+          c’est tout le sujet de cet ecran. Ces trois chiffres viennent de
+          l’etat deja charge. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        <CarteStat
+          libelle="Lignes de journal"
+          valeur={formatMontant(volumes.audit_log ?? 0)}
+          precision="depuis l’origine"
+          icone="history"
+        />
+        <CarteStat
+          libelle="Tables tracées"
+          valeur={String(journal.tables.length)}
+          precision="lu dans pg_trigger"
+          icone="shield-check"
+        />
+        <CarteStat
+          libelle="Dernière écriture"
+          valeur={journal.derniere_ecriture ? ilYaLisible(journal.derniere_ecriture) : '—'}
+          precision={journal.derniere_ecriture ? '' : 'aucune écriture'}
+          icone="check-circle"
+        />
+      </div>
 
       <Carte className="p-5">
         {!page && !erreur && (

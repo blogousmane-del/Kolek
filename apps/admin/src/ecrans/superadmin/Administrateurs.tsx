@@ -1,4 +1,4 @@
-import { Bouton, Carte } from '@kolek/ui';
+import { Bouton, Carte, CarteStat } from '@kolek/ui';
 
 import type { AdministrateurSuper, EtatSuperAdmin } from '../../superadmin';
 import { dateLisible } from './lisible';
@@ -25,6 +25,21 @@ export function Administrateurs({
         Un super administrateur voit et modifie cet écran. Un administrateur ordinaire ne le voit
         pas.
       </p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <CarteStat
+          libelle="Comptes d’administration"
+          valeur={String(etat.administrateurs.length)}
+          precision="voient le Dashboard"
+          icone="users"
+        />
+        <CarteStat
+          libelle="Super administrateurs"
+          valeur={String(etat.administrateurs.filter((a) => a.niveau === 'super').length)}
+          precision="voient cette console"
+          icone="shield-check"
+        />
+      </div>
 
       <Carte className="divide-y divide-hairline">
         {etat.administrateurs.map((a) => {

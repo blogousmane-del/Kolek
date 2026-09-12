@@ -157,6 +157,19 @@ const VUE = {
   genereLe: '2026-08-30T08:00:00Z',
 } as unknown as VueGlobale;
 
+/** Une configuration complète et acceptée par la boutique. */
+const COMPLET = {
+  cleConfiguree: true,
+  cleIndice: 'MNOP',
+  webhookConfigure: true,
+  produits: [
+    { palier: 'standard', configure: true },
+    { palier: 'pro', configure: true },
+    { palier: 'illimite', configure: true },
+  ],
+  boutique: 'joignable' as const,
+};
+
 function poser(etat: Record<string, unknown>) {
   utiliserEtat.mockReturnValue({ ...etat, recharger });
 }
@@ -410,19 +423,6 @@ describe('la plateforme', () => {
 });
 
 describe('le paiement des abonnements', () => {
-  /** Une configuration complète et acceptée par la boutique. */
-  const COMPLET = {
-    cleConfiguree: true,
-    cleIndice: 'MNOP',
-    webhookConfigure: true,
-    produits: [
-      { palier: 'standard', configure: true },
-      { palier: 'pro', configure: true },
-      { palier: 'illimite', configure: true },
-    ],
-    boutique: 'joignable' as const,
-  };
-
   it('n’offre aucun champ où saisir une clé', () => {
     // Le cœur de cet écran. Un champ imposerait que la clé traverse le
     // navigateur d'un administrateur, se pose quelque part, et revienne à
@@ -1088,5 +1088,62 @@ describe('l’export CSV des abonnés', () => {
     expect(csv).toContain('Collecteur 001');
     expect(csv).toContain(`Collecteur ${String(TAILLE_PAGE + 5).padStart(3, '0')}`);
     expect(csv.split('\r\n').filter((l) => l.length > 0)).toHaveLength(1 + TAILLE_PAGE + 5);
+  });
+});
+
+/**
+ * Cinq onglets s'ouvraient sans rien annoncer. Chaque chiffre pose ici existe
+ * deja dans l'etat : aucun n'est calcule pour l'occasion, et aucune tendance
+ * n'est affichee — il n'existe pas de periode precedente pour ces valeurs.
+ */
+describe('les têtes d’onglet', () => {
+  it('Facturation annonce le MRR et garde son alerte en rouge', () => {
+    poser({ statut: 'ok', etat: ETAT });
+
+    rendre('abonnements');
+
+    expect(screen.getByText('MRR total')).toBeDefined();
+    expect(screen.getByText('En défaut')).toBeDefined();
+  });
+
+  it('Administrateurs compte les comptes et les super administrateurs', () => {
+    poser({ statut: 'ok', etat: ETAT });
+
+    rendre('administrateurs');
+
+    expect(screen.getByText('Comptes d’administration')).toBeDefined();
+    expect(screen.getByText('Super administrateurs')).toBeDefined();
+  });
+
+  it('Promotions compte les codes en cours', () => {
+    poser({ statut: 'ok', etat: ETAT });
+
+    rendre('promos');
+
+    expect(screen.getByText('Codes en cours')).toBeDefined();
+  });
+
+  it('Sécurité annonce la taille du journal sans le lire', () => {
+    poser({ statut: 'ok', etat: ETAT });
+
+    rendre('securite');
+
+    expect(screen.getByText('Lignes de journal')).toBeDefined();
+    // La tete annonce la taille ; le journal lui-meme reste a demander, car
+    // le consulter s'enregistre.
+    expect(screen.getByText('Afficher le journal')).toBeDefined();
+  });
+
+  /**
+   * `ETAT` ne porte aucune cle `paiement` : avec lui seul, l'ecran rendrait sa
+   * branche « la fonction en ligne ne rend pas encore l'etat du paiement » et
+   * ce libelle n’existerait jamais.
+   */
+  it('Paiement annonce les produits déclarés', () => {
+    poser({ statut: 'ok', etat: { ...ETAT, paiement: COMPLET } });
+
+    rendre('paiement');
+
+    expect(screen.getByText('Produits déclarés')).toBeDefined();
   });
 });
