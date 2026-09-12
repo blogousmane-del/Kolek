@@ -1271,13 +1271,13 @@ après le paragraphe d'explication :
         <CarteStat
           libelle="Produits déclarés"
           valeur={`${paiement.produits.filter((p) => p.configure).length} / ${paiement.produits.length}`}
-          precision={manquants.length > 0 ? 'un palier ne peut pas être payé' : 'tous les paliers'}
+          precision={precisionManquants(manquants.length)}
           icone="receipt"
           alerte={manquants.length > 0}
         />
         <CarteStat
           libelle="Boutique"
-          valeur={paiement.boutique === 'joignable' ? 'Joignable' : 'Injoignable'}
+          valeur={LIBELLE_BOUTIQUE[paiement.boutique]}
           precision={boutique.texte}
           icone="landmark"
           alerte={boutique.ton === 'ko'}
@@ -1287,6 +1287,39 @@ après le paragraphe d'explication :
 
 `manquants` et `boutique` sont **déjà** calculés avant le `return` — rien à
 déplacer. Ajouter `CarteStat` à l'import `@kolek/ui`.
+
+**Deux libellés que ce plan avait faux.** Les deux lignes ci-dessus sont de
+ce plan, aucune épreuve ne les assertait, et toutes deux disaient faux à
+l’écran — trouvées au regard à l’écran, le 2026-09-12 :
+
+- `? 'Joignable' : 'Injoignable'` faisait dire « Injoignable » à l’état
+  `non_configuree`, qui veut dire exactement l’inverse : aucune clé posée,
+  donc rien n’a été demandé à la boutique, donc rien n’a échoué. Annoncer un
+  échec qui n’a pas eu lieu vaut moins que ne rien dire.
+- `'un palier ne peut pas être payé'` restait au singulier sous un « 0 / 3 »,
+  pendant que l’alerte trois centimètres plus bas comptait « 3 paliers n’ont
+  pas de produit déclaré ». Deux chiffres pour un seul fait.
+
+Poser les deux au niveau du module, après la table `BOUTIQUE` :
+
+```tsx
+const LIBELLE_BOUTIQUE: Record<EtatPaiement['boutique'], string> = {
+  joignable: 'Joignable',
+  refusee: 'Clé refusée',
+  injoignable: 'Injoignable',
+  non_configuree: 'Non configurée',
+};
+
+function precisionManquants(combien: number): string {
+  if (combien === 0) return 'tous les paliers';
+  if (combien === 1) return 'un palier ne peut pas être payé';
+  return `${combien} paliers ne peuvent pas être payés`;
+}
+```
+
+L’épreuve qui tient le second, à ajouter au `describe` des têtes d’onglet :
+`accorde la précision au nombre de paliers sans produit`. Elle rend deux fois
+— trois produits manquants, puis un seul — et lit le libellé de la carte.
 
 - [ ] **Étape 8 : constater la verdeur**
 
