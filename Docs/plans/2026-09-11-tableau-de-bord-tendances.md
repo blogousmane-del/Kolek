@@ -2071,3 +2071,31 @@ Relevés à l'exécution, le 2026-09-11.
   et le tableau de bord la joignait quand même. Aucune épreuve ne pouvait le
   voir : il n'en existait aucune sur le rendu d'une ligne. Épreuve rouge
   d'abord, puis correction, puis confirmation à l'écran.
+
+## Relevés d'avant-production — 2026-09-12
+
+Pris avant tout geste d'écriture, en lecture seule, pour que la comparaison
+d'après poussée n'ait rien à reconstituer.
+
+- **Migrations** : `migration list --linked` aligne 50 migrations sur 50 et
+  ne laisse manquer que `20260911210000`. Aucune autre dérive.
+- **La fonction est bien absente** :
+  `to_regprocedure('public.admin_tendances(integer)')` rend `null` en
+  production. Le verrou de la route sera donc éprouvé pour de vrai : avant la
+  migration, l'écran doit afficher « tendances indisponibles » et garder ses
+  totaux.
+- **La fonction qui va changer** : `admin-vue-globale` est en **version 37**,
+  `ezbr_sha256` `f183d42890c2…`, déployée depuis le CI. Après la poussée elle
+  doit passer à 38 ; les 18 autres gardent la leur.
+- **Les fronts, avant** : `admin.kolek.cash` sert `index-eLEeInjb.js` et
+  `index-BYzEcFPa.css` ; `app.kolek.cash`, `index-DIDGJsab.js` et
+  `index-Da6QQP7H.css` ; `kolek.cash`, `index-BFnMfbiZ.js` et
+  `index-D_T0DKer.css`. Ce sont les empreintes du build de `7760bf3` : rien
+  n'a bougé depuis le chantier B.
+- **Les fronts, attendus après** : le build local de `6e40d23` ne change que
+  l'admin — `index-Dq0yNqAj.js` et `index-D50uipf_.css`. Le collecteur et le
+  site rendent exactement les empreintes déjà servies, ce que le chantier
+  laissait attendre : aucun d'eux ne touche au tableau de bord.
+- **La base, avant** : `releves_quotidiens` porte une seule ligne
+  (2026-09-11) ; la courbe de la santé restera donc à un point tant que le
+  relevé du 2026-09-12 ne sera pas écrit, à 23 h 55.
