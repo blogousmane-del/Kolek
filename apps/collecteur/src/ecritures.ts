@@ -1,5 +1,6 @@
 import { MISE_MIN, validerMise } from '@kolek/core';
 
+import { PHRASES, phraseEcriture, type EchecEcriture } from './phrases';
 import { supabase } from './supabase';
 
 /**
@@ -30,28 +31,7 @@ import { supabase } from './supabase';
  * endroit où ils deviennent des phrases.
  */
 
-export interface EchecEcriture {
-  /** Le code court du serveur, pour les tests et les journaux. */
-  code: string;
-  /** La phrase montrée au collecteur. */
-  message: string;
-}
-
-const PHRASES: Record<string, string> = {
-  DOUBLON: 'Cette mise a déjà été enregistrée.',
-  CARTE_INTROUVABLE: 'Cette carte n’existe pas ou ne t’appartient pas.',
-  CARTE_CLOTUREE: 'Cette carte est clôturée. Ouvre une nouvelle carte.',
-  CYCLE_COMPLET: 'Le cycle de 31 mises est complet. Il faut clôturer la carte.',
-  MONTANT_INVALIDE: 'Le montant doit être égal à la mise de la carte.',
-  BORNE: 'Une des informations saisies est trop longue.',
-  BORNE_MONTANT: 'Le serveur refuse ce montant. Choisis un des montants proposés.',
-  DROIT_REFUSE: 'Tu n’as pas le droit d’écrire cette ligne.',
-  ABONNEMENT_INACTIF:
-    'Ton abonnement n’est plus actif. Tu peux encaisser sur les cartes déjà ouvertes, mais pas ajouter de client ni ouvrir de carte. Contacte GTCS.',
-  RIEN_ECRIT: 'Le serveur n’a rien changé. Reconnecte-toi et réessaie.',
-  RESEAU: 'Pas de réseau. Réessaie une fois connecté.',
-  INCONNU: 'Enregistrement impossible. Réessaie.',
-};
+export type { EchecEcriture };
 
 /**
  * Les contraintes CHECK qui portent sur un montant, et non sur une longueur.
@@ -127,18 +107,10 @@ export function codeDErreur(erreur: { code?: string; message?: string } | null):
 }
 
 /**
- * La phrase associée à un code court.
- *
- * Exportée pour `encaisserPour`, qui reçoit les mêmes refus — `DOUBLON`,
- * `CARTE_CLOTUREE`, `CYCLE_COMPLET`, `MONTANT_INVALIDE` — par HTTP plutôt que
- * par PostgREST. Une seconde table de phrases divergerait de celle-ci, et le
- * collecteur lirait deux vérités concurrentes pour un même refus.
- *
- * `PHRASES` reste privée : c'est la traduction qui est partagée, pas la table.
+ * La phrase d'un code court — voir `phrases.ts`, où vit désormais la table.
+ * Réexportée ici parce que `encaisserPour` et les écrans l'importent d'ici.
  */
-export function phraseEcriture(code: string): EchecEcriture {
-  return { code, message: PHRASES[code] ?? PHRASES.INCONNU! };
-}
+export { phraseEcriture };
 
 function echec(erreur: { code?: string; message?: string } | null): EchecEcriture {
   return phraseEcriture(codeDErreur(erreur));
