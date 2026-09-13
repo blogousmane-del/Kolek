@@ -39,6 +39,7 @@ export type Requete = Promise<{ data: Ligne[]; error: null }> & {
   select: (colonnes?: string) => Requete;
   eq: (colonne: string, valeur: unknown) => Requete;
   gte: (colonne: string, valeur: string) => Requete;
+  in: (colonne: string, valeurs: readonly unknown[]) => Requete;
   order: (colonne: string, options?: { ascending?: boolean }) => Requete;
   range: (debut: number, fin: number) => Requete;
   limit: (nombre: number) => Requete;
@@ -67,6 +68,8 @@ function requete(etat: Etat): Requete {
       suite({ lignes: lignes.filter((l) => l[colonne] === valeur) }),
     gte: (colonne: string, valeur: string) =>
       suite({ lignes: lignes.filter((l) => String(l[colonne]) >= valeur) }),
+    in: (colonne: string, valeurs: readonly unknown[]) =>
+      suite({ lignes: lignes.filter((l) => valeurs.includes(l[colonne])) }),
     order: (colonne: string, options?: { ascending?: boolean }) =>
       suite({ tris: [...tris, { colonne, croissant: options?.ascending !== false }] }),
     range: (d: number, f: number) => suite({ debut: d, fin: f }),
