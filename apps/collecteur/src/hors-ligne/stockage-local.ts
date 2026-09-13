@@ -50,13 +50,27 @@ export function nomBase(collecteurId: string): string {
 /**
  * Le travail d'une transaction, et sa fin, attendus ensemble.
  *
- * `tx.done` rejette quand la transaction avorte — une contrainte violée, un
- * disque plein. Attendre le travail seul laisserait ce rejet sans preneur, et
- * attendre `tx.done` seul laisserait passer l'erreur du travail. `Promise.all`
- * prend les deux : le premier échec remonte, l'autre est tenu.
+ * Si le travail échoue, la transaction est avortée : IndexedDB ne le fait pas
+ * de lui-même sur une exception JS, et sans cela une transaction déjà à moitié
+ * écrite se validerait quand même. Rien de ce que le travail a écrit ne reste.
+ * `tx.done` rejette aussi quand la transaction avorte pour une autre raison —
+ * une contrainte violée, un disque plein. Le premier rejet, celui du travail,
+ * remonte ; celui de `tx.done` qui le suit est tenu par `Promise.all`, pour
+ * qu'aucun des deux ne reste sans preneur.
  */
-export async function dans<T>(tx: { done: Promise<void> }, travail: () => Promise<T>): Promise<T> {
-  const [resultat] = await Promise.all([travail(), tx.done]);
+export async function dans<T>(
+  tx: { done: Promise<void>; abort(): void },
+  travail: () => Promise<T>,
+): Promise<T> {
+  const travailTenu = (async () => travail())().catch((e: unknown) => {
+    try {
+      tx.abort();
+    } catch {
+      // Déjà finie ou déjà avortée : rien à défaire de plus.
+    }
+    throw e;
+  });
+  const [resultat] = await Promise.all([travailTenu, tx.done]);
   return resultat;
 }
 
@@ -73,6 +87,13 @@ export function ouvrirBase(collecteurId: string): Promise<BaseLocale> {
   const deja = ouvertes.get(collecteurId);
   if (deja) return deja;
 
+  // N'efface l'entrée en mémoire que si elle est encore celle de cette
+  // ouverture : une ouverture périmée (fermée, ou en échec) ne doit pas
+  // effacer la nouvelle qui a pu la remplacer entre-temps.
+  function oublierSiPerimee(): void {
+    if (ouvertes.get(collecteurId) === ouverture) ouvertes.delete(collecteurId);
+  }
+
   const ouverture: Promise<BaseLocale> = openDB<SchemaKolek>(nomBase(collecteurId), VERSION_BASE, {
     upgrade(db, ancienne) {
       if (ancienne < 1) {
@@ -85,17 +106,17 @@ export function ouvrirBase(collecteurId: string): Promise<BaseLocale> {
       }
     },
     blocking() {
-      ouvertes.delete(collecteurId);
+      oublierSiPerimee();
       void ouverture.then((base) => base.close());
     },
     terminated() {
-      ouvertes.delete(collecteurId);
+      oublierSiPerimee();
     },
   });
 
   ouvertes.set(collecteurId, ouverture);
   // Une ouverture ratée ne doit pas rester en mémoire : le prochain appel réessaie.
-  void ouverture.catch(() => ouvertes.delete(collecteurId));
+  void ouverture.catch(oublierSiPerimee);
   return ouverture;
 }
 
@@ -178,9 +199,30 @@ export async function compterOperationsSurCeTelephone(): Promise<number | null> 
     let total = 0;
     for (const { name } of await indexedDB.databases()) {
       if (!name?.startsWith(PREFIXE_BASE)) continue;
-      // Sans numéro de version : ouvre la base telle qu'elle est, sans la créer
-      // ni la faire monter.
-      const base = await openDB<SchemaKolek>(name);
+      // Sans numéro de version : ouvre la base telle qu'elle est, sans la
+      // faire monter. Si elle n'existe plus, la montée depuis 0 est avortée :
+      // elle n'est pas créée.
+      let neuve = false;
+      let base: BaseLocale;
+      try {
+        base = await openDB<SchemaKolek>(name, undefined, {
+          upgrade(_db, ancienne, _nouvelle, tx) {
+            // Une montée depuis 0 veut dire que la base n'existait plus : on
+            // avorte, et le navigateur ne garde pas la base neuve.
+            if (ancienne === 0) {
+              neuve = true;
+              tx.abort();
+              // idb crée une promesse « done » pour toute transaction touchée,
+              // même ici où personne ne l'attend : sans ce filet, l'avortement
+              // la fait rejeter dans le vide (Unhandled Rejection).
+              tx.done.catch(() => {});
+            }
+          },
+        });
+      } catch (e) {
+        if (neuve) continue; // Base disparue entre la liste et l'ouverture : 0 opération.
+        throw e; // Le catch externe rend null.
+      }
       try {
         if (base.objectStoreNames.contains('file')) total += await base.count('file');
       } finally {

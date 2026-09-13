@@ -9,6 +9,7 @@ import {
   CLE_PROFIL,
   compterFile,
   compterOperationsSurCeTelephone,
+  dans,
   demanderPersistance,
   effacerDonneesDeTournee,
   fermerBases,
@@ -105,6 +106,22 @@ describe('lire', () => {
   });
 });
 
+describe('une transaction avortée ne laisse rien (durcissement après relecture)', () => {
+  it('avorte l’écriture quand le travail échoue : rien ne reste sur le disque', async () => {
+    const base = await ouvrirBase('a');
+    const tx = base.transaction('tournee', 'readwrite');
+
+    await expect(
+      dans(tx, async () => {
+        await tx.store.put(tournee(), CLE_INSTANTANE);
+        throw new Error('panne');
+      }),
+    ).rejects.toThrow('panne');
+
+    expect((await lireTournee(base)).tournee.lueLe).toBeNull();
+  });
+});
+
 describe('ce qui survit, et ce qui s’efface', () => {
   it('garde tout à la réouverture — un rechargement de la page ne perd rien', async () => {
     const base = await ouvrirBase('a');
@@ -153,6 +170,17 @@ describe('compter sans rien lire (§8.6)', () => {
   it('se tait là où le navigateur ne sait pas lister ses bases', async () => {
     vi.stubGlobal('indexedDB', { databases: undefined });
     expect(await compterOperationsSurCeTelephone()).toBeNull();
+  });
+
+  it('ne crée pas de base pour un nom disparu entre la liste et l’ouverture (durcissement après relecture)', async () => {
+    const espion = vi
+      .spyOn(indexedDB, 'databases')
+      .mockResolvedValue([{ name: 'kolek-collecteur-fantome', version: 1 }]);
+
+    expect(await compterOperationsSurCeTelephone()).toBe(0);
+
+    espion.mockRestore();
+    expect((await indexedDB.databases()).some((d) => d.name === 'kolek-collecteur-fantome')).toBe(false);
   });
 });
 
