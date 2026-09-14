@@ -137,20 +137,36 @@ export async function retirerAcceptee(base: BaseLocale, op: Operation): Promise<
   });
 }
 
-/** Le refus est consigné au serveur : l'opération quitte la file, sa copie reste lisible hors ligne. */
+/**
+ * Le refus est consigné au serveur : l'opération quitte la file, sa copie reste
+ * lisible hors ligne. Rend le nombre d'enfants marqués.
+ *
+ * Ses enfants encore en attente sont marqués « parent refusé » dans la même
+ * transaction. Le synchroniseur les reconnaît aussi par la copie dans `refus`,
+ * mais cette copie s'efface avec la session : sans la marque, un enfant resté
+ * en file partirait seul à la reconnexion (§4.4).
+ */
 export async function retirerEnRefus(
   base: BaseLocale,
   op: Operation,
   maintenant: number = Date.now(),
-): Promise<void> {
+): Promise<number> {
   const tx = base.transaction(['file', 'refus'], 'readwrite');
-  await dans(tx, async () => {
+  return dans(tx, async () => {
     await tx.objectStore('refus').put({
       id: op.id,
       motif: op.motif ?? 'INCONNU',
       chargeUtile: chargeUtileDe(op),
       creeLe: new Date(maintenant).toISOString(),
     });
-    await tx.objectStore('file').delete(op.id);
+    const file = tx.objectStore('file');
+    let marques = 0;
+    for (const autre of await file.getAll()) {
+      if (autre.etat !== 'en_attente' || !autre.dependDe.includes(op.id)) continue;
+      await file.put({ ...autre, etat: 'refusee_a_consigner', motif: 'PARENT_REFUSE', tentatives: 0, prochainEssai: null });
+      marques += 1;
+    }
+    await file.delete(op.id);
+    return marques;
   });
 }

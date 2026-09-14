@@ -9,6 +9,7 @@ import { carte, client, operationClientCarte, operationMise, tournee } from './f
 import type { Operation } from './modele';
 import {
   CLE_INSTANTANE,
+  effacerDonneesDeTournee,
   fermerBases,
   lireOperations,
   lireRefus,
@@ -48,6 +49,14 @@ function authFactice(options: {
     },
   };
   return { client: client as unknown as SupabaseClient, refreshSession };
+}
+
+/** La session change sous la passe : un autre compte s'est connecté pendant un envoi. */
+function sessionDevient(c: SupabaseClient, id: string) {
+  (c.auth.getSession as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+    data: { session: { user: { id } } },
+    error: null,
+  });
 }
 
 async function baseAvec(...operations: Operation[]): Promise<BaseLocale> {
@@ -128,6 +137,55 @@ describe('le sursis (§7)', () => {
     await passe({ client: authFactice().client, base, collecteurId: 'col-1', maintenant: () => T, envoyer });
 
     expect(envoyer).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('une horloge corrigée en arrière', () => {
+  it('ramène un sursis écrit dans le futur, et envoie toute la file', async () => {
+    const enAvance = operationMise(1, { carteId: 'k1' }, {
+      faiteLe: '2026-10-12T09:00:00.000Z',
+      envoyableApres: '2026-10-12T09:00:06.000Z',
+    });
+    const base = await baseAvec(enAvance, operationMise(2, { carteId: 'k2' }));
+    const envoyer = envoiScenarise();
+
+    const bilan = await passe({ client: authFactice().client, base, collecteurId: 'col-1', maintenant: () => T, envoyer });
+
+    expect(bilan).toEqual({ etat: 'vide', reveil: null, traitees: 2 });
+    expect(envoyer).toHaveBeenCalledTimes(2);
+  });
+
+  it('ramène un nouvel essai prévu dans le futur, et réessaie', async () => {
+    const base = await baseAvec(operationMise(1, { carteId: 'k1' }, { tentatives: 2, prochainEssai: '2026-10-12T09:01:00.000Z' }));
+    const envoyer = envoiScenarise();
+
+    expect((await passe({ client: authFactice().client, base, collecteurId: 'col-1', maintenant: () => T, envoyer })).etat).toBe('vide');
+    expect(envoyer).toHaveBeenCalledTimes(1);
+  });
+
+  it('ramène la consignation d’un refus prévue dans le futur', async () => {
+    const refusee = operationMise(1, { carteId: 'k1' }, {
+      etat: 'refusee_a_consigner',
+      motif: 'CARTE_CLOTUREE',
+      tentatives: 3,
+      prochainEssai: '2026-10-12T09:02:00.000Z',
+    });
+    const base = await baseAvec(refusee);
+
+    expect((await passe({ client: authFactice().client, base, collecteurId: 'col-1', maintenant: () => T, consigner: accepte })).etat).toBe('vide');
+    expect(accepte).toHaveBeenCalledTimes(1);
+  });
+
+  it('laisse tel quel un essai légitime à dix minutes', async () => {
+    const dixMinutes = new Date(T + 600_000).toISOString();
+    const base = await baseAvec(operationMise(1, { carteId: 'k1' }, { tentatives: 5, prochainEssai: dixMinutes }));
+
+    expect(await passe({ client: authFactice().client, base, collecteurId: 'col-1', maintenant: () => T, envoyer: accepte })).toEqual({
+      etat: 'attente',
+      reveil: T + 600_000,
+      traitees: 0,
+    });
+    expect((await lireOperations(base))[0]!.prochainEssai).toBe(dixMinutes);
   });
 });
 
@@ -213,6 +271,25 @@ describe('les refus', () => {
     expect(bilan).toMatchObject({ etat: 'attente', reveil: T + 30_000 });
     expect(envoyer).not.toHaveBeenCalled();
   });
+
+  it('garde l’enfant « parent refusé » quand la déconnexion efface la copie des refus', async () => {
+    const parent = operationClientCarte(1, { clientId: 'c9', carteId: 'k9' });
+    const enfant = operationMise(2, { carteId: 'k9' }, { dependDe: ['op-1'], envoyableApres: '2026-09-13T09:00:06.000Z' });
+    const base = await baseAvec(parent, enfant);
+    const envoyer = envoiScenarise({ issue: 'refusee', motif: 'ABONNEMENT_INACTIF' });
+    const deps = { client: authFactice().client, base, collecteurId: 'col-1', envoyer, consigner: accepte };
+
+    // L'enfant est encore dans son sursis : marqué, mais pas encore consigné — il reste annulable.
+    expect(await passe({ ...deps, maintenant: () => T })).toEqual({ etat: 'attente', reveil: T + 7000, traitees: 3 });
+    expect((await lireOperations(base)).map((o) => [o.id, o.etat, o.motif])).toEqual([['op-2', 'refusee_a_consigner', 'PARENT_REFUSE']]);
+
+    await effacerDonneesDeTournee(base);
+
+    expect(await passe({ ...deps, maintenant: () => T + 7000 })).toMatchObject({ etat: 'vide' });
+    expect(envoyer).toHaveBeenCalledTimes(1);
+    expect(accepte).toHaveBeenCalledTimes(2);
+    expect((await lireRefus(base)).map((r) => [r.id, r.motif])).toEqual([['op-2', 'PARENT_REFUSE']]);
+  });
 });
 
 describe('la session (§4.5)', () => {
@@ -253,6 +330,47 @@ describe('la session (§4.5)', () => {
     expect(bilan.etat).toBe('vide');
     expect(refreshSession).toHaveBeenCalledTimes(1);
     expect(envoyer).toHaveBeenCalledTimes(2);
+  });
+
+  it('n’écrit aucun refus reçu sous une autre session, et s’arrête', async () => {
+    const base = await baseAvec(operationMise(1, { carteId: 'k1' }), operationMise(2, { carteId: 'k2' }));
+    const { client: c } = authFactice();
+    const envoyer = vi.fn(async () => {
+      sessionDevient(c, 'col-2');
+      return { issue: 'refusee' as const, motif: 'DROIT_REFUSE' };
+    });
+
+    expect((await passe({ client: c, base, collecteurId: 'col-1', maintenant: () => T, envoyer })).etat).toBe('autre_compte');
+    expect(envoyer).toHaveBeenCalledTimes(1);
+    expect((await lireOperations(base)).map((o) => [o.id, o.etat, o.tentatives])).toEqual([
+      ['op-1', 'en_attente', 0],
+      ['op-2', 'en_attente', 0],
+    ]);
+  });
+
+  it('ne compte pas une tentative reçue sous une autre session', async () => {
+    const base = await baseAvec(operationMise(1, { carteId: 'k1' }));
+    const { client: c } = authFactice();
+    const envoyer = vi.fn(async () => {
+      sessionDevient(c, 'col-2');
+      return { issue: 'inconnue' as const };
+    });
+
+    expect((await passe({ client: c, base, collecteurId: 'col-1', maintenant: () => T, envoyer })).etat).toBe('autre_compte');
+    expect((await lireOperations(base))[0]).toMatchObject({ etat: 'en_attente', tentatives: 0, prochainEssai: null });
+  });
+
+  it('ne reprogramme pas une consignation refusée sous une autre session', async () => {
+    const refusee = operationMise(1, { carteId: 'k1' }, { etat: 'refusee_a_consigner', motif: 'CARTE_CLOTUREE' });
+    const base = await baseAvec(refusee);
+    const { client: c } = authFactice();
+    const consigner = vi.fn(async () => {
+      sessionDevient(c, 'col-2');
+      return { issue: 'refusee' as const, motif: 'DROIT_REFUSE' };
+    });
+
+    expect((await passe({ client: c, base, collecteurId: 'col-1', maintenant: () => T, consigner })).etat).toBe('autre_compte');
+    expect((await lireOperations(base))[0]).toMatchObject({ tentatives: 0, prochainEssai: null });
   });
 });
 

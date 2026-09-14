@@ -4,7 +4,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PHRASES } from '../phrases';
-import { carte, client, operationMise, tournee } from './fabriques';
+import { carte, client, operationClientCarte, operationMise, tournee } from './fabriques';
 import { ajouter, annuler, avancer, mettreAJour, retirerAcceptee, retirerEnRefus } from './file';
 import { construireMise } from './gestes';
 import type { OperationMise } from './modele';
@@ -229,6 +229,23 @@ describe('quitter la file', () => {
         },
         creeLe: '2026-09-13T10:00:00.000Z',
       },
+    ]);
+  });
+
+  it('marque « parent refusé » les enfants encore en attente, dans la même transaction', async () => {
+    const base = await baseAvecUneCarte();
+    const parent = operationClientCarte(1, { clientId: 'c9', carteId: 'k9' }, { etat: 'refusee_a_consigner', motif: 'ABONNEMENT_INACTIF' });
+    const enfant = operationMise(2, { carteId: 'k9' }, { dependDe: ['op-1'] });
+    const dejaRefuse = operationMise(3, { carteId: 'k9' }, { dependDe: ['op-1'], etat: 'refusee_a_consigner', motif: 'CARTE_CLOTUREE' });
+    const libre = operationMise(4, { carteId: 'k1' });
+    for (const op of [parent, enfant, dejaRefuse, libre]) await base.add('file', op);
+
+    expect(await retirerEnRefus(base, parent, MAINTENANT)).toBe(1);
+
+    expect((await lireOperations(base)).map((o) => [o.id, o.etat, o.motif ?? null, o.tentatives, o.prochainEssai])).toEqual([
+      ['op-2', 'refusee_a_consigner', 'PARENT_REFUSE', 0, null],
+      ['op-3', 'refusee_a_consigner', 'CARTE_CLOTUREE', 0, null],
+      ['op-4', 'en_attente', null, 0, null],
     ]);
   });
 });

@@ -2,7 +2,7 @@ import { isAuthRetryableFetchError, type SupabaseClient } from '@supabase/supaba
 
 import { consigner, envoyer } from './envoyer';
 import { mettreAJour, retirerAcceptee, retirerEnRefus } from './file';
-import { MARGE_SURSIS_MS, TENTATIVES_MAX, delaiApres, type Operation } from './modele';
+import { DELAIS_MS, MARGE_SURSIS_MS, TENTATIVES_MAX, delaiApres, type Operation } from './modele';
 import { lireOperations, lireRefus, type BaseLocale } from './stockage-local';
 
 /**
@@ -10,15 +10,21 @@ import { lireOperations, lireRefus, type BaseLocale } from './stockage-local';
  *
  * Spec §6. Ce que la passe garantit :
  *
- * 1. **Rien ne part sans session, ni sous une autre identité** (§4.5). Sans
- *    session, supabase-js envoie la clé anonyme, RLS refuse en `42501`, et une
- *    opération valide serait consignée à tort.
+ * 1. **Rien ne part sans session, ni sous une autre identité** (§4.5), et aucun
+ *    refus n'est écrit sans relire la session : un refus reçu sous une autre
+ *    identité est le sien, pas celui de l'opération. Sans session, supabase-js
+ *    envoie la clé anonyme et PostgREST répond 401 : c'est `session`, jamais un
+ *    refus.
  * 2. **L'ordre est strict entre opérations en attente.** Un échec passager
  *    arrête la passe ; une réponse inconnue aussi, jusqu'à la 5ᵉ tentative.
- * 3. **Un parent refusé emporte ses enfants**, qui ne partent jamais seuls.
+ * 3. **Un parent refusé emporte ses enfants**, qui ne partent jamais seuls — même
+ *    quand la copie des refus s'efface avec la session : ils sont marqués dans la
+ *    transaction qui retire le parent. Un enfant en sursis reste annulable.
  * 4. **Un refus connu ne bloque pas la file** (précision 5 du plan) : sa
  *    consignation est réessayée à part, sans fin, et rien n'est retiré tant
  *    qu'elle n'a pas réussi.
+ * 5. **Une horloge corrigée en arrière ne bloque rien** : une échéance plus
+ *    lointaine que toute attente légitime est ramenée à maintenant.
  *
  * La passe ne programme rien : elle dit quand revenir (`reveil`) et le
  * planificateur s'en charge.
@@ -49,6 +55,15 @@ const DE_SESSION: Record<Exclude<EtatSession, 'ok'>, BilanPasse['etat']> = {
   finie: 'session_finie',
   autre_compte: 'autre_compte',
 };
+
+/**
+ * La plus longue attente qu'une opération puisse légitimement demander : le
+ * dernier écart entre deux essais (10 min) et la marge du sursis. Le sursis
+ * lui-même (6 s) est bien en deçà. Au-delà, l'échéance a été écrite par une
+ * horloge en avance, corrigée depuis : l'attendre bloquerait toute la file
+ * aussi longtemps que l'erreur, sans alerte.
+ */
+const ATTENTE_PLAUSIBLE_MS = DELAIS_MS[DELAIS_MS.length - 1]! + MARGE_SURSIS_MS;
 
 /**
  * La session, sans conclure trop vite.
@@ -117,13 +132,32 @@ export async function passe(deps: Dependances): Promise<BilanPasse> {
     if (operations.length === 0) return bilan('vide');
     const t = maintenant();
 
-    // 1. Les refus déjà connus partent au serveur.
-    const aConsigner = operations.find((o) => o.etat === 'refusee_a_consigner' && estDue(o, t));
+    // 0. Une échéance impossible — plus loin que toute attente légitime — est
+    //    ramenée à maintenant sur le disque, avant tout envoi : `annuler` compare
+    //    la même échéance, et doit voir l'opération comme partie.
+    const limite = t + ATTENTE_PLAUSIBLE_MS;
+    const tropLoin = (iso: string | null) => iso !== null && Date.parse(iso) > limite;
+    const impossible = operations.find((o) => tropLoin(o.envoyableApres) || tropLoin(o.prochainEssai));
+    if (impossible) {
+      const maintenantIso = new Date(t).toISOString();
+      await mettreAJour(deps.base, {
+        ...impossible,
+        envoyableApres: tropLoin(impossible.envoyableApres) ? maintenantIso : impossible.envoyableApres,
+        prochainEssai: tropLoin(impossible.prochainEssai) ? maintenantIso : impossible.prochainEssai,
+      });
+      continue;
+    }
+
+    // 1. Les refus déjà connus partent au serveur — jamais pendant un sursis :
+    //    un enfant marqué « parent refusé » peut encore être annulé.
+    const aConsigner = operations.find(
+      (o) => o.etat === 'refusee_a_consigner' && estDue(o, t) && t >= envoyableA(o),
+    );
     if (aConsigner) {
       const issue = await consignerOp(deps.client, aConsigner);
       if (issue.issue === 'acceptee') {
-        await retirerEnRefus(deps.base, aConsigner, maintenant());
-        traitees += 1;
+        // Le parent, et ses enfants marqués « parent refusé » avec lui.
+        traitees += 1 + (await retirerEnRefus(deps.base, aConsigner, maintenant()));
         continue;
       }
       if (issue.issue === 'passager') return bilan('hors_ligne');
@@ -134,6 +168,10 @@ export async function passe(deps: Dependances): Promise<BilanPasse> {
       }
       // La consignation elle-même est refusée : on ne retire rien, la charge
       // reste sur le téléphone, et on réessaie plus tard sans bloquer la file.
+      // La session d'abord : un refus reçu sous une autre identité est le sien,
+      // pas celui de l'opération (§4.5). On s'arrête sans rien écrire.
+      const encore = await verifierSession(deps.client, deps.collecteurId);
+      if (encore !== 'ok') return bilan(DE_SESSION[encore]);
       const tentatives = aConsigner.tentatives + 1;
       await mettreAJour(deps.base, {
         ...aConsigner,
@@ -146,10 +184,12 @@ export async function passe(deps: Dependances): Promise<BilanPasse> {
     // 2. La première opération en attente.
     const courante = operations.find((o) => o.etat === 'en_attente');
     if (!courante) {
-      const prochains = operations
-        .map((o) => (o.prochainEssai ? Date.parse(o.prochainEssai) : Number.POSITIVE_INFINITY))
-        .filter(Number.isFinite);
-      return bilan('attente', prochains.length > 0 ? Math.min(...prochains) : null);
+      // Il ne reste que des refus à consigner plus tard : chacun attend son
+      // prochain essai, ou la fin de son sursis.
+      const prochains = operations.map((o) =>
+        Math.max(o.prochainEssai ? Date.parse(o.prochainEssai) : Number.NEGATIVE_INFINITY, envoyableA(o)),
+      );
+      return bilan('attente', Math.min(...prochains));
     }
     if (t < envoyableA(courante)) return bilan('attente', envoyableA(courante));
     if (!estDue(courante, t)) return bilan('attente', Date.parse(courante.prochainEssai!));
@@ -184,7 +224,10 @@ export async function passe(deps: Dependances): Promise<BilanPasse> {
         await retirerAcceptee(deps.base, op);
         traitees += 1;
         continue;
-      case 'refusee':
+      case 'refusee': {
+        // Même garde qu'à la consignation (§4.5).
+        const encore = await verifierSession(deps.client, deps.collecteurId);
+        if (encore !== 'ok') return bilan(DE_SESSION[encore]);
         await mettreAJour(deps.base, {
           ...op,
           etat: 'refusee_a_consigner',
@@ -194,6 +237,7 @@ export async function passe(deps: Dependances): Promise<BilanPasse> {
         });
         traitees += 1;
         continue;
+      }
       case 'passager':
         return bilan('hors_ligne');
       case 'session': {
@@ -202,6 +246,9 @@ export async function passe(deps: Dependances): Promise<BilanPasse> {
         continue;
       }
       case 'inconnue': {
+        // Même garde qu'à la consignation (§4.5).
+        const encore = await verifierSession(deps.client, deps.collecteurId);
+        if (encore !== 'ok') return bilan(DE_SESSION[encore]);
         const tentatives = op.tentatives + 1;
         if (tentatives >= TENTATIVES_MAX) {
           await mettreAJour(deps.base, {
