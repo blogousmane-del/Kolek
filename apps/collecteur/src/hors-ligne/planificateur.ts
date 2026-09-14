@@ -1,4 +1,4 @@
-import { delaiApres } from './modele';
+import { DELAIS_MS, delaiApres } from './modele';
 import type { BilanPasse } from './synchroniseur';
 
 /**
@@ -14,6 +14,13 @@ import type { BilanPasse } from './synchroniseur';
 
 /** Au plus un rechargement de tournée toutes les cinq minutes après un envoi (précision 10). */
 export const PERIODE_RAFRAICHISSEMENT_MS = 5 * 60_000;
+
+/**
+ * Le plus long réveil qu'une passe puisse légitimement demander : le dernier
+ * écart entre deux essais. Au-delà, l'horloge du téléphone est en cause — et
+ * `setTimeout` part tout de suite passé 2³¹−1 ms.
+ */
+const REVEIL_MAX_MS = DELAIS_MS[DELAIS_MS.length - 1]!;
 
 export interface Taches {
   passe: () => Promise<BilanPasse>;
@@ -41,12 +48,17 @@ export function creerPlanificateur(
     minuteur = null;
   }
 
+  /** Un réveil illisible attend comme un premier échec, jamais zéro milliseconde. */
+  function delaiBorne(ms: number): number {
+    return Number.isFinite(ms) ? Math.min(Math.max(0, ms), REVEIL_MAX_MS) : delaiApres(1);
+  }
+
   function programmer(ms: number) {
     annulerMinuteur();
     minuteur = setTimeout(() => {
       minuteur = null;
       void demander();
-    }, Math.max(0, ms));
+    }, delaiBorne(ms));
   }
 
   async function tour(avecRafraichissement: boolean): Promise<void> {

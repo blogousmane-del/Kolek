@@ -4,6 +4,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { BaseLocale } from './stockage-local';
+
 const passe = vi.fn();
 const rafraichir = vi.fn();
 
@@ -129,6 +131,30 @@ describe('lire et compter', () => {
     expect(await compterFileDe('col-1')).toBe(1);
     expect((await base.get('tournee', CLE_INSTANTANE)) ?? null).toBeNull();
   });
+
+  it('efface de nouveau une tournée qu’un rechargement en vol a réécrite après la fin de session', async () => {
+    let finir!: () => void;
+    let ecrit = false;
+    rafraichir.mockImplementation(async (_client: unknown, base: BaseLocale) => {
+      await new Promise<void>((r) => {
+        finir = r;
+      });
+      await base.put('tournee', tournee({ clients: [fabriqueClient('c-serveur')] }), CLE_INSTANTANE);
+      ecrit = true;
+      return 'fait';
+    });
+
+    demarrerMoteur(CLIENT, 'col-1');
+    await vi.waitFor(() => expect(rafraichir).toHaveBeenCalled());
+
+    await effacerTourneeDe('col-1');
+    arreterMoteur();
+    finir();
+    await vi.waitFor(() => expect(ecrit).toBe(true));
+
+    const base = await ouvrirBase('col-1');
+    await vi.waitFor(async () => expect((await base.get('tournee', CLE_INSTANTANE)) ?? null).toBeNull());
+  });
 });
 
 describe('le verrou entre onglets', () => {
@@ -142,5 +168,18 @@ describe('le verrou entre onglets', () => {
       locks: { request: (_nom: string, _o: unknown, rappel: (verrou: unknown) => unknown) => Promise.resolve(rappel(null)) },
     });
     expect(await sousVerrou('v', async () => 'fait', () => 'occupe')).toBe('occupe');
+  });
+
+  it('cède la place dans la même page là où l’API manque, et se libère même sur un échec', async () => {
+    vi.stubGlobal('navigator', {});
+    let liberer!: () => void;
+    const premier = sousVerrou('v', () => new Promise<string>((r) => { liberer = () => r('fait'); }), () => 'occupe');
+
+    expect(await sousVerrou('v', async () => 'fait', () => 'occupe')).toBe('occupe');
+    liberer();
+    expect(await premier).toBe('fait');
+
+    await expect(sousVerrou('v', async () => { throw new Error('panne'); }, () => 'occupe')).rejects.toThrow('panne');
+    expect(await sousVerrou('v', async () => 'fait', () => 'occupe')).toBe('fait');
   });
 });

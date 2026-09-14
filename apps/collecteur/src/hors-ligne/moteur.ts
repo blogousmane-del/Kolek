@@ -25,7 +25,8 @@ import { passe, type BilanPasse } from './synchroniseur';
  *
  * **Deux onglets.** `navigator.locks` garantit qu'un seul envoie. Là où l'API
  * manque, deux passes simultanées restent inoffensives : chaque envoi est
- * idempotent par identifiant, et chaque conclusion relit (§5.2).
+ * idempotent par identifiant, et chaque conclusion relit (§5.2). Dans une même
+ * page, un verrou tenu en mémoire les sépare quand même.
  */
 
 type Ecouteur = () => void;
@@ -34,6 +35,8 @@ const ecouteurs = new Set<Ecouteur>();
 let courant: { collecteurId: string; planificateur: Planificateur; arreter: () => void } | null = null;
 let stockage: EtatStockage = 'inconnu';
 let dernier: BilanPasse | null = null;
+/** Combien de fois la tournée de chaque collecteur a été effacée dans cette page. */
+const effacements = new Map<string, number>();
 
 export function ecouterChangements(ecouteur: Ecouteur): () => void {
   ecouteurs.add(ecouteur);
@@ -58,6 +61,9 @@ export function dernierBilan(): BilanPasse | null {
   return dernier;
 }
 
+/** Les verrous tenus dans cette page, là où `navigator.locks` manque. */
+const tenusIci = new Set<string>();
+
 export async function sousVerrou<T>(
   nom: string,
   travail: () => Promise<T>,
@@ -65,7 +71,17 @@ export async function sousVerrou<T>(
 ): Promise<T> {
   const verrous =
     typeof navigator !== 'undefined' && 'locks' in navigator ? navigator.locks : undefined;
-  if (!verrous) return travail();
+  if (!verrous) {
+    // Sans l'API, deux onglets ne se voient pas. Dans cette page, au moins, deux
+    // moteurs — un redémarrage pendant un tour — ne s'entrecroisent pas.
+    if (tenusIci.has(nom)) return siOccupe();
+    tenusIci.add(nom);
+    try {
+      return await travail();
+    } finally {
+      tenusIci.delete(nom);
+    }
+  }
   return verrous.request(nom, { ifAvailable: true }, (verrou) => (verrou ? travail() : siOccupe()));
 }
 
@@ -85,7 +101,20 @@ export function demarrerMoteur(client: SupabaseClient, collecteurId: string): ()
       rafraichir: () =>
         sousVerrou(
           verrou,
-          async () => rafraichir(client, await ouvrirBase(collecteurId), collecteurId),
+          async () => {
+            const avant = effacements.get(collecteurId) ?? 0;
+            const base = await ouvrirBase(collecteurId);
+            const issue = await rafraichir(client, base, collecteurId);
+            // La session a pris fin pendant le rechargement : l'effacement est
+            // passé avant cette écriture, et la tournée est revenue. On efface de
+            // nouveau. Un rechargement lancé après la fin de session, lui, ne peut
+            // rien écrire : sans session, la fiche du collecteur est illisible.
+            if ((effacements.get(collecteurId) ?? 0) !== avant) {
+              await effacerDonneesDeTournee(base);
+              return 'impossible' as const;
+            }
+            return issue;
+          },
           () => 'impossible' as const,
         ),
     },
@@ -164,6 +193,8 @@ export async function compterFileDe(collecteurId: string): Promise<number | null
 }
 
 export async function effacerTourneeDe(collecteurId: string): Promise<void> {
+  // Noté avant tout : un rechargement en vol saura qu'il doit effacer après lui.
+  effacements.set(collecteurId, (effacements.get(collecteurId) ?? 0) + 1);
   try {
     await effacerDonneesDeTournee(await ouvrirBase(collecteurId));
   } catch {

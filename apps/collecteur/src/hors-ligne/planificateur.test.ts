@@ -128,3 +128,35 @@ describe('arrêter', () => {
     expect(passe).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('un réveil impossible', () => {
+  it('ne programme jamais plus loin que dix minutes', async () => {
+    const passe = vi
+      .fn()
+      .mockResolvedValueOnce(bilan('attente', { reveil: Date.now() + 40 * 24 * 3_600_000 }))
+      .mockResolvedValue(bilan('vide'));
+    const p = creerPlanificateur({ passe, rafraichir: vi.fn().mockResolvedValue('fait') });
+
+    await p.demander();
+    await vi.advanceTimersByTimeAsync(599_999);
+    expect(passe).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(passe).toHaveBeenCalledTimes(2);
+    p.arreter();
+  });
+
+  it('attend trente secondes sur un réveil illisible, sans tourner en boucle', async () => {
+    const passe = vi
+      .fn()
+      .mockResolvedValueOnce(bilan('attente', { reveil: Number.NaN }))
+      .mockResolvedValue(bilan('vide'));
+    const p = creerPlanificateur({ passe, rafraichir: vi.fn().mockResolvedValue('fait') });
+
+    await p.demander();
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(passe).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(passe).toHaveBeenCalledTimes(2);
+    p.arreter();
+  });
+});
