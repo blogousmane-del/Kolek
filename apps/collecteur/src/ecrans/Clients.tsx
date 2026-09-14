@@ -18,9 +18,10 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { ClientCible } from '../Coquille';
 import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
-import { chargerTout, LIGNES_AFFICHEES_PAR_PAGE } from '../pagination';
+import { TourneeAbsente } from '../hors-ligne/vues';
+import { chargerListeClients } from '../lectures';
+import { LIGNES_AFFICHEES_PAR_PAGE } from '../pagination';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
-import { supabase } from '../supabase';
 import { ChoixMise } from './ChoixMise';
 import { useEstCollaborateur } from './commission';
 import { FicheClient } from './FicheClient';
@@ -191,9 +192,6 @@ export function Clients({
       autres, et c'est ici qu'il va les chercher. */
   const [toutesCartes, setToutesCartes] = useState<CarteClient[]>([]);
   const [erreur, setErreur] = useState<string | null>(null);
-  /** Le nombre de clients que le serveur dit posséder, quand il en a rendu
-      moins. `null` = liste entière, ou comptage indisponible. */
-  const [totalServeur, setTotalServeur] = useState<number | null>(null);
   const [recherche, setRecherche] = useState('');
   const [filtre, setFiltre] = useState<Filtre>('Tous');
   const enLigne = useEnLigne();
@@ -201,72 +199,15 @@ export function Clients({
   useEffect(() => {
     let vivant = true;
 
-    // Deux requêtes plutôt qu'une imbrication : la clé étrangère de `cartes`
-    // vers `clients` est composite `(client_id, collecteur_id)`, et faire
-    // deviner ce chemin à PostgREST est une dépendance fragile pour un gain
-    // d'un aller-retour sur une vingtaine de lignes.
-    //
-    // Le `try` n'est pas décoratif : le constructeur de requête de supabase-js
-    // est un « thenable », pas une Promise — il n'a pas de `.catch()`. Sans
-    // cette enveloppe, un rejet laisse l'écran figé sur « Chargement… ».
+    // La liste se lit sur la tournée du téléphone, en ligne comme hors ligne
+    // (spec J2b §5.4). La pagination réseau et le recoupement du nombre de
+    // clients vivent désormais dans `hors-ligne/rafraichir.ts` : une tournée
+    // que le serveur dit plus longue que ce qu'il a rendu n'y est pas écrite,
+    // donc cet écran ne peut plus recevoir une liste amputée (précision 11).
     void (async () => {
       try {
-        // ## Pourquoi ces deux requêtes sont paginées
-        //
-        // PostgREST applique `max_rows = 1000` — réglé dans `config.toml` —
-        // **sans erreur et sans en-tête d'avertissement**. Les deux requêtes se
-        // tronquaient donc en silence, et la seconde sans même que le bandeau
-        // du 2026-09-09 puisse le voir : il ne comptait que les clients. Un
-        // collecteur au-delà de mille cartes aurait vu des clients dépourvus
-        // des leurs, et un solde restituable calculé sur ce qui restait.
-        //
-        // `chargerTout` demande les pages jusqu'à épuisement. Voir
-        // `src/pagination.ts` pour pourquoi tout charger vaut mieux qu'une
-        // pagination à l'écran dans une application hors-ligne d'abord.
-        //
-        // **Le second critère de tri n'est pas décoratif.** Une pagination sur
-        // un ordre non total peut rendre deux fois la même ligne et en sauter
-        // une autre : `nom` n'est pas unique — deux « Konan Kouassi » sur un
-        // marché n'ont rien d'improbable — et `cartes` n'était pas triée du
-        // tout. `id` tranche les ex æquo.
-        const [reponseClients, reponseCartes] = await Promise.all([
-          chargerTout<Client>((debut, fin) =>
-            supabase
-              .from('clients')
-              // `count: 'exact'` reste, comme recoupement : le serveur dit
-              // combien de lignes il possède, et on compare à ce qu'on a
-              // vraiment reçu. Si la pagination laissait un jour tomber une
-              // page, ce comptage le dirait au lieu de le taire.
-              .select('id, nom, marche, telephone, avis_actifs', { count: 'exact' })
-              .order('nom')
-              .order('id')
-              .range(debut, fin),
-          ),
-          chargerTout<CarteClient>((debut, fin) =>
-            supabase
-              .from('cartes')
-              .select('id, client_id, mise, statut, mises_encaissees, ouverte_le')
-              .order('id')
-              .range(debut, fin),
-          ),
-        ]);
-
+        const { clients, cartes } = await chargerListeClients();
         if (!vivant) return;
-
-        if (reponseClients.error || reponseCartes.error) {
-          setErreur('Impossible de charger tes clients.');
-          // `toutesCartes` doit vider en même temps que `lignes` : le filtre
-          // « Clôturées » lit `toutesCartes` et non `lignes`, et la liste
-          // rendue n'est pas conditionnée par l'absence d'erreur — sans ça,
-          // il continuerait d'afficher les cartes du chargement précédent
-          // sous la bannière d'erreur.
-          setLignes([]);
-          setToutesCartes([]);
-          return;
-        }
-
-        const clients = (reponseClients.data ?? []) as Client[];
-        const cartes = (reponseCartes.data ?? []) as CarteClient[];
 
         const parClient = new Map<string, CarteClient[]>();
         for (const carte of cartes) {
@@ -289,22 +230,15 @@ export function Clients({
 
         setToutesCartes(cartes);
         setLignes(construites);
-
-        // Recoupement, et non plus détection de troncature : `chargerTout`
-        // épuise les pages, donc l'écart devrait être nul. S'il ne l'est pas,
-        // c'est qu'une page est tombée ou qu'un client a été inscrit pendant le
-        // chargement — les deux méritent d'être dits plutôt que tus.
-        //
-        // Le total est nul si le comptage n'a pas eu lieu. Déduire un manque
-        // d'une absence de réponse ferait crier l'écran sur toutes les listes,
-        // et le collecteur apprendrait à ignorer le bandeau.
-        const total = reponseClients.total;
-        setTotalServeur(typeof total === 'number' && total > clients.length ? total : null);
-      } catch {
+        // Une tournée arrivée après une première lecture sans elle efface le
+        // message : sans cette ligne, il resterait au-dessus de la liste.
+        setErreur(null);
+      } catch (e) {
         if (!vivant) return;
-        setErreur('Impossible de charger tes clients.');
-        // Même raison qu'au-dessus : `toutesCartes` suit `lignes` sur tout
-        // chemin d'erreur, pas seulement celui-ci.
+        setErreur(e instanceof TourneeAbsente ? e.message : 'Impossible de charger tes clients.');
+        // `toutesCartes` vide en même temps que `lignes` : le filtre
+        // « Clôturées » lit `toutesCartes` et non `lignes`, et la liste rendue
+        // n'est pas conditionnée par l'absence d'erreur.
         setLignes([]);
         setToutesCartes([]);
       }
@@ -313,8 +247,8 @@ export function Clients({
     return () => {
       vivant = false;
     };
-    // `revision` change après chaque écriture : la liste se relit d'elle-même
-    // plutôt que d'attendre un rechargement de page.
+    // `revision` change après chaque écriture, et quand le moteur signale une
+    // tournée rechargée : la liste se relit d'elle-même.
   }, [revision]);
 
   const visibles = useMemo(() => {
@@ -357,9 +291,8 @@ export function Clients({
    * un écran qui a l'air de marcher et qui ment : la recherche ne porterait
    * plus que sur les cinquante lignes affichées. Le collecteur chercherait un
    * client inscrit, ne le verrait pas, et le réinscrirait. Deux carnets pour
-   * une personne, et un solde restituable calculé sur le mauvais — c'est
-   * exactement ce que le bandeau de troncature ci-dessus surveille, et une
-   * pagination posée à l'envers le ferait rentrer sans bandeau pour le dire.
+   * une personne, et un solde restituable calculé sur le mauvais — et une
+   * pagination posée à l'envers le ferait sans que rien à l'écran le dise.
    *
    * `visibles.length` reste donc le compte de tout ce qui correspond : les
    * commandes de page l'annoncent, et l'annonce de recherche s'appuie dessus.
@@ -378,10 +311,8 @@ export function Clients({
    * sert personne. Voir `LIGNES_AFFICHEES_PAR_PAGE`, écrit à côté de
    * `TAILLE_PAGE` pour que les deux nombres ne se confondent pas.
    */
-  // `total: totalFiltre` et non `total` : une variable du même nom vit déjà
-  // dans la lecture asynchrone plus haut, où elle désigne le compte du serveur.
-  // Deux `total` de sens différents dans un même fichier se confondent à la
-  // relecture, et c'est la relecture qui compte ici.
+  // `total: totalFiltre` : le nom dit ce qu'il compte — les lignes qui passent
+  // la recherche et le filtre, pas les clients du collecteur.
   const {
     page,
     pages,
@@ -538,37 +469,6 @@ export function Clients({
           bordure et le rayon, donc l'anneau du système suit sa forme et il n'y
           en a qu'un. L'icône et la croix flottent au-dessus en `absolute`.
           C'est aussi ce que `Champ` fait déjà, à l'ornement près. */}
-      {/* La liste est-elle entière ?
-
-          PostgREST applique `max_rows` — mille, réglé dans `config.toml` — sans
-          erreur et sans en-tête d'avertissement. Au-delà, l'écran affichait une
-          liste incomplète qui avait exactement l'air d'une liste complète, et
-          le collecteur pouvait en conclure qu'un client n'était pas inscrit, et
-          le réinscrire : deux carnets pour une personne, et un solde
-          restituable calculé sur le mauvais.
-
-          La troncature est fermée depuis que les deux requêtes épuisent leurs
-          pages — voir `src/pagination.ts`. Ce bandeau n'est donc plus une
-          alerte de troncature mais un **recoupement** : le serveur dit combien
-          de clients il possède, et on compare à ce qu'on a reçu. L'écart
-          devrait être nul.
-
-          On le garde parce qu'un contrôle qui ne peut plus rien attraper est
-          exactement celui qu'on retire la veille du jour où il aurait servi. Si
-          une page tombait, ou si un client était inscrit pendant le chargement,
-          l'écran le dirait au lieu de le taire. */}
-      {totalServeur !== null && (
-        <div
-          role="alert"
-          className="mx-4 mt-4 rounded-2xl border border-negative/25 bg-negative-tint px-3.5 py-3 text-xs font-body text-negative"
-        >
-          Ta liste est incomplète : {formatMontant(totalServeur)} clients enregistrés, et
-          l’écran n’a pu en charger que {formatMontant(lignes?.length ?? 0)}. La recherche
-          ci-dessous ne porte que sur ceux qui sont chargés — un client absent de la liste
-          peut donc exister quand même. Ne le réinscris pas.
-        </div>
-      )}
-
       <div className="px-4 mt-5">
         <div className="relative">
           <Icone
@@ -713,7 +613,7 @@ export function Clients({
           <Carte className="p-4">
             <p className="text-base font-body text-ink m-0">Aucun client pour l’instant.</p>
             <p className="text-sm font-body text-muted-foreground mt-1">
-              La souscription arrive au jalon J2.
+              Inscris ton premier client avec le bouton ci-dessus.
             </p>
           </Carte>
         )}

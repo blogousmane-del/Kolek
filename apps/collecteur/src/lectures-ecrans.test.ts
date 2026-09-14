@@ -39,7 +39,6 @@ const {
   chargerAlertes,
   chargerCartesCloturables,
   chargerEtatAvis,
-  chargerProfil,
   chargerRapprochement,
   chargerRecus,
 } = await import('./lectures-ecrans');
@@ -232,16 +231,6 @@ describe('l’écran Retrait au-delà de mille cartes', () => {
 });
 
 describe('les comptes et les noms au-delà de mille lignes', () => {
-  it('chargerProfil compte tous les clients et toutes les cartes actives', async () => {
-    const { clients, cartes } = parc(1001);
-    tables = { clients, cartes };
-
-    const profil = await chargerProfil();
-
-    expect(profil.clients).toBe(1001);
-    expect(profil.cartesActives).toBe(1001);
-  });
-
   it('chargerRecus nomme le client d’une carte au-delà de la millième', async () => {
     const { clients, cartes } = parc(1001);
     tables = {

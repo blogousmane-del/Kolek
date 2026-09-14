@@ -1,3 +1,5 @@
+import 'fake-indexeddb/auto';
+
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { admin, creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
@@ -28,8 +30,10 @@ vi.mock('../../apps/collecteur/src/supabase', () => ({
   },
 }));
 
-const { chargerCartesCloturables, chargerProfil } = await import(
-  '../../apps/collecteur/src/lectures-ecrans'
+const { chargerCartesCloturables } = await import('../../apps/collecteur/src/lectures-ecrans');
+const { rafraichir } = await import('../../apps/collecteur/src/hors-ligne/rafraichir');
+const { lireProfil, lireTournee, ouvrirBase } = await import(
+  '../../apps/collecteur/src/hors-ligne/stockage-local'
 );
 
 const N = 1001;
@@ -82,12 +86,19 @@ describe('les lectures du collecteur contre le vrai PostgREST', () => {
     expect(data).toHaveLength(1000);
   });
 
-  it('chargerProfil compte les 1 001 clients et les 1 001 cartes actives', async () => {
-    const profil = await chargerProfil();
+  it('rafraichir copie sur le téléphone les 1 001 clients et les 1 001 cartes actives', async () => {
+    // Remplace l'épreuve de `chargerProfil`, qui lit désormais la tournée du
+    // téléphone (J2b §5.4) : c'est ici que le réseau est lu, donc ici que la
+    // pagination doit tenir contre le vrai PostgREST.
+    const base = await ouvrirBase(collecteur.id);
 
-    expect(profil.clients).toBe(N);
-    expect(profil.cartesActives).toBe(N);
-  });
+    expect(await rafraichir(collecteur.client, base, collecteur.id)).toBe('fait');
+
+    const { tournee } = await lireTournee(base);
+    expect(tournee.clients).toHaveLength(N);
+    expect(tournee.cartes.filter((k) => k.statut === 'active')).toHaveLength(N);
+    expect(await lireProfil(base)).not.toBeNull();
+  }, 60_000);
 
   it('chargerCartesCloturables rend les 1 001 cartes, chacune nommée', async () => {
     const cartes = await chargerCartesCloturables();

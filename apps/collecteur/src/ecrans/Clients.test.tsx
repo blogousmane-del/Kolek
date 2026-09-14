@@ -1,4 +1,4 @@
-import { formatMontant, MISES_PAR_CYCLE } from '@kolek/core';
+import { MISES_PAR_CYCLE } from '@kolek/core';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,14 +12,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
  * avoir touché le bouton, c'est-à-dire l'argent déjà en main.
  */
 
-const from = vi.fn();
+const chargerListeClients = vi.fn();
 
-vi.mock('../supabase', () => ({
-  supabase: {
-    from: (table: string) => from(table),
-    auth: { getUser: () => Promise.resolve({ data: { user: { id: 'col1' } } }) },
-  },
-}));
+// L'écran lit la tournée du téléphone (J2b) : c'est cette lecture qu'on
+// remplace. Le module réseau l'est aussi, pour qu'aucun client Supabase ne se
+// construise pendant les épreuves.
+vi.mock('../lectures', () => ({ chargerListeClients: () => chargerListeClients() }));
+vi.mock('../supabase', () => ({ supabase: {} }));
 
 vi.mock('./FicheClient', () => ({ FicheClient: () => null }));
 
@@ -75,33 +74,9 @@ const CARTES = [
   },
 ];
 
-/**
- * @param total Ce que le serveur dit posséder, toutes lignes confondues. Quand
- *   il dépasse le nombre de lignes rendues, PostgREST a tronqué : c'est le cas
- *   que le dernier bloc de tests mesure. `null` = pas de comptage demandé.
- */
-function brancherSupabase(total: number | null = CLIENTS.length) {
-  // La chaîne imite celle de l'écran, `range` compris : les deux requêtes sont
-  // paginées depuis le 2026-09-09, et un faux qui rendrait tout d'un coup
-  // laisserait la pagination sans aucune épreuve ici.
-  //
-  // `range` découpe vraiment le tableau. Les jeux d'essai tiennent en quelques
-  // lignes, donc la première page les rend toutes et le chargement s'arrête —
-  // c'est le chemin nominal. Le comportement sur plusieurs pages est éprouvé
-  // séparément dans `src/pagination.test.ts`, sans passer par le rendu.
-  const page = <T,>(lignes: T[], count: number | null) => ({
-    range: (debut: number, fin: number) =>
-      Promise.resolve({ data: lignes.slice(debut, fin + 1), error: null, count }),
-  });
-
-  from.mockImplementation((table: string) => {
-    if (table === 'clients') {
-      return {
-        select: () => ({ order: () => ({ order: () => page(CLIENTS, total) }) }),
-      };
-    }
-    return { select: () => ({ order: () => page(CARTES, null) }) };
-  });
+/** La tournée que l'écran reçoit : les trois clients et les quatre cartes ci-dessus, par défaut. */
+function brancherTournee(clients: unknown[] = CLIENTS, cartes: unknown[] = CARTES) {
+  chargerListeClients.mockResolvedValue({ clients, cartes });
 }
 
 function rendre(supplement: Record<string, unknown> = {}) {
@@ -123,12 +98,12 @@ function rendre(supplement: Record<string, unknown> = {}) {
 
 afterEach(() => {
   cleanup();
-  from.mockReset();
+  chargerListeClients.mockReset();
 });
 
 describe('liste des clients redevenue liste de personnes', () => {
   it('rend une ligne par client, quel que soit le nombre de carnets', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
 
     // Hj tient deux carnets, et n'existe qu'une fois. Signalé le 2026-08-26,
@@ -140,7 +115,7 @@ describe('liste des clients redevenue liste de personnes', () => {
   });
 
   it('dit combien de carnets le client tient, et où en est le plus avancé', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
 
     const ligne = (await screen.findByText('Hj')).closest('.bg-surface') as HTMLElement;
@@ -153,7 +128,7 @@ describe('liste des clients redevenue liste de personnes', () => {
   });
 
   it('ne propose plus d’encaisser depuis la liste', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
 
     await screen.findByText('Hj');
@@ -164,7 +139,7 @@ describe('liste des clients redevenue liste de personnes', () => {
   });
 
   it('mène à la fiche, où les carnets se voient', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
 
     expect(
@@ -173,7 +148,7 @@ describe('liste des clients redevenue liste de personnes', () => {
   });
 
   it('garde une ligne pour le client sans carte active', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
 
     // Ka n'a qu'une carte clôturée. Sans sa ligne, on ne peut plus lui en ouvrir.
@@ -181,7 +156,7 @@ describe('liste des clients redevenue liste de personnes', () => {
   });
 
   it('n’affiche pas les cartes clôturées dans la liste de travail', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
 
     // Un client fidèle depuis un an occuperait douze lignes d'historique.
@@ -189,7 +164,7 @@ describe('liste des clients redevenue liste de personnes', () => {
   });
 
   it('signale le cycle terminé sans proposer d’encaisser', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
 
     await screen.findByText('Sy');
@@ -207,7 +182,7 @@ describe('liste des clients redevenue liste de personnes', () => {
 
   it('mène au retrait du bon client depuis la carte terminée', async () => {
     const onRetrait = vi.fn();
-    brancherSupabase();
+    brancherTournee();
     rendre({ onRetrait });
 
     await screen.findByText('Sy');
@@ -235,7 +210,7 @@ describe('recherche de client', () => {
     });
 
   it('trouve un client par son numéro de téléphone', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
 
@@ -250,7 +225,7 @@ describe('recherche de client', () => {
   });
 
   it('trouve un client par son marché', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
 
@@ -264,7 +239,7 @@ describe('recherche de client', () => {
   });
 
   it('garde l’anneau de focus du système sur le champ', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
 
@@ -283,7 +258,7 @@ describe('recherche de client', () => {
   });
 
   it('donne à la croix d’effacement une cible de 44 px', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
     chercher('ka');
@@ -297,7 +272,7 @@ describe('recherche de client', () => {
   });
 
   it('annonce le nombre de clients trouvés', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
 
@@ -310,7 +285,7 @@ describe('recherche de client', () => {
   });
 
   it('n’écrit rien tant qu’on n’a pas cherché, mais la région existe déjà', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
 
@@ -330,7 +305,7 @@ describe('recherche de client', () => {
   });
 
   it('ne dit pas « aucun » quand c’est le filtre qui cache le client', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
 
@@ -349,7 +324,7 @@ describe('recherche de client', () => {
   });
 
   it('trouve « Adjamé » quand on tape « adjame »', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
 
@@ -363,7 +338,7 @@ describe('recherche de client', () => {
   });
 
   it('trouve un numéro écrit avec des espaces', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
 
@@ -377,7 +352,7 @@ describe('recherche de client', () => {
   });
 
   it('efface la recherche à la touche Échap', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
     chercher('ka');
@@ -390,7 +365,7 @@ describe('recherche de client', () => {
   });
 
   it('n’ouvre pas la croix native du navigateur en plus de la sienne', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
 
@@ -401,7 +376,7 @@ describe('recherche de client', () => {
   });
 
   it('n’ouvre ni majuscule ni correcteur sur le clavier', async () => {
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
 
@@ -413,56 +388,6 @@ describe('recherche de client', () => {
       'none',
     );
     expect(champ.getAttribute('autoCorrect') ?? champ.getAttribute('autocorrect')).toBe('off');
-  });
-});
-
-/**
- * La liste tronquee, et pourquoi elle doit le dire.
- *
- * `supabase/config.toml` pose `max_rows = 1000` : PostgREST rend au plus mille
- * lignes, sans erreur et sans en-tete d'avertissement. Au-dela, l'ecran affiche
- * une liste incomplete qui a exactement l'air d'une liste complete.
- *
- * Le cout n'est pas theorique, et il se cumule avec le defaut que la revue du
- * 2026-09-09 a deja releve sur le compteur : le collecteur cherche un client,
- * ne le trouve pas, en conclut qu'il n'est pas inscrit, et le reinscrit. Deux
- * clients pour une personne, deux carnets, et un solde restituable calcule sur
- * le mauvais. La recherche est locale — elle ne va pas chercher les lignes que
- * le serveur n'a pas envoyees, donc elle ne peut pas rattraper la troncature.
- *
- * Ce que ces tests exigent n'est pas la pagination : c'est que l'ecran cesse de
- * mentir par omission. Un defaut visible se corrige ; un defaut silencieux se
- * paie.
- */
-describe('liste tronquee par le serveur', () => {
-  it('previent quand le serveur en a plus qu’il n’en a rendu', async () => {
-    brancherSupabase(1200);
-    rendre();
-    await screen.findByText('Hj');
-
-    const alerte = screen.getByRole('alert');
-    expect(alerte.textContent).toContain(formatMontant(1200));
-    expect(alerte.textContent).toMatch(/recherche/i);
-  });
-
-  it('ne previent pas quand la liste est entiere', async () => {
-    brancherSupabase(CLIENTS.length);
-    rendre();
-    await screen.findByText('Hj');
-
-    // Un avertissement permanent est un avertissement qu'on cesse de lire.
-    expect(screen.queryByRole('alert')).toBeNull();
-  });
-
-  it('ne previent pas quand le serveur ne compte pas', async () => {
-    // `count` vaut `null` si le comptage n'a pas ete demande ou a echoue.
-    // Deduire une troncature d'une absence de reponse ferait crier l'ecran sur
-    // toutes les listes, et le collecteur apprendrait a ignorer le bandeau.
-    brancherSupabase(null);
-    rendre();
-    await screen.findByText('Hj');
-
-    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
 
@@ -485,9 +410,7 @@ describe('liste tronquee par le serveur', () => {
  * Si le decoupage se faisait **avant** le filtrage, la recherche ne porterait
  * plus que sur la page affichee. Le collecteur chercherait un client qui existe,
  * ne le verrait pas, et le reinscrirait : deux carnets pour une personne, et un
- * solde restituable calcule sur le mauvais. C'est exactement le defaut que le
- * bandeau de troncature ci-dessus surveille — et une pagination mal branchee le
- * ferait rentrer par la porte de derriere, sans bandeau pour le dire.
+ * solde restituable calcule sur le mauvais — et rien a l'ecran ne le dirait.
  */
 describe('pagination de la liste', () => {
   /** `n` clients numerotes, pour que l'ordre de lecture se lise a l'oeil nu. */
@@ -496,21 +419,6 @@ describe('pagination de la liste', () => {
       const rang = String(i + 1).padStart(3, '0');
       return { id: `c${rang}`, nom: `Client ${rang}`, marche: null, telephone: null, avis_actifs: false };
     });
-
-  /** Les memes faux que `brancherSupabase`, avec une liste de clients au choix. */
-  function brancherListe(clients: ReturnType<typeof beaucoup>) {
-    const page = <T,>(lignes: T[], count: number | null) => ({
-      range: (debut: number, fin: number) =>
-        Promise.resolve({ data: lignes.slice(debut, fin + 1), error: null, count }),
-    });
-
-    from.mockImplementation((table: string) => {
-      if (table === 'clients') {
-        return { select: () => ({ order: () => ({ order: () => page(clients, clients.length) }) }) };
-      }
-      return { select: () => ({ order: () => page([], null) }) };
-    });
-  }
 
   const chercher = (terme: string) =>
     fireEvent.change(screen.getByLabelText('Rechercher un client'), {
@@ -521,7 +429,7 @@ describe('pagination de la liste', () => {
   const lignesRendues = () => screen.queryAllByRole('button', { name: /^Ouvrir la fiche de/ });
 
   it('ne rend qu’une page de lignes, quelle que soit la longueur de la liste', async () => {
-    brancherListe(beaucoup(120));
+    brancherTournee(beaucoup(120), []);
     rendre();
     await screen.findByText('Client 001');
 
@@ -529,7 +437,7 @@ describe('pagination de la liste', () => {
   });
 
   it('mene a la page suivante', async () => {
-    brancherListe(beaucoup(120));
+    brancherTournee(beaucoup(120), []);
     rendre();
     await screen.findByText('Client 001');
 
@@ -542,7 +450,7 @@ describe('pagination de la liste', () => {
   it('cherche dans tous les clients, et non dans la page affichee', async () => {
     // Le test qui compte. `Client 099` est en troisieme page ; s'il ne
     // remontait pas, le collecteur conclurait qu'il n'est pas inscrit.
-    brancherListe(beaucoup(120));
+    brancherTournee(beaucoup(120), []);
     rendre();
     await screen.findByText('Client 001');
 
@@ -552,7 +460,7 @@ describe('pagination de la liste', () => {
   });
 
   it('compte tous les clients trouves, et non ceux de la page', async () => {
-    brancherListe(beaucoup(120));
+    brancherTournee(beaucoup(120), []);
     rendre();
     await screen.findByText('Client 001');
 
@@ -566,7 +474,7 @@ describe('pagination de la liste', () => {
   it('revient a la premiere page quand la recherche change', async () => {
     // Sans ce retour, on cherche depuis la page 2 et l'ecran repond par le
     // 51e resultat. Les cinquante premiers existent, et sont invisibles.
-    brancherListe(beaucoup(120));
+    brancherTournee(beaucoup(120), []);
     rendre();
     await screen.findByText('Client 001');
 
@@ -577,7 +485,7 @@ describe('pagination de la liste', () => {
   });
 
   it('revient a la premiere page quand le filtre change', async () => {
-    brancherListe(beaucoup(120));
+    brancherTournee(beaucoup(120), []);
     rendre();
     await screen.findByText('Client 001');
 
@@ -590,10 +498,24 @@ describe('pagination de la liste', () => {
   it('n’affiche aucune commande de page quand tout tient sur une', async () => {
     // Deux fleches inertes sous trois lignes sont du bruit, et le collecteur
     // apprendrait a ne plus les regarder.
-    brancherSupabase();
+    brancherTournee();
     rendre();
     await screen.findByText('Hj');
 
     expect(screen.queryByRole('button', { name: /page suivante/i })).toBeNull();
+  });
+});
+
+describe('la tournée pas encore chargée sur le téléphone', () => {
+  it('le dit, au lieu d’annoncer « aucun client »', async () => {
+    const { TourneeAbsente } = await import('../hors-ligne/vues');
+    chargerListeClients.mockRejectedValue(new TourneeAbsente());
+
+    rendre();
+
+    // « Aucun client pour l'instant » dirait à un collecteur qui en a quarante
+    // que son carnet a disparu.
+    expect(await screen.findByText(/pas encore sur ce téléphone/)).toBeTruthy();
+    expect(screen.queryByText('Aucun client pour l’instant.')).toBeNull();
   });
 });

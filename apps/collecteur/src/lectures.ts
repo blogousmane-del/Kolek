@@ -1,21 +1,18 @@
-import { soldeRestituable } from '@kolek/core';
-
-import { chargerTout } from './pagination';
-import { supabase } from './supabase';
+import { lectureCourante } from './hors-ligne/moteur';
+import { TourneeAbsente, listeDepuis, tableauDepuis, type ListeClients } from './hors-ligne/vues';
 
 /**
- * Les chiffres du collecteur, pour l'écran d'accueil.
+ * Les chiffres du collecteur, pour l'écran d'accueil, et la liste de ses clients.
  *
- * Aucune Edge Function, aucune clé privilégiée : les politiques RLS bornent
- * chaque `select` aux lignes du collecteur connecté. Ce qui protège l'écran est
- * le même mécanisme qui protège l'écriture, et il n'y a rien à ajouter.
+ * Depuis J2b, ils se calculent sur la tournée gardée par le téléphone — en
+ * ligne comme hors ligne, un seul chemin (spec §5.4). Le réseau n'entre ici que
+ * par `hors-ligne/rafraichir.ts`, qui recharge la tournée tout ou rien.
  *
- * L'écran affichait jusqu'ici les chiffres de la maquette — « 48 500 FCFA »,
- * « 24 clients », « +8 % vs hier ». Le commentaire qui les justifiait disait
- * qu'un écran de zéros serait « moins informatif qu'une maquette assumée ».
- * C'était défendable tant que rien ne s'écrivait en base. Ça ne l'est plus :
- * maintenant que le collecteur encaisse pour de vrai, un montant inventé sur
- * l'écran d'accueil est un montant qu'il peut prendre pour sa recette du jour.
+ * L'écran affichait jadis les chiffres de la maquette — « 48 500 FCFA »,
+ * « 24 clients », « +8 % vs hier ». Depuis que le collecteur encaisse pour de
+ * vrai, un montant inventé sur l'écran d'accueil est un montant qu'il peut
+ * prendre pour sa recette du jour. La règle tient toujours : ne rendre que ce
+ * que la tournée sait dire.
  */
 
 export interface Carte {
@@ -60,87 +57,15 @@ export interface TableauCollecteur {
   dernieres: Array<{ nom: string; montant: number; estCommission: boolean; quand: string }>;
 }
 
-/** Minuit local, pas UTC : « aujourd'hui » est la journée du collecteur, à Abidjan. */
-function debutDeJournee(): string {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+export async function chargerTableauCollecteur(): Promise<TableauCollecteur> {
+  const { tournee } = await lectureCourante();
+  if (tournee.lueLe === null) throw new TourneeAbsente();
+  return tableauDepuis(tournee, Date.now());
 }
 
-export async function chargerTableauCollecteur(): Promise<TableauCollecteur> {
-  const [reponseClients, reponseCartes, reponseMises] = await Promise.all([
-    // Clients et cartes épuisent leurs pages : `max_rows = 1000` tronque sans
-    // erreur, et l'encours affiché plus bas — ce que le collecteur doit à ses
-    // clients — se mettrait à mentir vers le bas. Voir `pagination.ts`.
-    chargerTout((debut, fin) =>
-      supabase.from('clients').select('id, nom').order('id').range(debut, fin),
-    ),
-    chargerTout((debut, fin) =>
-      supabase
-        .from('cartes')
-        .select('id, client_id, mise, statut, mises_encaissees')
-        .order('id')
-        .range(debut, fin),
-    ),
-    // Les vingt dernières suffisent à l'écran ; en tirer davantage ferait payer
-    // au collecteur, en 3G, des lignes que personne ne regarde.
-    supabase
-      .from('mises')
-      .select('id, carte_id, montant, est_commission, encaisse_le')
-      .order('encaisse_le', { ascending: false })
-      .limit(20),
-  ]);
-
-  if (reponseClients.error || reponseCartes.error || reponseMises.error) {
-    throw new Error('Chiffres indisponibles.');
-  }
-
-  const clients = (reponseClients.data ?? []) as Array<{ id: string; nom: string }>;
-  const cartes = (reponseCartes.data ?? []) as Carte[];
-  const mises = (reponseMises.data ?? []) as MiseRecente[];
-
-  const nomParClient = new Map(clients.map((c) => [c.id, c.nom]));
-  const carteParId = new Map(cartes.map((c) => [c.id, c]));
-
-  const debut = debutDeJournee();
-  const encaisseAujourdhui = mises
-    .filter((m) => m.encaisse_le >= debut)
-    .reduce((somme, m) => somme + m.montant, 0);
-
-  const actives = cartes.filter((c) => c.statut === 'active');
-
-  const encoursTotal = actives.reduce(
-    (somme, c) => somme + soldeRestituable(c.mises_encaissees, c.mise),
-    0,
-  );
-
-  // La carte du jour : la plus avancée parmi les actives. C'est celle dont le
-  // cycle se termine en premier, donc celle qu'il ne faut pas oublier.
-  const plusAvancee = [...actives].sort((a, b) => b.mises_encaissees - a.mises_encaissees)[0];
-
-  return {
-    clients: clients.length,
-    cartesActives: actives.length,
-    encaisseAujourdhui,
-    encoursTotal,
-    carteDuJour: plusAvancee
-      ? {
-          carteId: plusAvancee.id,
-          clientId: plusAvancee.client_id,
-          nom: nomParClient.get(plusAvancee.client_id) ?? 'Client',
-          mise: plusAvancee.mise,
-          misesEncaissees: plusAvancee.mises_encaissees,
-          solde: soldeRestituable(plusAvancee.mises_encaissees, plusAvancee.mise),
-        }
-      : null,
-    dernieres: mises.slice(0, 5).map((m) => {
-      const carte = carteParId.get(m.carte_id);
-      return {
-        nom: carte ? (nomParClient.get(carte.client_id) ?? 'Client') : 'Client',
-        montant: m.montant,
-        estCommission: m.est_commission,
-        quand: m.encaisse_le,
-      };
-    }),
-  };
+/** La liste de l'écran des clients. Voir `listeDepuis` pour la forme. */
+export async function chargerListeClients(): Promise<ListeClients> {
+  const { tournee } = await lectureCourante();
+  if (tournee.lueLe === null) throw new TourneeAbsente();
+  return listeDepuis(tournee);
 }

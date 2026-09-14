@@ -2,6 +2,8 @@ import { MISES_PAR_CYCLE, formatMontant, soldeRestituable } from '@kolek/core';
 
 import type { Carte, MiseRecente } from './lectures';
 import { chargerTout } from './pagination';
+import { lectureCourante } from './hors-ligne/moteur';
+import { ficheDepuis, profilDepuis } from './hors-ligne/vues';
 import { supabase } from './supabase';
 
 /**
@@ -502,36 +504,17 @@ export interface Profil {
   titulaireId: string | null;
 }
 
+/**
+ * Le profil gardé sur le téléphone, et les comptes de la tournée (spec J2b
+ * §5.4). Lu hors ligne : l'abonnement décide au geste de ce qu'on peut
+ * inscrire (§7), et la coquille doit dire qui est connecté.
+ *
+ * Lève `TourneeAbsente` quand le profil n'a jamais été lu : les crochets de
+ * `commission.ts` retombent alors sur leurs valeurs prudentes.
+ */
 export async function chargerProfil(): Promise<Profil> {
-  const [rCollecteur, rClients, rCartes] = await Promise.all([
-    supabase
-      .from('collecteurs')
-      .select('nom, telephone, zone, palier, abonnement_statut, abonnement_echeance, titulaire_id')
-      .maybeSingle(),
-    // Deux comptes, épuisés par pages : ils plafonneraient à 1000 sinon.
-    chargerTout((debut, fin) =>
-      supabase.from('clients').select('id').order('id').range(debut, fin),
-    ),
-    chargerTout((debut, fin) =>
-      supabase.from('cartes').select('id, statut').order('id').range(debut, fin),
-    ),
-  ]);
-
-  const c = (rCollecteur.data ?? {}) as Record<string, string | null>;
-
-  return {
-    nom: c.nom ?? 'Collecteur',
-    telephone: c.telephone ?? '',
-    zone: c.zone ?? null,
-    palier: c.palier ?? 'essai',
-    abonnementStatut: c.abonnement_statut ?? 'actif',
-    abonnementEcheance: c.abonnement_echeance ?? null,
-    titulaireId: c.titulaire_id ?? null,
-    clients: (rClients.data ?? []).length,
-    cartesActives: ((rCartes.data ?? []) as Array<{ statut: string }>).filter(
-      (x) => x.statut === 'active',
-    ).length,
-  };
+  const { tournee, profil } = await lectureCourante();
+  return profilDepuis(profil, tournee);
 }
 
 /* ------------------------ Cartes clôturables (Retrait) ------------------- */
@@ -718,77 +701,16 @@ export interface FicheClient {
 }
 
 /**
- * Tout ce que le collecteur doit savoir d'un client, en une lecture.
+ * Tout ce que le collecteur doit savoir d'un client, lu sur la tournée du
+ * téléphone (spec J2b §5.4) : ses cartes, et les mises de ses cartes actives et
+ * du jour. L'historique complet d'une carte clôturée reste en ligne
+ * (`chargerHistoriqueCarte`).
  *
- * Trois requêtes plutôt qu'une imbrication : la clé étrangère de `cartes` vers
- * `clients` est composite `(client_id, collecteur_id)`, et faire deviner ce
- * chemin à PostgREST est une dépendance fragile — c'est déjà le choix fait
- * dans l'écran des clients, pour la même raison.
- *
- * Les mises sont lues par carte et non par client : `mises` ne porte pas de
- * `client_id`. C'est voulu — la mise appartient à la carte, et la carte au
- * client. Une mise rattachée directement au client aurait deux chemins vers le
- * même fait, donc deux façons de se contredire.
+ * `null` : ce client n'est pas sur ce téléphone.
  */
 export async function chargerFicheClient(clientId: string): Promise<FicheClient | null> {
-  const { data: brut, error } = await supabase
-    .from('clients')
-    .select('id, nom, telephone, marche, activite, avis_actifs')
-    .eq('id', clientId)
-    .maybeSingle();
-
-  if (error || !brut) return null;
-  const c = brut as Record<string, string | boolean | null>;
-
-  const { data: cartesBrutes } = await supabase
-    .from('cartes')
-    .select('id, mise, statut, mises_encaissees, ouverte_le, cloturee_le')
-    .eq('client_id', clientId)
-    .order('ouverte_le', { ascending: false });
-
-  const cartes = ((cartesBrutes ?? []) as Array<Record<string, string | number | null>>).map(
-    (k) => ({
-      id: String(k.id),
-      mise: Number(k.mise),
-      statut: k.statut as CarteFiche['statut'],
-      misesEncaissees: Number(k.mises_encaissees),
-      ouverteLe: String(k.ouverte_le),
-      clotureeLe: k.cloturee_le === null ? null : String(k.cloturee_le),
-    }),
-  );
-
-  // Sans carte, pas de mise à chercher : un `in` sur une liste vide ferait un
-  // aller-retour pour rien.
-  let mises: MiseFiche[] = [];
-  if (cartes.length > 0) {
-    const { data: misesBrutes } = await supabase
-      .from('mises')
-      .select('id, montant, encaisse_le, est_commission')
-      .in(
-        'carte_id',
-        cartes.map((k) => k.id),
-      )
-      .order('encaisse_le', { ascending: false })
-      .limit(40);
-
-    mises = ((misesBrutes ?? []) as Array<Record<string, string | number | boolean>>).map((m) => ({
-      id: String(m.id),
-      montant: Number(m.montant),
-      encaisseLe: String(m.encaisse_le),
-      estCommission: Boolean(m.est_commission),
-    }));
-  }
-
-  return {
-    id: String(c.id),
-    nom: String(c.nom),
-    telephone: (c.telephone as string | null) ?? null,
-    marche: (c.marche as string | null) ?? null,
-    activite: (c.activite as string | null) ?? null,
-    avisActifs: Boolean(c.avis_actifs),
-    cartes,
-    mises,
-  };
+  const { tournee } = await lectureCourante();
+  return ficheDepuis(tournee, clientId);
 }
 
 /* ------------------------ Historique d'une carte ------------------------- */
