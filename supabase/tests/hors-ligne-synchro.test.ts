@@ -50,6 +50,10 @@ interface Reseau {
   expirerProchaineRequete: boolean;
   /** Nombre d'écritures encore permises avant la coupure. `null` : aucune coupure prévue. */
   ecrituresAvantCoupure: number | null;
+  /** Nombre d'écritures encore permises avant que la suivante perde sa réponse, comme `perdreProchaineReponse`. `null` : aucune prévue au-delà. */
+  ecrituresAvantPerte: number | null;
+  /** Nombre de requêtes `POST` vues vers `/clients`, quelle qu'en soit l'issue. */
+  requetesInsertionClients: number;
   fetch: typeof globalThis.fetch;
 }
 
@@ -59,11 +63,14 @@ function reseauFactice(): Reseau {
     perdreProchaineReponse: false,
     expirerProchaineRequete: false,
     ecrituresAvantCoupure: null,
+    ecrituresAvantPerte: null,
+    requetesInsertionClients: 0,
     fetch: async (entree, init) => {
       const adresse = typeof entree === 'string' ? entree : entree instanceof URL ? entree.href : entree.url;
       const methode = (init?.method ?? 'GET').toUpperCase();
       const api = adresse.includes('/rest/v1/');
       const ecriture = api && methode !== 'GET' && methode !== 'HEAD';
+      if (methode === 'POST' && adresse.includes('/rest/v1/clients')) r.requetesInsertionClients += 1;
 
       if (r.coupe) throw new TypeError('Failed to fetch');
       if (api && r.expirerProchaineRequete) {
@@ -76,6 +83,14 @@ function reseauFactice(): Reseau {
       if (ecriture && r.ecrituresAvantCoupure !== null) {
         if (r.ecrituresAvantCoupure === 0) throw new TypeError('Failed to fetch');
         r.ecrituresAvantCoupure -= 1;
+      }
+      if (ecriture && r.ecrituresAvantPerte !== null) {
+        if (r.ecrituresAvantPerte === 0) {
+          r.ecrituresAvantPerte = null;
+          await fetch(entree, init);
+          throw new TypeError('Failed to fetch');
+        }
+        r.ecrituresAvantPerte -= 1;
       }
       if (ecriture && r.perdreProchaineReponse) {
         r.perdreProchaineReponse = false;
@@ -336,4 +351,161 @@ describe('J2b contre la base locale', () => {
     expect(clients).toBe(telephone.clients.length);
     expect(await compterFile(p.base)).toBe(0);
   }, 120_000);
+});
+
+describe('ce que seul le vrai serveur prouve', () => {
+  it('inscription dont la réponse s’est perdue, client renommé entre-temps : la relecture par identité l’accepte, le nom renommé reste', async () => {
+    const p = await poste('Renomme');
+    const inscription = await geste(
+      p,
+      construireClientCarte({ ...ctx(p), abonnementStatut: 'actif' }, { nom: 'Ancienne Fiche', mise: 1000 }),
+    );
+
+    p.reseau.perdreProchaineReponse = true;
+    expect((await passe(deps(p))).etat).toBe('hors_ligne');
+    const { count: clientsAvant } = await admin
+      .from('clients')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', inscription.charge.client.id);
+    expect(clientsAvant).toBe(1);
+    const { count: cartesAvant } = await admin
+      .from('cartes')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', inscription.charge.carte.id);
+    expect(cartesAvant).toBe(0);
+
+    const renomme = await admin
+      .from('clients')
+      .update({ nom: 'Nom Corrige Par Admin' })
+      .eq('id', inscription.charge.client.id);
+    expect(renomme.error).toBeNull();
+
+    expect((await passe(deps(p))).etat).toBe('vide');
+
+    const { data: clients } = await admin.from('clients').select('id, nom').eq('id', inscription.charge.client.id);
+    expect(clients).toEqual([{ id: inscription.charge.client.id, nom: 'Nom Corrige Par Admin' }]);
+    const { count: cartes } = await admin
+      .from('cartes')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', inscription.charge.carte.id);
+    expect(cartes).toBe(1);
+    const { count: rejets } = await admin
+      .from('synchro_rejets')
+      .select('id', { count: 'exact', head: true })
+      .eq('collecteur_id', p.c.id);
+    expect(rejets).toBe(0);
+    expect(await compterFile(p.base)).toBe(0);
+  });
+
+  it('même inscription, mais abonnement suspendu entre-temps : le client est accepté par relecture, la carte est refusée et consignée', async () => {
+    const p = await poste('SuspenduReel');
+    const inscription = await geste(
+      p,
+      construireClientCarte({ ...ctx(p), abonnementStatut: 'actif' }, { nom: 'Cliente Attendue', mise: 1000 }),
+    );
+
+    p.reseau.perdreProchaineReponse = true;
+    expect((await passe(deps(p))).etat).toBe('hors_ligne');
+
+    const suspension = await admin.from('collecteurs').update({ abonnement_statut: 'suspendu' }).eq('id', p.c.id);
+    expect(suspension.error).toBeNull();
+
+    expect((await passe(deps(p))).etat).toBe('vide');
+
+    const { count: clients } = await admin
+      .from('clients')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', inscription.charge.client.id);
+    expect(clients).toBe(1);
+    const { count: cartes } = await admin
+      .from('cartes')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', inscription.charge.carte.id);
+    expect(cartes).toBe(0);
+
+    const { data: rejets } = await admin
+      .from('synchro_rejets')
+      .select('id, motif, charge_utile, traite')
+      .eq('collecteur_id', p.c.id);
+    expect(rejets).toEqual([
+      {
+        id: inscription.id,
+        motif: 'ABONNEMENT_INACTIF',
+        traite: false,
+        charge_utile: {
+          version: 1,
+          type: 'client_carte',
+          charge: inscription.charge,
+          faiteLe: inscription.faiteLe,
+          sequence: inscription.sequence,
+          dependDe: [],
+          etapes: { client: true, carte: false },
+        },
+      },
+    ]);
+    expect(await compterFile(p.base)).toBe(0);
+  });
+
+  it('réponse perdue sur la seconde mise : les deux lignes arrivent au serveur, jamais deux fois après redémarrage', async () => {
+    const p = await poste('SecondeMise');
+    const { carteId } = await carteEnLigne(p);
+    await rafraichir(p.client, p.base, p.c.id);
+    const m1 = await geste(p, construireMise(ctx(p), { carteId, montant: 1000, encaisseLe: new Date() }));
+    const m2 = await geste(p, construireMise(ctx(p), { carteId, montant: 1000, encaisseLe: new Date() }));
+
+    p.reseau.ecrituresAvantPerte = 1;
+    expect((await passe(deps(p))).etat).toBe('hors_ligne');
+    expect(await compterFile(p.base)).toBe(1);
+    expect((await lireOperations(p.base)).map((o) => o.id)).toEqual([m2.id]);
+    expect(await misesDeLaCarte(carteId)).toHaveLength(2);
+
+    // Le téléphone redémarre : la base se rouvre, le réseau revient.
+    await fermerBases();
+    p.base = await ouvrirBase(p.c.id);
+    expect((await passe(deps(p))).etat).toBe('vide');
+
+    const mises = await misesDeLaCarte(carteId);
+    expect(mises.map((m) => m.id).sort()).toEqual([m1.charge.id, m2.charge.id].sort());
+    expect(await compteurDe(carteId)).toBe(2);
+    const { count } = await admin.from('synchro_rejets').select('id', { count: 'exact', head: true }).eq('collecteur_id', p.c.id);
+    expect(count).toBe(0);
+    expect(await compterFile(p.base)).toBe(0);
+  });
+
+  it('inscription coupée entre ses deux écritures, puis redémarrage : la carte reprend seule, le client ne repart jamais', async () => {
+    const p = await poste('Coupee');
+    const inscription = await geste(
+      p,
+      construireClientCarte({ ...ctx(p), abonnementStatut: 'actif' }, { nom: 'Nouvelle Cliente', mise: 1000 }),
+    );
+
+    p.reseau.ecrituresAvantPerte = 1;
+    expect((await passe(deps(p))).etat).toBe('hors_ligne');
+
+    // Le téléphone redémarre : la base se rouvre, le réseau revient.
+    await fermerBases();
+    p.base = await ouvrirBase(p.c.id);
+    expect(await lireOperations(p.base)).toEqual([{ ...inscription, etapes: { client: true, carte: false } }]);
+
+    const avant = p.reseau.requetesInsertionClients;
+    expect((await passe(deps(p))).etat).toBe('vide');
+    expect(p.reseau.requetesInsertionClients).toBe(avant);
+
+    const { count: clients } = await admin
+      .from('clients')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', inscription.charge.client.id);
+    expect(clients).toBe(1);
+    const { count: cartes } = await admin
+      .from('cartes')
+      .select('id', { count: 'exact', head: true })
+      .eq('id', inscription.charge.carte.id);
+    expect(cartes).toBe(1);
+    const { count: rejets } = await admin
+      .from('synchro_rejets')
+      .select('id', { count: 'exact', head: true })
+      .eq('collecteur_id', p.c.id);
+    expect(rejets).toBe(0);
+    expect(await compterFile(p.base)).toBe(0);
+  });
 });
