@@ -72,7 +72,10 @@ export function phraseEcriture(code: string): EchecEcriture {
   return { code, message: PHRASES[code] ?? PHRASES.INCONNU! };
 }
 
+/** Un motif sans phrase (une version plus récente, un défaut) : on ne raconte rien qu'on ne sait pas. */
+const REFUS_SANS_PHRASE = 'Le serveur a refusé cette opération.';
+
 /** Le motif d'un refus, en clair. */
 export function phraseRefus(motif: string): string {
-  return PHRASES_REFUS[motif] ?? PHRASES_REFUS.INCONNU!;
+  return PHRASES_REFUS[motif] ?? REFUS_SANS_PHRASE;
 }

@@ -1,4 +1,4 @@
-import { PHRASES, type EchecEcriture } from '../phrases';
+import { PHRASES, phraseEcriture, type EchecEcriture } from '../phrases';
 import { appliquer, reappliquer } from './appliquer';
 import { chargeUtileDe, tourneeVide, type Operation, type Tournee } from './modele';
 import { CLE_INSTANTANE, dans, type BaseLocale } from './stockage-local';
@@ -33,6 +33,16 @@ export type ResultatAjout<O extends Operation> =
   | { ok: false; echec: EchecEcriture };
 
 /**
+ * IndexedDB ne lève que des `DOMException` : disque plein, base fermée,
+ * transaction avortée, valeur impossible à cloner. Reconnue par son étiquette
+ * et non par `instanceof`, qui échoue quand l'erreur vient d'un autre domaine
+ * d'exécution (le clone structuré, une épreuve sous jsdom).
+ */
+function vientDuStockage(e: unknown): boolean {
+  return Object.prototype.toString.call(e) === '[object DOMException]';
+}
+
+/**
  * Vérifie le geste contre la tournée telle que l'écran la montre, et l'ajoute —
  * dans la même transaction, pour qu'aucun autre geste ne se glisse entre les
  * deux.
@@ -58,10 +68,17 @@ export async function ajouter<O extends Operation>(
       if (resultat.ok) await file.add(resultat.operation);
       return resultat;
     });
-  } catch {
-    // Disque plein, stockage bloqué, base fermée : le geste est refusé à
-    // l'écran, jamais montré comme réussi (§4.1).
-    return { ok: false, echec: { code: 'STOCKAGE', message: PHRASES.STOCKAGE! } };
+  } catch (e) {
+    if (vientDuStockage(e)) {
+      // Disque plein, stockage bloqué, base fermée : le geste est refusé à
+      // l'écran, jamais montré comme réussi (§4.1).
+      return { ok: false, echec: { code: 'STOCKAGE', message: PHRASES.STOCKAGE! } };
+    }
+    // Un défaut du code, pas du disque : « Libère de la place » enverrait le
+    // collecteur vers un remède qui ne marchera pas. Rien n'a été écrit —
+    // `dans` a avorté la transaction — et la cause part dans la console.
+    console.error(e);
+    return { ok: false, echec: phraseEcriture('INCONNU') };
   }
 }
 

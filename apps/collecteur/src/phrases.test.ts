@@ -44,6 +44,7 @@ describe('les phrases des refus, au passé (§8.4)', () => {
   });
 
   it('ne laisse jamais un motif sans phrase', () => {
-    expect(phraseRefus('MOTIF_FUTUR')).toBe(PHRASES_REFUS.INCONNU);
+    expect(phraseRefus('MOTIF_FUTUR')).toBe('Le serveur a refusé cette opération.');
+    expect(phraseRefus('INCONNU')).toBe(PHRASES_REFUS.INCONNU);
   });
 });

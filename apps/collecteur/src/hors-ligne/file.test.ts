@@ -1,8 +1,9 @@
 import 'fake-indexeddb/auto';
 
 import { IDBFactory } from 'fake-indexeddb';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { PHRASES } from '../phrases';
 import { carte, client, operationMise, tournee } from './fabriques';
 import { ajouter, annuler, avancer, mettreAJour, retirerAcceptee, retirerEnRefus } from './file';
 import { construireMise } from './gestes';
@@ -77,6 +78,22 @@ describe('ajouter', () => {
     expect(r).toMatchObject({ ok: false, echec: { code: 'STOCKAGE' } });
     expect(await compterFile(base)).toBe(0);
     expect((await lireTournee(base)).tournee.cartes[0]!.misesEncaissees).toBe(0);
+  });
+
+  it('rend INCONNU sans rien écrire quand la construction lève un défaut de code', async () => {
+    const base = await baseAvecUneCarte();
+    const espion = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const r = await ajouter(base, () => {
+      throw new TypeError('défaut');
+    });
+
+    expect(r).toEqual({ ok: false, echec: { code: 'INCONNU', message: PHRASES.INCONNU } });
+    expect(await compterFile(base)).toBe(0);
+    expect(espion).toHaveBeenCalledTimes(1);
+    expect(espion).toHaveBeenCalledWith(expect.any(TypeError));
+
+    espion.mockRestore();
   });
 });
 
