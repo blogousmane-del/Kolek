@@ -38,7 +38,7 @@ function tableComptee(lignes: Ligne[], count: number) {
     select: () => chaine,
     order: () => chaine,
     range: (debut: number, fin: number) =>
-      Promise.resolve({ data: lignes.slice(debut, fin + 1), error: null, count }),
+      Promise.resolve({ data: lignes.slice(debut, fin + 1), error: null, count, status: 200 }),
   };
   return chaine;
 }
@@ -153,5 +153,49 @@ describe('ce qui n’est jamais écrit', () => {
 
     expect(await compterFile(base)).toBe(1);
     expect((await lireTournee(base)).tournee.cartes[0]!.misesEncaissees).toBe(1);
+  });
+});
+
+describe('une lecture ne vaut preuve que sur son statut', () => {
+  /** postgrest-js réécrit un 404 au corps vide en 204 sans erreur, `data` nul. */
+  function tableReecrite() {
+    const reponse = { data: null, error: null, count: null, status: 204 };
+    const chaine = Object.assign(Promise.resolve(reponse), {}) as unknown as Record<string, unknown>;
+    for (const methode of ['select', 'eq', 'gte', 'in', 'order', 'range', 'limit']) chaine[methode] = () => chaine;
+    chaine.maybeSingle = () => Promise.resolve(reponse);
+    return chaine;
+  }
+
+  async function baseDHier() {
+    const base = await ouvrirBase('col-1');
+    await base.put('tournee', tournee({ clients: [client('c-hier')] }), CLE_INSTANTANE);
+    return base;
+  }
+
+  it.each(['clients', 'cartes', 'mises', 'retraits', 'caisses_jour', 'collecteurs', 'synchro_rejets'])(
+    'ne prend pas un 204 sans erreur sur « %s » pour une liste vide : rien ne change',
+    async (table) => {
+      tables.clients = tableFactice([{ id: 'c1', nom: 'A', telephone: null, marche: null, activite: null, avis_actifs: false }]);
+      tables.cartes = tableFactice([{ id: 'k1', client_id: 'c1', mise: 1000, statut: 'active', mises_encaissees: 0, ouverte_le: AVANT, cloturee_le: null }]);
+      tables[table] = tableReecrite();
+      const base = await baseDHier();
+
+      expect(await rafraichir(clientFactice(), base, 'col-1', MAINTENANT)).toBe('impossible');
+      expect((await lireTournee(base)).tournee.clients.map((c) => c.id)).toEqual(['c-hier']);
+    },
+  );
+
+  it('prend un 206 pour une page lue', async () => {
+    const lignes = [{ id: 'c1', nom: 'A', telephone: null, marche: null, activite: null, avis_actifs: false }];
+    const chaine = {
+      select: () => chaine,
+      order: () => chaine,
+      range: () => Promise.resolve({ data: lignes, error: null, count: 1, status: 206 }),
+    };
+    tables.clients = chaine;
+    const base = await baseDHier();
+
+    expect(await rafraichir(clientFactice(), base, 'col-1', MAINTENANT)).toBe('fait');
+    expect((await lireTournee(base)).tournee.clients.map((c) => c.id)).toEqual(['c1']);
   });
 });

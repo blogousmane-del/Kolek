@@ -28,6 +28,19 @@ export const TAILLE_LOT_IN = 50;
 
 const COLONNES_MISES = 'id, carte_id, montant, encaisse_le, est_commission';
 
+/**
+ * Une lecture ne prouve rien d'autre qu'un 200, ou un 206 pour une page.
+ *
+ * postgrest-js 2.112.3 (`processResponse`) réécrit un 404 au corps vide en
+ * `{ error: null, data: null, status: 204 }`. `chargerTout` y lirait une liste
+ * vide, et une tournée vide remplacerait celle d'hier : la réponse devient donc
+ * une erreur, et rien n'est écrit.
+ */
+function exigerLecture<R extends { error: unknown; status?: number }>(r: R): R {
+  if (r.error || r.status === 200 || r.status === 206) return r;
+  return { ...r, error: { message: `lecture sans preuve (statut ${String(r.status)})` } };
+}
+
 interface LigneClient {
   id: string;
   nom: string;
@@ -102,17 +115,19 @@ export async function rafraichir(
           .from('clients')
           .select('id, nom, telephone, marche, activite, avis_actifs', { count: 'exact' })
           .order('id')
-          .range(d, f),
+          .range(d, f)
+          .then(exigerLecture),
       ),
       chargerTout<LigneCarte>((d, f) =>
         client
           .from('cartes')
           .select('id, client_id, mise, statut, mises_encaissees, ouverte_le, cloturee_le')
           .order('id')
-          .range(d, f),
+          .range(d, f)
+          .then(exigerLecture),
       ),
       chargerTout<LigneMise>((d, f) =>
-        client.from('mises').select(COLONNES_MISES).gte('encaisse_le', depuis).order('id').range(d, f),
+        client.from('mises').select(COLONNES_MISES).gte('encaisse_le', depuis).order('id').range(d, f).then(exigerLecture),
       ),
       chargerTout<LigneRetrait>((d, f) =>
         client
@@ -120,21 +135,24 @@ export async function rafraichir(
           .select('id, carte_id, montant_restitue, effectue_le')
           .gte('effectue_le', depuis)
           .order('id')
-          .range(d, f),
+          .range(d, f)
+          .then(exigerLecture),
       ),
-      client.from('caisses_jour').select('id, date, cash_attendu, cash_declare, ecart').eq('date', date),
+      client.from('caisses_jour').select('id, date, cash_attendu, cash_declare, ecart').eq('date', date).then(exigerLecture),
       client
         .from('collecteurs')
         .select('nom, telephone, zone, palier, abonnement_statut, abonnement_echeance, titulaire_id')
         .eq('id', collecteurId)
-        .maybeSingle(),
+        .maybeSingle()
+        .then(exigerLecture),
       chargerTout<LigneRefus>((d, f) =>
         client
           .from('synchro_rejets')
           .select('id, motif, charge_utile, cree_le')
           .eq('traite', false)
           .order('id')
-          .range(d, f),
+          .range(d, f)
+          .then(exigerLecture),
       ),
     ]);
 
@@ -161,7 +179,7 @@ export async function rafraichir(
     const rLots = await Promise.all(
       lots.map((lot) =>
         chargerTout<LigneMise>((d, f) =>
-          client.from('mises').select(COLONNES_MISES).in('carte_id', lot).order('id').range(d, f),
+          client.from('mises').select(COLONNES_MISES).in('carte_id', lot).order('id').range(d, f).then(exigerLecture),
         ),
       ),
     );
