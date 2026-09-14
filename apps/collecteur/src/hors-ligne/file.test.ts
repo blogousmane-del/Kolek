@@ -16,7 +16,14 @@ import {
   lireRefus,
   lireTournee,
   ouvrirBase,
+  type BaseLocale,
 } from './stockage-local';
+
+// `QuotaExceededError` existe à l'exécution (Node 26, vérifié dans l'environnement
+// vitest+jsdom de ce dépôt) mais le DOM embarqué par TypeScript 7 (tsgo, la version
+// installée ici) ne le déclare pas encore : ceci ne fait que le typer pour
+// l'épreuve, sans rien simuler côté exécution.
+declare const QuotaExceededError: new (message?: string) => DOMException;
 
 const MAINTENANT = Date.parse('2026-09-13T10:00:00.000Z');
 
@@ -80,20 +87,40 @@ describe('ajouter', () => {
     expect((await lireTournee(base)).tournee.cartes[0]!.misesEncaissees).toBe(0);
   });
 
+  it('reconnaît le disque plein, qui porte sa propre étiquette', async () => {
+    const plein = new QuotaExceededError('plein');
+    const base = {
+      transaction: () => {
+        throw plein;
+      },
+    } as unknown as BaseLocale;
+
+    expect(
+      await ajouter(base, () => {
+        throw new Error('jamais appelée');
+      }),
+    ).toEqual({
+      ok: false,
+      echec: { code: 'STOCKAGE', message: PHRASES.STOCKAGE },
+    });
+  });
+
   it('rend INCONNU sans rien écrire quand la construction lève un défaut de code', async () => {
     const base = await baseAvecUneCarte();
     const espion = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const r = await ajouter(base, () => {
-      throw new TypeError('défaut');
-    });
+    try {
+      const r = await ajouter(base, () => {
+        throw new TypeError('défaut');
+      });
 
-    expect(r).toEqual({ ok: false, echec: { code: 'INCONNU', message: PHRASES.INCONNU } });
-    expect(await compterFile(base)).toBe(0);
-    expect(espion).toHaveBeenCalledTimes(1);
-    expect(espion).toHaveBeenCalledWith(expect.any(TypeError));
-
-    espion.mockRestore();
+      expect(r).toEqual({ ok: false, echec: { code: 'INCONNU', message: PHRASES.INCONNU } });
+      expect(await compterFile(base)).toBe(0);
+      expect(espion).toHaveBeenCalledTimes(1);
+      expect(espion).toHaveBeenCalledWith(expect.any(TypeError));
+    } finally {
+      espion.mockRestore();
+    }
   });
 });
 

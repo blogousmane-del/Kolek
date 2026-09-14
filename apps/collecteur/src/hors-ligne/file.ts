@@ -33,13 +33,15 @@ export type ResultatAjout<O extends Operation> =
   | { ok: false; echec: EchecEcriture };
 
 /**
- * IndexedDB ne lève que des `DOMException` : disque plein, base fermée,
- * transaction avortée, valeur impossible à cloner. Reconnue par son étiquette
- * et non par `instanceof`, qui échoue quand l'erreur vient d'un autre domaine
- * d'exécution (le clone structuré, une épreuve sous jsdom).
+ * IndexedDB lève des `DOMException` : base fermée, transaction avortée, valeur
+ * impossible à cloner — et le disque plein, `QuotaExceededError`, sous-interface
+ * qui porte sa propre étiquette. `instanceof` reconnaît la famille dans le même
+ * domaine d'exécution ; l'étiquette la reconnaît quand l'erreur vient d'un autre
+ * (le clone structuré, une épreuve sous jsdom).
  */
 function vientDuStockage(e: unknown): boolean {
-  return Object.prototype.toString.call(e) === '[object DOMException]';
+  if (typeof DOMException !== 'undefined' && e instanceof DOMException) return true;
+  return /^\[object (DOMException|QuotaExceededError)\]$/.test(Object.prototype.toString.call(e));
 }
 
 /**
