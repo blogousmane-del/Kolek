@@ -1,13 +1,15 @@
 import { Bouton, EcranMessage } from '@kolek/ui';
-import type { Session } from '@supabase/supabase-js';
-import { useEffect, useState } from 'react';
+import { isAuthRetryableFetchError, type Session } from '@supabase/supabase-js';
+import { useEffect, useRef, useState } from 'react';
 
 import { viderCache } from './cache';
 import { Connexion } from './Connexion';
 import { Coquille } from './Coquille';
 import { MotDePasseOublie } from './ecrans/MotDePasseOublie';
 import { NouveauMotDePasse } from './ecrans/NouveauMotDePasse';
-import { supabase } from './supabase';
+import { effacerTourneeDe } from './hors-ligne/moteur';
+import { lireSessionGardee } from './session-gardee';
+import { CLE_SESSION, supabase } from './supabase';
 
 /**
  * L'état du compte une fois la session ouverte.
@@ -25,14 +27,42 @@ import { supabase } from './supabase';
  */
 type Compte = 'inconnu' | 'collecteur' | 'orphelin';
 
+/** La session gardée, ou rien — y compris quand le navigateur refuse l'accès au stockage. */
+function collecteurGarde(): string | null {
+  try {
+    return lireSessionGardee(localStorage, CLE_SESSION)?.userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
+  /**
+   * Le collecteur d'une session gardée sur le téléphone, quand le réseau manque
+   * pour la renouveler. Voir `session-gardee.ts` : sans lui, un collecteur hors
+   * ligne depuis plus d'une heure retombait sur l'écran de connexion.
+   */
+  const [collecteurHorsLigne, setCollecteurHorsLigne] = useState<string | null>(null);
   const [pret, setPret] = useState(false);
   const [compte, setCompte] = useState<Compte>('inconnu');
 
+  const collecteurId = session?.user.id ?? collecteurHorsLigne;
+
+  /** Le dernier collecteur ouvert : c'est sa tournée qu'une fin de session efface. */
+  const dernier = useRef<string | null>(null);
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    if (collecteurId) dernier.current = collecteurId;
+  }, [collecteurId]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data, error }) => {
       setSession(data.session);
+      // Seul un échec **réseau** autorise la reprise. Une session que le
+      // serveur a refusée est finie : le collecteur doit se reconnecter.
+      if (!data.session && error && isAuthRetryableFetchError(error)) {
+        setCollecteurHorsLigne(collecteurGarde());
+      }
       setPret(true);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((evenement, s) => {
@@ -45,7 +75,13 @@ export default function App() {
       if (evenement === 'SIGNED_OUT') {
         viderCache();
         setCompte('inconnu');
+        setCollecteurHorsLigne(null);
+        // La tournée s'efface avec la session ; la file, jamais (spec J2b
+        // §4.5) : elle attend que ce collecteur se reconnecte pour partir.
+        if (dernier.current) void effacerTourneeDe(dernier.current);
       }
+      // Une vraie session remplace toujours la session gardée.
+      if (s) setCollecteurHorsLigne(null);
       setSession(s);
     });
     return () => sub.subscription.unsubscribe();
@@ -56,14 +92,18 @@ export default function App() {
     let vivant = true;
 
     // La politique RLS borne déjà cette lecture à sa propre ligne : le compte
-    // demande « ma fiche », et reçoit soit sa fiche, soit rien. Une absence est
-    // donc une absence, pas un refus.
+    // demande « ma fiche », et reçoit soit sa fiche, soit rien.
     void supabase
       .from('collecteurs')
       .select('id')
       .maybeSingle()
-      .then(({ data }) => {
-        if (vivant) setCompte(data ? 'collecteur' : 'orphelin');
+      .then(({ data, error }) => {
+        // Une lecture en échec ne dit rien du compte. La prendre pour une
+        // absence affichait « Compte non rattaché » à un collecteur qui n'avait
+        // perdu que le réseau (plan J2b, précision 2). Le compte reste
+        // `inconnu`, et la coquille s'ouvre.
+        if (!vivant || error) return;
+        setCompte(data ? 'collecteur' : 'orphelin');
       });
 
     return () => {
@@ -85,7 +125,7 @@ export default function App() {
   if (chemin === '/nouveau-mot-de-passe') return <NouveauMotDePasse />;
   if (chemin === '/mot-de-passe-oublie') return <MotDePasseOublie />;
 
-  if (!session) return <Connexion />;
+  if (!collecteurId) return <Connexion />;
 
   if (compte === 'orphelin') {
     return (
@@ -98,9 +138,20 @@ export default function App() {
     );
   }
 
-  // `inconnu` : la fiche est en cours de lecture. On montre la coquille plutôt
-  // qu'un écran d'attente — elle a ses propres états de chargement, et un
-  // clignotement supplémentaire à chaque ouverture coûterait plus que la
-  // fraction de seconde qu'il couvre.
-  return <Coquille onDeconnexion={() => setSession(null)} />;
+  // `inconnu` : la fiche est en cours de lecture, ou le réseau manque. On montre
+  // la coquille plutôt qu'un écran d'attente — elle a ses propres états de
+  // chargement, et hors ligne c'est la seule chose utile à montrer.
+  //
+  // `key` : deux collecteurs se relaient sur un même téléphone. Un changement
+  // de compte remonte la coquille entière, sans rien garder du précédent.
+  return (
+    <Coquille
+      key={collecteurId}
+      collecteurId={collecteurId}
+      onDeconnexion={() => {
+        setSession(null);
+        setCollecteurHorsLigne(null);
+      }}
+    />
+  );
 }

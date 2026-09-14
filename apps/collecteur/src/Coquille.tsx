@@ -17,6 +17,7 @@ import { Rapprochement } from './ecrans/Rapprochement';
 import { Recus } from './ecrans/Recus';
 import { RetourPaiement } from './ecrans/RetourPaiement';
 import { Retrait } from './ecrans/Retrait';
+import { demarrerMoteur, ecouterChangements } from './hors-ligne/moteur';
 import { supabase } from './supabase';
 
 /**
@@ -64,12 +65,23 @@ export interface CarteChoisie {
   misesEncaissees: number;
 }
 
-export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
+export function Coquille({
+  collecteurId,
+  onDeconnexion,
+}: {
+  /**
+   * L'identité vient de la session, ou de la session gardée quand le réseau
+   * manque (`App.tsx`). Elle était lue ici par `getUser()`, qui fait un
+   * aller-retour : hors ligne, elle restait nulle et aucun geste n'était
+   * possible (plan J2b, précision 3).
+   */
+  collecteurId: string;
+  onDeconnexion: () => void;
+}) {
   // Départ sur « Clients » : c'est l'écran branché sur la base, et celui d'où
   // partent les deux gestes du métier — inscrire un client, encaisser sa mise.
   const [page, setPage] = useState<Page>('clients');
   const [erreurSortie, setErreurSortie] = useState<string | null>(null);
-  const [collecteurId, setCollecteurId] = useState<string | null>(null);
   const [nomCollecteur, setNomCollecteur] = useState<string | null>(null);
   /** Le palier et le numéro de la fiche, lus une fois pour l'écran d'abonnement :
       il présélectionne la formule courante et pré-remplit le numéro plutôt que
@@ -112,11 +124,28 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
     window.scrollTo(0, 0);
   }, [page]);
 
+  /**
+   * Le collecteur dont le moteur du hors-ligne tourne.
+   *
+   * Les écrans lisent la tournée par `lectureCourante`, qui ne connaît que le
+   * moteur démarré — et React lance les effets des enfants **avant** ceux du
+   * parent. Sans cette attente, le premier écran lirait avant que le moteur
+   * sache pour qui.
+   */
+  const [moteurDe, setMoteurDe] = useState<string | null>(null);
+
   useEffect(() => {
-    // `collecteur_id` doit accompagner chaque écriture : la politique RLS
-    // l'exige au `with check`. On le lit une fois, à l'ouverture.
-    void supabase.auth.getUser().then(({ data }) => setCollecteurId(data.user?.id ?? null));
-  }, []);
+    const arreter = demarrerMoteur(supabase, collecteurId);
+    setMoteurDe(collecteurId);
+    return () => {
+      arreter();
+      setMoteurDe(null);
+    };
+  }, [collecteurId]);
+
+  // Une passe qui a envoyé, une tournée rechargée : les écrans se relisent,
+  // par la même révision qu'après une écriture.
+  useEffect(() => ecouterChangements(() => setRevision((r) => r + 1)), []);
 
   useEffect(() => {
     // Le nom vient de `collecteurs`, pas des métadonnées du jeton : c'est la
@@ -385,7 +414,7 @@ export function Coquille({ onDeconnexion }: { onDeconnexion: () => void }) {
           — le dernier client de la tournée, son bouton « Encaisser » — passe
           sous la barre et devient injoignable. */}
       <div className="mx-auto flex min-h-dvh w-full max-w-mobile flex-col overflow-x-clip pb-nav lg:min-h-0 lg:max-w-none lg:pb-0 lg:py-8">
-        {contenu}
+        {moteurDe === collecteurId && contenu}
       </div>
 
       {/* La barre du bas ne connaît que ses cinq clés. Sur un écran secondaire,
