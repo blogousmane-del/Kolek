@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { classer, type Classement } from './classer';
+import { classer, type Classement, type ReponseServeur } from './classer';
 import {
   chargeUtileDe,
   type Operation,
@@ -19,7 +19,9 @@ import {
  * - **relire avant de conclure.** Un « déjà là » n'est cru qu'après relecture
  *   de la ligne par identifiant (§6.3). Un refus aussi : la ligne a pu arriver
  *   lors d'un envoi dont la réponse s'est perdue (précision 6 du plan) ;
- * - **la caisse en « dernière déclaration gagne »** (§6.4).
+ * - **la caisse en « dernière déclaration gagne »** (§6.4) ;
+ * - **une réponse ne vaut preuve que sur son statut** : 201 pour une insertion,
+ *   200 pour une relecture ou une mise à jour (voir `exigerCreation`).
  *
  * Il ne touche jamais au stockage : c'est le synchroniseur qui décide de ce que
  * l'issue fait à la file.
@@ -34,18 +36,36 @@ export type Issue =
 
 type Relecture = 'meme' | 'differente' | 'absente' | 'illisible';
 
+/**
+ * Une insertion ne prouve rien d'autre qu'un `201 Created`.
+ *
+ * postgrest-js 2.112.3 (`processResponse`) réécrit un 404 au corps vide en
+ * `{ error: null, status: 204 }`, et un 404 au corps en tableau en
+ * `{ error: null, status: 200 }`. Sans `.select()`, rien d'autre ne distingue ces
+ * réponses d'une insertion réussie : les croire retirerait de la file une
+ * opération qui n'est pas au serveur. Une réponse sans erreur et sans 201 devient
+ * donc une erreur sans code : `classer` la range en `inconnu`, l'envoi est
+ * retenté, et le rejeu tombe sur la clé si la ligne était arrivée.
+ */
+function exigerCreation(r: ReponseServeur): ReponseServeur {
+  if (r.error || r.status === 201) return r;
+  return { error: { code: '', message: `insertion sans preuve (statut ${r.status})` }, status: r.status };
+}
+
 async function relire(
   client: SupabaseClient,
   table: string,
   id: string,
   attendu: Record<string, unknown>,
 ): Promise<Relecture> {
-  const { data, error } = await client
+  const { data, error, status } = await client
     .from(table)
     .select(Object.keys(attendu).join(', '))
     .eq('id', id)
     .maybeSingle();
-  if (error) return 'illisible';
+  // Même piège qu'à l'insertion : seul un 200 portant une ligne, ou rien, est
+  // une lecture. Un 404 réécrit (204, ou 200 et un tableau) ne dit pas « absente ».
+  if (error || status !== 200 || Array.isArray(data)) return 'illisible';
   if (!data) return 'absente';
   const ligne = data as unknown as Record<string, unknown>;
   return Object.entries(attendu).every(([colonne, valeur]) => ligne[colonne] === valeur)
@@ -86,7 +106,7 @@ async function envoyerMise(client: SupabaseClient, op: OperationMise): Promise<I
   const r = await client
     .from('mises')
     .insert({ id, collecteur_id: op.collecteurId, carte_id: carteId, montant, encaisse_le: encaisseLe });
-  return resoudre(classer(r, 'mise'), () => relire(client, 'mises', id, { carte_id: carteId, montant }));
+  return resoudre(classer(exigerCreation(r), 'mise'), () => relire(client, 'mises', id, { carte_id: carteId, montant }));
 }
 
 async function envoyerClientCarte(
@@ -107,7 +127,7 @@ async function envoyerClientCarte(
       activite: fiche.activite,
       avis_actifs: fiche.avisActifs,
     });
-    const issue = await resoudre(classer(r, 'client'), () =>
+    const issue = await resoudre(classer(exigerCreation(r), 'client'), () =>
       relire(client, 'clients', fiche.id, { nom: fiche.nom }),
     );
     if (issue.issue !== 'acceptee') return issue;
@@ -119,7 +139,7 @@ async function envoyerClientCarte(
     const r = await client
       .from('cartes')
       .insert({ id: carte.id, collecteur_id: op.collecteurId, client_id: fiche.id, mise: carte.mise });
-    const issue = await resoudre(classer(r, 'carte'), () =>
+    const issue = await resoudre(classer(exigerCreation(r), 'carte'), () =>
       relire(client, 'cartes', carte.id, { client_id: fiche.id, mise: carte.mise }),
     );
     if (issue.issue !== 'acceptee') return issue;
@@ -135,7 +155,7 @@ async function envoyerCarte(client: SupabaseClient, op: OperationCarte): Promise
   const r = await client
     .from('cartes')
     .insert({ id, collecteur_id: op.collecteurId, client_id: clientId, mise });
-  return resoudre(classer(r, 'carte'), () =>
+  return resoudre(classer(exigerCreation(r), 'carte'), () =>
     relire(client, 'cartes', id, { client_id: clientId, mise }),
   );
 }
@@ -145,7 +165,7 @@ async function envoyerCaisse(client: SupabaseClient, op: OperationCaisse): Promi
   const r = await client
     .from('caisses_jour')
     .insert({ id, collecteur_id: op.collecteurId, date, cash_declare: cashDeclare });
-  const c = classer(r, 'caisse');
+  const c = classer(exigerCreation(r), 'caisse');
   if (c.cas === 'accepte') return { issue: 'acceptee' };
 
   // La fenêtre de 90 jours n'est appliquée qu'à l'insertion : une journée
@@ -161,8 +181,10 @@ async function envoyerCaisse(client: SupabaseClient, op: OperationCaisse): Promi
     .select('id');
   const cu = classer(u, 'caisse');
   if (cu.cas !== 'accepte') return resoudre(cu, async () => 'absente');
+  // Même piège qu'à l'insertion : seul un 200 portant un tableau est un compte.
+  if (u.status !== 200 || !Array.isArray(u.data)) return { issue: 'inconnue' };
   // Le `select` sert à compter : un `update` que RLS écarte répond sans erreur.
-  if ((u.data ?? []).length > 0) return { issue: 'acceptee' };
+  if (u.data.length > 0) return { issue: 'acceptee' };
   return horsFenetre ? { issue: 'refusee', motif: 'DATE_INVALIDE' } : { issue: 'inconnue' };
 }
 
@@ -196,7 +218,7 @@ export async function consigner(client: SupabaseClient, op: Operation): Promise<
     motif,
     charge_utile: chargeUtileDe(op),
   });
-  return resoudre(classer(r, 'consignation'), () =>
+  return resoudre(classer(exigerCreation(r), 'consignation'), () =>
     relire(client, 'synchro_rejets', op.id, { motif }),
   );
 }

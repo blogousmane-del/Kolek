@@ -299,3 +299,72 @@ describe('consigner un refus (§6.5)', () => {
     expect((appels[0]!.valeur as { motif: string }).motif).toBe('INCONNU');
   });
 });
+
+describe('une réponse ne vaut preuve que sur son statut', () => {
+  // postgrest-js réécrit un 404 au corps vide en 204 sans erreur, et un 404 au
+  // corps en tableau en 200 sans erreur.
+  const REECRIT_VIDE: Reponse = { error: null, status: 204, data: null };
+  const REECRIT_TABLEAU: Reponse = { error: null, status: 200, data: [] };
+  const inscription = () => operationClientCarte(1, { clientId: 'c1', carteId: 'k1', nom: 'Awa', mise: 1500 });
+
+  it.each([
+    ['204', REECRIT_VIDE],
+    ['200', REECRIT_TABLEAU],
+  ])('ne prend pas pour arrivée une mise dont l’insertion répond %s sans erreur', async (_statut, reponse) => {
+    const { client, appels } = clientFactice({ insert: { mises: [reponse] } });
+
+    expect(await envoyer(client, operationMise(1, { carteId: 'k1', montant: 2000 }), rien)).toEqual({ issue: 'inconnue' });
+    expect(appels).toHaveLength(1);
+  });
+
+  it('ne note pas le client d’une inscription dont l’insertion répond 204', async () => {
+    const { client, appels } = clientFactice({ insert: { clients: [REECRIT_VIDE] } });
+    const noter = vi.fn(rien);
+
+    expect(await envoyer(client, inscription(), noter)).toEqual({ issue: 'inconnue' });
+    expect(noter).not.toHaveBeenCalled();
+    expect(appels.map((a) => a.table)).toEqual(['clients']);
+  });
+
+  it('ne note pas la carte d’une inscription dont l’insertion répond 204', async () => {
+    const { client } = clientFactice({ insert: { cartes: [REECRIT_VIDE] } });
+    const noter = vi.fn(rien);
+
+    expect(await envoyer(client, inscription(), noter)).toEqual({ issue: 'inconnue' });
+    expect(noter.mock.calls).toEqual([[{ client: true, carte: false }]]);
+  });
+
+  it('ne prend pour arrivées ni une carte, ni une caisse, ni une consignation qui répondent 204', async () => {
+    const carte = clientFactice({ insert: { cartes: [REECRIT_VIDE] } });
+    expect(await envoyer(carte.client, operationCarte(1, { carteId: 'k2', clientId: 'c1', mise: 500 }), rien)).toEqual({
+      issue: 'inconnue',
+    });
+
+    const caisse = clientFactice({ insert: { caisses_jour: [REECRIT_VIDE] } });
+    expect(
+      await envoyer(caisse.client, operationCaisse(1, { id: 'd1', date: '2026-09-13', cashDeclare: 7000 }), rien),
+    ).toEqual({ issue: 'inconnue' });
+    expect(caisse.appels).toHaveLength(1);
+
+    const rejet = clientFactice({ insert: { synchro_rejets: [REECRIT_VIDE] } });
+    const refusee = operationMise(3, { carteId: 'k1' }, { etat: 'refusee_a_consigner', motif: 'CARTE_CLOTUREE' });
+    expect(await consigner(rejet.client, refusee)).toEqual({ issue: 'inconnue' });
+  });
+
+  it.each([
+    ['204', REECRIT_VIDE],
+    ['200 et un tableau', REECRIT_TABLEAU],
+  ])('ne tient pas pour lue une relecture qui répond %s : c’est passager', async (_statut, reponse) => {
+    const { client } = clientFactice({ insert: { mises: [metier('CARTE_CLOTUREE')] }, relire: { mises: [reponse] } });
+
+    expect(await envoyer(client, operationMise(1, { carteId: 'k1', montant: 2000 }), rien)).toEqual({ issue: 'passager' });
+  });
+
+  it('ne refuse pas une journée hors fenêtre sur une mise à jour qui répond 204', async () => {
+    const { client } = clientFactice({ insert: { caisses_jour: [metier('DATE_INVALIDE')] }, update: [REECRIT_VIDE] });
+
+    expect(
+      await envoyer(client, operationCaisse(1, { id: 'd1', date: '2026-09-13', cashDeclare: 7000 }), rien),
+    ).toEqual({ issue: 'inconnue' });
+  });
+});
