@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
+import { avecDelai } from './delai-requete';
 import { cleSessionPour } from './session-gardee';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -17,4 +18,8 @@ if (!url || !cle) {
  */
 export const CLE_SESSION = cleSessionPour(url);
 
-export const supabase = createClient(url, cle, { auth: { storageKey: CLE_SESSION } });
+/** `avecDelai` : une requête de données sans réponse est coupée à trente secondes (`delai-requete.ts`). */
+export const supabase = createClient(url, cle, {
+  auth: { storageKey: CLE_SESSION },
+  global: { fetch: avecDelai() },
+});
