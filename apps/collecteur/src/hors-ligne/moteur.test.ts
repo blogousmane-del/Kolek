@@ -21,6 +21,7 @@ const {
   ecouterChangements,
   effacerTourneeDe,
   lectureCourante,
+  signalerChangement,
   sousVerrou,
 } = await import('./moteur');
 const { CLE_INSTANTANE, fermerBases, ouvrirBase } = await import('./stockage-local');
@@ -100,6 +101,27 @@ describe('après un geste', () => {
 
     expect(ecouteur).toHaveBeenCalled();
     expect(passe).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('prévenir les écrans', () => {
+  it('prévient tous les écrans, même quand l’un d’eux lève', () => {
+    const espion = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const qui = vi.fn(() => {
+      throw new Error('écran');
+    });
+    const autre = vi.fn();
+    const oublierQui = ecouterChangements(qui);
+    const oublierAutre = ecouterChangements(autre);
+    try {
+      signalerChangement();
+      expect(autre).toHaveBeenCalled();
+      expect(espion).toHaveBeenCalled();
+    } finally {
+      oublierQui();
+      oublierAutre();
+      espion.mockRestore();
+    }
   });
 });
 

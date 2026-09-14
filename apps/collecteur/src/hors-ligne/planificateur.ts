@@ -9,6 +9,10 @@ import type { BilanPasse } from './synchroniseur';
  * tout de suite — le retour du réseau ne doit pas attendre la fin d'une attente
  * de dix minutes.
  *
+ * Une demande de rechargement qui n'aboutit pas reste due : elle est retentée
+ * au prochain tour où le serveur répond. Une panne n'est jamais tue : la cause
+ * part dans la console, et la reprise continue.
+ *
  * `navigator.onLine` ne décide de rien : seul le bilan d'une passe fait foi.
  */
 
@@ -41,6 +45,8 @@ export function creerPlanificateur(
   let minuteur: ReturnType<typeof setTimeout> | null = null;
   let echecsPassagers = 0;
   let dernierRafraichissement = Number.NEGATIVE_INFINITY;
+  /** Un rechargement demandé qui n'a pas encore abouti : retenté au prochain tour où le serveur répond. */
+  let rechargementDu = false;
   let arrete = false;
 
   function annulerMinuteur() {
@@ -62,28 +68,45 @@ export function creerPlanificateur(
   }
 
   async function tour(avecRafraichissement: boolean): Promise<void> {
+    if (avecRafraichissement) rechargementDu = true;
     let bilan: BilanPasse;
     try {
       bilan = await taches.passe();
-    } catch {
+    } catch (e) {
+      // Reprise comme hors ligne, mais jamais en silence : une panne locale —
+      // disque plein, défaut — échouerait sinon sans fin et sans trace.
+      console.error(e);
       bilan = { etat: 'hors_ligne', reveil: null, traitees: 0 };
     }
     echecsPassagers = bilan.etat === 'hors_ligne' ? echecsPassagers + 1 : 0;
 
-    // Recharger n'a de sens que si le serveur vient de répondre.
+    // Recharger n'a de sens que si le serveur vient de répondre, et jamais
+    // pour un planificateur arrêté pendant la passe.
     const joignable = bilan.etat === 'vide' || bilan.etat === 'attente';
     const perime = Date.now() - dernierRafraichissement >= PERIODE_RAFRAICHISSEMENT_MS;
     const apresEnvoi = bilan.etat === 'vide' && bilan.traitees > 0 && perime;
     let rafraichie = false;
-    if (joignable && (avecRafraichissement || apresEnvoi)) {
-      rafraichie = (await taches.rafraichir().catch(() => 'impossible' as const)) === 'fait';
-      if (rafraichie) dernierRafraichissement = Date.now();
+    if (!arrete && joignable && (rechargementDu || apresEnvoi)) {
+      rafraichie =
+        (await taches.rafraichir().catch((e: unknown) => {
+          console.error(e);
+          return 'impossible' as const;
+        })) === 'fait';
+      if (rafraichie) {
+        dernierRafraichissement = Date.now();
+        rechargementDu = false;
+      }
     }
 
     if (arrete) return;
-    surFin(bilan, rafraichie);
+    // Le réveil d'abord : un écran qui lève en étant prévenu ne doit pas l'annuler.
     if (bilan.etat === 'attente' && bilan.reveil !== null) programmer(bilan.reveil - Date.now());
     else if (bilan.etat === 'hors_ligne') programmer(delaiApres(echecsPassagers));
+    try {
+      surFin(bilan, rafraichie);
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   function demander(options: { rafraichir?: boolean } = {}): Promise<void> {

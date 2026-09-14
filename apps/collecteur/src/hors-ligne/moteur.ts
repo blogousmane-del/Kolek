@@ -46,7 +46,14 @@ export function ecouterChangements(ecouteur: Ecouteur): () => void {
 }
 
 export function signalerChangement(): void {
-  for (const ecouteur of [...ecouteurs]) ecouteur();
+  for (const ecouteur of [...ecouteurs]) {
+    try {
+      ecouteur();
+    } catch (e) {
+      // Un écran qui lève ne prive pas les autres de l'avis.
+      console.error(e);
+    }
+  }
 }
 
 export function collecteurCourant(): string | null {

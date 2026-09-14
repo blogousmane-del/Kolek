@@ -113,6 +113,38 @@ describe('quand recharger la tournée (précision 10)', () => {
     await p.demander();
     expect(rafraichir).toHaveBeenCalledTimes(2);
   });
+
+  it('garde une demande de rechargement qui a échoué, et la retente au prochain tour où le serveur répond', async () => {
+    const rafraichir = vi.fn<() => Promise<'fait' | 'impossible'>>().mockResolvedValueOnce('impossible').mockResolvedValue('fait');
+    const passe = vi
+      .fn<() => Promise<BilanPasse>>()
+      .mockResolvedValueOnce(bilan('attente', { reveil: Date.now() + 30_000 }))
+      .mockResolvedValue(bilan('vide'));
+    const p = creerPlanificateur({ passe, rafraichir });
+
+    await p.demander({ rafraichir: true });
+    expect(rafraichir).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(passe).toHaveBeenCalledTimes(2);
+    expect(rafraichir).toHaveBeenCalledTimes(2);
+
+    // Abouti : un tour sans demande ne recharge plus.
+    await p.demander();
+    expect(rafraichir).toHaveBeenCalledTimes(2);
+  });
+
+  it('garde la demande faite hors ligne, et recharge au retour du serveur', async () => {
+    const rafraichir = vi.fn(async () => 'fait' as const);
+    const passe = vi.fn<() => Promise<BilanPasse>>().mockResolvedValueOnce(bilan('hors_ligne')).mockResolvedValue(bilan('vide'));
+    const p = creerPlanificateur({ passe, rafraichir });
+
+    await p.demander({ rafraichir: true });
+    expect(rafraichir).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(rafraichir).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('arrêter', () => {
@@ -126,6 +158,22 @@ describe('arrêter', () => {
     await p.demander();
 
     expect(passe).toHaveBeenCalledTimes(1);
+  });
+
+  it('ne lance pas de rechargement après l’arrêt, même au bout d’une passe en vol', async () => {
+    let finir: () => void = () => {};
+    const passe = vi
+      .fn<() => Promise<BilanPasse>>()
+      .mockImplementationOnce(() => new Promise((r) => { finir = () => r(bilan('vide')); }));
+    const rafraichir = vi.fn(async () => 'fait' as const);
+    const p = creerPlanificateur({ passe, rafraichir });
+
+    const enVol = p.demander({ rafraichir: true });
+    p.arreter();
+    finir();
+    await enVol;
+
+    expect(rafraichir).not.toHaveBeenCalled();
   });
 });
 
@@ -158,5 +206,58 @@ describe('un réveil impossible', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(passe).toHaveBeenCalledTimes(2);
     p.arreter();
+  });
+});
+
+describe('une panne ne passe jamais en silence', () => {
+  it('écrit la cause d’une passe qui lève, et reprend comme hors ligne', async () => {
+    const espion = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const panne = new Error('disque plein');
+      const passe = vi.fn<() => Promise<BilanPasse>>().mockRejectedValueOnce(panne).mockResolvedValue(bilan('vide'));
+      const p = creerPlanificateur({ passe, rafraichir: vi.fn(async () => 'fait' as const) });
+
+      await p.demander();
+      expect(espion).toHaveBeenCalledWith(panne);
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(passe).toHaveBeenCalledTimes(2);
+    } finally {
+      espion.mockRestore();
+    }
+  });
+
+  it('écrit la cause d’un rechargement qui lève', async () => {
+    const espion = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const panne = new Error('instantané illisible');
+      const rafraichir = vi.fn<() => Promise<'fait' | 'impossible'>>().mockRejectedValue(panne);
+      const p = creerPlanificateur({ passe: vi.fn(async () => bilan('vide')), rafraichir });
+
+      await p.demander({ rafraichir: true });
+      expect(espion).toHaveBeenCalledWith(panne);
+    } finally {
+      espion.mockRestore();
+    }
+  });
+
+  it('programme le réveil même quand un écran lève en étant prévenu', async () => {
+    const espion = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const passe = vi
+        .fn<() => Promise<BilanPasse>>()
+        .mockResolvedValueOnce(bilan('attente', { reveil: Date.now() + 7000 }))
+        .mockResolvedValue(bilan('vide'));
+      const p = creerPlanificateur({ passe, rafraichir: vi.fn(async () => 'fait' as const) }, () => {
+        throw new Error('écran');
+      });
+
+      await p.demander();
+      await vi.advanceTimersByTimeAsync(7000);
+      expect(passe).toHaveBeenCalledTimes(2);
+      p.arreter();
+    } finally {
+      espion.mockRestore();
+    }
   });
 });
