@@ -49,11 +49,12 @@ export default function App() {
 
   const collecteurId = session?.user.id ?? collecteurHorsLigne;
 
-  /** Le dernier collecteur ouvert : c'est sa tournée qu'une fin de session efface. */
+  /**
+   * Le dernier collecteur ouvert : c'est sa tournée qu'une fin de session efface.
+   * Retenu là où la session est posée, pas dans un effet : un effet passe après
+   * l'affichage, et une fin de session arrivée entre les deux n'effaçait rien.
+   */
   const dernier = useRef<string | null>(null);
-  useEffect(() => {
-    if (collecteurId) dernier.current = collecteurId;
-  }, [collecteurId]);
 
   useEffect(() => {
     let vivant = true;
@@ -62,17 +63,22 @@ export default function App() {
     // retire. Une session finie pendant que l'application était fermée se
     // constate au chargement, et sa tournée doit s'effacer comme à toute fin de
     // session : sans lui, `dernier` était encore vide à ce moment-là.
-    const garde = collecteurGarde();
-    if (garde) dernier.current = garde;
+    const retenir = (id: string | null): string | null => {
+      if (id) dernier.current = id;
+      return id;
+    };
+    retenir(collecteurGarde());
 
     // Un réseau qui accepte puis se tait fait pendre le renouvellement de la
     // session, et `getSession` avec lui : l'écran restait blanc. Passé ce délai,
     // la tournée gardée s'ouvre. La session continue de répondre en arrière-plan,
     // sans être coupée : couper un renouvellement déjà tourné côté serveur
     // fermerait toutes les sessions du collecteur.
+    let ouverteSansSession = false;
     const minuteur = setTimeout(() => {
       if (!vivant) return;
-      setCollecteurHorsLigne(collecteurGarde());
+      ouverteSansSession = true;
+      setCollecteurHorsLigne(retenir(collecteurGarde()));
       setPret(true);
     }, ATTENTE_SESSION_DEMARRAGE_MS);
 
@@ -82,21 +88,24 @@ export default function App() {
         if (!vivant) return;
         clearTimeout(minuteur);
         setSession(data.session);
+        retenir(data.session?.user.id ?? null);
         // Seul un échec **réseau** autorise la reprise. Une session que le
         // serveur a refusée est finie : le collecteur doit se reconnecter.
         setCollecteurHorsLigne(
-          !data.session && error && isAuthRetryableFetchError(error) ? collecteurGarde() : null,
+          !data.session && error && isAuthRetryableFetchError(error) ? retenir(collecteurGarde()) : null,
         );
         setPret(true);
       })
       .catch((e: unknown) => {
         // Rare — stockage plein, session illisible — mais sans ce rattrapage
         // l'écran restait blanc pour toujours. Rien ne prouve un échec réseau :
-        // retour à la connexion.
+        // retour à la connexion. Une tournée gardée déjà ouverte le reste : rien
+        // ne prouve non plus que la session est finie, et le collecteur n'aurait
+        // pas de réseau pour se reconnecter.
         if (!vivant) return;
         clearTimeout(minuteur);
         console.error(e);
-        setCollecteurHorsLigne(null);
+        if (!ouverteSansSession) setCollecteurHorsLigne(null);
         setPret(true);
       });
 
@@ -122,7 +131,10 @@ export default function App() {
         void effacerTourneeDe(dernier.current);
       }
       // Une vraie session remplace toujours la session gardée.
-      if (s) setCollecteurHorsLigne(null);
+      if (s) {
+        retenir(s.user.id);
+        setCollecteurHorsLigne(null);
+      }
       setSession(s);
     });
     return () => {

@@ -13,7 +13,7 @@ import {
   ouvrirBase,
   type EtatStockage,
 } from './stockage-local';
-import { passe, type BilanPasse } from './synchroniseur';
+import { passe, verifierSession, type BilanPasse } from './synchroniseur';
 
 /**
  * Le moteur du hors-ligne, pour le collecteur connecté.
@@ -109,6 +109,11 @@ export function demarrerMoteur(client: SupabaseClient, collecteurId: string): ()
         sousVerrou(
           verrou,
           async () => {
+            // Chaque lecture lit la session avant `fetch`, sans délai : une
+            // session qui pend tiendrait le verrou. Bornée ici comme dans la
+            // passe (décision de l'exploitant, 2026-09-14) ; sans session sûre,
+            // rien ne se relit, et la demande reste due.
+            if ((await verifierSession(client, collecteurId)) !== 'ok') return 'impossible' as const;
             const avant = effacements.get(collecteurId) ?? 0;
             const base = await ouvrirBase(collecteurId);
             const issue = await rafraichir(client, base, collecteurId);

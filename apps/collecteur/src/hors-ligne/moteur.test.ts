@@ -8,8 +8,12 @@ import type { BaseLocale } from './stockage-local';
 
 const passe = vi.fn();
 const rafraichir = vi.fn();
+const verifierSession = vi.fn();
 
-vi.mock('./synchroniseur', () => ({ passe: (...args: unknown[]) => passe(...args) }));
+vi.mock('./synchroniseur', () => ({
+  passe: (...args: unknown[]) => passe(...args),
+  verifierSession: (...args: unknown[]) => verifierSession(...args),
+}));
 vi.mock('./rafraichir', () => ({ rafraichir: (...args: unknown[]) => rafraichir(...args) }));
 
 const {
@@ -35,6 +39,7 @@ beforeEach(async () => {
   globalThis.indexedDB = new IDBFactory() as unknown as typeof indexedDB;
   passe.mockReset().mockResolvedValue({ etat: 'vide', reveil: null, traitees: 0 });
   rafraichir.mockReset().mockResolvedValue('fait');
+  verifierSession.mockReset().mockResolvedValue('ok');
 });
 
 afterEach(() => {
@@ -176,6 +181,25 @@ describe('lire et compter', () => {
 
     const base = await ouvrirBase('col-1');
     await vi.waitFor(async () => expect((await base.get('tournee', CLE_INSTANTANE)) ?? null).toBeNull());
+  });
+});
+
+describe('recharger la tournée', () => {
+  it('ne relit rien sans session sûre, et libère le tour', async () => {
+    // Une session qui pend est bornée par `verifierSession` (verifier-session.test.ts) :
+    // ici, seul compte que le rechargement l'attende avant de relire.
+    verifierSession.mockResolvedValue('passager');
+
+    demarrerMoteur(CLIENT, 'col-1');
+    await vi.waitFor(() => expect(verifierSession).toHaveBeenCalledTimes(1));
+    await laisserTourner();
+
+    expect(verifierSession).toHaveBeenCalledWith(CLIENT, 'col-1');
+    expect(rafraichir).not.toHaveBeenCalled();
+
+    verifierSession.mockResolvedValue('ok');
+    window.dispatchEvent(new Event('online'));
+    await vi.waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1));
   });
 });
 

@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { AuthSessionMissingError, type SupabaseClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DELAI_REQUETE_MS } from '../delai-requete';
@@ -111,6 +111,26 @@ describe('une session qui expire bientôt', () => {
 
     expect(await verifierSession(client, 'col-1')).toBe('ok');
     expect(refreshSession).not.toHaveBeenCalled();
+  });
+
+  it('un renouvellement anticipé refusé ne finit pas une session encore valide', async () => {
+    // Trop de demandes, jeton déjà tourné par un autre onglet : supabase-js garde
+    // la session, qui vaut encore une minute. On revient plus tard.
+    const { client } = clientAuth({
+      getSession: async () => ({ data: { session: session('col-1', 60_000) }, error: null }),
+      refreshSession: async () => ({ data: { session: null }, error: new AuthSessionMissingError() }),
+    });
+
+    expect(await verifierSession(client, 'col-1')).toBe('passager');
+  });
+
+  it('une session déjà expirée dont le renouvellement est refusé est finie', async () => {
+    const { client } = clientAuth({
+      getSession: async () => ({ data: { session: session('col-1', -60_000) }, error: null }),
+      refreshSession: async () => ({ data: { session: null }, error: new AuthSessionMissingError() }),
+    });
+
+    expect(await verifierSession(client, 'col-1')).toBe('finie');
   });
 
   it('sous une autre identité, reste une autre identité', async () => {

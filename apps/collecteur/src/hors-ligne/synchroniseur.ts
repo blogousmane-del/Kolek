@@ -113,7 +113,12 @@ export async function verifierSession(
     const expiration = data.session.expires_at;
     // Sans échéance lisible, supabase-js reste seul juge du renouvellement.
     if (typeof expiration === 'number' && expiration * 1000 - Date.now() < MARGE_SESSION_MS) {
-      return renouvelerSession(client, collecteurId);
+      const renouvelee = await renouvelerSession(client, collecteurId);
+      // Un renouvellement anticipé refusé — trop de demandes, jeton déjà tourné
+      // par un autre onglet — ne finit pas une session encore valide : on
+      // revient plus tard. Une session vraiment révoquée est retirée par
+      // supabase-js, et la passe suivante la trouve finie.
+      return renouvelee === 'finie' && expiration * 1000 > Date.now() ? 'passager' : renouvelee;
     }
     return 'ok';
   }

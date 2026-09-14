@@ -203,6 +203,34 @@ describe('une session qui ne répond pas au démarrage', () => {
     expect(screen.getByText('écran de connexion')).toBeTruthy();
   });
 
+  it('garde ouverte la tournée gardée quand la session lève après l’attente', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const espion = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      localStorage.setItem('sb-test-auth-token', GARDEE);
+      let lever: (raison: unknown) => void = () => {};
+      getSession.mockReturnValue(
+        new Promise((_resoudre, rejeter) => {
+          lever = rejeter;
+        }),
+      );
+
+      render(<App />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(ATTENTE_SESSION_DEMARRAGE_MS);
+      });
+      expect(screen.getByText('coquille de col-1')).toBeTruthy();
+
+      await act(async () => {
+        lever(new Error('stockage plein'));
+      });
+
+      expect(screen.getByText('coquille de col-1')).toBeTruthy();
+    } finally {
+      espion.mockRestore();
+    }
+  });
+
   it('ne reste pas blanc quand la lecture de la session lève', async () => {
     const espion = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
