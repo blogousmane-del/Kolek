@@ -189,7 +189,7 @@ describe('une inscription, en deux étapes', () => {
     };
     const { client } = clientFactice({
       insert: { clients: [refus] },
-      relire: { clients: [lu({ nom: 'Awa' })] },
+      relire: { clients: [lu({ collecteur_id: 'col-1' })] },
     });
     const noter = vi.fn(rien);
 
@@ -200,10 +200,22 @@ describe('une inscription, en deux étapes', () => {
   it('reconnaît l’inscription rejouée par ses deux clés', async () => {
     const { client } = clientFactice({
       insert: { clients: [doublon('clients_pkey')], cartes: [doublon('cartes_pkey')] },
-      relire: { clients: [lu({ nom: 'Awa' })], cartes: [lu({ client_id: 'c1', mise: 1500 })] },
+      relire: { clients: [lu({ collecteur_id: 'col-1' })], cartes: [lu({ client_id: 'c1', mise: 1500 })] },
     });
 
     expect(await envoyer(client, op, rien)).toEqual({ issue: 'acceptee' });
+  });
+
+  it('reconnaît l’inscription rejouée d’un client renommé depuis', async () => {
+    const { client, appels } = clientFactice({
+      insert: { clients: [doublon('clients_pkey')] },
+      relire: { clients: [lu({ collecteur_id: 'col-1' })] },
+    });
+    const noter = vi.fn(rien);
+
+    expect(await envoyer(client, op, noter)).toEqual({ issue: 'acceptee' });
+    expect(appels[1]).toMatchObject({ table: 'clients', geste: 'relire', filtres: [['id', 'c1']] });
+    expect(noter.mock.calls).toEqual([[{ client: true, carte: false }], [{ client: true, carte: true }]]);
   });
 });
 
@@ -362,6 +374,25 @@ describe('une réponse ne vaut preuve que sur son statut', () => {
 
   it('ne refuse pas une journée hors fenêtre sur une mise à jour qui répond 204', async () => {
     const { client } = clientFactice({ insert: { caisses_jour: [metier('DATE_INVALIDE')] }, update: [REECRIT_VIDE] });
+
+    expect(
+      await envoyer(client, operationCaisse(1, { id: 'd1', date: '2026-09-13', cashDeclare: 7000 }), rien),
+    ).toEqual({ issue: 'inconnue' });
+  });
+
+  it('ne conclut pas sur une mise à jour de caisse qui répond 204 après un conflit de date', async () => {
+    const { client } = clientFactice({ insert: { caisses_jour: [doublon('caisses_jour_pkey')] }, update: [REECRIT_VIDE] });
+
+    expect(
+      await envoyer(client, operationCaisse(1, { id: 'd1', date: '2026-09-13', cashDeclare: 7000 }), rien),
+    ).toEqual({ issue: 'inconnue' });
+  });
+
+  it('ne compte pas une mise à jour de caisse qui répond 200 sans tableau', async () => {
+    const { client } = clientFactice({
+      insert: { caisses_jour: [metier('DATE_INVALIDE')] },
+      update: [{ error: null, status: 200, data: null }],
+    });
 
     expect(
       await envoyer(client, operationCaisse(1, { id: 'd1', date: '2026-09-13', cashDeclare: 7000 }), rien),

@@ -14,7 +14,7 @@ import {
  * Envoyer une opération, et dire ce qu'il en est advenu.
  *
  * Chaque envoi est l'écriture d'aujourd'hui, colonne pour colonne (§5.5). Ce
- * module n'ajoute que deux choses :
+ * module n'ajoute que trois choses :
  *
  * - **relire avant de conclure.** Un « déjà là » n'est cru qu'après relecture
  *   de la ligne par identifiant (§6.3). Un refus aussi : la ligne a pu arriver
@@ -63,8 +63,8 @@ async function relire(
     .select(Object.keys(attendu).join(', '))
     .eq('id', id)
     .maybeSingle();
-  // Même piège qu'à l'insertion : seul un 200 portant une ligne, ou rien, est
-  // une lecture. Un 404 réécrit (204, ou 200 et un tableau) ne dit pas « absente ».
+  // Même piège qu'à l'insertion : une lecture ne vaut que sur 200 sans tableau.
+  // Un 404 réécrit (204, ou 200 et un tableau) ne dit pas « absente ».
   if (error || status !== 200 || Array.isArray(data)) return 'illisible';
   if (!data) return 'absente';
   const ligne = data as unknown as Record<string, unknown>;
@@ -127,8 +127,12 @@ async function envoyerClientCarte(
       activite: fiche.activite,
       avis_actifs: fiche.avisActifs,
     });
+    // Relu par une colonne que rien ne modifie : le nom se corrige (administration,
+    // autre appareil), et un nom changé ferait prendre pour refusée une
+    // inscription arrivée. L'identifiant vient du téléphone et la ligne n'est
+    // visible que pour ce collecteur : si elle existe, c'est la nôtre.
     const issue = await resoudre(classer(exigerCreation(r), 'client'), () =>
-      relire(client, 'clients', fiche.id, { nom: fiche.nom }),
+      relire(client, 'clients', fiche.id, { collecteur_id: op.collecteurId }),
     );
     if (issue.issue !== 'acceptee') return issue;
     etapes = { ...etapes, client: true };
