@@ -58,6 +58,23 @@ export async function creerCollecteur(nom: string, telephone: string): Promise<C
 }
 
 /**
+ * Un second client connecté comme `c`, dont chaque requête passe par `fetch`.
+ *
+ * Pour les épreuves du hors-ligne : couper le réseau, perdre une réponse,
+ * expirer un jeton — sur la vraie base, sous RLS, avec les vrais déclencheurs.
+ * La session est la sienne : elle se renouvelle sans toucher à celle de `c`.
+ */
+export async function connecterAvec(
+  c: CollecteurTest,
+  fetch: typeof globalThis.fetch,
+): Promise<SupabaseClient> {
+  const client = createClient(url!, anonKey!, { ...sansSession, global: { fetch } });
+  const { error } = await client.auth.signInWithPassword({ email: c.email, password: MOT_DE_PASSE });
+  if (error) throw error;
+  return client;
+}
+
+/**
  * Nettoyage au mieux : supprime les utilisateurs de test qui n'ont rien encaissé.
  *
  * Un collecteur ayant des mises ne peut pas être supprimé — les clés étrangères
