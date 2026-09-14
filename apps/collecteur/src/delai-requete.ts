@@ -6,63 +6,34 @@
  * plus rien ne part, ni de cet onglet ni d'un autre, tant que le navigateur
  * n'abandonne pas de lui-même. Décision de l'exploitant, 2026-09-14.
  *
- * ## Seulement `/rest/v1/`
+ * ## Par l'option `db.timeout` de supabase-js
  *
- * - Les écritures de données sont rejouables : l'identifiant vient du client,
- *   et un rejeu sort en `DOUBLON` ou se relit (`hors-ligne/envoyer.ts`).
+ * Elle n'enveloppe que le client de données (`from`, `rpc`) : la portée tient à
+ * sa construction, sans lire d'adresse. Elle annule par `AbortController`, donc
+ * sous le nom `AbortError`, que `@supabase/postgrest-js` rend en `status: 0`
+ * sans réessayer — sous un autre nom, il réessaierait les lectures lui-même.
+ *
+ * - Les écritures de la file sont rejouables : l'identifiant vient du client, et
+ *   un rejeu sort en `DOUBLON` ou se relit (`hors-ligne/envoyer.ts`).
  * - Une Edge Function n'est pas coupée : `encaisserPour` tire un nouvel
  *   identifiant à chaque appel, et couper une réponse lente après l'encaissement
  *   ferait encaisser deux fois au second essai.
  * - L'authentification n'est pas coupée : couper un renouvellement déjà tourné
  *   côté serveur ferait réutiliser l'ancien jeton, et GoTrue révoque alors toutes
- *   les sessions du collecteur.
+ *   les sessions du collecteur. La passe cesse seulement de l'attendre
+ *   (`verifierSession`).
  *
- * ## Pourquoi `AbortError`
+ * ## Ce que le délai ne couvre pas
  *
- * `@supabase/postgrest-js` rend un rejet nommé `AbortError` en `status: 0`, sans
- * réessayer. Sous un autre nom, il réessaie les lectures lui-même, et chaque
- * essai attendrait encore trente secondes.
- *
- * ## Jusqu'aux en-têtes
- *
- * Le délai court jusqu'à l'arrivée de la réponse, pas jusqu'à la fin de son
- * corps : une page de tournée lente mais qui avance ne doit pas être coupée à
- * chaque essai. Un corps qui cesse d'arriver en cours de lecture n'est pas
- * couvert.
+ * - Le corps de la réponse : le délai court jusqu'à son arrivée, pas jusqu'à la
+ *   fin de sa lecture. Une page de tournée lente mais qui avance ne doit pas être
+ *   coupée à chaque essai.
+ * - L'attente du jeton : supabase-js lit la session avant d'appeler `fetch`, et
+ *   une session qui pend fait pendre la requête avec elle. `verifierSession` la
+ *   borne, et la renouvelle avant qu'elle n'expire au milieu d'une passe.
  */
 
 export const DELAI_REQUETE_MS = 30_000;
 
-function estDonnees(entree: RequestInfo | URL): boolean {
-  try {
-    const adresse = entree instanceof Request ? entree.url : String(entree);
-    return new URL(adresse).pathname.startsWith('/rest/v1/');
-  } catch {
-    return false;
-  }
-}
-
-export function avecDelai(
-  fetchBase: typeof fetch = (entree, init) => fetch(entree, init),
-  delaiMs: number = DELAI_REQUETE_MS,
-): typeof fetch {
-  return async (entree, init) => {
-    if (!estDonnees(entree)) return fetchBase(entree, init);
-
-    const controleur = new AbortController();
-    const signalAppelant = init?.signal ?? (entree instanceof Request ? entree.signal : undefined);
-    const relayer = () => controleur.abort(signalAppelant?.reason);
-    if (signalAppelant?.aborted) relayer();
-    else signalAppelant?.addEventListener('abort', relayer, { once: true });
-
-    const minuteur = setTimeout(
-      () => controleur.abort(new DOMException('Délai de réponse dépassé', 'AbortError')),
-      delaiMs,
-    );
-    try {
-      return await fetchBase(entree, { ...init, signal: controleur.signal });
-    } finally {
-      clearTimeout(minuteur);
-    }
-  };
-}
+/** Les réglages de données du client (`db` de `createClient`). */
+export const OPTIONS_DONNEES = { timeout: DELAI_REQUETE_MS };

@@ -8,7 +8,7 @@ import { Coquille } from './Coquille';
 import { MotDePasseOublie } from './ecrans/MotDePasseOublie';
 import { NouveauMotDePasse } from './ecrans/NouveauMotDePasse';
 import { effacerTourneeDe } from './hors-ligne/moteur';
-import { lireSessionGardee } from './session-gardee';
+import { ATTENTE_SESSION_DEMARRAGE_MS, lireSessionGardee } from './session-gardee';
 import { CLE_SESSION, supabase } from './supabase';
 
 /**
@@ -56,15 +56,50 @@ export default function App() {
   }, [collecteurId]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data, error }) => {
-      setSession(data.session);
-      // Seul un échec **réseau** autorise la reprise. Une session que le
-      // serveur a refusée est finie : le collecteur doit se reconnecter.
-      if (!data.session && error && isAuthRetryableFetchError(error)) {
-        setCollecteurHorsLigne(collecteurGarde());
-      }
+    let vivant = true;
+
+    // Le collecteur de la session gardée, retenu avant que supabase-js ne la
+    // retire. Une session finie pendant que l'application était fermée se
+    // constate au chargement, et sa tournée doit s'effacer comme à toute fin de
+    // session : sans lui, `dernier` était encore vide à ce moment-là.
+    const garde = collecteurGarde();
+    if (garde) dernier.current = garde;
+
+    // Un réseau qui accepte puis se tait fait pendre le renouvellement de la
+    // session, et `getSession` avec lui : l'écran restait blanc. Passé ce délai,
+    // la tournée gardée s'ouvre. La session continue de répondre en arrière-plan,
+    // sans être coupée : couper un renouvellement déjà tourné côté serveur
+    // fermerait toutes les sessions du collecteur.
+    const minuteur = setTimeout(() => {
+      if (!vivant) return;
+      setCollecteurHorsLigne(collecteurGarde());
       setPret(true);
-    });
+    }, ATTENTE_SESSION_DEMARRAGE_MS);
+
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!vivant) return;
+        clearTimeout(minuteur);
+        setSession(data.session);
+        // Seul un échec **réseau** autorise la reprise. Une session que le
+        // serveur a refusée est finie : le collecteur doit se reconnecter.
+        setCollecteurHorsLigne(
+          !data.session && error && isAuthRetryableFetchError(error) ? collecteurGarde() : null,
+        );
+        setPret(true);
+      })
+      .catch((e: unknown) => {
+        // Rare — stockage plein, session illisible — mais sans ce rattrapage
+        // l'écran restait blanc pour toujours. Rien ne prouve un échec réseau :
+        // retour à la connexion.
+        if (!vivant) return;
+        clearTimeout(minuteur);
+        console.error(e);
+        setCollecteurHorsLigne(null);
+        setPret(true);
+      });
+
     const { data: sub } = supabase.auth.onAuthStateChange((evenement, s) => {
       // Toute fin de session vide le cache de navigation, pas seulement le
       // bouton « Déconnexion ». Corrigé par l'audit du 2026-08-23 : la coquille
@@ -80,11 +115,21 @@ export default function App() {
         // §4.5) : elle attend que ce collecteur se reconnecte pour partir.
         if (dernier.current) void effacerTourneeDe(dernier.current);
       }
+      // Un autre compte s'ouvre sans fin de session constatée — autre onglet,
+      // lien d'invitation : la tournée du précédent s'efface aussi. Sa file,
+      // jamais.
+      if (s && dernier.current && s.user.id !== dernier.current) {
+        void effacerTourneeDe(dernier.current);
+      }
       // Une vraie session remplace toujours la session gardée.
       if (s) setCollecteurHorsLigne(null);
       setSession(s);
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      vivant = false;
+      clearTimeout(minuteur);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {

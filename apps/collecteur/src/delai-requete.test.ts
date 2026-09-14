@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { avecDelai, DELAI_REQUETE_MS } from './delai-requete';
+import { DELAI_REQUETE_MS, OPTIONS_DONNEES } from './delai-requete';
 import { classer } from './hors-ligne/classer';
 
 const URL_BASE = 'http://127.0.0.1:54321';
@@ -28,6 +28,15 @@ function reseauMuet() {
   return { fetchBase: fetchBase as unknown as typeof fetch, appels, espion: fetchBase, premierAppel };
 }
 
+/** Le client tel que `supabase.ts` le construit, sur un réseau factice. */
+function clientSur(fetchBase: typeof fetch) {
+  return createClient(URL_BASE, 'cle-publique', {
+    auth: { persistSession: false, autoRefreshToken: false },
+    db: OPTIONS_DONNEES,
+    global: { fetch: fetchBase },
+  });
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
 });
@@ -39,107 +48,109 @@ afterEach(() => {
 describe('une requête de données sans réponse', () => {
   it('vaut trente secondes', () => {
     expect(DELAI_REQUETE_MS).toBe(30_000);
+    expect(OPTIONS_DONNEES).toEqual({ timeout: DELAI_REQUETE_MS });
   });
 
-  it('est coupée à trente secondes, pas avant', async () => {
-    const { fetchBase } = reseauMuet();
-    let issue: unknown = 'en vol';
-    avecDelai(fetchBase)(`${URL_BASE}/rest/v1/mises`, { method: 'POST' }).then(
-      () => (issue = 'répondue'),
-      (e: unknown) => (issue = e),
-    );
-
-    await vi.advanceTimersByTimeAsync(DELAI_REQUETE_MS - 1);
-    expect(issue).toBe('en vol');
-
-    await vi.advanceTimersByTimeAsync(1);
-    expect((issue as { name?: string }).name).toBe('AbortError');
-  });
-
-  it('rend une insertion en statut 0, que la file classe passagère', async () => {
+  it('est coupée à trente secondes, pas avant, et la file la classe passagère', async () => {
     const { fetchBase, premierAppel } = reseauMuet();
-    const client = createClient(URL_BASE, 'cle-publique', {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { fetch: avecDelai(fetchBase) },
-    });
-
-    const enVol = client
+    const enVol = clientSur(fetchBase)
       .from('mises')
       .insert({ id: 'mise-1', montant: 500 })
       .then((r) => r);
+    let reponse: Awaited<typeof enVol> | undefined;
+    void enVol.then((r) => {
+      reponse = r;
+    });
     await premierAppel;
-    await vi.advanceTimersByTimeAsync(DELAI_REQUETE_MS);
-    const reponse = await enVol;
 
-    expect(reponse.status).toBe(0);
-    expect(classer(reponse, 'mise')).toEqual({ cas: 'passager' });
+    await vi.advanceTimersByTimeAsync(DELAI_REQUETE_MS - 1);
+    expect(reponse).toBeUndefined();
+
+    await vi.advanceTimersByTimeAsync(1);
+    await vi.waitFor(() => expect(reponse).toBeDefined());
+    expect(reponse!.status).toBe(0);
+    expect(classer(reponse!, 'mise')).toEqual({ cas: 'passager' });
   });
 
   it('ne fait pas réessayer une lecture par supabase-js : un seul appel au réseau', async () => {
     const { fetchBase, espion, premierAppel } = reseauMuet();
-    const client = createClient(URL_BASE, 'cle-publique', {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { fetch: avecDelai(fetchBase) },
-    });
-
-    const enVol = client
+    const enVol = clientSur(fetchBase)
       .from('clients')
       .select('id')
       .eq('id', 'c-1')
       .maybeSingle()
       .then((r) => r);
     await premierAppel;
+
     await vi.advanceTimersByTimeAsync(DELAI_REQUETE_MS);
-    const reponse = await enVol;
     await vi.advanceTimersByTimeAsync(10 * DELAI_REQUETE_MS);
 
-    expect(reponse.status).toBe(0);
+    // Compté avant d'attendre la réponse : un nouvel essai pendrait, et
+    // l'épreuve rougirait sur son assertion plutôt que par dépassement.
     expect(espion).toHaveBeenCalledTimes(1);
+    expect((await enVol).status).toBe(0);
   });
 
   it('laisse passer une réponse arrivée à temps, sans minuteur restant', async () => {
-    const reponse = new Response('[]', { status: 200 });
-    const fetchBase = vi.fn(async () => reponse) as unknown as typeof fetch;
+    const fetchBase = vi.fn(
+      async () => new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    ) as unknown as typeof fetch;
 
-    await expect(avecDelai(fetchBase)(`${URL_BASE}/rest/v1/cartes`)).resolves.toBe(reponse);
+    const reponse = await clientSur(fetchBase).from('cartes').select('id');
+
+    expect(reponse.status).toBe(200);
     expect(vi.getTimerCount()).toBe(0);
   });
 
   it('obéit toujours à une annulation demandée par l’appelant', async () => {
-    const { fetchBase } = reseauMuet();
+    const { fetchBase, premierAppel } = reseauMuet();
     const appelant = new AbortController();
-    let issue: unknown = 'en vol';
-    avecDelai(fetchBase)(`${URL_BASE}/rest/v1/mises`, { signal: appelant.signal }).then(
-      () => (issue = 'répondue'),
-      (e: unknown) => (issue = e),
-    );
+    const enVol = clientSur(fetchBase)
+      .from('mises')
+      .select('id')
+      .abortSignal(appelant.signal)
+      .then((r) => r);
+    await premierAppel;
 
     appelant.abort();
-    await vi.advanceTimersByTimeAsync(0);
+    const reponse = await enVol;
 
-    expect(issue).not.toBe('en vol');
+    expect(reponse.status).toBe(0);
+    expect(reponse.error?.message).toContain('AbortError');
     expect(vi.getTimerCount()).toBe(0);
   });
 });
 
 describe('ce qui n’est jamais coupé', () => {
-  it.each([
-    ['un encaissement pour un coéquipier', '/functions/v1/collecteur-encaisser-pour'],
-    ['un paiement d’abonnement', '/functions/v1/abonnement-payer'],
-    ['un renouvellement de session', '/auth/v1/token?grant_type=refresh_token'],
-  ])('%s : la requête part telle quelle, sans délai', async (_cas, chemin) => {
-    const { fetchBase, appels } = reseauMuet();
-    const init: RequestInit = { method: 'POST' };
-    let issue: unknown = 'en vol';
-    avecDelai(fetchBase)(`${URL_BASE}${chemin}`, init).then(
-      () => (issue = 'répondue'),
-      (e: unknown) => (issue = e),
-    );
+  it('un encaissement pour un coéquipier (Edge Function)', async () => {
+    const { fetchBase, appels, premierAppel } = reseauMuet();
+    let fini = false;
+    void clientSur(fetchBase)
+      .functions.invoke('collecteur-encaisser-pour', { body: { miseId: 'mise-1' } })
+      .then(() => {
+        fini = true;
+      });
+    await premierAppel;
 
     await vi.advanceTimersByTimeAsync(20 * DELAI_REQUETE_MS);
 
-    expect(issue).toBe('en vol');
-    expect(appels[0]!.init).toBe(init);
-    expect(vi.getTimerCount()).toBe(0);
+    expect(appels[0]!.adresse).toContain('/functions/v1/collecteur-encaisser-pour');
+    expect(fini).toBe(false);
+  });
+
+  it('un renouvellement de session', async () => {
+    const { fetchBase, appels, premierAppel } = reseauMuet();
+    let fini = false;
+    void clientSur(fetchBase)
+      .auth.refreshSession({ refresh_token: 'r' })
+      .then(() => {
+        fini = true;
+      });
+    await premierAppel;
+
+    await vi.advanceTimersByTimeAsync(20 * DELAI_REQUETE_MS);
+
+    expect(appels[0]!.adresse).toContain('/auth/v1/token');
+    expect(fini).toBe(false);
   });
 });

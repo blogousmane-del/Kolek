@@ -2,6 +2,8 @@ import { AuthRetryableFetchError, AuthSessionMissingError } from '@supabase/supa
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ATTENTE_SESSION_DEMARRAGE_MS } from './session-gardee';
+
 /**
  * Le démarrage de l'application, avec et sans réseau (plan J2b, précisions 1
  * et 2). Le critère de réussite de la spec commence ici : « téléphone redémarré
@@ -141,5 +143,112 @@ describe('la fin de session', () => {
 
     expect(effacerTourneeDe).toHaveBeenCalledWith('col-1');
     expect(await screen.findByText('écran de connexion')).toBeTruthy();
+  });
+});
+
+describe('une session qui ne répond pas au démarrage', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('ouvre la tournée gardée après l’attente, pas avant', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    localStorage.setItem('sb-test-auth-token', GARDEE);
+    getSession.mockReturnValue(new Promise(() => {}));
+
+    render(<App />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ATTENTE_SESSION_DEMARRAGE_MS - 1);
+    });
+    expect(screen.queryByText('coquille de col-1')).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(screen.getByText('coquille de col-1')).toBeTruthy();
+  });
+
+  it('renvoie à la connexion après l’attente, sans session gardée', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    getSession.mockReturnValue(new Promise(() => {}));
+
+    render(<App />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ATTENTE_SESSION_DEMARRAGE_MS);
+    });
+
+    expect(screen.getByText('écran de connexion')).toBeTruthy();
+  });
+
+  it('rend la connexion quand la session répond enfin qu’elle est finie', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    localStorage.setItem('sb-test-auth-token', GARDEE);
+    let repondre: (valeur: unknown) => void = () => {};
+    getSession.mockReturnValue(
+      new Promise((r) => {
+        repondre = r;
+      }),
+    );
+
+    render(<App />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ATTENTE_SESSION_DEMARRAGE_MS);
+    });
+    expect(screen.getByText('coquille de col-1')).toBeTruthy();
+
+    await act(async () => {
+      repondre({ data: { session: null }, error: new AuthSessionMissingError() });
+    });
+
+    expect(screen.getByText('écran de connexion')).toBeTruthy();
+  });
+
+  it('ne reste pas blanc quand la lecture de la session lève', async () => {
+    const espion = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const panne = new Error('stockage plein');
+      getSession.mockRejectedValue(panne);
+
+      render(<App />);
+
+      expect(await screen.findByText('écran de connexion')).toBeTruthy();
+      expect(espion).toHaveBeenCalledWith(panne);
+    } finally {
+      espion.mockRestore();
+    }
+  });
+});
+
+describe('la tournée d’un collecteur dont la session s’arrête sans déconnexion', () => {
+  it('s’efface quand la session gardée se révèle finie au chargement', () => {
+    localStorage.setItem('sb-test-auth-token', GARDEE);
+    getSession.mockReturnValue(new Promise(() => {}));
+    render(<App />);
+
+    act(() => surChangement('SIGNED_OUT', null));
+
+    expect(effacerTourneeDe).toHaveBeenCalledWith('col-1');
+  });
+
+  it('s’efface quand un autre compte s’ouvre à sa place', async () => {
+    getSession.mockResolvedValue({ data: { session: SESSION }, error: null });
+    render(<App />);
+    await screen.findByText('coquille de col-1');
+
+    act(() => surChangement('SIGNED_IN', { user: { id: 'col-2' } }));
+
+    expect(effacerTourneeDe).toHaveBeenCalledWith('col-1');
+    expect(effacerTourneeDe).not.toHaveBeenCalledWith('col-2');
+    expect(await screen.findByText('coquille de col-2')).toBeTruthy();
+  });
+
+  it('ne s’efface pas quand la même session se renouvelle', async () => {
+    getSession.mockResolvedValue({ data: { session: SESSION }, error: null });
+    render(<App />);
+    await screen.findByText('coquille de col-1');
+
+    act(() => surChangement('TOKEN_REFRESHED', SESSION));
+
+    expect(effacerTourneeDe).not.toHaveBeenCalled();
   });
 });

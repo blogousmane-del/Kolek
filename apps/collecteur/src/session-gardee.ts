@@ -16,6 +16,13 @@
  * renouvelle la session au retour du réseau — ou la déclare finie.
  */
 
+/**
+ * Au démarrage, le temps laissé à la session pour répondre avant d'ouvrir la
+ * tournée gardée. Court : c'est un écran blanc que le collecteur regarde. La
+ * session continue de répondre en arrière-plan, et la remplace si elle revient.
+ */
+export const ATTENTE_SESSION_DEMARRAGE_MS = 5_000;
+
 /** La formule de `SupabaseClient` (`@supabase/supabase-js`, `dist/index.mjs:635`). */
 export function cleSessionPour(url: string): string {
   return `sb-${new URL(url).hostname.split('.')[0]}-auth-token`;

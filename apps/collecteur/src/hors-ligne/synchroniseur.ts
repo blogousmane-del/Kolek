@@ -1,5 +1,6 @@
 import { isAuthRetryableFetchError, type SupabaseClient } from '@supabase/supabase-js';
 
+import { DELAI_REQUETE_MS } from '../delai-requete';
 import { consigner, envoyer } from './envoyer';
 import { mettreAJour, retirerAcceptee, retirerEnRefus } from './file';
 import { DELAIS_MS, MARGE_SURSIS_MS, TENTATIVES_MAX, delaiApres, type Operation } from './modele';
@@ -66,18 +67,56 @@ const DE_SESSION: Record<Exclude<EtatSession, 'ok'>, BilanPasse['etat']> = {
 const ATTENTE_PLAUSIBLE_MS = DELAIS_MS[DELAIS_MS.length - 1]! + MARGE_SURSIS_MS;
 
 /**
- * La session, sans conclure trop vite.
+ * Sous ce reste de validité, la passe renouvelle la session avant d'envoyer.
+ * Sinon supabase-js la renouvellerait lui-même au milieu d'un envoi, en lisant
+ * le jeton avant `fetch`, sans aucun délai : un réseau muet à ce moment-là
+ * tiendrait la passe et le verrou. Cinq minutes couvrent une passe ordinaire.
+ */
+export const MARGE_SESSION_MS = 5 * 60_000;
+
+/**
+ * La réponse de l'authentification, ou `null` passé le délai des requêtes. La
+ * requête n'est pas coupée — couper un renouvellement déjà tourné côté serveur
+ * fermerait toutes les sessions du collecteur — on cesse seulement de
+ * l'attendre. Décision de l'exploitant, 2026-09-14.
+ */
+async function sansAttendrePlusQueLeDelai<T>(reponse: Promise<T>): Promise<T | null> {
+  let minuteur: ReturnType<typeof setTimeout> | undefined;
+  const echeance = new Promise<null>((resoudre) => {
+    minuteur = setTimeout(() => resoudre(null), DELAI_REQUETE_MS);
+  });
+  try {
+    return await Promise.race([reponse, echeance]);
+  } finally {
+    clearTimeout(minuteur);
+  }
+}
+
+/**
+ * La session, sans conclure trop vite, et sans l'attendre sans fin.
  *
  * Hors ligne, un jeton expiré rend `session: null` **avec** une erreur
  * `AuthRetryableFetchError` : la session existe encore, c'est le réseau qui
  * manque. Seul un renouvellement refusé pour une autre raison la déclare finie.
+ * Une session qui ne répond pas dans le délai vaut un échec passager : rien ne
+ * part.
  */
 export async function verifierSession(
   client: SupabaseClient,
   collecteurId: string,
 ): Promise<EtatSession> {
-  const { data, error } = await client.auth.getSession();
-  if (data.session) return data.session.user.id === collecteurId ? 'ok' : 'autre_compte';
+  const lue = await sansAttendrePlusQueLeDelai(client.auth.getSession());
+  if (!lue) return 'passager';
+  const { data, error } = lue;
+  if (data.session) {
+    if (data.session.user.id !== collecteurId) return 'autre_compte';
+    const expiration = data.session.expires_at;
+    // Sans échéance lisible, supabase-js reste seul juge du renouvellement.
+    if (typeof expiration === 'number' && expiration * 1000 - Date.now() < MARGE_SESSION_MS) {
+      return renouvelerSession(client, collecteurId);
+    }
+    return 'ok';
+  }
   if (error && isAuthRetryableFetchError(error)) return 'passager';
   return renouvelerSession(client, collecteurId);
 }
@@ -86,7 +125,9 @@ export async function renouvelerSession(
   client: SupabaseClient,
   collecteurId: string,
 ): Promise<EtatSession> {
-  const { data, error } = await client.auth.refreshSession();
+  const lu = await sansAttendrePlusQueLeDelai(client.auth.refreshSession());
+  if (!lu) return 'passager';
+  const { data, error } = lu;
   if (error) return isAuthRetryableFetchError(error) ? 'passager' : 'finie';
   if (!data.session) return 'finie';
   return data.session.user.id === collecteurId ? 'ok' : 'autre_compte';
