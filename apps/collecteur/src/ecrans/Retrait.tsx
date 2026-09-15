@@ -93,8 +93,10 @@ export function Retrait({
 
   // `cartes` reste la liste entière : le filtre ne change que ce qu'on montre,
   // jamais ce qu'on a lu. Une seule lecture sert les deux vues, et revenir à
-  // toutes les cartes ne coûte pas un aller-retour réseau.
-  const visibles = client ? (cartes ?? []).filter((c) => c.clientId === client.id) : cartes;
+  // toutes les cartes ne coûte pas un aller-retour réseau. Rien lu (lecture en
+  // cours, ou en échec hors ligne) reste `null` : une liste vide dirait d'un
+  // client qui a des cartes que toutes sont clôturées.
+  const visibles = client && cartes ? cartes.filter((c) => c.clientId === client.id) : cartes;
 
   /**
    * Pourquoi le retrait d'une carte attend, ou `null` (spec J2b §7).

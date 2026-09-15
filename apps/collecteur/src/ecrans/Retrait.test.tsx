@@ -251,6 +251,25 @@ describe('le filtre par client', () => {
     expect(onToutesLesCartes).toHaveBeenCalled();
   });
 
+  it('ne dit pas qu’un client n’a plus de carte quand la lecture a échoué', () => {
+    // Hors ligne, la lecture lève : l'écran n'a rien lu. « Ses cartes ont toutes
+    // été clôturées » à côté de l'alerte serait faux, et pousserait à lui ouvrir
+    // une carte de plus (spec J2b §8.9).
+    donnees = null;
+    erreurLecture = 'Cet écran demande le réseau.';
+    rendre({ client: HJ });
+
+    expect(screen.getByText('Cet écran demande le réseau.')).toBeTruthy();
+    expect(screen.queryByText('Aucune carte active pour ce client')).toBeNull();
+  });
+
+  it('ne dit pas qu’un client n’a plus de carte pendant la lecture', () => {
+    donnees = null;
+    rendre({ client: HJ });
+
+    expect(screen.queryByText('Aucune carte active pour ce client')).toBeNull();
+  });
+
   it('ne filtre rien quand aucun client n’est demandé', () => {
     rendre();
 
