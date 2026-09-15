@@ -484,6 +484,11 @@ export async function chargerCartesCloturables(): Promise<CarteCloturable[]> {
     ),
   ]);
 
+  // Une lecture en échec ne rend pas une liste vide : hors ligne, l'écran dirait
+  // « Aucune carte active » d'un client qui en a une (spec J2b §8.9).
+  if (rCartes.error) throw rCartes.error;
+  if (rClients.error) throw rClients.error;
+
   const noms = new Map(
     ((rClients.data ?? []) as Array<{ id: string; nom: string }>).map((c) => [c.id, c.nom]),
   );

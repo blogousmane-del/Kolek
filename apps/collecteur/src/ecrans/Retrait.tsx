@@ -68,7 +68,7 @@ export function Retrait({
 }) {
   const estCollaborateur = useEstCollaborateur();
   const enLigne = useEnLigne();
-  const { operations } = useHorsLigne();
+  const { operations, file } = useHorsLigne();
   const [aConfirmer, setAConfirmer] = useState<CarteCloturable | null>(null);
   // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit.
   const premier = usePremierRendu();
@@ -96,8 +96,28 @@ export function Retrait({
   // toutes les cartes ne coûte pas un aller-retour réseau.
   const visibles = client ? (cartes ?? []).filter((c) => c.clientId === client.id) : cartes;
 
+  /**
+   * Pourquoi le retrait d'une carte attend, ou `null` (spec J2b §7).
+   *
+   * Lu au rendu pour les deux boutons — celui qui ouvre la confirmation et
+   * celui qui la valide — et relu au moment de confirmer : entre l'ouverture et
+   * le geste, une mise de la carte a pu entrer dans la file, ou le réseau
+   * tomber. La clôture recalcule au serveur depuis les mises qu'il a reçues ;
+   * sans cette garde, le client repartirait avec moins que son dû.
+   *
+   * Une file pas encore lue ne vaut pas une file vide.
+   */
+  function retraitBloquePour(carteId: string): string | null {
+    if (file === null) return 'Opérations du téléphone pas encore vérifiées.';
+    return (
+      phraseAttenteCarte(enAttenteSurCarte(operations, carteId)) ??
+      (enLigne ? null : 'Le retrait demande le réseau.')
+    );
+  }
+
   async function confirmer() {
     if (!aConfirmer || envoi) return;
+    if (retraitBloquePour(aConfirmer.carteId) !== null) return;
     setEnvoi(true);
     setErreurEcriture(null);
 
@@ -216,11 +236,7 @@ export function Retrait({
             <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 lg:items-start">
               {visibles?.map((carte, rang) => {
               const enConfirmation = aConfirmer?.carteId === carte.carteId;
-              // Pourquoi le retrait de cette carte attend : une opération encore
-              // sur le téléphone, ou pas de réseau pour la clôture.
-              const retraitBloque =
-                phraseAttenteCarte(enAttenteSurCarte(operations, carte.carteId)) ??
-                (enLigne ? null : 'Le retrait demande le réseau.');
+              const retraitBloque = retraitBloquePour(carte.carteId);
 
               return (
                 <Carte
@@ -312,13 +328,16 @@ export function Retrait({
                         {carte.clientNom} ? La carte se clôture, c’est définitif.
                       </p>
                       <div className="flex gap-2">
-                        <Bouton onClick={confirmer} disabled={envoi}>
+                        <Bouton onClick={confirmer} disabled={envoi || retraitBloque !== null}>
                           {envoi ? 'Retrait…' : 'Oui, faire le retrait'}
                         </Bouton>
                         <Bouton variante="contour" onClick={() => setAConfirmer(null)} disabled={envoi}>
                           Annuler
                         </Bouton>
                       </div>
+                      {retraitBloque && (
+                        <p className="font-body text-xs text-muted-foreground m-0">{retraitBloque}</p>
+                      )}
                     </div>
                   )}
                 </Carte>

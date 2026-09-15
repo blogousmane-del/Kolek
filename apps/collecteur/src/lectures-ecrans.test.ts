@@ -203,6 +203,24 @@ describe('l’écran Retrait au-delà de mille cartes', () => {
     expect(cloturables).toHaveLength(1001);
     expect(cloturables.find((c) => c.carteId === 'k1000')?.clientNom).toBe('Dernière');
   });
+
+  it.each(['cartes', 'clients'])(
+    'lève quand la lecture de « %s » échoue, plutôt que de dire « aucune carte »',
+    async (enPanne) => {
+      // Hors ligne, postgrest-js ne lève pas : il rend `{ error }`. Une liste vide
+      // à la place ferait dire à l'écran que le client n'a plus de carte.
+      const panne = { data: null, error: { message: 'Failed to fetch' }, count: null, status: 0 };
+      const { clients, cartes } = parc(2);
+      tables = { clients, cartes };
+      from.mockImplementation((table: string) => {
+        if (table !== enPanne) return tableFactice(tables[table] ?? []);
+        const chaine = { select: () => chaine, order: () => chaine, range: () => Promise.resolve(panne) };
+        return chaine;
+      });
+
+      await expect(chargerCartesCloturables()).rejects.toMatchObject({ message: 'Failed to fetch' });
+    },
+  );
 });
 
 describe('les comptes et les noms au-delà de mille lignes', () => {

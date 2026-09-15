@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { operationMise } from '../hors-ligne/fabriques';
@@ -80,12 +80,25 @@ vi.mock('../supabase', () => ({
 
 /** La file du téléphone, telle que l'écran la lit. Vide par défaut. */
 let operationsEnFile: unknown[] = [];
+/** Le compte de la file, lue par défaut. `null` : le téléphone ne l'a pas encore lue. */
+const FILE_LUE = {
+  mises: 0,
+  clients: 0,
+  cartes: 0,
+  caisses: 0,
+  enAttente: 0,
+  aConsigner: 0,
+  refusees: 0,
+  plusAncienne: null,
+  plusAncienneType: null,
+};
+let fileLue: unknown = FILE_LUE;
 vi.mock('../hors-ligne/useHorsLigne', () => ({
   useHorsLigne: () => ({
     operations: operationsEnFile,
     refus: [],
     tournee: null,
-    file: null,
+    file: fileLue,
     stockage: 'inconnu',
   }),
 }));
@@ -153,6 +166,7 @@ afterEach(() => {
   ouvrirCarte.mockReset();
   rafraichir.mockReset();
   operationsEnFile = [];
+  fileLue = FILE_LUE;
   delete (window.navigator as unknown as { onLine?: boolean }).onLine;
 });
 
@@ -267,5 +281,45 @@ describe('le retrait attend la file et le réseau (§7)', () => {
 
     expect(boutons.every((b) => b.disabled)).toBe(true);
     expect(screen.getAllByText('Le retrait demande le réseau.')).toHaveLength(3);
+  });
+
+  it('ne laisse pas valider une confirmation ouverte quand une mise de la carte entre en file', () => {
+    // La confirmation a été ouverte sur une carte sans attente. Une mise de cette
+    // carte arrive ensuite dans la file : le serveur clôturerait sans elle.
+    const { rerender } = rendre();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Faire le retrait' })[0]!);
+
+    operationsEnFile = [operationMise(1, { carteId: 'k1' })];
+    rerender(<Retrait revision={0} collecteurId="col1" onRetour={vi.fn()} onEcriture={vi.fn()} />);
+
+    const valider = screen.getByRole('button', { name: 'Oui, faire le retrait' }) as HTMLButtonElement;
+    expect(valider.disabled).toBe(true);
+    expect(screen.getByText('1 mise de cette carte pas encore envoyée.')).toBeTruthy();
+    fireEvent.click(valider);
+    expect(cloturerCarte).not.toHaveBeenCalled();
+  });
+
+  it('ne laisse pas valider une confirmation ouverte quand le réseau tombe', () => {
+    rendre();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Faire le retrait' })[0]!);
+
+    act(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
+
+    const valider = screen.getByRole('button', { name: 'Oui, faire le retrait' }) as HTMLButtonElement;
+    expect(valider.disabled).toBe(true);
+    fireEvent.click(valider);
+    expect(cloturerCarte).not.toHaveBeenCalled();
+  });
+
+  it('attend que le téléphone ait lu sa file : une file pas lue ne vaut pas une file vide', () => {
+    fileLue = null;
+    rendre();
+
+    const boutons = screen.getAllByRole('button', { name: 'Faire le retrait' }) as HTMLButtonElement[];
+
+    expect(boutons.every((b) => b.disabled)).toBe(true);
+    expect(screen.getAllByText('Opérations du téléphone pas encore vérifiées.')).toHaveLength(3);
   });
 });
