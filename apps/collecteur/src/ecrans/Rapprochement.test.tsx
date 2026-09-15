@@ -41,6 +41,35 @@ describe('l’attendu du jour', () => {
   });
 });
 
+describe('l’écart', () => {
+  const PROVISOIRE = 'Écart provisoire : le serveur le recalculera à la prochaine connexion.';
+
+  it('se dit provisoire quand le chiffre vient du téléphone', async () => {
+    chargerRapprochement.mockResolvedValue({ ...DU_JOUR, cashDeclare: 4000, ecart: -1000, provisoire: true });
+
+    render(<Rapprochement collecteurId="col-1" revision={0} onRetour={vi.fn()} />);
+
+    expect(await screen.findByText(PROVISOIRE)).toBeTruthy();
+  });
+
+  it('ne se dit pas provisoire quand il vient du serveur', async () => {
+    chargerRapprochement.mockResolvedValue({ ...DU_JOUR, cashDeclare: 4000, ecart: -1000 });
+
+    render(<Rapprochement collecteurId="col-1" revision={0} onRetour={vi.fn()} />);
+
+    expect(await screen.findByText('Écart de caisse')).toBeTruthy();
+    expect(screen.queryByText(PROVISOIRE)).toBeNull();
+  });
+
+  it('ne promet pas un attendu calculé par le serveur quand le téléphone l’estime', async () => {
+    chargerRapprochement.mockResolvedValue({ ...DU_JOUR, provisoire: true });
+
+    render(<Rapprochement collecteurId="col-1" revision={0} onRetour={vi.fn()} />);
+
+    expect(await screen.findByText(/le téléphone l’estime/)).toBeTruthy();
+  });
+});
+
 describe('déclarer', () => {
   it('passe la date et le montant, sans identifiant de ligne (précision 9)', async () => {
     chargerRapprochement.mockResolvedValue(DU_JOUR);

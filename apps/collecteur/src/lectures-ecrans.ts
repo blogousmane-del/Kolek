@@ -2,7 +2,7 @@ import { MISES_PAR_CYCLE, formatMontant, soldeRestituable } from '@kolek/core';
 
 import type { Carte, MiseRecente } from './lectures';
 import { chargerTout } from './pagination';
-import { lectureCourante } from './hors-ligne/moteur';
+import { collecteurCourant, lectureCourante } from './hors-ligne/moteur';
 import { TourneeAbsente, ficheDepuis, profilDepuis, rapprochementDepuis } from './hors-ligne/vues';
 import { supabase } from './supabase';
 
@@ -391,9 +391,12 @@ export interface Rapprochement {
 
 /** La caisse du jour, lue sur la tournée du téléphone (spec J2b §5.4). */
 export async function chargerRapprochement(): Promise<Rapprochement> {
+  // Lu au même instant que `lectureCourante` le lit : la main qui compte est
+  // celle de la tournée lue.
+  const collecteurId = collecteurCourant();
   const { tournee, operations } = await lectureCourante();
-  if (tournee.lueLe === null) throw new TourneeAbsente();
-  return rapprochementDepuis(tournee, operations, Date.now());
+  if (collecteurId === null || tournee.lueLe === null) throw new TourneeAbsente();
+  return rapprochementDepuis(tournee, operations, Date.now(), collecteurId);
 }
 
 /* -------------------------------- Profil --------------------------------- */

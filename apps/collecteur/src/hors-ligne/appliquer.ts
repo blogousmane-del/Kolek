@@ -49,11 +49,33 @@ function appliquerSur(t: Tournee, op: Operation): void {
       if (t.mises.some((m) => m.id === id)) return;
       const carte = t.cartes.find((c) => c.id === carteId);
       if (!carte || carte.statut !== 'active' || carte.misesEncaissees >= MISES_PAR_CYCLE) return;
-      // La règle du serveur, `new.est_commission := (c.mises_encaissees = 0)`,
-      // reprise pour l'affichage. Le serveur décide ; sa valeur remplace
-      // celle-ci au rafraîchissement (§7).
-      t.mises.push({ id, carteId, montant, encaisseLe, estCommission: carte.misesEncaissees === 0 });
+      t.mises.push({
+        id,
+        carteId,
+        montant,
+        encaisseLe,
+        // `encaisse_par` vaut `auth.uid()` au serveur, et le synchroniseur
+        // n'envoie une opération que sous la session de son collecteur.
+        encaissePar: op.collecteurId,
+        // La règle du serveur, `new.est_commission := (c.mises_encaissees = 0)`,
+        // reprise pour l'affichage. Le serveur décide ; sa valeur remplace
+        // celle-ci au rafraîchissement (§7).
+        estCommission: carte.misesEncaissees === 0,
+      });
       carte.misesEncaissees += 1;
+      // Le déclencheur `caisses_rafraichir_apres_mise`, repris : la ligne de
+      // caisse du jour UTC de la mise suit l'encaissement. Sans ce report, une
+      // mise acceptée entre dans l'instantané pendant que la ligne garde
+      // l'attendu d'avant, et l'écran de caisse dirait juste une caisse que le
+      // serveur voit en écart. L'écart est oublié : ce n'est plus celui du
+      // serveur. Une ligne jamais calculée (`cashAttendu` nul) reste nulle, et
+      // la vue recompte les mises elles-mêmes. Le tout reste sous la garde
+      // d'identifiant ci-dessus : une mise déjà dans l'instantané n'ajoute rien.
+      const ligne = t.caisses.find((c) => c.date === jourUtc(encaisseLe));
+      if (ligne && ligne.cashAttendu !== null) {
+        ligne.cashAttendu += montant;
+        ligne.ecart = null;
+      }
       return;
     }
     case 'client_carte': {
@@ -101,4 +123,10 @@ function appliquerSur(t: Tournee, op: Operation): void {
       return;
     }
   }
+}
+
+/** Le jour UTC d'une heure ISO, découpé comme `cash_attendu_du_jour`. `null` pour une heure illisible. */
+function jourUtc(iso: string): string | null {
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? null : new Date(ms).toISOString().slice(0, 10);
 }

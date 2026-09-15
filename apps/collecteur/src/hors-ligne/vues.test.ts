@@ -1,7 +1,8 @@
 import { soldeRestituable } from '@kolek/core';
 import { describe, expect, it } from 'vitest';
 
-import { INSTANT, caisse, carte, client, operationMise, tournee } from './fabriques';
+import { appliquer, reappliquer } from './appliquer';
+import { COLLECTEUR, INSTANT, caisse, carte, client, operationMise, tournee } from './fabriques';
 import type { MiseLocale, ProfilLocal } from './modele';
 import {
   TourneeAbsente,
@@ -19,6 +20,7 @@ const mise = (id: string, carteId: string, quand: string, reste: Partial<MiseLoc
   carteId,
   montant: 1000,
   encaisseLe: quand,
+  encaissePar: COLLECTEUR,
   estCommission: false,
   ...reste,
 });
@@ -183,14 +185,21 @@ describe('le profil', () => {
 describe('la caisse du jour (§6.4)', () => {
   const MIDI = Date.parse('2026-09-13T12:00:00.000Z');
   const RELUE = '2026-09-13T08:00:00.000Z';
+  const retrait = (id: string, carteId: string, montantRestitue: number, quand: string, restituePar = COLLECTEUR) => ({
+    id,
+    carteId,
+    montantRestitue,
+    effectueLe: quand,
+    restituePar,
+  });
 
-  it('reprend les chiffres du serveur quand rien du jour n’attend', () => {
+  it('reprend les chiffres du serveur quand rien n’a changé depuis la lecture du jour', () => {
     const t = tournee({
       lueLe: RELUE,
       caisses: [caisse({ id: 'l1', date: '2026-09-13', cashAttendu: 5000, cashDeclare: 4500, ecart: -500 })],
     });
 
-    expect(rapprochementDepuis(t, [], MIDI)).toEqual({
+    expect(rapprochementDepuis(t, [], MIDI, COLLECTEUR)).toEqual({
       date: '2026-09-13',
       cashAttendu: 5000,
       cashDeclare: 4500,
@@ -199,39 +208,95 @@ describe('la caisse du jour (§6.4)', () => {
     });
   });
 
-  it('recalcule un attendu provisoire quand une mise du jour attend l’envoi', () => {
-    const op = operationMise(1, { carteId: 'k1', encaisseLe: '2026-09-13T11:00:00.000Z' });
-    // La tournée arrive réappliquée : la mise en file y est déjà.
-    const t = tournee({
+  it('suit une mise acceptée depuis la lecture, et se dit provisoire', () => {
+    // La mise a quitté la file pour l'instantané (`retirerAcceptee`) ; la ligne
+    // du serveur a changé, la tournée ne l'a pas relue.
+    const lue = tournee({
       lueLe: RELUE,
-      mises: [mise('m0', 'k1', '2026-09-13T09:00:00.000Z'), mise(op.charge.id, 'k1', op.charge.encaisseLe)],
-      retraits: [{ id: 'r1', carteId: 'k2', montantRestitue: 300, effectueLe: '2026-09-13T10:00:00.000Z' }],
-      caisses: [caisse({ date: '2026-09-13', cashAttendu: 1000, cashDeclare: 1000, ecart: 0 })],
+      clients: [client('c1')],
+      cartes: [carte('k1', 'c1', { misesEncaissees: 3 })],
+      caisses: [caisse({ date: '2026-09-13', cashAttendu: 10000, cashDeclare: 10000, ecart: 0 })],
     });
+    const t = appliquer(lue, operationMise(1, { carteId: 'k1', encaisseLe: '2026-09-13T11:00:00.000Z' }));
 
-    expect(rapprochementDepuis(t, [op], MIDI)).toEqual({
+    expect(rapprochementDepuis(t, [], MIDI, COLLECTEUR)).toEqual({
       date: '2026-09-13',
-      cashAttendu: 1700,
-      cashDeclare: 1000,
-      ecart: -700,
+      cashAttendu: 11000,
+      cashDeclare: 10000,
+      ecart: -1000,
       provisoire: true,
     });
   });
 
-  it('sans déclaration ni attente, calcule ce que le serveur calculera', () => {
-    const t = tournee({ lueLe: RELUE, mises: [mise('m1', 'k1', '2026-09-13T09:00:00.000Z')] });
+  it('suit une mise du jour qui attend l’envoi, et se dit provisoire', () => {
+    const op = operationMise(1, { carteId: 'k1', encaisseLe: '2026-09-13T11:00:00.000Z' });
+    const lue = tournee({
+      lueLe: RELUE,
+      clients: [client('c1')],
+      cartes: [carte('k1', 'c1', { misesEncaissees: 1 })],
+      mises: [mise('m0', 'k1', '2026-09-13T09:00:00.000Z')],
+      retraits: [retrait('r1', 'k2', 300, '2026-09-13T10:00:00.000Z')],
+      caisses: [caisse({ date: '2026-09-13', cashAttendu: 700, cashDeclare: 700, ecart: 0 })],
+    });
 
-    expect(rapprochementDepuis(t, [], MIDI)).toEqual({
+    // La tournée arrive réappliquée, comme `lireTournee` la rend.
+    expect(rapprochementDepuis(reappliquer(lue, [op]), [op], MIDI, COLLECTEUR)).toEqual({
       date: '2026-09-13',
-      cashAttendu: 1000,
+      cashAttendu: 1700,
+      cashDeclare: 700,
+      ecart: -1000,
+      provisoire: true,
+    });
+  });
+
+  it('garde la ligne du serveur pour base : elle compte ce que ce téléphone ne voit pas', () => {
+    // 3 000 encaissés pour un coéquipier, sur une carte absente de cette
+    // tournée : seul le serveur les connaît. L'écart a été oublié après le
+    // dépannage.
+    const t = tournee({
+      lueLe: RELUE,
+      mises: [mise('m1', 'k1', '2026-09-13T09:00:00.000Z')],
+      caisses: [caisse({ date: '2026-09-13', cashAttendu: 4000, cashDeclare: 4000, ecart: null })],
+    });
+
+    expect(rapprochementDepuis(t, [], MIDI, COLLECTEUR)).toEqual({
+      date: '2026-09-13',
+      cashAttendu: 4000,
+      cashDeclare: 4000,
+      ecart: 0,
+      provisoire: true,
+    });
+  });
+
+  it('sans ligne du serveur, ne recompte que l’argent passé par cette main, et se dit provisoire', () => {
+    // Le titulaire a encaissé 500 et rendu 200 sur les cartes de ce
+    // collecteur : c'est dans sa caisse à lui (`cash_attendu_du_jour` filtre
+    // sur `encaisse_par` et `restitue_par`).
+    const t = tournee({
+      lueLe: RELUE,
+      mises: [
+        mise('m1', 'k1', '2026-09-13T09:00:00.000Z'),
+        mise('m2', 'k1', '2026-09-13T10:00:00.000Z', { montant: 500, encaissePar: 'titulaire-1' }),
+      ],
+      retraits: [
+        retrait('r1', 'k2', 300, '2026-09-13T10:00:00.000Z'),
+        retrait('r2', 'k3', 200, '2026-09-13T11:00:00.000Z', 'titulaire-1'),
+      ],
+    });
+
+    expect(rapprochementDepuis(t, [], MIDI, COLLECTEUR)).toEqual({
+      date: '2026-09-13',
+      cashAttendu: 700,
       cashDeclare: null,
       ecart: null,
-      provisoire: false,
+      provisoire: true,
     });
   });
 
   it('se dit provisoire sur une tournée qui n’a pas été relue aujourd’hui', () => {
-    expect(rapprochementDepuis(tournee({ lueLe: '2026-09-12T18:00:00.000Z' }), [], MIDI).provisoire).toBe(true);
+    expect(
+      rapprochementDepuis(tournee({ lueLe: '2026-09-12T18:00:00.000Z' }), [], MIDI, COLLECTEUR).provisoire,
+    ).toBe(true);
   });
 
   it('découpe la journée en UTC, comme cash_attendu_du_jour', () => {
@@ -239,6 +304,6 @@ describe('la caisse du jour (§6.4)', () => {
       lueLe: RELUE,
       mises: [mise('veille', 'k1', '2026-09-12T23:30:00.000Z'), mise('jour', 'k1', '2026-09-13T00:30:00.000Z')],
     });
-    expect(rapprochementDepuis(t, [], MIDI).cashAttendu).toBe(1000);
+    expect(rapprochementDepuis(t, [], MIDI, COLLECTEUR).cashAttendu).toBe(1000);
   });
 });

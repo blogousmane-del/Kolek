@@ -201,16 +201,25 @@ export function profilDepuis(p: ProfilLocal | null, t: Tournee): Profil {
  * UTC+0 toute l'année : cela ne change rien aujourd'hui, par géographie et non
  * par intention.
  *
- * **Provisoire** tant que le téléphone sait quelque chose que le serveur n'a
- * pas encore compté — une mise ou une déclaration du jour en file — ou que la
- * tournée n'a pas été relue aujourd'hui. L'attendu est alors recalculé avec les
- * termes du serveur : les mises du jour, moins les restitutions du jour (depuis
- * le 2026-08-25).
+ * **Les chiffres du serveur** tant que rien n'a changé depuis la lecture du
+ * jour : ligne relue aujourd'hui, écart gardé, rien du jour en file.
+ *
+ * **Provisoire** dans tous les autres cas. L'attendu vient alors :
+ * - **de la ligne du serveur, quand elle existe.** Elle seule compte l'argent
+ *   pris ou rendu sur la carte d'un coéquipier, que cette tournée ne contient
+ *   pas. `appliquer` y porte les mises faites depuis la lecture ; un geste en
+ *   ligne qui la change sans la tournée en efface l'écart (`ecritures-ecrans`) ;
+ * - **sinon, d'un recompte** avec les termes du serveur : les mises du jour
+ *   moins les restitutions du jour (depuis le 2026-08-25), passées par **cette
+ *   main** — `encaisse_par` et `restitue_par`, pas le propriétaire de la carte.
+ *   Sans ligne, le téléphone ne peut pas savoir ce qu'un titulaire a encaissé
+ *   pour autrui : le chiffre ne se dit donc jamais celui du serveur.
  */
 export function rapprochementDepuis(
   t: Tournee,
   operations: readonly Operation[],
   maintenant: number,
+  collecteurId: string,
 ): Rapprochement {
   const date = new Date(maintenant).toISOString().slice(0, 10);
   const duJour = (iso: string) => new Date(iso).toISOString().slice(0, 10) === date;
@@ -234,11 +243,7 @@ export function rapprochementDepuis(
     };
   }
 
-  const encaisse = t.mises.filter((m) => duJour(m.encaisseLe)).reduce((s, m) => s + m.montant, 0);
-  const restitue = t.retraits
-    .filter((r) => duJour(r.effectueLe))
-    .reduce((s, r) => s + r.montantRestitue, 0);
-  const cashAttendu = encaisse - restitue;
+  const cashAttendu = ligne?.cashAttendu ?? recompterAttendu(t, collecteurId, duJour);
   const cashDeclare = ligne?.cashDeclare ?? null;
 
   return {
@@ -246,6 +251,17 @@ export function rapprochementDepuis(
     cashAttendu,
     cashDeclare,
     ecart: cashDeclare === null ? null : cashDeclare - cashAttendu,
-    provisoire: ligne !== null || enAttente || !relueAujourdhui,
+    provisoire: true,
   };
+}
+
+/** Les mises du jour moins les restitutions du jour, passées par cette main. */
+function recompterAttendu(t: Tournee, collecteurId: string, duJour: (iso: string) => boolean): number {
+  const encaisse = t.mises
+    .filter((m) => m.encaissePar === collecteurId && duJour(m.encaisseLe))
+    .reduce((s, m) => s + m.montant, 0);
+  const restitue = t.retraits
+    .filter((r) => r.restituePar === collecteurId && duJour(r.effectueLe))
+    .reduce((s, r) => s + r.montantRestitue, 0);
+  return encaisse - restitue;
 }

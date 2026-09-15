@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { appliquer, reappliquer } from './appliquer';
 import {
+  COLLECTEUR,
   INSTANT,
   caisse,
   carte,
@@ -21,7 +22,7 @@ describe('une mise', () => {
 
     expect(apres.cartes[0]!.misesEncaissees).toBe(5);
     expect(apres.mises).toEqual([
-      { id: 'mise-1', carteId: 'k1', montant: 1000, encaisseLe: INSTANT, estCommission: false },
+      { id: 'mise-1', carteId: 'k1', montant: 1000, encaisseLe: INSTANT, encaissePar: COLLECTEUR, estCommission: false },
     ]);
   });
 
@@ -37,7 +38,7 @@ describe('une mise', () => {
     const t = tournee({
       clients: [client('c1')],
       cartes: [carte('k1', 'c1', { misesEncaissees: 5 })],
-      mises: [{ id: 'mise-1', carteId: 'k1', montant: 1000, encaisseLe: INSTANT, estCommission: false }],
+      mises: [{ id: 'mise-1', carteId: 'k1', montant: 1000, encaisseLe: INSTANT, encaissePar: COLLECTEUR, estCommission: false }],
     });
 
     const apres = appliquer(t, operationMise(1, { carteId: 'k1' }));
@@ -58,6 +59,45 @@ describe('une mise', () => {
     for (const carteId of ['absente', 'close', 'pleine']) {
       expect(appliquer(t, operationMise(1, { carteId }))).toEqual(t);
     }
+  });
+
+  it('porte la mise dans l’attendu de la caisse du jour, comme le déclencheur du serveur, et oublie l’écart', () => {
+    // `caisses_rafraichir_apres_mise` recalcule la ligne du serveur à chaque
+    // mise. Sans ce report, une mise acceptée entrerait dans l'instantané
+    // pendant que la ligne garderait l'attendu d'avant.
+    const t = tournee({
+      clients: [client('c1')],
+      cartes: [carte('k1', 'c1', { misesEncaissees: 2 })],
+      caisses: [caisse({ cashAttendu: 10000, cashDeclare: 10000, ecart: 0 })],
+    });
+
+    const apres = appliquer(t, operationMise(1, { carteId: 'k1' }));
+
+    expect(apres.caisses).toEqual([
+      { id: 'caisse-serveur', date: '2026-09-13', cashAttendu: 11000, cashDeclare: 10000, ecart: null },
+    ]);
+  });
+
+  it('ne porte pas dans la caisse une mise que l’instantané porte déjà', () => {
+    const ligne = caisse({ cashAttendu: 11000, cashDeclare: 10000, ecart: -1000 });
+    const t = tournee({
+      clients: [client('c1')],
+      cartes: [carte('k1', 'c1', { misesEncaissees: 3 })],
+      mises: [{ id: 'mise-1', carteId: 'k1', montant: 1000, encaisseLe: INSTANT, encaissePar: COLLECTEUR, estCommission: false }],
+      caisses: [ligne],
+    });
+
+    expect(appliquer(t, operationMise(1, { carteId: 'k1' })).caisses).toEqual([ligne]);
+  });
+
+  it('ne touche ni la caisse d’un autre jour, ni une ligne que le serveur n’a pas encore calculée', () => {
+    const autreJour = caisse({ date: '2026-09-12', cashAttendu: 4000, cashDeclare: 4000, ecart: 0 });
+    const pasCalculee = caisse({ id: 'd1', cashAttendu: null, cashDeclare: 5000, ecart: null });
+    const avec = (ligne: typeof autreJour) =>
+      tournee({ clients: [client('c1')], cartes: [carte('k1', 'c1')], caisses: [ligne] });
+
+    expect(appliquer(avec(autreJour), operationMise(1, { carteId: 'k1' })).caisses).toEqual([autreJour]);
+    expect(appliquer(avec(pasCalculee), operationMise(1, { carteId: 'k1' })).caisses).toEqual([pasCalculee]);
   });
 });
 
@@ -147,7 +187,7 @@ describe('réappliquer la file sur un instantané (§9.1)', () => {
     const recent = tournee({
       clients: [client('c1')],
       cartes: [carte('k1', 'c1', { misesEncaissees: 3 })],
-      mises: [{ id: 'mise-1', carteId: 'k1', montant: 1000, encaisseLe: INSTANT, estCommission: false }],
+      mises: [{ id: 'mise-1', carteId: 'k1', montant: 1000, encaisseLe: INSTANT, encaissePar: COLLECTEUR, estCommission: false }],
     });
 
     const apres = reappliquer(recent, [

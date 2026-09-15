@@ -88,6 +88,23 @@ describe('ce qui est chargé (§5.1)', () => {
     expect((await lireTournee(base)).tournee.mises).toHaveLength(1);
   });
 
+  it('garde qui a pris l’argent et qui l’a rendu, pour ranger chaque somme dans la bonne caisse', async () => {
+    tables.cartes = tableFactice([{ id: 'k1', client_id: 'c1', mise: 500, statut: 'active', mises_encaissees: 1, ouverte_le: AVANT, cloturee_le: null }]);
+    tables.mises = tableFactice([{ id: 'm1', carte_id: 'k1', montant: 500, encaisse_le: DU_JOUR, encaisse_par: 'titulaire-1', est_commission: true }]);
+    tables.retraits = tableFactice([{ id: 'r1', carte_id: 'k9', montant_restitue: 300, effectue_le: DU_JOUR, restitue_par: 'col-1' }]);
+    const base = await ouvrirBase('col-1');
+
+    await rafraichir(clientFactice(), base, 'col-1', MAINTENANT);
+
+    const { tournee: t } = await lireTournee(base);
+    expect(t.mises).toEqual([
+      { id: 'm1', carteId: 'k1', montant: 500, encaisseLe: DU_JOUR, encaissePar: 'titulaire-1', estCommission: true },
+    ]);
+    expect(t.retraits).toEqual([
+      { id: 'r1', carteId: 'k9', montantRestitue: 300, effectueLe: DU_JOUR, restituePar: 'col-1' },
+    ]);
+  });
+
   it('garde le profil et remplace les refus par ceux du serveur', async () => {
     tables.caisses_jour = tableFactice([{ id: 'd1', date: '2026-09-13', cash_attendu: 1000, cash_declare: 900, ecart: -100 }]);
     tables.synchro_rejets = tableFactice([{ id: 'op-9', motif: 'CARTE_CLOTUREE', charge_utile: { version: 1 }, cree_le: DU_JOUR, traite: false }]);

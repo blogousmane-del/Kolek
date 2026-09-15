@@ -89,9 +89,10 @@ export function Rapprochement({ collecteurId, revision, onRetour }: {
           donnees && (
             <div className="bg-white/10 rounded-lg p-4">
               <p className="text-white/60 text-xs font-body mb-0.5">
-                {/* Provisoire : le téléphone compte des mises que le serveur n'a
-                    pas encore reçues. Le dire évite qu'un écart d'attente se
-                    lise comme un manquant. */}
+                {/* Provisoire : le chiffre vient du téléphone — une mise que le
+                    serveur n'a pas encore comptée, un geste en ligne pas encore
+                    relu. Le dire évite qu'un écart d'attente se lise comme un
+                    manquant. */}
                 {donnees.provisoire
                   ? 'Cash attendu — provisoire, le serveur recalculera'
                   : 'Cash attendu — calculé par le serveur'}
@@ -188,12 +189,19 @@ export function Rapprochement({ collecteurId, revision, onRetour }: {
                     Ce que tu portes correspond exactement à tes mises du jour.
                   </p>
                 )}
+
+                {donnees.provisoire && (
+                  <p className="font-body text-xs text-muted-foreground mt-2">
+                    Écart provisoire : le serveur le recalculera à la prochaine connexion.
+                  </p>
+                )}
               </Carte>
             )}
 
             <p className="font-body text-xs text-muted-foreground px-1">
-              Le montant attendu est calculé par le serveur à partir de tes mises. Tu ne peux pas
-              le modifier — c’est ce qui rend l’écart crédible, pour toi comme pour GTCS.
+              Le montant attendu est calculé par le serveur à partir de tes mises. En attendant
+              sa lecture, le téléphone l’estime. Tu ne peux pas le modifier — c’est ce qui rend
+              l’écart crédible, pour toi comme pour GTCS.
             </p>
           </>
         }

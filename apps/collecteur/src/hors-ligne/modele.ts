@@ -134,6 +134,12 @@ export interface MiseLocale {
   carteId: string;
   montant: number;
   encaisseLe: string;
+  /**
+   * Qui a pris l'argent (`mises.encaisse_par`). Distinct du propriétaire de la
+   * carte quand un titulaire dépanne un coéquipier : c'est cette main, et non
+   * la carte, qui range la mise dans une caisse du jour.
+   */
+  encaissePar: string;
   /** Posé par le serveur ; provisoire tant que la mise n'est pas relue. */
   estCommission: boolean;
 }
@@ -143,6 +149,8 @@ export interface RetraitLocal {
   carteId: string;
   montantRestitue: number;
   effectueLe: string;
+  /** Qui a sorti l'argent (`retraits.restitue_par`). Même règle que `MiseLocale.encaissePar`. */
+  restituePar: string;
 }
 
 export interface CaisseLocale {
@@ -151,6 +159,11 @@ export interface CaisseLocale {
   /** `null` tant que le serveur n'a pas calculé cette ligne. */
   cashAttendu: number | null;
   cashDeclare: number;
+  /**
+   * L'écart du serveur. `null` tant que le serveur ne l'a pas calculé — ou dès
+   * que le téléphone sait que la caisse a changé depuis la lecture : l'écart
+   * gardé ne vaudrait plus.
+   */
   ecart: number | null;
 }
 

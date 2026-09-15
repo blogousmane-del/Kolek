@@ -26,7 +26,7 @@ import { CLE_INSTANTANE, CLE_PROFIL, dans, type BaseLocale } from './stockage-lo
  */
 export const TAILLE_LOT_IN = 50;
 
-const COLONNES_MISES = 'id, carte_id, montant, encaisse_le, est_commission';
+const COLONNES_MISES = 'id, carte_id, montant, encaisse_le, encaisse_par, est_commission';
 
 /**
  * Une lecture ne prouve rien d'autre qu'un 200, ou un 206 pour une page.
@@ -63,6 +63,7 @@ interface LigneMise {
   carte_id: string;
   montant: number;
   encaisse_le: string;
+  encaisse_par: string;
   est_commission: boolean;
 }
 interface LigneRetrait {
@@ -70,6 +71,7 @@ interface LigneRetrait {
   carte_id: string;
   montant_restitue: number;
   effectue_le: string;
+  restitue_par: string;
 }
 interface LigneCaisse {
   id: string;
@@ -132,7 +134,7 @@ export async function rafraichir(
       chargerTout<LigneRetrait>((d, f) =>
         client
           .from('retraits')
-          .select('id, carte_id, montant_restitue, effectue_le')
+          .select('id, carte_id, montant_restitue, effectue_le, restitue_par')
           .gte('effectue_le', depuis)
           .order('id')
           .range(d, f)
@@ -192,6 +194,7 @@ export async function rafraichir(
         carteId: m.carte_id,
         montant: m.montant,
         encaisseLe: m.encaisse_le,
+        encaissePar: m.encaisse_par,
         estCommission: m.est_commission,
       });
     }
@@ -212,6 +215,7 @@ export async function rafraichir(
         carteId: r.carte_id,
         montantRestitue: r.montant_restitue,
         effectueLe: r.effectue_le,
+        restituePar: r.restitue_par,
       })),
       caisses: ((rCaisses.data ?? []) as LigneCaisse[]).map((c) => ({
         id: c.id,
