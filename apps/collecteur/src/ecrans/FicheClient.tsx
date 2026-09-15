@@ -818,13 +818,16 @@ function CartesEnCours({
       // Base illisible : l'opération ne peut pas être retirée, elle partira.
       issue = 'partie';
     }
-    if (enCours.current !== en) return;
-
     if (issue === 'annulee') {
-      poser(null);
+      // Reconnue par son identifiant, et non par l'objet : pendant l'attente de
+      // la base, la purge (arrière-plan, appui sur une autre carte) a pu
+      // remplacer l'attente par la même mise marquée partie. L'annulation a
+      // pourtant réussi : la mise n'existe plus, l'écran ne la montre plus.
+      if (enCours.current?.operationId === en.operationId) poser(null);
       contexte.current.onEcriture();
       return;
     }
+    if (enCours.current !== en) return;
     // L'échéance était passée, ou l'opération a déjà quitté la file : elle est
     // partie. Le bandeau cesse de proposer ce qu'il ne peut plus tenir.
     poser({ ...en, envoyee: true });

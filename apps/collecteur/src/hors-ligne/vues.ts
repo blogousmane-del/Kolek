@@ -349,6 +349,9 @@ export function enAttenteSurCarte(operations: readonly Operation[], carteId: str
   let mises = 0;
   let creation = false;
   for (const o of operations) {
+    // Un refus à consigner a été envoyé, et refusé : il ne partira jamais, et la
+    // tournée ne le compte pas. Il se montre dans les alertes ; il n'attend rien.
+    if (o.etat !== 'en_attente') continue;
     if (o.type === 'mise' && o.charge.carteId === carteId) mises += 1;
     if (
       (o.type === 'carte' && o.charge.id === carteId) ||

@@ -595,6 +595,50 @@ describe('fiche d’un client à plusieurs cartes', () => {
     expect(screen.getByText('21/31 j · 68 %')).toBeTruthy();
   });
 
+  it('efface la mise annulée même si l’arrière-plan l’a fait partir pendant l’annulation', async () => {
+    // L'annulation attend la base quelques millisecondes. Si l'application passe
+    // en arrière-plan à ce moment, la purge remplace l'attente par la même mise
+    // marquée partie. L'annulation a pourtant réussi : l'écran ne doit laisser
+    // ni « encaissé » ni un jour de plus sur une mise qui n'existe plus.
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES_ENCAISSABLES);
+    enregistrerMise.mockResolvedValue(MISE_ENREGISTREE);
+    let rendreAnnulation: (issue: 'annulee') => void = () => {};
+    annulerMise.mockImplementation(
+      () =>
+        new Promise<'annulee'>((resoudre) => {
+          rendreAnnulation = resoudre;
+        }),
+    );
+    const onEcriture = vi.fn();
+    rendreFiche({ onEcriture });
+    await screen.findByRole('button', { name: ENCAISSER_6000 });
+
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: ENCAISSER_6000 }));
+    await laisserEcrire();
+    onEcriture.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Annuler' }));
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    });
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    delete (document as unknown as { visibilityState?: DocumentVisibilityState }).visibilityState;
+
+    await act(async () => {
+      rendreAnnulation('annulee');
+    });
+    await laisserEcrire();
+
+    expect(screen.queryByText(/FCFA encaissé/)).toBeNull();
+    expect(screen.getByRole('button', { name: ENCAISSER_6000 })).toBeTruthy();
+    expect(screen.getByText('20/31 j · 65 %')).toBeTruthy();
+    expect(onEcriture).toHaveBeenCalledTimes(1);
+  });
+
   it('laisse le bandeau sur sa carte quand on en choisit une autre', async () => {
     // Le décompte court pendant que le collecteur va regarder l'autre carnet —
     // c'est même le geste que la rangée existe pour rendre facile. La mise qui
@@ -1082,6 +1126,21 @@ describe('les gestes restés en ligne attendent la file et le réseau', () => {
 
     expect(retrait.disabled).toBe(true);
     expect(screen.getByText('1 mise de cette carte pas encore envoyée.')).toBeTruthy();
+  });
+
+  it('offre le retrait quand la seule opération de la carte est un refus à consigner', async () => {
+    // Refusée par le serveur, elle ne partira jamais : la clôture calcule juste
+    // sans elle, et « pas encore envoyée » mentirait.
+    operationsEnFile = [
+      operationMise(1, { carteId: 'k1' }, { etat: 'refusee_a_consigner', motif: 'CARTE_CLOTUREE' }),
+    ];
+    chargerFicheClient.mockResolvedValue(FICHE_DEUX_CARTES);
+    rendreFiche({ clientId: 'cli1' });
+
+    const retrait = (await screen.findByRole('button', { name: 'Aller au retrait' })) as HTMLButtonElement;
+
+    expect(retrait.disabled).toBe(false);
+    expect(screen.queryByText('1 mise de cette carte pas encore envoyée.')).toBeNull();
   });
 
   it('demande le réseau pour le retrait, la correction de fiche et les avis', async () => {

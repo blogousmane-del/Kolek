@@ -410,6 +410,17 @@ describe('ce qui attend sur une carte (§7)', () => {
     ).toBe('Cette carte n’est pas encore envoyée.');
   });
 
+  it('ne compte pas un refus à consigner : il ne partira jamais', () => {
+    const file = [
+      operationMise(1, { carteId: 'k1' }, { etat: 'refusee_a_consigner', motif: 'CARTE_CLOTUREE' }),
+      operationCarte(2, { carteId: 'k2', clientId: 'c1' }, { etat: 'refusee_a_consigner', motif: 'INCONNU' }),
+    ];
+
+    expect(enAttenteSurCarte(file, 'k1')).toEqual({ mises: 0, creation: false });
+    expect(enAttenteSurCarte(file, 'k2')).toEqual({ mises: 0, creation: false });
+    expect(phraseAttenteCarte(enAttenteSurCarte(file, 'k1'))).toBeNull();
+  });
+
   it('se tait quand rien de la carte n’est en file', () => {
     expect(phraseAttenteCarte(enAttenteSurCarte([operationCaisse(1, { cashDeclare: 0 })], 'k1'))).toBeNull();
   });
