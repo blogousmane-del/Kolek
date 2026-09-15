@@ -39,8 +39,6 @@ const {
   chargerAlertes,
   chargerCartesCloturables,
   chargerEtatAvis,
-  chargerProfil,
-  chargerRapprochement,
   chargerRecus,
 } = await import('./lectures-ecrans');
 
@@ -195,30 +193,6 @@ describe('les alertes d’un collecteur au-delà de mille lignes', () => {
   });
 });
 
-describe('le rapprochement d’une journée au-delà de mille lignes', () => {
-  it('compte toutes les mises et tous les retraits du jour', async () => {
-    // Aucune déclaration encore : l'attendu est calculé ici. Coupées à mille,
-    // les deux listes rendraient 100 000 − 10 000 = 90 000 au lieu de 90 090.
-    tables = {
-      caisses_jour: [],
-      mises: Array.from({ length: 1001 }, (_, i) => ({
-        id: `m${rang(i)}`,
-        montant: 100,
-        encaisse_le: MAINTENANT,
-      })),
-      retraits: Array.from({ length: 1001 }, (_, i) => ({
-        id: `r${rang(i)}`,
-        montant_restitue: 10,
-        effectue_le: MAINTENANT,
-      })),
-    };
-
-    const rapprochement = await chargerRapprochement();
-
-    expect(rapprochement.cashAttendu).toBe(100_100 - 10_010);
-  });
-});
-
 describe('l’écran Retrait au-delà de mille cartes', () => {
   it('propose toutes les cartes, la 1 001e comprise, avec le nom de son client', async () => {
     const { clients, cartes } = parc(1001);
@@ -229,19 +203,27 @@ describe('l’écran Retrait au-delà de mille cartes', () => {
     expect(cloturables).toHaveLength(1001);
     expect(cloturables.find((c) => c.carteId === 'k1000')?.clientNom).toBe('Dernière');
   });
+
+  it.each(['cartes', 'clients'])(
+    'lève quand la lecture de « %s » échoue, plutôt que de dire « aucune carte »',
+    async (enPanne) => {
+      // Hors ligne, postgrest-js ne lève pas : il rend `{ error }`. Une liste vide
+      // à la place ferait dire à l'écran que le client n'a plus de carte.
+      const panne = { data: null, error: { message: 'Failed to fetch' }, count: null, status: 0 };
+      const { clients, cartes } = parc(2);
+      tables = { clients, cartes };
+      from.mockImplementation((table: string) => {
+        if (table !== enPanne) return tableFactice(tables[table] ?? []);
+        const chaine = { select: () => chaine, order: () => chaine, range: () => Promise.resolve(panne) };
+        return chaine;
+      });
+
+      await expect(chargerCartesCloturables()).rejects.toMatchObject({ message: 'Failed to fetch' });
+    },
+  );
 });
 
 describe('les comptes et les noms au-delà de mille lignes', () => {
-  it('chargerProfil compte tous les clients et toutes les cartes actives', async () => {
-    const { clients, cartes } = parc(1001);
-    tables = { clients, cartes };
-
-    const profil = await chargerProfil();
-
-    expect(profil.clients).toBe(1001);
-    expect(profil.cartesActives).toBe(1001);
-  });
-
   it('chargerRecus nomme le client d’une carte au-delà de la millième', async () => {
     const { clients, cartes } = parc(1001);
     tables = {

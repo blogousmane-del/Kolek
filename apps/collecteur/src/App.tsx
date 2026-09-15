@@ -1,13 +1,15 @@
 import { Bouton, EcranMessage } from '@kolek/ui';
-import type { Session } from '@supabase/supabase-js';
-import { useEffect, useState } from 'react';
+import { isAuthRetryableFetchError, type Session } from '@supabase/supabase-js';
+import { useEffect, useRef, useState } from 'react';
 
 import { viderCache } from './cache';
 import { Connexion } from './Connexion';
 import { Coquille } from './Coquille';
 import { MotDePasseOublie } from './ecrans/MotDePasseOublie';
 import { NouveauMotDePasse } from './ecrans/NouveauMotDePasse';
-import { supabase } from './supabase';
+import { effacerTourneeDe } from './hors-ligne/moteur';
+import { ATTENTE_SESSION_DEMARRAGE_MS, lireSessionGardee } from './session-gardee';
+import { CLE_SESSION, supabase } from './supabase';
 
 /**
  * L'état du compte une fois la session ouverte.
@@ -25,16 +27,88 @@ import { supabase } from './supabase';
  */
 type Compte = 'inconnu' | 'collecteur' | 'orphelin';
 
+/** La session gardée, ou rien — y compris quand le navigateur refuse l'accès au stockage. */
+function collecteurGarde(): string | null {
+  try {
+    return lireSessionGardee(localStorage, CLE_SESSION)?.userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
+  /**
+   * Le collecteur d'une session gardée sur le téléphone, quand le réseau manque
+   * pour la renouveler. Voir `session-gardee.ts` : sans lui, un collecteur hors
+   * ligne depuis plus d'une heure retombait sur l'écran de connexion.
+   */
+  const [collecteurHorsLigne, setCollecteurHorsLigne] = useState<string | null>(null);
   const [pret, setPret] = useState(false);
   const [compte, setCompte] = useState<Compte>('inconnu');
 
+  const collecteurId = session?.user.id ?? collecteurHorsLigne;
+
+  /**
+   * Le dernier collecteur ouvert : c'est sa tournée qu'une fin de session efface.
+   * Retenu là où la session est posée, pas dans un effet : un effet passe après
+   * l'affichage, et une fin de session arrivée entre les deux n'effaçait rien.
+   */
+  const dernier = useRef<string | null>(null);
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    let vivant = true;
+
+    // Le collecteur de la session gardée, retenu avant que supabase-js ne la
+    // retire. Une session finie pendant que l'application était fermée se
+    // constate au chargement, et sa tournée doit s'effacer comme à toute fin de
+    // session : sans lui, `dernier` était encore vide à ce moment-là.
+    const retenir = (id: string | null): string | null => {
+      if (id) dernier.current = id;
+      return id;
+    };
+    retenir(collecteurGarde());
+
+    // Un réseau qui accepte puis se tait fait pendre le renouvellement de la
+    // session, et `getSession` avec lui : l'écran restait blanc. Passé ce délai,
+    // la tournée gardée s'ouvre. La session continue de répondre en arrière-plan,
+    // sans être coupée : couper un renouvellement déjà tourné côté serveur
+    // fermerait toutes les sessions du collecteur.
+    let ouverteSansSession = false;
+    const minuteur = setTimeout(() => {
+      if (!vivant) return;
+      ouverteSansSession = true;
+      setCollecteurHorsLigne(retenir(collecteurGarde()));
       setPret(true);
-    });
+    }, ATTENTE_SESSION_DEMARRAGE_MS);
+
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (!vivant) return;
+        clearTimeout(minuteur);
+        setSession(data.session);
+        retenir(data.session?.user.id ?? null);
+        // Seul un échec **réseau** autorise la reprise. Une session que le
+        // serveur a refusée est finie : le collecteur doit se reconnecter.
+        setCollecteurHorsLigne(
+          !data.session && error && isAuthRetryableFetchError(error) ? retenir(collecteurGarde()) : null,
+        );
+        setPret(true);
+      })
+      .catch((e: unknown) => {
+        // Rare — stockage plein, session illisible — mais sans ce rattrapage
+        // l'écran restait blanc pour toujours. Rien ne prouve un échec réseau :
+        // retour à la connexion. Une tournée gardée déjà ouverte le reste : rien
+        // ne prouve non plus que la session est finie, et le collecteur n'aurait
+        // pas de réseau pour se reconnecter.
+        if (!vivant) return;
+        clearTimeout(minuteur);
+        console.error(e);
+        if (!ouverteSansSession) setCollecteurHorsLigne(null);
+        setPret(true);
+      });
+
     const { data: sub } = supabase.auth.onAuthStateChange((evenement, s) => {
       // Toute fin de session vide le cache de navigation, pas seulement le
       // bouton « Déconnexion ». Corrigé par l'audit du 2026-08-23 : la coquille
@@ -45,10 +119,29 @@ export default function App() {
       if (evenement === 'SIGNED_OUT') {
         viderCache();
         setCompte('inconnu');
+        setCollecteurHorsLigne(null);
+        // La tournée s'efface avec la session ; la file, jamais (spec J2b
+        // §4.5) : elle attend que ce collecteur se reconnecte pour partir.
+        if (dernier.current) void effacerTourneeDe(dernier.current);
+      }
+      // Un autre compte s'ouvre sans fin de session constatée — autre onglet,
+      // lien d'invitation : la tournée du précédent s'efface aussi. Sa file,
+      // jamais.
+      if (s && dernier.current && s.user.id !== dernier.current) {
+        void effacerTourneeDe(dernier.current);
+      }
+      // Une vraie session remplace toujours la session gardée.
+      if (s) {
+        retenir(s.user.id);
+        setCollecteurHorsLigne(null);
       }
       setSession(s);
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      vivant = false;
+      clearTimeout(minuteur);
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -56,14 +149,18 @@ export default function App() {
     let vivant = true;
 
     // La politique RLS borne déjà cette lecture à sa propre ligne : le compte
-    // demande « ma fiche », et reçoit soit sa fiche, soit rien. Une absence est
-    // donc une absence, pas un refus.
+    // demande « ma fiche », et reçoit soit sa fiche, soit rien.
     void supabase
       .from('collecteurs')
       .select('id')
       .maybeSingle()
-      .then(({ data }) => {
-        if (vivant) setCompte(data ? 'collecteur' : 'orphelin');
+      .then(({ data, error }) => {
+        // Une lecture en échec ne dit rien du compte. La prendre pour une
+        // absence affichait « Compte non rattaché » à un collecteur qui n'avait
+        // perdu que le réseau (plan J2b, précision 2). Le compte reste
+        // `inconnu`, et la coquille s'ouvre.
+        if (!vivant || error) return;
+        setCompte(data ? 'collecteur' : 'orphelin');
       });
 
     return () => {
@@ -85,7 +182,7 @@ export default function App() {
   if (chemin === '/nouveau-mot-de-passe') return <NouveauMotDePasse />;
   if (chemin === '/mot-de-passe-oublie') return <MotDePasseOublie />;
 
-  if (!session) return <Connexion />;
+  if (!collecteurId) return <Connexion />;
 
   if (compte === 'orphelin') {
     return (
@@ -98,9 +195,20 @@ export default function App() {
     );
   }
 
-  // `inconnu` : la fiche est en cours de lecture. On montre la coquille plutôt
-  // qu'un écran d'attente — elle a ses propres états de chargement, et un
-  // clignotement supplémentaire à chaque ouverture coûterait plus que la
-  // fraction de seconde qu'il couvre.
-  return <Coquille onDeconnexion={() => setSession(null)} />;
+  // `inconnu` : la fiche est en cours de lecture, ou le réseau manque. On montre
+  // la coquille plutôt qu'un écran d'attente — elle a ses propres états de
+  // chargement, et hors ligne c'est la seule chose utile à montrer.
+  //
+  // `key` : deux collecteurs se relaient sur un même téléphone. Un changement
+  // de compte remonte la coquille entière, sans rien garder du précédent.
+  return (
+    <Coquille
+      key={collecteurId}
+      collecteurId={collecteurId}
+      onDeconnexion={() => {
+        setSession(null);
+        setCollecteurHorsLigne(null);
+      }}
+    />
+  );
 }

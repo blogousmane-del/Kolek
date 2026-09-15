@@ -1,5 +1,7 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { operationMise } from '../hors-ligne/fabriques';
 
 /**
  * L'écran de retrait : son vocabulaire, ses deux portes, et son filtre.
@@ -76,6 +78,31 @@ vi.mock('../supabase', () => ({
   supabase: { auth: { getUser: () => Promise.resolve({ data: { user: { id: 'col1' } } }) } },
 }));
 
+/** La file du téléphone, telle que l'écran la lit. Vide par défaut. */
+let operationsEnFile: unknown[] = [];
+/** Le compte de la file, lue par défaut. `null` : le téléphone ne l'a pas encore lue. */
+const FILE_LUE = {
+  mises: 0,
+  clients: 0,
+  cartes: 0,
+  caisses: 0,
+  enAttente: 0,
+  aConsigner: 0,
+  refusees: 0,
+  plusAncienne: null,
+  plusAncienneType: null,
+};
+let fileLue: unknown = FILE_LUE;
+vi.mock('../hors-ligne/useHorsLigne', () => ({
+  useHorsLigne: () => ({
+    operations: operationsEnFile,
+    refus: [],
+    tournee: null,
+    file: fileLue,
+    stockage: 'inconnu',
+  }),
+}));
+
 const { Retrait } = await import('./Retrait');
 
 /** Hj tient deux cartes : une pleine, une en cours. Ka en tient une pleine. */
@@ -138,6 +165,9 @@ afterEach(() => {
   cloturerCarte.mockReset();
   ouvrirCarte.mockReset();
   rafraichir.mockReset();
+  operationsEnFile = [];
+  fileLue = FILE_LUE;
+  delete (window.navigator as unknown as { onLine?: boolean }).onLine;
 });
 
 describe('vocabulaire de l’écran de retrait', () => {
@@ -221,10 +251,94 @@ describe('le filtre par client', () => {
     expect(onToutesLesCartes).toHaveBeenCalled();
   });
 
+  it('ne dit pas qu’un client n’a plus de carte quand la lecture a échoué', () => {
+    // Hors ligne, la lecture lève : l'écran n'a rien lu. « Ses cartes ont toutes
+    // été clôturées » à côté de l'alerte serait faux, et pousserait à lui ouvrir
+    // une carte de plus (spec J2b §8.9).
+    donnees = null;
+    erreurLecture = 'Cet écran demande le réseau.';
+    rendre({ client: HJ });
+
+    expect(screen.getByText('Cet écran demande le réseau.')).toBeTruthy();
+    expect(screen.queryByText('Aucune carte active pour ce client')).toBeNull();
+  });
+
+  it('ne dit pas qu’un client n’a plus de carte pendant la lecture', () => {
+    donnees = null;
+    rendre({ client: HJ });
+
+    expect(screen.queryByText('Aucune carte active pour ce client')).toBeNull();
+  });
+
   it('ne filtre rien quand aucun client n’est demandé', () => {
     rendre();
 
     expect(screen.getAllByRole('button', { name: 'Faire le retrait' })).toHaveLength(3);
     expect(screen.queryByText(/Cartes de/)).toBeNull();
+  });
+});
+
+describe('le retrait attend la file et le réseau (§7)', () => {
+  it('refuse le retrait d’une carte dont une mise attend l’envoi, et le dit', () => {
+    // Le montant rendu est recalculé au serveur depuis les mises qu'il a
+    // reçues. Tant qu'une mise de la carte est sur le téléphone, le client
+    // repartirait avec moins que son dû.
+    operationsEnFile = [operationMise(1, { carteId: 'k1' })];
+    rendre();
+
+    const boutons = screen.getAllByRole('button', { name: 'Faire le retrait' }) as HTMLButtonElement[];
+
+    expect(boutons.map((b) => b.disabled)).toEqual([true, false, false]);
+    expect(screen.getByText('1 mise de cette carte pas encore envoyée.')).toBeTruthy();
+  });
+
+  it('demande le réseau pour rendre l’argent', () => {
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    rendre();
+
+    const boutons = screen.getAllByRole('button', { name: 'Faire le retrait' }) as HTMLButtonElement[];
+
+    expect(boutons.every((b) => b.disabled)).toBe(true);
+    expect(screen.getAllByText('Le retrait demande le réseau.')).toHaveLength(3);
+  });
+
+  it('ne laisse pas valider une confirmation ouverte quand une mise de la carte entre en file', () => {
+    // La confirmation a été ouverte sur une carte sans attente. Une mise de cette
+    // carte arrive ensuite dans la file : le serveur clôturerait sans elle.
+    const { rerender } = rendre();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Faire le retrait' })[0]!);
+
+    operationsEnFile = [operationMise(1, { carteId: 'k1' })];
+    rerender(<Retrait revision={0} collecteurId="col1" onRetour={vi.fn()} onEcriture={vi.fn()} />);
+
+    const valider = screen.getByRole('button', { name: 'Oui, faire le retrait' }) as HTMLButtonElement;
+    expect(valider.disabled).toBe(true);
+    expect(screen.getByText('1 mise de cette carte pas encore envoyée.')).toBeTruthy();
+    fireEvent.click(valider);
+    expect(cloturerCarte).not.toHaveBeenCalled();
+  });
+
+  it('ne laisse pas valider une confirmation ouverte quand le réseau tombe', () => {
+    rendre();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Faire le retrait' })[0]!);
+
+    act(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
+
+    const valider = screen.getByRole('button', { name: 'Oui, faire le retrait' }) as HTMLButtonElement;
+    expect(valider.disabled).toBe(true);
+    fireEvent.click(valider);
+    expect(cloturerCarte).not.toHaveBeenCalled();
+  });
+
+  it('attend que le téléphone ait lu sa file : une file pas lue ne vaut pas une file vide', () => {
+    fileLue = null;
+    rendre();
+
+    const boutons = screen.getAllByRole('button', { name: 'Faire le retrait' }) as HTMLButtonElement[];
+
+    expect(boutons.every((b) => b.disabled)).toBe(true);
+    expect(screen.getAllByText('Opérations du téléphone pas encore vérifiées.')).toHaveLength(3);
   });
 });

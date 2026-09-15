@@ -24,7 +24,7 @@ import { chargerProfil } from '../lectures-ecrans';
  */
 export function useEstCollaborateur(): boolean {
   const { donnees } = useDonnees('profil', chargerProfil, {
-    messageErreur: 'Fiche indisponible. Vérifie le réseau.',
+    messageErreur: 'Fiche indisponible sur ce téléphone. Connecte-toi une fois au réseau pour la charger.',
   });
 
   // `!= null` et non `!!` : un identifiant est une chaîne, et la chaîne vide
@@ -58,18 +58,20 @@ export function useEstCollaborateur(): boolean {
  */
 export function useAbonnementActif(): boolean {
   const { donnees } = useDonnees('profil', chargerProfil, {
-    messageErreur: 'Fiche indisponible. Vérifie le réseau.',
+    messageErreur: 'Fiche indisponible sur ce téléphone. Connecte-toi une fois au réseau pour la charger.',
   });
 
-  // Par défaut actif : `chargerProfil` rend déjà `'actif'` quand la fiche n'a
-  // pas pu être lue, et fermer le formulaire sur une panne de réseau ferait
-  // passer une coupure pour une suspension.
+  // Par défaut actif : `chargerProfil` lève quand le profil n'a jamais été lu
+  // sur ce téléphone, et fermer le formulaire sur ce manque ferait passer une
+  // tournée pas encore chargée pour une suspension. L'écran n'est pas la
+  // sécurité : `collecteur-creer-collaborateur` refuse un abonnement suspendu
+  // (`ABONNEMENT_INACTIF`, 403).
   return (donnees?.abonnementStatut ?? 'actif') === 'actif';
 }
 
 export function useEstTitulaire(): boolean {
   const { donnees } = useDonnees('profil', chargerProfil, {
-    messageErreur: 'Fiche indisponible. Vérifie le réseau.',
+    messageErreur: 'Fiche indisponible sur ce téléphone. Connecte-toi une fois au réseau pour la charger.',
   });
 
   return donnees?.palier === 'illimite' && donnees.titulaireId == null;

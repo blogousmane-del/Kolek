@@ -13,6 +13,7 @@ import { useState } from 'react';
 
 import type { CarteChoisie } from '../Coquille';
 import { enregistrerMise } from '../ecritures';
+import { useHorsLigne } from '../hors-ligne/useHorsLigne';
 
 /**
  * Encaissement d'une mise.
@@ -49,6 +50,7 @@ export function Encaisser({
   const [erreur, setErreur] = useState<string | null>(null);
   const [succes, setSucces] = useState<string | null>(null);
   const enLigne = useEnLigne();
+  const { file } = useHorsLigne();
 
   async function confirmer() {
     if (!carte || !collecteurId || envoi) return;
@@ -85,7 +87,7 @@ export function Encaisser({
         </div>
       </div>
 
-      {!enLigne && <BandeauHorsLigne className="mx-4 mt-3" />}
+      <BandeauHorsLigne enLigne={enLigne} compte={file} className="mx-4 mt-3" />
 
       {!carte ? (
         // On arrive ici par l'onglet du bas, sans être passé par la liste. Dire

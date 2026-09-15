@@ -23,7 +23,7 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
   const estCollaborateur = useEstCollaborateur();
   const { donnees, erreur } = useDonnees('bilan', chargerBilan, {
     revision,
-    messageErreur: 'Chiffres indisponibles. Vérifie le réseau.',
+    messageErreur: 'Cet écran demande le réseau.',
   });
   // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit.
   const premier = usePremierRendu();

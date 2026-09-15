@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Les commandes posées sous la carte de l'accueil.
@@ -22,6 +22,29 @@ vi.mock('../supabase', () => ({
   supabase: { auth: { getUser: () => Promise.resolve({ data: { user: { id: 'col1' } } }) } },
 }));
 
+const FILE_VIDE = {
+  mises: 0,
+  clients: 0,
+  cartes: 0,
+  caisses: 0,
+  enAttente: 0,
+  aConsigner: 0,
+  refusees: 0,
+  plusAncienne: null,
+  plusAncienneType: null,
+};
+let etatHorsLigne: Record<string, unknown> = {};
+const horsLigne = (reste: Record<string, unknown> = {}) => ({
+  operations: [],
+  refus: [],
+  tournee: null,
+  file: FILE_VIDE,
+  stockage: 'persistant',
+  ...reste,
+});
+
+vi.mock('../hors-ligne/useHorsLigne', () => ({ useHorsLigne: () => etatHorsLigne }));
+
 const { Accueil } = await import('./Accueil');
 const { viderCache } = await import('../cache');
 
@@ -41,8 +64,14 @@ const TABLEAU = {
   dernieres: [],
 };
 
+beforeEach(() => {
+  etatHorsLigne = horsLigne();
+});
+
 afterEach(() => {
   cleanup();
+  // L'état réseau simulé par une épreuve ne doit pas survivre à la suivante.
+  delete (window.navigator as unknown as { onLine?: boolean }).onLine;
   // `useDonnees` garde sa lecture sous la clé « accueil », au-delà du démontage
   // — c'est ce qui fait qu'un retour sur l'écran affiche des chiffres avant le
   // réseau. Sans cette purge, le tableau du test précédent survit au suivant.
@@ -104,5 +133,79 @@ describe('les commandes sous la carte à finir en premier', () => {
     expect(await screen.findByText('Aucune carte active.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^Encaisser sur la carte/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Ouvrir la fiche/ })).toBeNull();
+  });
+});
+
+describe('le compteur de la file sur l’accueil (§8.2)', () => {
+  it('reste visible en ligne tant que la file n’est pas vide', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    etatHorsLigne = horsLigne({ file: { ...FILE_VIDE, mises: 2, enAttente: 2 } });
+
+    rendre();
+
+    expect(await screen.findByText('Envoi en cours · 2 restantes')).toBeTruthy();
+  });
+
+  it('dit ce que la file contient, hors ligne', async () => {
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    etatHorsLigne = horsLigne({ file: { ...FILE_VIDE, mises: 3, clients: 1, enAttente: 4 } });
+
+    rendre();
+
+    expect(
+      await screen.findByText('Hors ligne · 3 mises et 1 client en attente d’envoi'),
+    ).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/synchronisés dès connexion/);
+  });
+});
+
+describe('ce que l’accueil signale de la file (§8.4, §8.7, §8.8)', () => {
+  it('mène aux refus par un bandeau qui ne bloque rien', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    etatHorsLigne = horsLigne({ file: { ...FILE_VIDE, refusees: 2 } });
+    const onNaviguer = vi.fn();
+    rendre({ onNaviguer });
+
+    fireEvent.click(await screen.findByRole('button', { name: '2 opérations refusées — à voir' }));
+
+    expect(onNaviguer).toHaveBeenCalledWith('alertes');
+  });
+
+  it('prévient quand le plus ancien geste attend depuis 75 jours ou plus', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    etatHorsLigne = horsLigne({
+      file: {
+        ...FILE_VIDE,
+        mises: 1,
+        enAttente: 1,
+        // Une seconde de plus que 76 jours : la division ne tombe pas sur la frontière.
+        plusAncienne: new Date(Date.now() - 76 * 86_400_000 - 1000).toISOString(),
+        plusAncienneType: 'mise',
+      },
+    });
+    rendre();
+
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Une mise attend depuis 76 jours. Retrouve du réseau avant 90 jours.',
+    );
+  });
+
+  it('dit une fois par lancement que le stockage n’est pas garanti', async () => {
+    // La seule épreuve du fichier qui passe par `non_garanti` : le drapeau
+    // « déjà dit » vit dans le module, pour toute la durée du lancement.
+    const PHRASE =
+      'Ce téléphone peut effacer les données de Kolek s’il manque de place. Garde l’application installée et envoie dès que possible.';
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    etatHorsLigne = horsLigne({ stockage: 'non_garanti' });
+
+    rendre();
+    expect(await screen.findByText(PHRASE)).toBeTruthy();
+
+    // Retour sur l'accueil pendant le même lancement.
+    cleanup();
+    rendre();
+    expect(await screen.findByRole('button', { name: 'Encaisser sur la carte de Mariam' })).toBeTruthy();
+    expect(screen.queryByText(PHRASE)).toBeNull();
   });
 });

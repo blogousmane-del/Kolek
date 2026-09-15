@@ -49,3 +49,17 @@ describe('le PostgREST factice des épreuves', () => {
     expect((await tableFactice(t).select('*').eq('id', 'a').maybeSingle()).data).toEqual(t[0]);
   });
 });
+
+describe('le filtre `in`', () => {
+  it('ne garde que les lignes dont la colonne est dans la liste', async () => {
+    const table = tableFactice([
+      { id: 'a', carte_id: 'k1' },
+      { id: 'b', carte_id: 'k2' },
+      { id: 'c', carte_id: 'k3' },
+    ]);
+
+    const { data } = await table.select('id').in('carte_id', ['k1', 'k3']).order('id');
+
+    expect(data.map((l) => l.id)).toEqual(['a', 'c']);
+  });
+});

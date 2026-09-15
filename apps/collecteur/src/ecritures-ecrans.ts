@@ -1,4 +1,7 @@
-import { type EchecEcriture, codeDErreur, phraseEcriture } from './ecritures';
+import { ajouterAuTelephone, phraseEcriture, type EchecEcriture } from './ecritures';
+import { construireCaisse } from './hors-ligne/gestes';
+import { collecteurCourant, demanderRafraichissement } from './hors-ligne/moteur';
+import { modifierInstantane, ouvrirBase } from './hors-ligne/stockage-local';
 import { supabase } from './supabase';
 
 /**
@@ -8,12 +11,13 @@ import { supabase } from './supabase';
  * Elles n'empruntent pas le même chemin, et la différence n'est pas un hasard
  * d'implémentation — c'est le schéma qui l'impose :
  *
- * - **La caisse** s'écrit directement. `authenticated` a `insert (id,
- *   collecteur_id, date, cash_declare)` et `update (cash_declare)` sur
- *   `caisses_jour`, et rien de plus. `cash_attendu` est posé par un déclencheur
- *   depuis les mises, `ecart` est une colonne engendrée. Le collecteur déclare
- *   donc ce qu'il a en main sans jamais pouvoir toucher à ce qu'il devrait
- *   avoir — sinon masquer un manquant tiendrait en une requête.
+ * - **La caisse** entre dans la file du téléphone (J2b §6.4), et le
+ *   synchroniseur l'écrit. `authenticated` a `insert (id, collecteur_id, date,
+ *   cash_declare)` et `update (cash_declare)` sur `caisses_jour`, et rien de
+ *   plus. `cash_attendu` est posé par un déclencheur depuis les mises, `ecart`
+ *   est une colonne engendrée. Le collecteur déclare donc ce qu'il a en main
+ *   sans jamais pouvoir toucher à ce qu'il devrait avoir — sinon masquer un
+ *   manquant tiendrait en une requête.
  *
  * - **La clôture** passe par une Edge Function. `retraits` n'accorde que
  *   `select` à `authenticated` : la table est un journal d'argent rendu, et son
@@ -47,54 +51,31 @@ function phrase(code: string): EchecEcriture {
 
 /* --------------------------- Rapprochement ------------------------------- */
 
-export type ResultatCaisse =
-  | { ok: true; cashAttendu: number; cashDeclare: number; ecart: number }
-  | { ok: false; echec: EchecEcriture };
+export type ResultatCaisse = { ok: true } | { ok: false; echec: EchecEcriture };
 
 /**
- * Déclare le cash réellement en main pour la journée.
+ * Déclare le cash réellement en main pour la journée — sur le téléphone d'abord.
  *
- * Lecture puis écriture explicite, plutôt qu'un `upsert`. La raison est la liste
- * blanche de colonnes : PostgREST, sur conflit, réaffecte **toutes** les
- * colonnes envoyées, `id` et `collecteur_id` compris. Or `update` n'est accordé
- * que sur `cash_declare`. Un `upsert` marcherait à la première déclaration du
- * jour et échouerait en `42501` à la correction — le cas le plus utile.
+ * La déclaration entre dans la file ; le synchroniseur l'écrit « dernière
+ * déclaration gagne » : insertion, puis mise à jour de `cash_declare` sur
+ * conflit, sans jamais d'`upsert` — PostgREST y réaffecterait `id` et
+ * `collecteur_id`, que `update` n'accorde pas (`hors-ligne/envoyer.ts`).
  *
- * `ligneId` évite de relire : l'écran vient de charger le rapprochement, il sait
- * déjà s'il existe une ligne.
+ * L'identifiant de la ligne est tiré à la première déclaration du jour et repris
+ * ensuite, depuis la tournée (plan J2b, précision 9). `cash_attendu` et `ecart`
+ * restent posés par le serveur ; l'écran montre un attendu provisoire jusqu'au
+ * rafraîchissement.
  */
 export async function declarerCaisse(
   collecteurId: string,
   date: string,
   montant: number,
-  ligneId: string | null,
 ): Promise<ResultatCaisse> {
-  if (!Number.isInteger(montant) || montant < 0) {
-    return { ok: false, echec: phrase('MONTANT_INVALIDE') };
-  }
-
-  const requete = ligneId
-    ? supabase.from('caisses_jour').update({ cash_declare: montant }).eq('id', ligneId)
-    : supabase
-        .from('caisses_jour')
-        .insert({ collecteur_id: collecteurId, date, cash_declare: montant });
-
-  // `select()` après écriture : `cash_attendu` et `ecart` sont posés par le
-  // serveur, donc les recevoir en retour est la seule façon de montrer l'écart
-  // sans faire un second aller-retour.
-  const { data, error } = await requete.select('cash_attendu, cash_declare, ecart').maybeSingle();
-
-  if (error) return { ok: false, echec: phrase(codeDErreur(error)) };
-
-  const ligne = data as { cash_attendu: number; cash_declare: number; ecart: number } | null;
-  if (!ligne) return { ok: false, echec: phrase('INCONNU') };
-
-  return {
-    ok: true,
-    cashAttendu: ligne.cash_attendu,
-    cashDeclare: ligne.cash_declare,
-    ecart: ligne.ecart,
-  };
+  const resultat = await ajouterAuTelephone(
+    collecteurId,
+    construireCaisse({ collecteurId, maintenant: Date.now() }, { date, montant }),
+  );
+  return resultat.ok ? { ok: true } : resultat;
 }
 
 /* ------------------------------- Retrait --------------------------------- */
@@ -126,6 +107,10 @@ export async function cloturerCarte(carteId: string): Promise<ResultatCloture> {
     } catch {
       // Corps illisible : le message générique reste juste.
     }
+    // Refusée — la carte a pu être fermée ailleurs — ou sans réponse alors que
+    // la fermeture a pu se faire : la tournée relit la carte plutôt que de la
+    // garder active, et la caisse du jour cesse de se dire juste.
+    await perimerCaisseDuJour(jourUtc(new Date()));
     return { ok: false, echec: phrase(code) };
   }
 
@@ -135,13 +120,96 @@ export async function cloturerCarte(carteId: string): Promise<ResultatCloture> {
   // « ne rends pas l'argent deux fois » — ne s'afficherait jamais, et le corps
   // serait lu comme une clôture réussie avec une commission indéfinie.
   const corps = data as { montantRestitue?: number; commission?: number; erreur?: string };
-  if (corps.erreur) return { ok: false, echec: phrase(corps.erreur) };
+  if (corps.erreur) {
+    // Une clôture partielle a déjà inscrit le retrait au serveur : la tournée
+    // doit le relire, même si la carte n'est pas encore fermée, et la caisse du
+    // jour a changé au serveur.
+    await perimerCaisseDuJour(jourUtc(new Date()));
+    return { ok: false, echec: phrase(corps.erreur) };
+  }
 
+  await noterCloture(carteId, corps.montantRestitue ?? 0);
   return {
     ok: true,
     montantRestitue: corps.montantRestitue ?? 0,
     commission: corps.commission ?? 0,
   };
+}
+
+/**
+ * La clôture réussie, portée dans l'instantané du téléphone.
+ *
+ * La clôture reste en ligne (spec J2b §1.2). Sans ce report, la tournée
+ * garderait la carte active jusqu'au prochain rafraîchissement, et l'écran
+ * proposerait d'encaisser sur une carte que le serveur refusera. Le retrait
+ * noté ici porte un identifiant provisoire : le rafraîchissement le remplace
+ * par la ligne du serveur.
+ *
+ * La caisse du jour suit, comme `caisses_rafraichir_apres_retrait` au serveur :
+ * l'argent rendu sort de l'attendu, une seule fois — seulement quand le retrait
+ * est noté ici, donc absent de la tournée. Sur la carte d'un coéquipier, absente
+ * de cette tournée, rien n'est recompté : l'écart est seulement oublié.
+ */
+async function noterCloture(carteId: string, montantRestitue: number): Promise<void> {
+  const collecteurId = collecteurCourant();
+  if (collecteurId) {
+    try {
+      const maintenant = new Date();
+      const quand = maintenant.toISOString();
+      await modifierInstantane(await ouvrirBase(collecteurId), (t) => {
+        const ligne = t.caisses.find((c) => c.date === jourUtc(maintenant));
+        if (ligne) ligne.ecart = null;
+        const carte = t.cartes.find((k) => k.id === carteId);
+        if (!carte) return;
+        carte.statut = 'cloturee';
+        carte.clotureeLe = quand;
+        if (!t.retraits.some((r) => r.carteId === carteId)) {
+          t.retraits.push({
+            id: `retrait-${carteId}`,
+            carteId,
+            montantRestitue,
+            effectueLe: quand,
+            restituePar: collecteurId,
+          });
+          if (ligne && ligne.cashAttendu !== null) ligne.cashAttendu -= montantRestitue;
+        }
+      });
+    } catch {
+      // Disque illisible : le rafraîchissement demandé ci-dessous remettra la
+      // tournée d'accord.
+    }
+  }
+  demanderRafraichissement();
+}
+
+/**
+ * Un geste en ligne a pu changer la caisse du jour au serveur sans que la
+ * tournée le voie : un encaissement pour un coéquipier, une clôture refusée,
+ * partielle ou sans réponse.
+ *
+ * L'écart gardé est oublié, l'écran se dit provisoire, et la tournée est relue.
+ * L'attendu n'est pas recompté : un rechargement concurrent a pu déjà porter le
+ * geste, et l'ajouter ici le compterait deux fois.
+ */
+async function perimerCaisseDuJour(jour: string): Promise<void> {
+  const collecteurId = collecteurCourant();
+  if (collecteurId) {
+    try {
+      await modifierInstantane(await ouvrirBase(collecteurId), (t) => {
+        const ligne = t.caisses.find((c) => c.date === jour);
+        if (ligne) ligne.ecart = null;
+      });
+    } catch {
+      // Disque illisible : la relecture demandée ci-dessous remettra la caisse
+      // d'accord.
+    }
+  }
+  demanderRafraichissement();
+}
+
+/** Le jour UTC d'un instant, découpé comme `cash_attendu_du_jour`. */
+function jourUtc(instant: Date): string {
+  return instant.toISOString().slice(0, 10);
 }
 
 /* ------------------------------- L'équipe -------------------------------- */
@@ -262,8 +330,14 @@ export async function encaisserPour(
     // Les refus métier reprennent les phrases du chemin ordinaire, par
     // `codeDErreur`/`PHRASES` d'`ecritures.ts` : deux libellés pour « le cycle
     // est complet » seraient deux vérités concurrentes.
+    // Sans réponse, l'encaissement a pu se faire : la caisse du jour ne peut
+    // plus se dire juste. Un refus franc ne coûte qu'une relecture.
+    await perimerCaisseDuJour(jourUtc(encaisseLe));
     return { ok: false, echec: phraseEcriture(code) };
   }
 
+  // L'argent est dans cette sacoche-ci, sur une carte absente de cette tournée :
+  // seul le serveur peut le compter (`caisses_rafraichir_apres_mise`).
+  await perimerCaisseDuJour(jourUtc(encaisseLe));
   return { ok: true, miseId };
 }

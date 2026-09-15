@@ -35,14 +35,15 @@ interface Etat {
   fin: number;
 }
 
-export type Requete = Promise<{ data: Ligne[]; error: null }> & {
+export type Requete = Promise<{ data: Ligne[]; error: null; status: number }> & {
   select: (colonnes?: string) => Requete;
   eq: (colonne: string, valeur: unknown) => Requete;
   gte: (colonne: string, valeur: string) => Requete;
+  in: (colonne: string, valeurs: readonly unknown[]) => Requete;
   order: (colonne: string, options?: { ascending?: boolean }) => Requete;
   range: (debut: number, fin: number) => Requete;
   limit: (nombre: number) => Requete;
-  maybeSingle: () => Promise<{ data: Ligne | null; error: null }>;
+  maybeSingle: () => Promise<{ data: Ligne | null; error: null; status: number }>;
 };
 
 function comparer(a: Ligne, b: Ligne, tris: Tri[]): number {
@@ -61,17 +62,19 @@ function requete(etat: Etat): Requete {
   const rendues = triees.slice(debut, Math.min(fin + 1, debut + MAX_ROWS));
   const suite = (change: Partial<Etat>) => requete({ ...etat, ...change });
 
-  return Object.assign(Promise.resolve({ data: rendues, error: null as null }), {
+  return Object.assign(Promise.resolve({ data: rendues, error: null as null, status: 200 }), {
     select: () => suite({}),
     eq: (colonne: string, valeur: unknown) =>
       suite({ lignes: lignes.filter((l) => l[colonne] === valeur) }),
     gte: (colonne: string, valeur: string) =>
       suite({ lignes: lignes.filter((l) => String(l[colonne]) >= valeur) }),
+    in: (colonne: string, valeurs: readonly unknown[]) =>
+      suite({ lignes: lignes.filter((l) => valeurs.includes(l[colonne])) }),
     order: (colonne: string, options?: { ascending?: boolean }) =>
       suite({ tris: [...tris, { colonne, croissant: options?.ascending !== false }] }),
     range: (d: number, f: number) => suite({ debut: d, fin: f }),
     limit: (nombre: number) => suite({ fin: debut + nombre - 1 }),
-    maybeSingle: () => Promise.resolve({ data: triees[0] ?? null, error: null as null }),
+    maybeSingle: () => Promise.resolve({ data: triees[0] ?? null, error: null as null, status: 200 }),
   });
 }
 

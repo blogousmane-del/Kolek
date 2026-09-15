@@ -2,6 +2,7 @@ import { PALIERS, formatMontant } from '@kolek/core';
 import { Bouton, Carte, Icone, Squelette, useEnLigne } from '@kolek/ui';
 
 import { useDonnees } from '../cache';
+import { useHorsLigne } from '../hors-ligne/useHorsLigne';
 import { chargerProfil } from '../lectures-ecrans';
 import { CorpsEcran, EnTeteEcran } from './EnTeteEcran';
 
@@ -28,9 +29,12 @@ export function Plus({ onRetour, onDeconnexion, onAbonnement }: {
   onAbonnement: () => void;
 }) {
   const { donnees: profil, erreur } = useDonnees('profil', chargerProfil, {
-    messageErreur: 'Fiche indisponible. Vérifie le réseau.',
+    messageErreur: 'Fiche indisponible sur ce téléphone. Connecte-toi une fois au réseau pour la charger.',
   });
   const enLigne = useEnLigne();
+  const { file, stockage } = useHorsLigne();
+  /** Tout ce qui n'a pas quitté le téléphone, refus à consigner compris : c'est ce que la déconnexion attend. */
+  const enFile = file ? file.enAttente + file.aConsigner : 0;
 
   const tarif = PALIERS.find((p) => p.cle === profil?.palier);
 
@@ -169,9 +173,21 @@ export function Plus({ onRetour, onDeconnexion, onAbonnement }: {
                   </div>
                   <p className="font-body text-xs text-muted-foreground">
                     {enLigne
-                      ? 'Tes encaissements partent au serveur au moment où tu les enregistres.'
-                      : 'Sans réseau, les écrans montrent la dernière lecture connue et aucun encaissement ne peut être enregistré.'}
+                      ? 'Tes encaissements sont enregistrés sur ce téléphone, puis envoyés au serveur dans l’ordre.'
+                      : 'Sans réseau, tu peux encaisser, inscrire un client, ouvrir une carte et déclarer ta caisse : tout est gardé sur ce téléphone et part au retour du réseau. Le retrait, le bilan et les reçus attendent le réseau.'}
                   </p>
+                  {enFile > 0 && (
+                    <p className="font-body text-xs font-medium text-ink mt-2">
+                      {`${enFile} opération${enFile > 1 ? 's' : ''} sur ce téléphone pas encore envoyée${enFile > 1 ? 's' : ''}.`}
+                    </p>
+                  )}
+                  {/* Permanent ici, une fois sur l'accueil (spec J2b §8.7). */}
+                  {stockage === 'non_garanti' && (
+                    <p className="mt-3 rounded-md bg-info-tint p-3 font-body text-sm text-info">
+                      Ce téléphone peut effacer les données de Kolek s’il manque de place. Garde
+                      l’application installée et envoie dès que possible.
+                    </p>
+                  )}
                 </Carte>
 
                 <Carte className="p-4">

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -30,18 +30,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * structurelles, et celles-là il les voit.
  */
 
-const getUser = vi.fn();
-const maybeSingle = vi.fn();
 const signOut = vi.fn();
+const chargerProfil = vi.fn();
+const compterFileDe = vi.fn();
+const effacerTourneeDe = vi.fn();
 const invoke = vi.fn();
 
 vi.mock('./supabase', () => ({
   supabase: {
     auth: {
-      getUser: () => getUser(),
       signOut: () => signOut(),
     },
-    from: () => ({ select: () => ({ maybeSingle: () => maybeSingle() }) }),
     // La coquille réconcilie les paiements en silence à chaque ouverture — c'est
     // ce qui remplace un cron. Sans ce témoin, l'appel lève dans un effet, hors
     // de toute assertion : la suite affiche sept erreurs et sort en échec en
@@ -51,6 +50,18 @@ vi.mock('./supabase', () => ({
 }));
 
 vi.mock('./cache', () => ({ viderCache: vi.fn() }));
+
+// Le moteur du hors-ligne est remplacé : la coquille le démarre, ce fichier
+// vérifie qu'elle le fait pour le bon collecteur, pas ce que le moteur fait.
+const demarrerMoteur = vi.fn((..._args: unknown[]) => () => {});
+const ecouterChangements = vi.fn((..._args: unknown[]) => () => {});
+vi.mock('./hors-ligne/moteur', () => ({
+  compterFileDe: (id: string) => compterFileDe(id),
+  demarrerMoteur: (...args: unknown[]) => demarrerMoteur(...args),
+  ecouterChangements: (...args: unknown[]) => ecouterChangements(...args),
+  effacerTourneeDe: (id: string) => effacerTourneeDe(id),
+}));
+vi.mock('./lectures-ecrans', () => ({ chargerProfil: () => chargerProfil() }));
 
 // Les dix écrans sont remplacés par des témoins : ce test porte sur la
 // coquille, pas sur ce qu'elle affiche.
@@ -139,9 +150,16 @@ vi.mock('./ecrans/Accueil', () => ({
 }));
 
 vi.mock('./ecrans/Clients', () => ({
-  Clients: ({ onRetrait }: { onRetrait: (c: { id: string; nom: string }) => void }) => (
+  Clients: ({
+    onRetrait,
+    revision,
+  }: {
+    onRetrait: (c: { id: string; nom: string }) => void;
+    revision: number;
+  }) => (
     <>
       <div>écran Clients</div>
+      <div>révision {revision}</div>
       <button type="button" onClick={() => onRetrait({ id: 'cli9', nom: 'Sy' })}>
         retirer pour Sy
       </button>
@@ -170,8 +188,9 @@ vi.mock('./ecrans/Retrait', () => ({
 const { Coquille } = await import('./Coquille');
 
 beforeEach(() => {
-  getUser.mockResolvedValue({ data: { user: { id: 'collecteur-1' } } });
-  maybeSingle.mockResolvedValue({ data: { nom: 'Awa' } });
+  chargerProfil.mockResolvedValue({ nom: 'Awa', palier: 'pro', telephone: '+2250700000000' });
+  compterFileDe.mockResolvedValue(0);
+  effacerTourneeDe.mockResolvedValue(undefined);
   invoke.mockResolvedValue({ data: { credites: 0, enAttente: 0, echeance: null }, error: null });
   // `window.scrollTo` n'existe pas dans jsdom : sans ce témoin, chaque rendu
   // écrit une erreur « Not implemented » dans la sortie du test.
@@ -183,8 +202,11 @@ afterEach(() => {
   // vitest, que ce dépôt n'active pas. Même raison que `Portillon.test.tsx`.
   cleanup();
   vi.unstubAllGlobals();
-  getUser.mockReset();
-  maybeSingle.mockReset();
+  demarrerMoteur.mockClear();
+  ecouterChangements.mockClear();
+  chargerProfil.mockReset();
+  compterFileDe.mockReset();
+  effacerTourneeDe.mockReset();
   signOut.mockReset();
   invoke.mockReset();
   window.history.replaceState({}, '', '/');
@@ -200,7 +222,7 @@ describe('le retour depuis la page de paiement', () => {
   it('ouvre l’écran de confirmation sur ?paiement=retour', () => {
     window.history.replaceState({}, '', '/?paiement=retour');
 
-    render(<Coquille onDeconnexion={vi.fn()} />);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
 
     expect(screen.getByText('écran RetourPaiement')).toBeTruthy();
   });
@@ -208,7 +230,7 @@ describe('le retour depuis la page de paiement', () => {
   it('efface le paramètre, sans quoi un rechargement rejouerait l’écran', () => {
     window.history.replaceState({}, '', '/?paiement=retour');
 
-    render(<Coquille onDeconnexion={vi.fn()} />);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
 
     expect(window.location.search).toBe('');
   });
@@ -218,13 +240,13 @@ describe('le retour depuis la page de paiement', () => {
     // ce que quelqu'un d'autre y a mis — une campagne, un jeton de partage.
     window.history.replaceState({}, '', '/?paiement=retour&de=affiche');
 
-    render(<Coquille onDeconnexion={vi.fn()} />);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
 
     expect(window.location.search).toBe('?de=affiche');
   });
 
   it('ne l’ouvre pas sans le paramètre', () => {
-    render(<Coquille onDeconnexion={vi.fn()} />);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
 
     expect(screen.queryByText('écran RetourPaiement')).toBeNull();
   });
@@ -232,7 +254,7 @@ describe('le retour depuis la page de paiement', () => {
   it('réconcilie en silence à chaque ouverture', () => {
     // Ce qui rattrape un collecteur qui a payé puis fermé l'onglet : il est
     // crédité en rouvrant son carnet, sans rien demander à personne.
-    render(<Coquille onDeconnexion={vi.fn()} />);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
 
     expect(invoke).toHaveBeenCalledWith('abonnement-verifier', { body: {} });
   });
@@ -248,7 +270,7 @@ describe('ce que la coquille fait de la carte encaissée', () => {
     //
     // Le geste est répété trente fois par jour, debout, devant une cliente.
     // L'écran doit dire « c'est fait », pas « va chercher un client ».
-    render(<Coquille onDeconnexion={vi.fn()} />);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
 
     const barre = screen.getByRole('navigation', { name: 'Navigation principale' });
     fireEvent.click(within(barre).getByRole('button', { name: 'Accueil' }));
@@ -273,7 +295,7 @@ describe('ce que la coquille fait de la carte encaissée', () => {
     // Le `null` qu'on retire du succès doit reparaître ailleurs : sans lui,
     // l'onglet « Encaisser » de la barre du bas rouvrirait la carte du client
     // précédent, et un appui de trop écrirait une seconde mise sur elle.
-    render(<Coquille onDeconnexion={vi.fn()} />);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
 
     const barre = screen.getByRole('navigation', { name: 'Navigation principale' });
     fireEvent.click(within(barre).getByRole('button', { name: 'Accueil' }));
@@ -289,7 +311,7 @@ describe('ce que la coquille fait de la carte encaissée', () => {
 
 describe('coquille du collecteur', () => {
   it('fixe la barre du bas au champ de vision, pas au document', () => {
-    render(<Coquille onDeconnexion={vi.fn()} />);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
 
     const barre = screen.getByRole('navigation', { name: 'Navigation principale' });
 
@@ -304,7 +326,7 @@ describe('coquille du collecteur', () => {
   });
 
   it('reproduit le plafond de la colonne, la barre n’héritant plus de rien', () => {
-    render(<Coquille onDeconnexion={vi.fn()} />);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
 
     const barre = screen.getByRole('navigation', { name: 'Navigation principale' });
 
@@ -317,7 +339,7 @@ describe('coquille du collecteur', () => {
   });
 
   it('réserve dans la colonne la hauteur que la barre n’occupe plus', () => {
-    render(<Coquille onDeconnexion={vi.fn()} />);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
 
     const colonne = screen.getByText('écran Clients').parentElement;
 
@@ -333,7 +355,7 @@ describe('coquille du collecteur', () => {
 
 describe('le filtre de l’écran de retrait', () => {
   it('emporte le client désigné quand on part d’une de ses cartes', () => {
-    render(<Coquille onDeconnexion={vi.fn()} />);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'retirer pour Sy' }));
 
@@ -341,7 +363,7 @@ describe('le filtre de l’écran de retrait', () => {
   });
 
   it('rend la liste entière à toute autre navigation', () => {
-    render(<Coquille onDeconnexion={vi.fn()} />);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
 
     // Le filtre appartient au geste qui l'a posé. La tuile « Retrait » de
     // l'accueil demande la liste complète : sans remise à zéro, elle rouvrait
@@ -352,5 +374,97 @@ describe('le filtre de l’écran de retrait', () => {
     fireEvent.click(screen.getByRole('button', { name: 'tuile Retrait' }));
 
     expect(screen.getByText('filtre : aucun')).toBeTruthy();
+  });
+});
+
+describe('le moteur du hors-ligne', () => {
+  it('démarre pour le collecteur de la session, et s’arrête avec la coquille', () => {
+    const arreter = vi.fn();
+    demarrerMoteur.mockReturnValueOnce(arreter);
+
+    const { unmount } = render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
+
+    expect(demarrerMoteur).toHaveBeenCalledWith(expect.anything(), 'collecteur-1');
+    unmount();
+    expect(arreter).toHaveBeenCalled();
+  });
+
+  it('fait relire les écrans quand le moteur signale un changement', async () => {
+    let signaler: () => void = () => {};
+    ecouterChangements.mockImplementationOnce((...args: unknown[]) => {
+      signaler = args[0] as () => void;
+      return () => {};
+    });
+
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
+    expect(await screen.findByText('révision 0')).toBeTruthy();
+
+    act(() => signaler());
+
+    expect(await screen.findByText('révision 1')).toBeTruthy();
+  });
+});
+
+describe('la déconnexion ne détruit rien (§4.5, §8.5)', () => {
+  const sortir = () => fireEvent.click(screen.getByRole('button', { name: 'Déconnexion' }));
+
+  it('est refusée tant que des opérations attendent sur le téléphone', async () => {
+    compterFileDe.mockResolvedValue(3);
+    const onDeconnexion = vi.fn();
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={onDeconnexion} />);
+
+    sortir();
+
+    expect(
+      await screen.findByText('3 opérations pas encore envoyées. Retrouve du réseau avant de te déconnecter.'),
+    ).toBeTruthy();
+    expect(compterFileDe).toHaveBeenCalledWith('collecteur-1');
+    expect(signOut).not.toHaveBeenCalled();
+    expect(effacerTourneeDe).not.toHaveBeenCalled();
+    expect(onDeconnexion).not.toHaveBeenCalled();
+  });
+
+  it('parle au singulier d’une seule opération', async () => {
+    compterFileDe.mockResolvedValue(1);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
+
+    sortir();
+
+    expect(
+      await screen.findByText('1 opération pas encore envoyée. Retrouve du réseau avant de te déconnecter.'),
+    ).toBeTruthy();
+  });
+
+  it('est refusée quand la file ne peut pas être comptée : on ne sort pas sur un doute', async () => {
+    compterFileDe.mockResolvedValue(null);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
+
+    sortir();
+
+    expect(
+      await screen.findByText('Impossible de vérifier les opérations de ce téléphone. Réessaie.'),
+    ).toBeTruthy();
+    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it('efface la tournée et sort quand la file est vide', async () => {
+    signOut.mockResolvedValue({ error: null });
+    const onDeconnexion = vi.fn();
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={onDeconnexion} />);
+
+    sortir();
+
+    await waitFor(() => expect(onDeconnexion).toHaveBeenCalled());
+    expect(effacerTourneeDe).toHaveBeenCalledWith('collecteur-1');
+  });
+});
+
+describe('qui est connecté, hors ligne', () => {
+  it('montre le nom du profil gardé sur le téléphone', async () => {
+    chargerProfil.mockResolvedValue({ nom: 'Awa Traoré', palier: 'pro', telephone: '+2250700000000' });
+
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
+
+    expect(await screen.findByText('Awa Traoré')).toBeTruthy();
   });
 });

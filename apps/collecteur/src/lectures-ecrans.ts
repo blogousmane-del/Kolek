@@ -2,6 +2,8 @@ import { MISES_PAR_CYCLE, formatMontant, soldeRestituable } from '@kolek/core';
 
 import type { Carte, MiseRecente } from './lectures';
 import { chargerTout } from './pagination';
+import { collecteurCourant, lectureCourante } from './hors-ligne/moteur';
+import { TourneeAbsente, ficheDepuis, profilDepuis, rapprochementDepuis } from './hors-ligne/vues';
 import { supabase } from './supabase';
 
 /**
@@ -21,23 +23,6 @@ import { supabase } from './supabase';
  * vide qui l'assume vaut mieux qu'un chiffre plausible. C'est le défaut qu'on a
  * corrigé sur l'accueil le 2026-08-20, et il ne doit pas revenir par la fenêtre.
  */
-
-/**
- * Le jour au sens du serveur, en UTC.
- *
- * `cash_attendu_du_jour` découpe la journée sur `(encaisse_le at time zone
- * 'UTC')::date`, explicitement et non selon le fuseau de la session. Le
- * rapprochement doit donc demander la même date, sans quoi le collecteur
- * déclarerait son cash pour une journée que le serveur calcule autrement, et
- * l'écart apparaîtrait sans cause visible.
- *
- * Abidjan étant à UTC+0 toute l'année, cela ne change rien aujourd'hui — par
- * géographie, pas par intention. Un téléphone réglé sur un autre fuseau
- * déplacerait la frontière du jour.
- */
-function dateUtcDuJour(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /** Minuit local, il y a `jours` jours. Sert aux tranches du bilan. */
 function ilYA(jours: number): Date {
@@ -392,90 +377,26 @@ export async function chargerAlertes(): Promise<Alerte[]> {
 
 export interface Rapprochement {
   date: string;
-  /** Calculé par le serveur depuis les mises. Le collecteur ne l'écrit jamais. */
+  /** Posé par le serveur depuis les mises ; recalculé sur le téléphone tant que
+      `provisoire`. Le collecteur ne l'écrit jamais. */
   cashAttendu: number;
   /** Ce que le collecteur déclare avoir en main. `null` s'il n'a rien déclaré. */
   cashDeclare: number | null;
   ecart: number | null;
-  /** Identifiant de la ligne du jour, s'il en existe déjà une. */
-  ligneId: string | null;
+  /** Le téléphone compte ce que le serveur n'a pas encore reçu — ou la tournée
+      date d'avant aujourd'hui. Les chiffres du serveur reviennent au
+      rafraîchissement. */
+  provisoire: boolean;
 }
 
+/** La caisse du jour, lue sur la tournée du téléphone (spec J2b §5.4). */
 export async function chargerRapprochement(): Promise<Rapprochement> {
-  const date = dateUtcDuJour();
-
-  // Les mises et les retraits du jour épuisent leurs pages : ils font une somme,
-  // et une somme tronquée ment vers le bas sans rien casser (voir `chargerBilan`).
-  // Mesuré le 2026-09-11 : 250 mises en une journée pour le plus actif des
-  // collecteurs, le quart de `max_rows`.
-  const [rCaisse, rMises, rRetraits] = await Promise.all([
-    supabase
-      .from('caisses_jour')
-      .select('id, cash_attendu, cash_declare, ecart')
-      .eq('date', date)
-      .maybeSingle(),
-    chargerTout((debut, fin) =>
-      supabase
-        .from('mises')
-        .select('montant, encaisse_le')
-        .gte('encaisse_le', `${date}T00:00:00Z`)
-        .order('id')
-        .range(debut, fin),
-    ),
-    chargerTout((debut, fin) =>
-      supabase
-        .from('retraits')
-        .select('montant_restitue, effectue_le')
-        .gte('effectue_le', `${date}T00:00:00Z`)
-        .order('id')
-        .range(debut, fin),
-    ),
-  ]);
-
-  const ligne = rCaisse.data as {
-    id: string;
-    cash_attendu: number;
-    cash_declare: number;
-    ecart: number;
-  } | null;
-
-  if (ligne) {
-    return {
-      date,
-      cashAttendu: ligne.cash_attendu,
-      cashDeclare: ligne.cash_declare,
-      ecart: ligne.ecart,
-      ligneId: ligne.id,
-    };
-  }
-
-  // Aucune déclaration encore : on montre l'attendu tel que le serveur le
-  // calculerait, sans rien écrire. Même découpage de journée — UTC — que
-  // `cash_attendu_du_jour`, sinon le chiffre affiché avant l'enregistrement et
-  // celui posé par le déclencheur ne coïncideraient pas.
-  const dujour = ((rMises.data ?? []) as Array<{ montant: number; encaisse_le: string }>).filter(
-    (m) => m.encaisse_le.slice(0, 10) === date,
-  );
-
-  // Et les restitutions du jour se soustraient, comme côté serveur depuis le
-  // 2026-08-25. Deux calculs du même nombre à deux endroits : celui-ci existe
-  // parce qu'aucune ligne n'est encore écrite, donc aucune fonction n'a été
-  // appelée. S'ils divergent, le collecteur voit un attendu changer au moment
-  // où il déclare — c'est-à-dire au moment où il compte son argent.
-  const restitue = ((rRetraits.data ?? []) as Array<{
-    montant_restitue: number;
-    effectue_le: string;
-  }>)
-    .filter((r) => r.effectue_le.slice(0, 10) === date)
-    .reduce((t, r) => t + r.montant_restitue, 0);
-
-  return {
-    date,
-    cashAttendu: dujour.reduce((t, m) => t + m.montant, 0) - restitue,
-    cashDeclare: null,
-    ecart: null,
-    ligneId: null,
-  };
+  // Lu au même instant que `lectureCourante` le lit : la main qui compte est
+  // celle de la tournée lue.
+  const collecteurId = collecteurCourant();
+  const { tournee, operations } = await lectureCourante();
+  if (collecteurId === null || tournee.lueLe === null) throw new TourneeAbsente();
+  return rapprochementDepuis(tournee, operations, Date.now(), collecteurId);
 }
 
 /* -------------------------------- Profil --------------------------------- */
@@ -502,36 +423,19 @@ export interface Profil {
   titulaireId: string | null;
 }
 
+/**
+ * Le profil gardé sur le téléphone, et les comptes de la tournée (spec J2b
+ * §5.4). Lu hors ligne : l'abonnement décide au geste de ce qu'on peut
+ * inscrire (§7), et la coquille doit dire qui est connecté.
+ *
+ * Lève `TourneeAbsente` quand le profil n'a jamais été lu. Les crochets de
+ * `commission.ts` retombent alors sur leurs valeurs par défaut — abonnement
+ * présumé actif, pas de collaborateur, pas de titulaire. Ces valeurs ne sont
+ * pas la sécurité : le serveur refuse ensuite ce qui doit l'être.
+ */
 export async function chargerProfil(): Promise<Profil> {
-  const [rCollecteur, rClients, rCartes] = await Promise.all([
-    supabase
-      .from('collecteurs')
-      .select('nom, telephone, zone, palier, abonnement_statut, abonnement_echeance, titulaire_id')
-      .maybeSingle(),
-    // Deux comptes, épuisés par pages : ils plafonneraient à 1000 sinon.
-    chargerTout((debut, fin) =>
-      supabase.from('clients').select('id').order('id').range(debut, fin),
-    ),
-    chargerTout((debut, fin) =>
-      supabase.from('cartes').select('id, statut').order('id').range(debut, fin),
-    ),
-  ]);
-
-  const c = (rCollecteur.data ?? {}) as Record<string, string | null>;
-
-  return {
-    nom: c.nom ?? 'Collecteur',
-    telephone: c.telephone ?? '',
-    zone: c.zone ?? null,
-    palier: c.palier ?? 'essai',
-    abonnementStatut: c.abonnement_statut ?? 'actif',
-    abonnementEcheance: c.abonnement_echeance ?? null,
-    titulaireId: c.titulaire_id ?? null,
-    clients: (rClients.data ?? []).length,
-    cartesActives: ((rCartes.data ?? []) as Array<{ statut: string }>).filter(
-      (x) => x.statut === 'active',
-    ).length,
-  };
+  const { tournee, profil } = await lectureCourante();
+  return profilDepuis(profil, tournee);
 }
 
 /* ------------------------ Cartes clôturables (Retrait) ------------------- */
@@ -579,6 +483,11 @@ export async function chargerCartesCloturables(): Promise<CarteCloturable[]> {
       supabase.from('clients').select('id, nom').order('id').range(debut, fin),
     ),
   ]);
+
+  // Une lecture en échec ne rend pas une liste vide : hors ligne, l'écran dirait
+  // « Aucune carte active » d'un client qui en a une (spec J2b §8.9).
+  if (rCartes.error) throw rCartes.error;
+  if (rClients.error) throw rClients.error;
 
   const noms = new Map(
     ((rClients.data ?? []) as Array<{ id: string; nom: string }>).map((c) => [c.id, c.nom]),
@@ -713,82 +622,21 @@ export interface FicheClient {
   avisActifs: boolean;
   /** Toutes ses cartes, la plus récente d'abord. */
   cartes: CarteFiche[];
-  /** Ses derniers versements, toutes cartes confondues. */
+  /** Ses derniers versements : ceux de ses cartes actives, et ceux du jour (spec J2b §5.1). */
   mises: MiseFiche[];
 }
 
 /**
- * Tout ce que le collecteur doit savoir d'un client, en une lecture.
+ * Tout ce que le collecteur doit savoir d'un client, lu sur la tournée du
+ * téléphone (spec J2b §5.4) : ses cartes, et les mises de ses cartes actives et
+ * du jour. L'historique complet d'une carte clôturée reste en ligne
+ * (`chargerHistoriqueCarte`).
  *
- * Trois requêtes plutôt qu'une imbrication : la clé étrangère de `cartes` vers
- * `clients` est composite `(client_id, collecteur_id)`, et faire deviner ce
- * chemin à PostgREST est une dépendance fragile — c'est déjà le choix fait
- * dans l'écran des clients, pour la même raison.
- *
- * Les mises sont lues par carte et non par client : `mises` ne porte pas de
- * `client_id`. C'est voulu — la mise appartient à la carte, et la carte au
- * client. Une mise rattachée directement au client aurait deux chemins vers le
- * même fait, donc deux façons de se contredire.
+ * `null` : ce client n'est pas sur ce téléphone.
  */
 export async function chargerFicheClient(clientId: string): Promise<FicheClient | null> {
-  const { data: brut, error } = await supabase
-    .from('clients')
-    .select('id, nom, telephone, marche, activite, avis_actifs')
-    .eq('id', clientId)
-    .maybeSingle();
-
-  if (error || !brut) return null;
-  const c = brut as Record<string, string | boolean | null>;
-
-  const { data: cartesBrutes } = await supabase
-    .from('cartes')
-    .select('id, mise, statut, mises_encaissees, ouverte_le, cloturee_le')
-    .eq('client_id', clientId)
-    .order('ouverte_le', { ascending: false });
-
-  const cartes = ((cartesBrutes ?? []) as Array<Record<string, string | number | null>>).map(
-    (k) => ({
-      id: String(k.id),
-      mise: Number(k.mise),
-      statut: k.statut as CarteFiche['statut'],
-      misesEncaissees: Number(k.mises_encaissees),
-      ouverteLe: String(k.ouverte_le),
-      clotureeLe: k.cloturee_le === null ? null : String(k.cloturee_le),
-    }),
-  );
-
-  // Sans carte, pas de mise à chercher : un `in` sur une liste vide ferait un
-  // aller-retour pour rien.
-  let mises: MiseFiche[] = [];
-  if (cartes.length > 0) {
-    const { data: misesBrutes } = await supabase
-      .from('mises')
-      .select('id, montant, encaisse_le, est_commission')
-      .in(
-        'carte_id',
-        cartes.map((k) => k.id),
-      )
-      .order('encaisse_le', { ascending: false })
-      .limit(40);
-
-    mises = ((misesBrutes ?? []) as Array<Record<string, string | number | boolean>>).map((m) => ({
-      id: String(m.id),
-      montant: Number(m.montant),
-      encaisseLe: String(m.encaisse_le),
-      estCommission: Boolean(m.est_commission),
-    }));
-  }
-
-  return {
-    id: String(c.id),
-    nom: String(c.nom),
-    telephone: (c.telephone as string | null) ?? null,
-    marche: (c.marche as string | null) ?? null,
-    activite: (c.activite as string | null) ?? null,
-    avisActifs: Boolean(c.avis_actifs),
-    cartes,
-    mises,
-  };
+  const { tournee } = await lectureCourante();
+  return ficheDepuis(tournee, clientId);
 }
 
 /* ------------------------ Historique d'une carte ------------------------- */

@@ -1,48 +1,40 @@
-import { soldeRestituable } from '@kolek/core';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { tableFactice, type Ligne } from './postgrest-factice';
+import { carte, client, tournee } from './hors-ligne/fabriques';
+import { tourneeVide, type Tournee } from './hors-ligne/modele';
+import { TourneeAbsente } from './hors-ligne/vues';
 
 /**
- * L'accueil d'un collecteur au-delà de mille lignes.
+ * L'accueil et la liste des clients lisent le téléphone, jamais le réseau
+ * (spec J2b §5.4).
  *
- * C'est l'écran qui s'ouvre à chaque lancement, et il porte l'encours : ce
- * que le collecteur doit à ses clients. Coupé à mille cartes, ce chiffre ment
- * vers le bas, et rien à l'écran ne le laisse deviner.
+ * L'épreuve « au-delà de mille lignes » qui vivait ici a suivi la pagination
+ * là où elle est partie : `hors-ligne/rafraichir.test.ts`, et contre le vrai
+ * PostgREST, `supabase/tests/lectures-paginees.test.ts`.
  */
 
-const from = vi.fn();
+const lectureCourante = vi.fn();
 
-vi.mock('./supabase', () => ({
-  supabase: { from: (table: string) => from(table) },
-}));
+vi.mock('./hors-ligne/moteur', () => ({ lectureCourante: () => lectureCourante() }));
 
-const { chargerTableauCollecteur } = await import('./lectures');
+const { chargerListeClients, chargerTableauCollecteur } = await import('./lectures');
 
-const N = 1001;
-const rang = (i: number) => String(i).padStart(4, '0');
+const lu = (t: Tournee) => ({ tournee: t, operations: [], refus: [], profil: null });
 
-beforeEach(() => {
-  const tables: Record<string, Ligne[]> = {
-    clients: Array.from({ length: N }, (_, i) => ({ id: `c${rang(i)}`, nom: `Client ${rang(i)}` })),
-    cartes: Array.from({ length: N }, (_, i) => ({
-      id: `k${rang(i)}`,
-      client_id: `c${rang(i)}`,
-      mise: 500,
-      statut: 'active',
-      mises_encaissees: 2,
-    })),
-    mises: [],
-  };
-  from.mockImplementation((table: string) => tableFactice(tables[table] ?? []));
-});
+describe('les lectures de la collecte', () => {
+  it('calculent sur la tournée gardée', async () => {
+    lectureCourante.mockResolvedValue(
+      lu(tournee({ clients: [client('c1', 'Awa')], cartes: [carte('k1', 'c1')] })),
+    );
 
-describe('l’accueil d’un collecteur au-delà de mille lignes', () => {
-  it('compte tous ses clients, toutes ses cartes, et tout ce qu’il doit', async () => {
-    const tableau = await chargerTableauCollecteur();
+    expect((await chargerTableauCollecteur()).clients).toBe(1);
+    expect((await chargerListeClients()).clients.map((c) => c.nom)).toEqual(['Awa']);
+  });
 
-    expect(tableau.clients).toBe(N);
-    expect(tableau.cartesActives).toBe(N);
-    expect(tableau.encoursTotal).toBe(N * soldeRestituable(2, 500));
+  it('disent que la tournée manque, plutôt que de rendre une liste vide', async () => {
+    lectureCourante.mockResolvedValue(lu(tourneeVide()));
+
+    await expect(chargerTableauCollecteur()).rejects.toThrow(TourneeAbsente);
+    await expect(chargerListeClients()).rejects.toThrow(TourneeAbsente);
   });
 });

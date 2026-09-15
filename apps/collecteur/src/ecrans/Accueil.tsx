@@ -17,12 +17,22 @@ import {
   useEnLigne,
   type ActionRapide,
 } from '@kolek/ui';
+import { useEffect, useState } from 'react';
 
 import { useDonnees } from '../cache';
 import type { CarteChoisie, Page } from '../Coquille';
+import { useHorsLigne } from '../hors-ligne/useHorsLigne';
+import { phraseAttenteLongue } from '../hors-ligne/vues';
 import { chargerTableauCollecteur } from '../lectures';
 import { usePremierRendu } from '../premier-rendu';
 import { useEstTitulaire } from './commission';
+
+/**
+ * L'avertissement du stockage non garanti se dit une fois par lancement (spec
+ * J2b §8.7). Répété à chaque retour sur l'accueil, il deviendrait un décor
+ * qu'on ne lit plus ; `Plus` le garde en permanence pour qui le cherche.
+ */
+let stockageDejaSignale = false;
 
 /**
  * Écran d'accueil du collecteur.
@@ -61,9 +71,18 @@ export function Accueil({
 }) {
   const enLigne = useEnLigne();
   const estTitulaire = useEstTitulaire();
+  const { file, stockage } = useHorsLigne();
+  const attenteLongue = phraseAttenteLongue(file, Date.now());
+  const refusees = file?.refusees ?? 0;
+  const [avisStockage, setAvisStockage] = useState(false);
+  useEffect(() => {
+    if (stockage !== 'non_garanti' || stockageDejaSignale) return;
+    stockageDejaSignale = true;
+    setAvisStockage(true);
+  }, [stockage]);
   const { donnees: tableau, erreur } = useDonnees('accueil', chargerTableauCollecteur, {
     revision,
-    messageErreur: 'Chiffres indisponibles. Vérifie le réseau.',
+    messageErreur: 'Chiffres indisponibles sur ce téléphone. Connecte-toi une fois au réseau pour charger ta tournée.',
   });
 
   /** Extraite une fois : les commandes posées sous la carte s'y réfèrent
@@ -161,7 +180,10 @@ export function Accueil({
           </span>
         </div>
 
-        {!enLigne && <BandeauHorsLigne className="mt-4 relative z-10" />}
+        {/* Toujours rendu : il se tait seul quand la file est vide et le réseau là.
+            En ligne avec une file, il reste — le compteur ne quitte l'accueil
+            qu'une fois tout parti (§8.2). */}
+        <BandeauHorsLigne enLigne={enLigne} compte={file} className="mt-4 relative z-10" />
       </div>
 
       {/* Résumé du jour — trois indicateurs avec badges d'icônes */}
@@ -213,6 +235,34 @@ export function Accueil({
         <p role="alert" className="mx-4 mt-3 text-sm font-body text-negative">
           {erreur}
         </p>
+      )}
+
+      {/* Ce que la file demande au collecteur. Rien ici ne bloque un geste : un
+          refus se lit dans les alertes, l'attente longue et le stockage se
+          règlent en retrouvant du réseau (spec J2b §8.4, §8.7, §8.8). */}
+      {(attenteLongue || refusees > 0 || avisStockage) && (
+        <div className="mx-4 mt-3 space-y-2">
+          {attenteLongue && (
+            <p role="alert" className="rounded-md bg-negative-tint p-3 text-sm font-body text-negative">
+              {attenteLongue}
+            </p>
+          )}
+          {refusees > 0 && (
+            <button
+              type="button"
+              onClick={() => onNaviguer('alertes')}
+              className="anim-pression w-full cursor-pointer rounded-md border border-negative bg-surface p-3 text-left text-sm font-body font-medium text-negative"
+            >
+              {`${refusees} opération${refusees > 1 ? 's' : ''} refusée${refusees > 1 ? 's' : ''} — à voir`}
+            </button>
+          )}
+          {avisStockage && (
+            <p className="rounded-md bg-info-tint p-3 text-sm font-body text-info">
+              Ce téléphone peut effacer les données de Kolek s’il manque de place. Garde
+              l’application installée et envoie dès que possible.
+            </p>
+          )}
+        </div>
       )}
 
       {/* Sur écran large, la carte et l'historique se lisent côte à côte :

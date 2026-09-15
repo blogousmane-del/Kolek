@@ -51,3 +51,18 @@ describe('ce qui ne bouge pas', () => {
     expect(screen.getByRole('button', { name: /continuer avec google/i })).toBeTruthy();
   });
 });
+
+describe('l’avis avant connexion (spec J2b §8.6)', () => {
+  it('dit ce qui attend sur le téléphone, sans le présenter comme une erreur', () => {
+    render(<EcranConnexion {...BASE} avis="3 opérations attendent sur ce téléphone." />);
+
+    expect(screen.getByRole('status').textContent).toBe('3 opérations attendent sur ce téléphone.');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('ne montre rien sans avis', () => {
+    render(<EcranConnexion {...BASE} />);
+
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+});
