@@ -139,7 +139,7 @@ export function FicheClient({
       setFiche(lue);
       setErreur(null);
     } catch {
-      setErreur('Fiche indisponible. Vérifie le réseau.');
+      setErreur('Fiche indisponible sur ce téléphone. Connecte-toi une fois au réseau pour la charger.');
     }
   }, [clientId]);
 

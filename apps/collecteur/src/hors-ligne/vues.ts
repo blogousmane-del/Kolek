@@ -566,5 +566,12 @@ export function phraseAttenteLongue(file: EtatFile | null, maintenant: number): 
   if (file === null || file.plusAncienne === null || file.plusAncienneType === null) return null;
   const jours = joursDAttente(file.plusAncienne, maintenant);
   if (jours < JOURS_ALERTE_ATTENTE) return null;
-  return `${NATURE_EN_ATTENTE[file.plusAncienneType]} attend depuis ${jours} jours. Retrouve du réseau avant 90 jours.`;
+  const debut = `${NATURE_EN_ATTENTE[file.plusAncienneType]} attend depuis ${jours} jours.`;
+  // Passé la fenêtre, « avant 90 jours » se contredirait. Le serveur ne borne
+  // par la date que les mises (`encaisse_le`) et les caisses (`date`) : le plus
+  // ancien geste peut être une inscription, la phrase dit donc ce qu'il refuse.
+  if (jours >= 90) {
+    return `${debut} Retrouve du réseau dès que possible : passé 90 jours, le serveur refuse une mise ou une caisse, et le refus reste lisible dans les alertes.`;
+  }
+  return `${debut} Retrouve du réseau avant 90 jours.`;
 }

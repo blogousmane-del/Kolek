@@ -939,6 +939,22 @@ describe('client sans carte active : le bloc d’ouverture reste atteignable', (
   });
 });
 
+describe('fiche absente du téléphone', () => {
+  it('dit que la fiche manque sur ce téléphone, sans accuser le réseau', async () => {
+    // Depuis J2b, la fiche se lit sur le téléphone : une lecture qui échoue
+    // veut dire que la tournée n'y a jamais été chargée, pas que le réseau manque.
+    chargerFicheClient.mockRejectedValue(new Error('tournée absente'));
+    rendreFiche({ clientId: 'cli1' });
+
+    expect(
+      await screen.findByText(
+        'Fiche indisponible sur ce téléphone. Connecte-toi une fois au réseau pour la charger.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Vérifie le réseau/)).toBeNull();
+  });
+});
+
 /**
  * La carte choisie vit dans `FicheClient`, pas dans `CartesEnCours` : voir le
  * commentaire posé sur ce `useState`. Une relecture ne doit jamais ramener le

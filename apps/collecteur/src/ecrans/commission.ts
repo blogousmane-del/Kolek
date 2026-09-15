@@ -24,7 +24,7 @@ import { chargerProfil } from '../lectures-ecrans';
  */
 export function useEstCollaborateur(): boolean {
   const { donnees } = useDonnees('profil', chargerProfil, {
-    messageErreur: 'Fiche indisponible. Vérifie le réseau.',
+    messageErreur: 'Fiche indisponible sur ce téléphone. Connecte-toi une fois au réseau pour la charger.',
   });
 
   // `!= null` et non `!!` : un identifiant est une chaîne, et la chaîne vide
@@ -58,7 +58,7 @@ export function useEstCollaborateur(): boolean {
  */
 export function useAbonnementActif(): boolean {
   const { donnees } = useDonnees('profil', chargerProfil, {
-    messageErreur: 'Fiche indisponible. Vérifie le réseau.',
+    messageErreur: 'Fiche indisponible sur ce téléphone. Connecte-toi une fois au réseau pour la charger.',
   });
 
   // Par défaut actif : `chargerProfil` lève quand le profil n'a jamais été lu
@@ -71,7 +71,7 @@ export function useAbonnementActif(): boolean {
 
 export function useEstTitulaire(): boolean {
   const { donnees } = useDonnees('profil', chargerProfil, {
-    messageErreur: 'Fiche indisponible. Vérifie le réseau.',
+    messageErreur: 'Fiche indisponible sur ce téléphone. Connecte-toi une fois au réseau pour la charger.',
   });
 
   return donnees?.palier === 'illimite' && donnees.titulaireId == null;

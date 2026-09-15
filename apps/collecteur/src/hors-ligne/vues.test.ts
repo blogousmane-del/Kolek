@@ -592,4 +592,28 @@ describe('l’attente du plus ancien geste (§4.7, §8.8)', () => {
     expect(phraseAttenteLongue(avec(null, null), MAINTENANT)).toBeNull();
     expect(phraseAttenteLongue(null, MAINTENANT)).toBeNull();
   });
+
+  it('passé 90 jours, ne promet plus un délai déjà dépassé', () => {
+    // « Retrouve du réseau avant 90 jours » à 91 jours se contredirait. Le
+    // serveur ne borne par la date que les mises et les caisses ; le plus
+    // ancien geste peut être une inscription : la phrase dit ce que le serveur
+    // refuse, et non « il la refusera ».
+    const avec = (plusAncienne: string, plusAncienneType: TypeOperation) => ({
+      ...etatFileDepuis([], []),
+      plusAncienne,
+      plusAncienneType,
+    });
+    const passe =
+      'Retrouve du réseau dès que possible : passé 90 jours, le serveur refuse une mise ou une caisse, et le refus reste lisible dans les alertes.';
+
+    expect(phraseAttenteLongue(avec('2026-06-16T12:00:00.000Z', 'mise'), MAINTENANT)).toBe(
+      'Une mise attend depuis 89 jours. Retrouve du réseau avant 90 jours.',
+    );
+    expect(phraseAttenteLongue(avec('2026-06-15T12:00:00.000Z', 'mise'), MAINTENANT)).toBe(
+      `Une mise attend depuis 90 jours. ${passe}`,
+    );
+    expect(phraseAttenteLongue(avec('2026-06-14T12:00:00.000Z', 'client_carte'), MAINTENANT)).toBe(
+      `Une inscription attend depuis 91 jours. ${passe}`,
+    );
+  });
 });
