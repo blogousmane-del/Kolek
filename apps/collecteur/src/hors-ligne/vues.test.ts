@@ -62,16 +62,19 @@ describe('l’accueil, calculé sur la tournée', () => {
   });
 
   it('montre les cinq dernières mises, la plus récente d’abord, nommées', () => {
+    // Insérées dans le désordre, l'une à la façon du serveur (`+00:00`) : le tri
+    // porte sur l'instant, ni sur l'ordre d'arrivée ni sur le texte.
+    const quand = (n: number) => (n === 1 ? ilYA(n * 60_000).replace('Z', '+00:00') : ilYA(n * 60_000));
     const six = tournee({
       clients: [client('c1', 'Awa')],
       cartes: [carte('k1', 'c1')],
-      mises: [1, 2, 3, 4, 5, 6].map((n) => mise(`m${n}`, 'k1', ilYA(n * 60_000))),
+      mises: [4, 1, 6, 2, 5, 3].map((n) => mise(`m${n}`, 'k1', quand(n))),
     });
 
     const { dernieres } = tableauDepuis(six, MAINTENANT);
 
-    expect(dernieres.map((d) => d.quand)).toEqual([1, 2, 3, 4, 5].map((n) => ilYA(n * 60_000)));
-    expect(dernieres[0]).toEqual({ nom: 'Awa', montant: 1000, estCommission: false, quand: ilYA(60_000) });
+    expect(dernieres.map((d) => d.quand)).toEqual([1, 2, 3, 4, 5].map(quand));
+    expect(dernieres[0]).toEqual({ nom: 'Awa', montant: 1000, estCommission: false, quand: quand(1) });
   });
 
   it('n’a pas de carte du jour sans carte active', () => {

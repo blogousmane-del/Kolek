@@ -509,8 +509,10 @@ export interface Profil {
  * §5.4). Lu hors ligne : l'abonnement décide au geste de ce qu'on peut
  * inscrire (§7), et la coquille doit dire qui est connecté.
  *
- * Lève `TourneeAbsente` quand le profil n'a jamais été lu : les crochets de
- * `commission.ts` retombent alors sur leurs valeurs prudentes.
+ * Lève `TourneeAbsente` quand le profil n'a jamais été lu. Les crochets de
+ * `commission.ts` retombent alors sur leurs valeurs par défaut — abonnement
+ * présumé actif, pas de collaborateur, pas de titulaire. Ces valeurs ne sont
+ * pas la sécurité : le serveur refuse ensuite ce qui doit l'être.
  */
 export async function chargerProfil(): Promise<Profil> {
   const { tournee, profil } = await lectureCourante();
@@ -696,7 +698,7 @@ export interface FicheClient {
   avisActifs: boolean;
   /** Toutes ses cartes, la plus récente d'abord. */
   cartes: CarteFiche[];
-  /** Ses derniers versements, toutes cartes confondues. */
+  /** Ses derniers versements : ceux de ses cartes actives, et ceux du jour (spec J2b §5.1). */
   mises: MiseFiche[];
 }
 

@@ -61,9 +61,11 @@ export function useAbonnementActif(): boolean {
     messageErreur: 'Fiche indisponible. Vérifie le réseau.',
   });
 
-  // Par défaut actif : `chargerProfil` rend déjà `'actif'` quand la fiche n'a
-  // pas pu être lue, et fermer le formulaire sur une panne de réseau ferait
-  // passer une coupure pour une suspension.
+  // Par défaut actif : `chargerProfil` lève quand le profil n'a jamais été lu
+  // sur ce téléphone, et fermer le formulaire sur ce manque ferait passer une
+  // tournée pas encore chargée pour une suspension. L'écran n'est pas la
+  // sécurité : `collecteur-creer-collaborateur` refuse un abonnement suspendu
+  // (`ABONNEMENT_INACTIF`, 403).
   return (donnees?.abonnementStatut ?? 'actif') === 'actif';
 }
 
