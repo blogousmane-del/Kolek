@@ -77,7 +77,12 @@ describe('mouvementsDepuis', () => {
     // Les sources en portent d'autres — le compteur d'une carte, un nom. Les
     // laisser passer ferait diverger la forme du téléphone de celle de la vue,
     // et l'épreuve de parité de `supabase/tests/mouvements.test.ts` avec elle.
-    const [ligne] = mouvementsDepuis({ ...vide, mises: [{ ...MISE, nom: 'Aya' }] });
+    // Le champ en trop passe par une variable : appliqué à un littéral, le
+    // contrôle des propriétés excédentaires de TypeScript refuserait l'appel,
+    // alors que c'est exactement ce que reçoit le téléphone — des lignes de
+    // tournée qui portent plus de champs que le registre n'en garde.
+    const avecUnChampEnPlus = { ...MISE, nom: 'Aya' };
+    const [ligne] = mouvementsDepuis({ ...vide, mises: [avecUnChampEnPlus] });
 
     expect(Object.keys(ligne!).sort()).toEqual([
       'carteId',
