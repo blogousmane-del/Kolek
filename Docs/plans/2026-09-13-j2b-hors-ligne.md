@@ -1354,6 +1354,8 @@ git commit -m "feat(hors-ligne): classer une reponse du serveur, sans jamais pre
 
 ## Tâche 4 : le stockage du téléphone
 
+**Le code livré diffère de cette tâche.** Écart 20 (`dans` avorte la transaction quand le travail échoue ; compter ne crée aucune base, commit `2f2d089`) et écart 48 (écritures en `durability: 'strict'`, commit `519e6d1`). Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
+
 **Fichiers :**
 - Créer : `apps/collecteur/src/hors-ligne/stockage-local.ts`, `apps/collecteur/src/hors-ligne/stockage-local.test.ts`
 
@@ -1800,6 +1802,8 @@ git commit -m "feat(hors-ligne): une base par collecteur sur le telephone" -m "C
 ---
 
 ## Tâche 5 : les phrases, les gestes et la file
+
+**Le code livré diffère de cette tâche.** Écarts 22 et 23 (seules les erreurs du stockage deviennent `STOCKAGE` ; phrase neutre pour un refus sans motif reconnu, commits `e417613` et `7c6e6dd`) et écart 48 (`519e6d1`). Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
 
 **Fichiers :**
 - Créer : `apps/collecteur/src/phrases.ts`, `apps/collecteur/src/phrases.test.ts`
@@ -2544,6 +2548,8 @@ Attendu : PASS.
 
 - [ ] **Étape 6 : écrire l'épreuve de la file (§9.2)**
 
+**Corrigé après exécution (écart 21).** Le second appel à `avancer` passait `MAINTENANT` : une échéance qui n'est pas passée, que le code du plan avance à juste titre, et l'épreuve tombait. Il passe désormais `MAINTENANT + 2000`, l'assertion est inchangée.
+
 Créer `apps/collecteur/src/hors-ligne/file.test.ts` :
 
 ```ts
@@ -2672,7 +2678,7 @@ describe('le sursis (§7)', () => {
     await avancer(base, r.operation.id, MAINTENANT + 1000);
     expect((await lireOperations(base))[0]!.envoyableApres).toBe('2026-09-13T10:00:01.000Z');
 
-    await avancer(base, r.operation.id, MAINTENANT);
+    await avancer(base, r.operation.id, MAINTENANT + 2000);
     expect((await lireOperations(base))[0]!.envoyableApres).toBe('2026-09-13T10:00:01.000Z');
   });
 });
@@ -2769,6 +2775,8 @@ git commit -m "feat(hors-ligne): la file, et les gestes verifies contre la tourn
 
 ## Tâche 6 : envoyer, relire, consigner
 
+**Le code livré diffère de cette tâche.** Écart 19 (une réponse ne vaut preuve que sur son statut : 201 à l'insertion, 200 à la relecture, commit `e179931`) et écart 26 (une inscription rejouée se relit par `collecteur_id`, commit `e8713bf`). Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
+
 **Fichiers :**
 - Créer : `apps/collecteur/src/hors-ligne/envoyer.ts`, `apps/collecteur/src/hors-ligne/envoyer.test.ts`
 
@@ -2804,6 +2812,8 @@ const doublon = (contrainte: string): Reponse => ({
   status: 409,
 });
 const metier = (code: string): Reponse => ({ error: { code: 'P0001', message: code }, status: 400 });
+/** `mises_avant_insert` lève `DOUBLON` sous `23505`, que PostgREST rend en 409. */
+const DOUBLON: Reponse = { error: { code: '23505', message: 'DOUBLON' }, status: 409 };
 const lu = (data: unknown): Reponse => ({ error: null, status: 200, data });
 
 /**
@@ -2884,7 +2894,7 @@ describe('une mise', () => {
 
   it('prend un DOUBLON relu à l’identique pour une mise arrivée (§6.3)', async () => {
     const { client, appels } = clientFactice({
-      insert: { mises: [metier('DOUBLON')] },
+      insert: { mises: [DOUBLON] },
       relire: { mises: [lu({ carte_id: 'k1', montant: 2000 })] },
     });
 
@@ -2894,17 +2904,17 @@ describe('une mise', () => {
 
   it('refuse un DOUBLON dont la ligne diffère, ou reste invisible', async () => {
     const differente = clientFactice({
-      insert: { mises: [metier('DOUBLON')] },
+      insert: { mises: [DOUBLON] },
       relire: { mises: [lu({ carte_id: 'k2', montant: 2000 })] },
     });
-    const invisible = clientFactice({ insert: { mises: [metier('DOUBLON')] } });
+    const invisible = clientFactice({ insert: { mises: [DOUBLON] } });
 
     expect(await envoyer(differente.client, op, rien)).toEqual({ issue: 'refusee', motif: 'DOUBLON_INVERIFIABLE' });
     expect(await envoyer(invisible.client, op, rien)).toEqual({ issue: 'refusee', motif: 'DOUBLON_INVERIFIABLE' });
   });
 
   it('ne conclut rien quand la relecture n’aboutit pas : c’est passager', async () => {
-    const { client } = clientFactice({ insert: { mises: [metier('DOUBLON')] }, relire: { mises: [RESEAU] } });
+    const { client } = clientFactice({ insert: { mises: [DOUBLON] }, relire: { mises: [RESEAU] } });
     expect(await envoyer(client, op, rien)).toEqual({ issue: 'passager' });
   });
 
@@ -3178,14 +3188,12 @@ async function resoudre(c: Classement, relecture: () => Promise<Relecture>): Pro
   }
 }
 
-function envoyerMise(client: SupabaseClient, op: OperationMise): Promise<Issue> {
+async function envoyerMise(client: SupabaseClient, op: OperationMise): Promise<Issue> {
   const { id, carteId, montant, encaisseLe } = op.charge;
-  return client
+  const r = await client
     .from('mises')
-    .insert({ id, collecteur_id: op.collecteurId, carte_id: carteId, montant, encaisse_le: encaisseLe })
-    .then((r) =>
-      resoudre(classer(r, 'mise'), () => relire(client, 'mises', id, { carte_id: carteId, montant })),
-    );
+    .insert({ id, collecteur_id: op.collecteurId, carte_id: carteId, montant, encaisse_le: encaisseLe });
+  return resoudre(classer(r, 'mise'), () => relire(client, 'mises', id, { carte_id: carteId, montant }));
 }
 
 async function envoyerClientCarte(
@@ -3317,6 +3325,8 @@ git commit -m "feat(hors-ligne): envoyer une operation, relire avant de conclure
 ---
 
 ## Tâche 7 : le synchroniseur
+
+**Le code livré diffère de cette tâche.** Écarts 27, 28 et 29 (identité revérifiée avant tout refus ; échéance impossible ramenée à maintenant ; enfants d'un parent refusé marqués dans la même transaction, commit `692f22d`). Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
 
 **Fichiers :**
 - Créer : `apps/collecteur/src/hors-ligne/synchroniseur.ts`, `apps/collecteur/src/hors-ligne/synchroniseur.test.ts`
@@ -3886,6 +3896,8 @@ git commit -m "feat(hors-ligne): le synchroniseur, dans l'ordre, sans jamais rie
 
 ## Tâche 8 : recharger la tournée
 
+**Le code livré diffère de cette tâche.** Écart 30 (une lecture ne vaut preuve que sur 200 ou 206, commit `51b0dcd`), écart 48 (`519e6d1`) et la trace des pannes du rafraîchissement (même commit). Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
+
 **Fichiers :**
 - Créer : `apps/collecteur/src/hors-ligne/rafraichir.ts`, `apps/collecteur/src/hors-ligne/rafraichir.test.ts`
 
@@ -3926,7 +3938,7 @@ function clientFactice(): SupabaseClient {
 /** Une table en panne : toute requête rend une erreur. */
 function tablePanne() {
   const reponse = { data: null, error: { message: 'panne' }, count: null };
-  const chaine: Record<string, unknown> = Object.assign(Promise.resolve(reponse), {});
+  const chaine = Object.assign(Promise.resolve(reponse), {}) as unknown as Record<string, unknown>;
   for (const methode of ['select', 'eq', 'gte', 'in', 'order', 'range', 'limit']) chaine[methode] = () => chaine;
   chaine.maybeSingle = () => Promise.resolve(reponse);
   return chaine;
@@ -4325,6 +4337,8 @@ git commit -m "feat(hors-ligne): recharger la tournee, tout ou rien" -m "Co-Auth
 ---
 
 ## Tâche 9 : l'argent se prouve contre la base locale (§9.3)
+
+**Le code livré diffère de cette tâche.** Quatre épreuves de base ajoutées (inscription rejouée d'un client renommé, abonnement suspendu entre-temps, réponse perdue puis redémarrage, inscription coupée entre ses étapes), commit `e23c611`. Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
 
 **Fichiers :**
 - Modifier : `supabase/tests/harnais.ts`
@@ -4725,6 +4739,8 @@ git commit -m "test(hors-ligne): aucune perte, aucun doublon, contre les vrais d
 
 ## Tâche 10 : le planificateur et le moteur
 
+**Le code livré diffère de cette tâche.** Réveil borné, verrou en mémoire sans `navigator.locks`, effacements par collecteur (commit `1eeeb33`) ; écarts 34 et 35 (un rechargement demandé reste dû ; les pannes se journalisent, commit `1d7bddb`). Le délai de l'écart 33 est posé en tâche 11. Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
+
 **Fichiers :**
 - Créer : `apps/collecteur/src/hors-ligne/planificateur.ts`, `apps/collecteur/src/hors-ligne/planificateur.test.ts`
 - Créer : `apps/collecteur/src/hors-ligne/moteur.ts`, `apps/collecteur/src/hors-ligne/moteur.test.ts`
@@ -4987,6 +5003,8 @@ Attendu : PASS.
 
 - [ ] **Étape 3 : écrire l'épreuve du moteur**
 
+**Corrigé après exécution (écart 32).** Attendre un seul tour de boucle (`laisserTourner`) ne suffisait pas : l'ouverture d'IndexedDB à froid prend plusieurs tours, et l'épreuve tombait une fois sur quelques-unes. Le bloc ci-dessous attend désormais le premier tour par `vi.waitFor`. Le code du moteur est inchangé.
+
 Créer `apps/collecteur/src/hors-ligne/moteur.test.ts` :
 
 ```ts
@@ -5033,13 +5051,19 @@ afterEach(() => {
 
 const laisserTourner = () => new Promise((r) => setTimeout(r, 0));
 
+/** Attend la fin du premier tour — la passe, puis le rechargement — quelle que soit la lenteur d'une ouverture de base à froid. */
+const premierTour = async () => {
+  await vi.waitFor(() => expect(rafraichir).toHaveBeenCalledTimes(1));
+  await laisserTourner();
+};
+
 describe('démarrer', () => {
   it('passe et recharge la tournée dès l’ouverture, puis prévient les écrans', async () => {
     const ecouteur = vi.fn();
     ecouterChangements(ecouteur);
 
     demarrerMoteur(CLIENT, 'col-1');
-    await laisserTourner();
+    await premierTour();
 
     expect(collecteurCourant()).toBe('col-1');
     expect(passe).toHaveBeenCalledTimes(1);
@@ -5050,17 +5074,17 @@ describe('démarrer', () => {
 
   it('repasse au retour du réseau', async () => {
     demarrerMoteur(CLIENT, 'col-1');
-    await laisserTourner();
+    await premierTour();
 
     window.dispatchEvent(new Event('online'));
-    await laisserTourner();
+    await vi.waitFor(() => expect(passe).toHaveBeenCalledTimes(2));
 
     expect(passe).toHaveBeenCalledTimes(2);
   });
 
   it('ne répond plus à rien une fois arrêté', async () => {
     const arreter = demarrerMoteur(CLIENT, 'col-1');
-    await laisserTourner();
+    await premierTour();
     arreter();
 
     window.dispatchEvent(new Event('online'));
@@ -5075,12 +5099,12 @@ describe('démarrer', () => {
 describe('après un geste', () => {
   it('prévient les écrans et demande une passe', async () => {
     demarrerMoteur(CLIENT, 'col-1');
-    await laisserTourner();
+    await premierTour();
     const ecouteur = vi.fn();
     ecouterChangements(ecouteur);
 
     apresGeste();
-    await laisserTourner();
+    await vi.waitFor(() => expect(passe).toHaveBeenCalledTimes(2));
 
     expect(ecouteur).toHaveBeenCalled();
     expect(passe).toHaveBeenCalledTimes(2);
@@ -5337,9 +5361,11 @@ Rappel pour chaque fichier touché : mesurer avant (`node crlf.mjs --mesurer <fi
 
 ## Tâche 11 : ouvrir la tournée sans réseau, et démarrer le moteur
 
+**Le code livré diffère de cette tâche.** Écarts 33 et 36 (délai de 30 s sur les requêtes de données seulement, par `db.timeout`), 38 (attente de session bornée) et 39 (tournée effacée aussi pour une session révoquée ou un autre compte) ; commits `3e11732`, `a7317b1`, `07aa00b`. Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
+
 **Fichiers :**
 - Créer : `apps/collecteur/src/session-gardee.ts`, `apps/collecteur/src/session-gardee.test.ts`, `apps/collecteur/src/App.test.tsx`
-- Modifier : `apps/collecteur/src/supabase.ts`, `apps/collecteur/src/App.tsx`, `apps/collecteur/src/Coquille.tsx`, `apps/collecteur/src/Coquille.test.tsx`
+- Modifier : `apps/collecteur/src/supabase.ts`, `apps/collecteur/src/App.tsx`, `apps/collecteur/src/Coquille.tsx`, `apps/collecteur/src/Coquille.test.tsx`, `apps/collecteur/vitest.config.ts` (écart 37)
 
 **Interfaces :**
 - Consomme : `demarrerMoteur(client, collecteurId): () => void`, `ecouterChangements(ecouteur): () => void`, `effacerTourneeDe(collecteurId): Promise<void>` (tâche 10).
@@ -5502,6 +5528,17 @@ export const supabase = createClient(url, cle, { auth: { storageKey: CLE_SESSION
 Puis `node crlf.mjs apps/collecteur/src/supabase.ts apps/collecteur/src/session-gardee.ts apps/collecteur/src/session-gardee.test.ts`.
 
 - [ ] **Étape 4 : écrire l'épreuve du démarrage**
+
+**Corrigé après exécution (écart 37).** Cette épreuve suppose un `localStorage`. Node 26 prive jsdom du sien, et `apps/collecteur/vitest.config.ts` ne branchait pas le module de préparation qui en fournit un (l'administration le fait). Sans lui, une épreuve qui vérifie qu'on n'écrit rien dans le navigateur passerait faute de navigateur. D'abord, dans le bloc `test` de `apps/collecteur/vitest.config.ts` :
+
+```ts
+    // Le même `localStorage` en mémoire que `packages/ui`, et une seule copie :
+    // Node prive jsdom du sien, et sans lui un test qui vérifie qu'on n'écrit
+    // rien dans le navigateur passerait faute de navigateur.
+    setupFiles: ['../../packages/ui/vitest.setup.ts'],
+```
+
+Lancer la suite complète avant et après : une épreuve qui change de statut se voit. Ajouter `apps/collecteur/vitest.config.ts` au commit de la tâche.
 
 Créer `apps/collecteur/src/App.test.tsx` :
 
@@ -6009,6 +6046,8 @@ Attendu : toutes les épreuves de l'application au vert, typage sans erreur, lin
 ---
 
 ## Tâche 12 : l'accueil, la liste et la fiche lisent la tournée
+
+**Le code livré diffère de cette tâche.** Écart 40 (garde des épreuves contre la production, commit `6014efc`) et commentaires de `chargerProfil` corrigés (commit `2172e7c`). Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
 
 **Fichiers :**
 - Créer : `apps/collecteur/src/hors-ligne/vues.ts`, `apps/collecteur/src/hors-ligne/vues.test.ts`
@@ -6908,6 +6947,8 @@ Attendu : tout au vert. Si une épreuve d'un autre écran tombe sur « Aucun col
 ---
 
 ## Tâche 13 : les gestes de la collecte passent par la file
+
+**Le code livré diffère de cette tâche.** Écarts 41 et 42 (la caisse du jour suit chaque mise acceptée ; elle compte ce que la main a encaissé, par `encaisse_par` et `restitue_par`, commit `c858944`). Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
 
 **Fichiers :**
 - Modifier : `apps/collecteur/src/ecritures.ts` (réécrit), `apps/collecteur/src/ecritures.test.ts`
@@ -9258,6 +9299,8 @@ Attendu : tout au vert. `grep -rn "synchronisés dès connexion" apps packages -
 
 ## Tâche 15 : la fiche client — le sursis entre dans la file dès l'appui
 
+**Le code livré diffère de cette tâche.** Écart 43 (un refus n'attend plus sur la carte ; l'annulation se reconnaît par `operationId`, commit `21a2af3`). Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
+
 **Fichiers :**
 - Modifier : `apps/collecteur/src/encaissement-differe.ts`, `apps/collecteur/src/encaissement-differe.test.ts` (tous deux LF)
 - Modifier : `apps/collecteur/src/hors-ligne/vues.ts`, `apps/collecteur/src/hors-ligne/vues.test.ts` (ce qui attend sur une carte)
@@ -11018,6 +11061,8 @@ Attendu : tout au vert. Contrôle : `grep -c "window.setTimeout" apps/collecteur
 
 ## Tâche 16 : le retrait attend la file et le réseau
 
+**Le code livré diffère de cette tâche.** Écart 44 (retrait gardé jusqu'au geste ; file non lue bloque ; lecture en échec lève ; filtre client, commits `fdc71bf` et `1851ffb`). Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
+
 **Fichiers :**
 - Modifier : `apps/collecteur/src/ecrans/Retrait.tsx`, `apps/collecteur/src/ecrans/Retrait.test.tsx` (CRLF, 1 insécable, inchangée)
 - Modifier : `apps/collecteur/src/ecrans/ActiverCarte.tsx`
@@ -11218,6 +11263,8 @@ git commit -m "feat(hors-ligne): le retrait attend que la carte n'ait plus rien 
 ---
 
 ## Tâche 17 : les refus, l'attente et le stockage se lisent sur le téléphone
+
+**Le code livré diffère de cette tâche.** Écarts 46 et 47 (phrase au-delà de 90 jours ; fiche et commission alignées sur « Plus », commit `b513dec`). Le dépôt fait foi ; les blocs ci-dessous restent le plan d'origine.
 
 **Fichiers :**
 - Modifier : `apps/collecteur/src/hors-ligne/vues.ts`, `apps/collecteur/src/hors-ligne/vues.test.ts`
@@ -12533,6 +12580,8 @@ Attendu : tout au vert ; les trois fichiers mesurés restent en `LF`.
 
 - [ ] **Étape 1 : l'en-tête du cache**
 
+**Corrigé après exécution (écart 45).** Le texte prescrit disait « la base du collecteur est effacée à la déconnexion » : faux. La tournée, le profil et les refus s'effacent ; la file, jamais (spec §4, garantie 5). Il oubliait aussi trois écrans restés en ligne : retrait, historique, avis. Le texte ci-dessous est celui qui a été posé.
+
 Dans `apps/collecteur/src/cache.ts`, remplacer :
 
 ```ts
@@ -12548,17 +12597,17 @@ par :
 ```ts
  * **Il ne survit pas au rechargement.** Une `Map` en mémoire, pas
  * `localStorage`. Les lectures des écrans restés en ligne — bilan, reçus,
- * alertes, équipe — portent les noms et les soldes des clients : les écrire sur
- * le disque du téléphone les laisserait lisibles après la déconnexion, à qui a
- * l'appareil en main. Le gain — un affichage instantané au démarrage à froid —
- * ne vaut pas ce prix.
+ * retrait, historique, avis, alertes du serveur, équipe — portent les noms et
+ * les soldes des clients : les écrire sur le disque du téléphone les laisserait
+ * lisibles après la déconnexion, à qui a l'appareil en main. Le gain — un
+ * affichage instantané au démarrage à froid — ne vaut pas ce prix.
  *
  * La tournée des écrans de collecte, elle, est sur le disque depuis J2b
  * (`hors-ligne/stockage-local.ts`, spec J2b §5.1) : sans elle, aucun
- * encaissement sans réseau. Ce prix-là est payé une fois, là-bas, et borné — la
- * base du collecteur est effacée à la déconnexion, que la coquille refuse tant
- * que la file n'est pas vide. Ce cache ne fait que garder en mémoire ce que ces
- * écrans en ont lu.
+ * encaissement sans réseau. Ce prix-là est payé une fois, là-bas, et borné : la
+ * tournée, le profil et les refus s'effacent avec la session. La file, jamais
+ * (spec J2b §4.5) ; la coquille refuse la déconnexion tant qu'elle n'est pas
+ * vide. Ce cache ne fait que garder en mémoire ce que ces écrans en ont lu.
 ```
 
 Puis `node crlf.mjs apps/collecteur/src/cache.ts`.
@@ -12641,6 +12690,8 @@ Attendu : `verifier` vert de bout en bout (il commence par `db:reset` **local**)
 
 - [ ] **Étape 2 : construire contre la pile locale**
 
+**Corrigé après exécution (écart 49).** Le motif `\.supabase\.co` du garde-fou comptait le joker `*.supabase.co` que supabase-js porte en littéral dans son propre code : un faux positif qui arrêtait tout. Il cherche désormais un hôte de projet (`<ref>.supabase.co`), plus la référence de production où qu'elle soit.
+
 Créer `$TMP/regard-j2b/construire.mjs` :
 
 ```js
@@ -12674,7 +12725,10 @@ let distant = 0;
 for (const nom of readdirSync(join(sortie, 'assets')).filter((n) => n.endsWith('.js'))) {
   const contenu = readFileSync(join(sortie, 'assets', nom), 'utf8');
   local += contenu.split('127.0.0.1:54321').length - 1;
-  distant += (contenu.match(/\.supabase\.co(?![a-z0-9])/g) ?? []).length;
+  // Un hôte de projet (`<ref>.supabase.co`), pas le joker `*.supabase.co` que
+  // supabase-js porte en littéral ; et la référence de production, où qu'elle soit.
+  distant += (contenu.match(/[a-z0-9-]+\.supabase\.co(?![a-z0-9])/g) ?? []).length;
+  distant += contenu.split('yfnwmokxkznejotgpfgf').length - 1;
 }
 console.log(`hôte local : ${local} ; hôte en .supabase.co : ${distant}`);
 if (local === 0 || distant > 0) throw new Error('Le paquet ne vise pas la pile locale seule : ne pas le servir.');
@@ -12688,10 +12742,33 @@ Attendu : la construction réussit, puis `hôte local : 1` ou plus, et `hôte en
 
 - [ ] **Étape 3 : servir, préparer un compte, ouvrir Chrome**
 
+**Corrigé après exécution (écarts 50 et 51).** `vite preview` passe par `vite.config.ts`, dont le garde refuse de servir sans `VITE_SUPABASE_*` : un lanceur les lui donne, ceux de la pile locale, sans les afficher. Chrome demande un profil au **chemin court** : dans `$TMP` (~150 caractères), le chemin de `CacheStorage` dépasse 260 caractères, `caches.open` lève `UnknownError` et le service worker ne s'installe jamais — un symptôme qui ressemble à un défaut de l'application. Enfin, la coupure de `cdp.mjs hors-ligne` tombait dès qu'une autre commande s'attachait à l'onglet (`navigator.onLine` repassait à vrai) : elle est réappliquée toutes les 250 ms.
+
+Créer `$TMP/regard-j2b/servir.mjs` :
+
+```js
+// Sert le paquet local sur 5181. La configuration Vite exige les variables même
+// pour servir : on lui donne celles de la pile locale, sans les afficher.
+// Usage, depuis la racine du dépôt : node servir.mjs <répertoire du paquet>
+import { execSync, spawn } from 'node:child_process';
+import { resolve } from 'node:path';
+
+if (!process.argv[2]) throw new Error('Donner le répertoire du paquet.');
+const statut = JSON.parse(execSync('npx supabase status -o json', { encoding: 'utf8' }));
+if (statut.API_URL !== 'http://127.0.0.1:54321') throw new Error(`Pile inattendue : ${statut.API_URL}`);
+
+const enfant = spawn(
+  process.execPath,
+  ['node_modules/vite/bin/vite.js', 'preview', 'apps/collecteur', '--outDir', resolve(process.argv[2]), '--port', '5181', '--strictPort'],
+  { stdio: 'inherit', env: { ...process.env, VITE_SUPABASE_URL: statut.API_URL, VITE_SUPABASE_ANON_KEY: statut.ANON_KEY } },
+);
+enfant.on('exit', (code) => process.exit(code ?? 1));
+```
+
 Servir le paquet sur **5181**, jamais sur 5173 ni 5174 (commande en arrière-plan) :
 
 ```bash
-node node_modules/vite/bin/vite.js preview apps/collecteur --outDir "$TMP/dist-j2b" --port 5181 --strictPort
+node "$TMP/regard-j2b/servir.mjs" "$TMP/dist-j2b"
 ```
 
 Créer `$TMP/regard-j2b/preparer.mjs` :
@@ -12794,15 +12871,31 @@ for (const table of ['clients', 'cartes', 'mises', 'caisses_jour', 'synchro_reje
   console.log(`${table} : ${count}`);
 }
 
+// PostgREST ne rend jamais plus de `max_rows` lignes (1 000, supabase/config.toml) :
+// une lecture sans `range` tronque en silence. Lire par pages, jusqu'à la page courte.
+async function toutLire(table, colonnes) {
+  const lignes = [];
+  for (let debut = 0; ; debut += 1000) {
+    const { data, error } = await admin
+      .from(table)
+      .select(colonnes)
+      .eq('collecteur_id', id)
+      .order('id')
+      .range(debut, debut + 999);
+    if (error) throw error;
+    lignes.push(...data);
+    if (data.length < 1000) return lignes;
+  }
+}
+
 // Les totaux, pour les comparer à ce que le téléphone montrait avant l'envoi.
-const { data: mises, error: erreurMises } = await admin.from('mises').select('montant, carte_id').eq('collecteur_id', id);
-if (erreurMises) throw erreurMises;
-const { data: cartes, error: erreurCartes } = await admin.from('cartes').select('id, mises_encaissees').eq('collecteur_id', id);
-if (erreurCartes) throw erreurCartes;
-const { data: caisses, error: erreurCaisses } = await admin.from('caisses_jour').select('date, cash_declare').eq('collecteur_id', id);
-if (erreurCaisses) throw erreurCaisses;
+const mises = await toutLire('mises', 'id, montant, carte_id');
+const cartes = await toutLire('cartes', 'id, mises_encaissees');
+const caisses = await toutLire('caisses_jour', 'id, date, cash_declare');
 console.log(`somme des mises : ${mises.reduce((s, m) => s + m.montant, 0)}`);
-const incoherentes = cartes.filter((k) => mises.filter((m) => m.carte_id === k.id).length !== k.mises_encaissees);
+const parCarte = new Map();
+for (const m of mises) parCarte.set(m.carte_id, (parCarte.get(m.carte_id) ?? 0) + 1);
+const incoherentes = cartes.filter((k) => (parCarte.get(k.id) ?? 0) !== k.mises_encaissees);
 console.log(`cartes dont le compteur diffère du nombre de mises : ${incoherentes.length}`);
 console.log(`caisses : ${caisses.map((c) => `${c.date} = ${c.cash_declare}`).join(' ; ') || 'aucune'}`);
 ```
@@ -12972,6 +13065,10 @@ try {
     case 'base':
       console.log(JSON.stringify(await evaluer(LIRE_BASES), null, 2));
       break;
+    case 'eval':
+      // Lire un état de la page ; la seule action permise est la navigation (écart 51).
+      console.log(JSON.stringify(await evaluer(args[0]), null, 2));
+      break;
     case 'sw':
       console.log(`service worker aux commandes : ${await evaluer('Boolean(navigator.serviceWorker && navigator.serviceWorker.controller)')}`);
       break;
@@ -13007,6 +13104,11 @@ try {
       await envoyer('Network.enable');
       await envoyer('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
       console.log('Onglet hors ligne. Arrêter ce processus rend le réseau à l’onglet.');
+      // La coupure tombe dès qu'une autre session CDP s'attache à l'onglet
+      // (navigator.onLine repasse à true) : la réappliquer tant que ce processus vit.
+      setInterval(() => {
+        void envoyer('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+      }, 250);
       await new Promise(() => {});
       break;
     case 'fermer':
@@ -13026,7 +13128,7 @@ Préparer le compte du regard, puis lancer Chrome (en arrière-plan, profil jeta
 
 ```bash
 node "$TMP/regard-j2b/preparer.mjs" regard 3 1
-"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --remote-debugging-port=9333 --user-data-dir="$TMP/regard-j2b/chrome-profil" --no-first-run about:blank
+"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --remote-debugging-port=9333 --window-size=390,844 --user-data-dir="C:/Users/M.BERTHE/AppData/Local/Temp/kj2b" --no-first-run about:blank
 ```
 
 Dans la suite, `C` désigne `node "$TMP/regard-j2b/cdp.mjs"`. Les libellés de boutons que ce plan ne fixe pas se lisent par `C texte` avant de cliquer.
@@ -13035,7 +13137,7 @@ Dans la suite, `C` désigne `node "$TMP/regard-j2b/cdp.mjs"`. Les libellés de b
 
 **En ligne.**
 
-1. `C ouvrir`, `C attendre "Se connecter"`, `C connecter "$TMP/regard-j2b/compte-regard.json"`, `C attendre "Encaissé aujourd’hui"`.
+1. `C ouvrir`, `C attendre "Se connecter"`, `C connecter "$TMP/regard-j2b/compte-regard.json"`. **Corrigé après exécution (écart 51)** : l'application s'ouvre sur « Clients » (écran initial antérieur à J2b), pas sur l'accueil. En sans-interface, deux barres de navigation coexistent, et `C cliquer "Accueil"` en trouve deux : cliquer la dernière par `C eval "(() => { const b = [...document.querySelectorAll('button, a')].filter((e) => e.innerText.trim() === 'Accueil'); b.at(-1).click(); return b.length; })()"`. Puis `C attendre "ENCAISSÉ AUJOURD’HUI"` : `innerText` rend les capitales de la feuille de style. Un titre qui n'apparaît pas se lit d'abord par `C texte`.
 2. `C sw` — attendu `true` (relancer `C ouvrir` une fois si `false` : le service worker prend la main à son activation).
 3. `C base` — attendu : une base, `file: 0`, `lueLe` non nul.
 
@@ -13063,7 +13165,7 @@ La seconde commande tourne en arrière-plan jusqu'à l'étape 6.
 1. `C fermer`, puis arrêter le maintien hors ligne : son onglet n'existe plus.
 2. Arrêter le serveur de prévisualisation (la tâche d'arrière-plan de l'étape 3). `curl -s -o /dev/null -w "%{http_code}" http://localhost:5181/` doit rendre `000`.
 3. Relancer `node "$TMP/regard-j2b/cdp.mjs" hors-ligne` en arrière-plan : ne trouvant aucun onglet, il en ouvre un vierge et lui coupe le réseau.
-4. `C ouvrir` (il reprend cet onglet vierge), puis `C attendre "Encaissé aujourd’hui" 30000`.
+4. `C ouvrir` (il reprend cet onglet vierge), puis `C attendre "Hors ligne ·" 30000` (écart 51 : l'écran initial est « Clients », le bandeau y figure aussi).
 5. `C base` — attendu `file: 4`, `lueLe` inchangé. `C texte` — attendu : le même bandeau qu'au point 8.
 
 La coquille doit venir du cache du service worker. **Si la page ne se charge pas, s'arrêter** : c'est le critère §1.3 qui tombe, et la correction touche la PWA — la décider avec l'exploitant, pas dans l'élan.
@@ -13071,6 +13173,8 @@ La coquille doit venir du cache du service worker. **Si la page ne se charge pas
 Contrôle en trois états (mémoire « regard par Chrome ») pour chaque phrase qui surprend : le fichier sur le disque, le paquet construit (`grep -lF "<phrase>" "$TMP/dist-j2b/assets/"*.js`), le texte de la page.
 
 - [ ] **Étape 6 : le retour du réseau**
+
+**Corrigé après exécution (écart 52).** La première version de `compter.mjs` lisait mises, cartes et caisses sans `range` : PostgREST ne rend jamais plus de `max_rows` lignes (1 000, `supabase/config.toml`). Sur la mesure de l'étape 7, elle affichait « somme 1 000 000 » et 284 cartes incohérentes pour 9 000 mises justes. La version ci-dessus lit par pages ; éprouvée le 2026-09-15 contre un recompte SQL (`docker exec supabase_db_Kolek psql`) : 9 000 mises, 9 000 000, 0 carte incohérente des deux côtés. Une perte annoncée par ce script se recompte en SQL avant d'y croire.
 
 1. Arrêter le maintien hors ligne (tâche d'arrière-plan). `docker start supabase_kong_Kolek`. Relancer le serveur de prévisualisation (commande de l'étape 3).
 2. `C ouvrir`, puis `C base` toutes les dix secondes — attendu : `file: 0` en moins de deux minutes.
@@ -13086,7 +13190,7 @@ L'instantané est un seul document, réécrit à chaque acceptation (écart rele
 node "$TMP/regard-j2b/preparer.mjs" mesure 300 30
 ```
 
-1. `C connecter "$TMP/regard-j2b/compte-mesure.json"`, `C attendre "300 cartes actives" 120000`.
+1. `C connecter "$TMP/regard-j2b/compte-mesure.json"`, puis `C base` jusqu'à `lueLe` non nul (écart 51 : aucun écran n'affiche « 300 cartes actives » ; le chargement complet prend ~9 s sur la pile locale).
 2. `C base` — relever `caracteresInstantane`.
 3. Ouvrir la fiche d'un client, puis `C mesurer "<libellé exact du bouton d'encaissement, lu par C texte>"` — relever la durée.
 4. Déconnexion refusée tant que la mise est en file ; attendre `file: 0` par `C base`, puis se déconnecter.
@@ -13193,3 +13297,62 @@ Ce que ce plan fait autrement que la spec, ou qu'elle ne disait pas. **Soumis à
 16. **Un compte de refus peut compter une fois de trop, le temps d'une passe** : si la consignation arrive au serveur mais que la transaction locale qui retire l'opération échoue, `EtatFile.refusees` compte l'opération deux fois jusqu'à la passe suivante. La liste des alertes, elle, ne la montre qu'une fois (tâche 17).
 17. **Après la mise à jour, une ouverture en ligne est nécessaire** avant la première tournée sans réseau (tâche 19, étape 10) : la tournée n'existe sur le téléphone qu'une fois chargée.
 18. **Hors périmètre** : l'écart 5 de l'audit (mouvements et rattrapages), et toute action sur un refus.
+
+### Relevés pendant l'exécution (19 à 52)
+
+Présentés à l'exploitant le 2026-09-15, après la mise en ligne (`831036f`). « Décidé » renvoie à une question posée pendant le chantier ; les autres sont des corrections du texte de ce plan, sans effet sur le comportement voulu.
+
+19. **Une réponse ne vaut preuve que sur son statut** (tâche 6, décidé « Exiger 201 »). postgrest-js 2.112.3 réécrit un 404 au corps vide en `{ error: null, status: 204 }` : une insertion serait prise pour acceptée sans être au serveur. Insertion exigée en 201, relecture en 200 sans tableau, mise à jour de caisse en 200 avec tableau. `e179931`.
+20. **`dans` avorte la transaction quand le travail échoue, et compter ne crée aucune base** (tâche 4, décidé « Durcir »). `2f2d089`.
+21. **Épreuve contradictoire de `avancer`** (tâche 5) : corrigée sur place.
+22. **Seules les erreurs du stockage deviennent `STOCKAGE`** (tâche 5, décidé « Séparer ») : `DOMException` et `QuotaExceededError` ; toute autre exception devient `INCONNU` et se journalise. `e417613`, `7c6e6dd`.
+23. **Un refus sans motif reconnu dit « Le serveur a refusé cette opération. »** (tâche 5, décidé « Phrase neutre ») au lieu de « cinq fois sans motif reconnu ». `e417613`.
+24. **`DOUBLON` arrive sous `23505` en 409**, pas en `P0001` (tâche 6, `mises_avant_insert`) : corrigé sur place.
+25. **`envoyerMise` en `async`** (tâche 6) : un `PostgrestBuilder` n'est qu'un `PromiseLike`, `.then` ne typait pas. Corrigé sur place.
+26. **Une inscription rejouée se relit par `collecteur_id`**, pas par le nom (tâche 6, décidé « Comparer collecteur ») : le nom se modifie ailleurs. `e8713bf`.
+27. **L'identité se revérifie avant tout refus ou tentative** (tâche 7, décidé « Revérifier »). `692f22d`.
+28. **Une échéance impossible est ramenée à maintenant** (tâche 7, décidé « Borner ») : au-delà de dix minutes et sa marge, une horloge reculée bloquait la file. `692f22d`.
+29. **Les enfants d'un parent refusé sont marqués `PARENT_REFUSE` dans la même transaction** (tâche 7, décidé « Marquer les enfants »). `692f22d`.
+30. **Une lecture du rechargement ne vaut preuve que sur 200 ou 206** (tâche 8, même règle que l'écart 19) : un 404 réécrit en 204 aurait écrit une tournée vide. `51b0dcd`.
+31. **`tablePanne` : conversion par `unknown`** (tâche 8, TS2322) : corrigé sur place.
+32. **Épreuve du moteur instable à froid** (tâche 10) : corrigée sur place.
+33. **Délai de 30 s sur les requêtes** (tâche 10, décidé « Délai 30 s », posé en tâche 11).
+34. **Un rechargement demandé reste dû jusqu'à ce qu'il aboutisse** (tâche 10, décidé « Garder la demande »). `1d7bddb`.
+35. **Les pannes de la passe et du rechargement se journalisent** (tâche 10, décidé « Journaliser »). `1d7bddb`.
+36. **Le délai ne couvre que les requêtes de données** (tâche 11), par `db.timeout` (`DELAI_REQUETE_MS = 30 000`). Les fonctions en sont exclues : `encaisserPour` tire un nouvel identifiant à chaque appel, une relance après délai pourrait encaisser deux fois. La connexion aussi : couper un renouvellement de session peut révoquer la session. La session reste bornée par `verifierSession` et `renouvelerSession`. Écart à la décision de l'écart 33, **validé par l'exploitant le 2026-09-15 (« Garder »)**. `3e11732`, `a7317b1`.
+37. **`localStorage` des épreuves du collecteur** (tâche 11) : corrigé sur place.
+38. **L'attente de session est bornée** (tâche 11, décidé « Borner l'attente ») : 30 s pour vérifier ou renouveler, 5 s au démarrage, renouvellement anticipé cinq minutes avant l'expiration. `a7317b1`, `07aa00b`.
+39. **La tournée s'efface aussi pour une session révoquée application fermée, ou un autre compte** (tâche 11, décidé « Effacer aussi ces cas »). `a7317b1`.
+40. **Les épreuves ne peuvent plus joindre la production** (tâche 12, décidé « Poser la garde ») : Vitest chargeait l'URL et la clé de `.env`. `test.env` vers `127.0.0.1:9` dans les trois `vitest.config`, et une épreuve de garde par application. `6014efc`.
+41. **La caisse du jour suit chaque mise acceptée** (tâche 13, décidé « Suivre chaque mise ») ; sans ligne du serveur, l'attendu est toujours provisoire. `c858944`.
+42. **La caisse compte ce que la main a encaissé**, par `encaisse_par` et `restitue_par`, pas par la propriété des cartes (tâche 13, décidé « Compter la main »). `c858944`.
+43. **Un refus n'attend plus sur la carte, et l'annulation se reconnaît par `operationId`** (tâche 15, décidés « Ne compter que l'attente » et « Corriger »). `21a2af3`.
+44. **Le retrait est gardé jusqu'au geste** (tâche 16, décidés « Garder jusqu'au geste » et « Corriger la lecture ») : une file non lue bloque (« Opérations du téléphone pas encore vérifiées. »), une lecture en échec lève, le filtre par client ne dit plus « aucune carte » sur une liste non lue. `fdc71bf`, `1851ffb`.
+45. **En-tête du cache** (tâche 18) : corrigé sur place.
+46. **Au-delà de 90 jours, l'avertissement change** (tâche 17, décidé « Corriger ») : « passé 90 jours, le serveur refuse une mise ou une caisse, et le refus reste lisible dans les alertes ». Le serveur ne borne que les mises et les caisses. `b513dec`.
+47. **Fiche et commission alignées** (tâche 17, décidé « Aligner maintenant ») : « Fiche indisponible sur ce téléphone. Connecte-toi une fois au réseau pour la charger. » `b513dec`.
+48. **Les neuf transactions d'écriture en `durability: 'strict'`** (revue finale, décidé « Strict avant fusion »), et la trace des pannes du rafraîchissement. Une épreuve compte les écritures et leur mode. `519e6d1`.
+49. **Garde-fou de la construction** (tâche 19, étape 2) : corrigé sur place.
+50. **Servir et ouvrir Chrome** (tâche 19, étape 3) : corrigé sur place.
+51. **Écran initial, casse, navigation et coupure du regard** (tâche 19, étapes 3 à 7) : corrigés sur place.
+52. **Comptage non paginé** (tâche 19, étape 6) : corrigé sur place.
+
+**Inexactitudes mineures du texte, laissées en l'état :** le rouge attendu à l'étape 3 de la tâche 12 ; celui de l'étape 9 de la tâche 14 (constaté : `TypeError` sur les 19 épreuves) ; `crlf.mjs` refuse un fichier réécrit en entier par Write (préférer Edit) ; la tâche 15 annonce 9 épreuves du sursis pour 8 écrites, et 23 pour les vues quand il y en a 25 (les deux de plus viennent du correctif de la tâche 13) ; le contrôle de l'étape 12 de la tâche 17 oubliait `commission.ts` et `FicheClient.tsx` (réglés par l'écart 47) ; le compte « 29 fichiers » de la tâche 18 (87 lignes sur 42 fichiers), dont le motif ne cherche ni « hors-ligne » ni « synchro ».
+
+### Reportés au chantier suivant
+
+Relevés en relecture ou au regard, jugés sans perte d'argent ni de données. À la revue finale, l'exploitant n'a retenu avant fusion que la trace du rafraîchissement (écart 48) ; le reste attend le chantier suivant :
+
+- « Prévenir » de la liste des clients n'est pas gardé par la file (`Clients.tsx`).
+- L'alerte au premier lancement (`Accueil.tsx`).
+- Une écriture dans la file juste après un effacement subi de la tournée (`file.ts`, `moteur.ts`).
+- Un enfant encore en sursis quand son parent est refusé (`PARENT_REFUSE`, `FicheClient.tsx`).
+- Le bandeau « Envoi en cours » ne montre aucun progrès.
+- Le commentaire du 42501 sous `anon` (`synchroniseur.ts`).
+- Deux onglets ouverts sur le même compte.
+- La borne `integer` de `cash_declare` (`gestes.ts`).
+- Les angles morts de l'épreuve de durabilité (raccourcis `idb`, sous-dossiers, `.tsx`).
+- La fiche d'un client sur une tournée jamais chargée dit « Fiche introuvable » au lieu de « pas encore sur ce téléphone ».
+- L'avis rouge de déconnexion reste affiché.
+- Hors ligne, file vide, l'écran Retrait reste vide ~7 s (trois relances de postgrest-js).
+- Le commentaire d'`Abonnement.tsx` (« seul geste qui exige le réseau ») est faux.
