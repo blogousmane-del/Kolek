@@ -22,10 +22,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * ## Ce qu'il ne fait pas, et pourquoi
  *
  * **Il ne survit pas au rechargement.** Une `Map` en mémoire, pas
- * `localStorage`. Ces lectures portent les noms et les soldes des clients :
- * les écrire sur le disque du téléphone les laisserait lisibles après la
- * déconnexion, à qui a l'appareil en main. Le gain — un affichage instantané au
- * démarrage à froid — ne vaut pas ce prix.
+ * `localStorage`. Les lectures des écrans restés en ligne — bilan, reçus,
+ * retrait, historique, avis, alertes du serveur, équipe — portent les noms et
+ * les soldes des clients : les écrire sur le disque du téléphone les laisserait
+ * lisibles après la déconnexion, à qui a l'appareil en main. Le gain — un
+ * affichage instantané au démarrage à froid — ne vaut pas ce prix.
+ *
+ * La tournée des écrans de collecte, elle, est sur le disque depuis J2b
+ * (`hors-ligne/stockage-local.ts`, spec J2b §5.1) : sans elle, aucun
+ * encaissement sans réseau. Ce prix-là est payé une fois, là-bas, et borné : la
+ * tournée, le profil et les refus s'effacent avec la session. La file, jamais
+ * (spec J2b §4.5) ; la coquille refuse la déconnexion tant qu'elle n'est pas
+ * vide. Ce cache ne fait que garder en mémoire ce que ces écrans en ont lu.
  *
  * **Il ne sert jamais une valeur d'avant une écriture.** Chaque lecture est
  * rangée avec la révision courante ; un encaissement incrémente la révision et

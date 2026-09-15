@@ -24,7 +24,7 @@ surveillerMisesAJour();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Filet
-      message="Rien n’est perdu : les mises déjà enregistrées sur ce téléphone restent en attente de synchronisation. Recharge l’écran."
+      message="Rien n’est perdu : ce qui est enregistré sur ce téléphone y reste jusqu’à son envoi. Recharge l’écran."
     >
       <App />
     </Filet>
