@@ -7,11 +7,14 @@ import {
   Feuille,
   Icone,
   LigneTransaction,
+  useEnLigne,
   type CarteItem,
 } from '@kolek/ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
+  annulerMise,
+  avancerEnvoi,
   definirConsentementAvis,
   enregistrerMise,
   modifierClient,
@@ -25,6 +28,9 @@ import {
   SURSIS_S,
   type EnAttente,
 } from '../encaissement-differe';
+import type { Operation } from '../hors-ligne/modele';
+import { useHorsLigne } from '../hors-ligne/useHorsLigne';
+import { enAttenteSurCarte, identifiantsEnAttente, phraseAttenteCarte } from '../hors-ligne/vues';
 import { chargerFicheClient, type CarteFiche, type FicheClient as Fiche } from '../lectures-ecrans';
 import { ActiverCarte } from './ActiverCarte';
 import { ChoixMise } from './ChoixMise';
@@ -40,6 +46,15 @@ import { useEstCollaborateur } from './commission';
  * une virgule, et c'est le même bandeau qui les affiche.
  */
 const SESSION_PERDUE = 'Session perdue. Reconnecte-toi avant de réessayer.';
+
+/**
+ * Ce que voit le collecteur quand l'enregistrement sur le téléphone lève au lieu
+ * de répondre. `enregistrerMise` rend `{ ok: false }` sur tout refus connu ; un
+ * rejet ne dit pas si l'opération a été écrite avant. La phrase ne promet donc
+ * rien, et demande de regarder la carte avant de recommencer.
+ */
+const ENREGISTREMENT_INCERTAIN =
+  'Enregistrement incertain sur ce téléphone. Vérifie la carte avant de réessayer.';
 
 /**
  * La fiche d'un client, en panneau flottant.
@@ -95,23 +110,23 @@ export function FicheClient({
   const [fiche, setFiche] = useState<Fiche | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   // La carte choisie vit ici, un cran au-dessus de `CartesEnCours`, et pas
-  // dans son propre `useState`. `CartesEnCours` démonte et remonte à chaque
-  // relecture réussie : l'effet ci-dessous fait passer `fiche` par `null`
-  // avant de relire, ce qui emporte tout `{fiche && (…)}`. Un `useState` posé
-  // plus bas s'y réinitialiserait sur `actives[0]` — la carte la plus avancée
-  // — à chaque encaissement, exactement le défaut que ce bouton devait faire
-  // disparaître, simplement relogé un niveau plus bas.
+  // dans son propre `useState`. Jusqu'à J2b, `CartesEnCours` démontait et
+  // remontait à chaque relecture : la fiche repassait par `null`. Elle ne le
+  // fait plus qu'au changement de client, mais un `useState` posé plus bas
+  // resterait à la merci du moindre démontage — et se réinitialiserait sur la
+  // carte la plus avancée, pas sur celle qu'on vient de payer.
   const [visibleId, setVisibleId] = useState<string | null>(null);
   const [historiqueOuvert, setHistoriqueOuvert] = useState(false);
   // Le brouillon de correction vit ici, et non dans `CorrigerFiche` — même
-  // raison que `visibleId` ci-dessus. La mise différée de `CartesEnCours`
-  // part six secondes après l'appui et appelle `onEcriture` ; la coquille
-  // fait monter `revision`, la fiche repasse par `null`, et le formulaire se
-  // démonte. Un brouillon logé dedans s'effaçait sous les doigts du
-  // collecteur — au moment exact où l'on corrige : il vient d'encaisser, et
-  // le client lui dit que son numéro a changé. Constaté en relisant, le
-  // 2026-09-11, avant toute mise en ligne.
+  // raison que `visibleId` ci-dessus. Jusqu'à J2b, chaque écriture faisait
+  // repasser la fiche par `null` et démontait le formulaire : un brouillon
+  // logé dedans s'effaçait sous les doigts du collecteur, au moment exact où
+  // l'on corrige. Constaté en relisant, le 2026-09-11.
   const [brouillon, setBrouillon] = useState<CorrectionClient | null>(null);
+  const enLigne = useEnLigne();
+  const { operations } = useHorsLigne();
+  /** Ce qui n'a pas encore quitté le téléphone : clients, cartes, mises (§8.3). */
+  const pasEnvoyes = useMemo(() => identifiantsEnAttente(operations), [operations]);
 
   const relire = useCallback(async () => {
     if (!clientId) return;
@@ -129,11 +144,17 @@ export function FicheClient({
   }, [clientId]);
 
   useEffect(() => {
-    // La fiche précédente est effacée avant la lecture : sans ça, ouvrir un
-    // second client montre un instant les chiffres du premier — et un solde
+    // La fiche précédente est effacée au changement de client : sans ça, ouvrir
+    // un second client montre un instant les chiffres du premier — et un solde
     // qui appartient à quelqu'un d'autre est la pire chose à afficher ici.
     setFiche(null);
     setErreur(null);
+  }, [clientId]);
+
+  useEffect(() => {
+    // Une relecture du même client, elle, ne vide rien (J2b) : la tournée est
+    // sur le téléphone, la lecture est immédiate, et vider démontait le bandeau
+    // du sursis — « Annuler » disparaissait sous le doigt.
     void relire();
   }, [relire, revision]);
 
@@ -189,6 +210,15 @@ export function FicheClient({
     // La plus avancée d'abord : c'est celle dont le cycle se termine en premier,
     // donc celle sur laquelle une décision se présente le plus tôt.
     .sort((a, b) => b.carte.misesEncaissees - a.carte.misesEncaissees);
+
+  // Corriger la fiche et changer les avis restent en ligne (spec §1.2) : ce
+  // sont des modifications, et un client pas encore envoyé n'existe pas au
+  // serveur — la correction partirait sur une ligne absente.
+  const correctionBloquee = !enLigne
+    ? 'Corriger la fiche ou les avis demande le réseau.'
+    : fiche && pasEnvoyes.has(fiche.id)
+      ? 'Client pas encore envoyé : sa fiche se corrige une fois arrivé au serveur.'
+      : null;
 
   // Plein écran, et non dans la `Feuille` : `HistoriqueClient` porte son propre
   // bandeau et attend toute la hauteur. Le glisser dans un panneau modal lui
@@ -246,17 +276,28 @@ export function FicheClient({
             />
           ) : (
             <>
-              <Coordonnees fiche={fiche} onChange={onEcriture} onRelire={relire} />
+              <Coordonnees
+                fiche={fiche}
+                bloque={correctionBloquee !== null}
+                onChange={onEcriture}
+                onRelire={relire}
+              />
               {/* Une faute de frappe faite au marché était définitive jusqu'au
                   2026-09-11 : aucun écran, collecteur ou administration, ne
                   modifiait un client. */}
               <Bouton
                 variante="fantome"
                 pleineLargeur
+                disabled={correctionBloquee !== null}
                 onClick={() => setBrouillon(origineDe(fiche))}
               >
                 Corriger la fiche
               </Bouton>
+              {correctionBloquee && (
+                <p className="font-body text-xs text-muted-foreground text-center m-0">
+                  {correctionBloquee}
+                </p>
+              )}
             </>
           )}
 
@@ -266,6 +307,8 @@ export function FicheClient({
               nomClient={fiche.nom}
               clientId={fiche.id}
               collecteurId={collecteurId}
+              operations={operations}
+              enLigne={enLigne}
               onRetrait={onRetrait}
               onEcriture={onEcriture}
               visibleId={visibleId}
@@ -307,12 +350,12 @@ export function FicheClient({
                   <LigneTransaction
                     key={m.id}
                     nom={m.estCommission ? 'Commission' : 'Mise'}
-                    meta={new Date(m.encaisseLe).toLocaleDateString('fr-FR', {
+                    meta={`${new Date(m.encaisseLe).toLocaleDateString('fr-FR', {
                       day: 'numeric',
                       month: 'short',
                       hour: '2-digit',
                       minute: '2-digit',
-                    })}
+                    })}${pasEnvoyes.has(m.id) ? ' · pas encore envoyée' : ''}`}
                     montant={`+${formatMontant(m.montant)}`}
                     type={m.estCommission ? 'neutre' : 'positive'}
                     derniere={i === Math.min(liste.length, 8) - 1}
@@ -337,10 +380,13 @@ function sousTitre(fiche: Fiche): string {
 /** Le numéro, et le consentement aux avis — les deux vont ensemble. */
 function Coordonnees({
   fiche,
+  bloque,
   onChange,
   onRelire,
 }: {
   fiche: Fiche;
+  /** Réseau absent, ou client pas encore envoyé : le consentement ne peut pas partir. */
+  bloque: boolean;
   onChange: () => void;
   onRelire: () => Promise<void>;
 }) {
@@ -381,7 +427,7 @@ function Coordonnees({
           Demande-lui avant de confirmer.
         </p>
         <div className="flex gap-2 mt-2">
-          <Bouton onClick={() => void poser(true)} disabled={envoi}>
+          <Bouton onClick={() => void poser(true)} disabled={envoi || bloque}>
             {envoi ? 'Enregistrement…' : 'Il a accepté'}
           </Bouton>
           <Bouton variante="contour" onClick={() => setDemande(false)} disabled={envoi}>
@@ -406,7 +452,7 @@ function Coordonnees({
       </span>
       <button
         type="button"
-        disabled={envoi}
+        disabled={envoi || bloque}
         aria-pressed={fiche.avisActifs}
         onClick={() => (fiche.avisActifs ? void poser(false) : setDemande(true))}
         className="anim-pression px-3 py-1.5 rounded-md border border-hairline text-ink text-xs font-body font-semibold whitespace-nowrap cursor-pointer disabled:opacity-40"
@@ -589,12 +635,15 @@ function CorrigerFiche({
  * ## Les six secondes
  *
  * `mises` est append-only — voir `encaissement-differe.ts`, qui porte la règle.
- * L'appui remplit la case à l'écran et n'écrit rien ; l'insertion part six
- * secondes plus tard, et « Annuler » l'empêche jusque-là.
+ * Depuis J2b, l'appui écrit l'opération dans la file du téléphone, avec une
+ * échéance à six secondes ; le synchroniseur ne l'envoie qu'après, et
+ * « Annuler » la retire de la file d'ici là. La case ne se remplit qu'une fois
+ * l'opération sur le disque (spec §4.1).
  *
- * Fermer la fiche ou passer l'application en arrière-plan ne perd pas la mise :
- * elle part tout de suite. Le décompte n'a plus de témoin, et le système peut
- * tuer une application masquée sans prévenir.
+ * Fermer la fiche ou passer l'application en arrière-plan avance l'échéance :
+ * plus personne ne regarde « Annuler », la mise part tout de suite. Et un
+ * rechargement pendant le sursis ne la perd plus — elle est sur le disque
+ * (écart 4).
  *
  * ## Pourquoi l'attente est aussi tenue en référence
  *
@@ -607,6 +656,8 @@ function CartesEnCours({
   nomClient,
   clientId,
   collecteurId,
+  operations,
+  enLigne,
   onRetrait,
   onEcriture,
   visibleId,
@@ -616,6 +667,9 @@ function CartesEnCours({
   nomClient: string;
   clientId: string;
   collecteurId: string | null;
+  /** La file du téléphone : une opération de la carte encore là ferme le retrait (§7). */
+  operations: readonly Operation[];
+  enLigne: boolean;
   /** Le nom accompagne la demande : l'écran de retrait s'ouvre réduit à ce
       client et doit pouvoir le nommer même quand il ne lui reste aucune carte. */
   onRetrait: (clientNom: string) => void;
@@ -627,17 +681,20 @@ function CartesEnCours({
 }) {
   const [attente, setAttente] = useState<EnAttente | null>(null);
   const [restant, setRestant] = useState(0);
+  /** Un enregistrement sur le téléphone est en vol : le bouton attend sa réponse. */
+  const [occupe, setOccupe] = useState(false);
 
   const enCours = useRef<EnAttente | null>(null);
+  /** La même garde, lue sans attendre un rendu : deux appuis dans la même image n'écrivent qu'une mise. */
+  const ecriture = useRef(false);
   const sursis = useRef<number | null>(null);
   const decompte = useRef<number | null>(null);
-  // Après le démontage, les références restent utiles — l'écriture en cours
-  // les lit — mais l'état ne peut plus rien afficher. React avertit sur une
-  // pose d'état après démontage ; ici elle serait en plus sans effet.
+  // Après le démontage, les références restent utiles — l'enregistrement en
+  // cours les lit — mais l'état ne peut plus rien afficher.
   const monte = useRef(true);
 
-  // Le contexte d'écriture suit chaque rendu, pour la même raison que
-  // l'attente : la purge part d'endroits qui ne referment rien.
+  // Le contexte suit chaque rendu, pour la même raison que l'attente : la purge
+  // part d'endroits qui ne referment rien.
   const contexte = useRef({ collecteurId, onEcriture });
   contexte.current = { collecteurId, onEcriture };
 
@@ -654,89 +711,82 @@ function CartesEnCours({
     if (monte.current) setRestant(0);
   }
 
-  async function ecrire(en: EnAttente) {
-    const { collecteurId: id, onEcriture: prevenir } = contexte.current;
-    if (!id) {
-      // Sans identifiant de collecteur, rien ne peut partir. Le dire, plutôt
-      // que de laisser un bandeau vert sur une écriture qui n'aura pas lieu.
-      poser({ ...en, envoyee: true, echec: SESSION_PERDUE });
-      return;
-    }
-    // Le `try` ne couvre que l'appel réseau, pas `prevenir()` : ce dernier est
-    // le rappel du composant appelant, et un rejet synchrone qui y prendrait
-    // naissance n'a rien à voir avec l'écriture, qui a réussi. Le laisser dans
-    // le `try` le ferait atterrir dans le `catch` ci-dessous et afficher
-    // « Réponse perdue » sur une mise pourtant enregistrée — avec un
-    // « Réessayer » qui l'insérerait une seconde fois, irréversiblement. Même
-    // découpage que le try/catch d'`ActiverCarte`.
-    let resultat;
-    try {
-      resultat = await enregistrerMise(id, en.carteId, en.mise);
-    } catch {
-      // `enregistrerMise` rend `{ ok: false }` sur les refus du serveur, mais
-      // une coupure franche fait **rejeter** la promesse. Sans ce filet, le
-      // bandeau reste vert et figé : « Annuler » a disparu — la mise est
-      // peut-être partie — et « Réessayer » n'apparaît jamais. Aucune sortie.
-      //
-      // Le message ne promet rien, parce que l'écriture a pu aboutir avant que
-      // la réponse ne se perde. Même prudence, et presque les mêmes mots, que
-      // le try/catch d'`ActiverCarte`.
-      poser({
-        ...en,
-        envoyee: true,
-        echec: 'Réponse perdue. Vérifie la carte avant de réessayer.',
-      });
-      return;
-    }
-    if (resultat.ok) {
-      // L'attente n'est pas levée ici : la relecture s'en charge. La lever
-      // maintenant reviderait la case le temps que la fiche revienne.
-      prevenir();
-      return;
-    }
-    poser({ ...en, envoyee: true, echec: resultat.echec.message });
+  /** Avance l'échéance d'une opération en file. Un échec la laisse partir à son heure : rien n'est perdu. */
+  function faireAvancer(operationId: string) {
+    const id = contexte.current.collecteurId;
+    if (!id) return;
+    avancerEnvoi(id, operationId).catch(() => {
+      // L'opération reste en file avec son échéance d'origine.
+    });
   }
 
-  /** Écrit tout de suite ce qui attendait, et rend les minuteurs au repos. */
+  /** Ce qui était en sursis part maintenant : un autre appui, la fiche qui se ferme, l'arrière-plan. */
   function purger() {
     arreter();
     const en = enCours.current;
-    if (!en) return;
-    // Déjà partie et sans échec : la relecture s'en occupe. La renvoyer
-    // écrirait la mise une seconde fois, et rien ne la retirerait.
-    if (en.envoyee && !en.echec) return;
-    const repris: EnAttente = { ...en, envoyee: true, echec: undefined };
-    poser(repris);
-    void ecrire(repris);
+    // Rien sur le disque, ou déjà envoyable : il n'y a rien à avancer — et
+    // surtout rien à réécrire, la mise est déjà dans la file.
+    if (!en || en.envoyee || en.operationId === null) return;
+    poser({ ...en, envoyee: true });
+    faireAvancer(en.operationId);
   }
 
-  function encaisser(carte: CarteFiche) {
-    // Un second appui pendant un décompte fait partir le premier. Deux mises
-    // le même jour sur la même carte sont acceptées par le serveur ; ce n'est
-    // pas à cet écran de les interdire, seulement de ne pas les perdre.
+  async function encaisser(carte: CarteFiche) {
+    if (ecriture.current) return;
+    // Un second appui pendant un sursis fait partir le premier. Deux mises le
+    // même jour sur la même carte sont acceptées par le serveur ; ce n'est pas
+    // à cet écran de les interdire, seulement de ne pas les perdre.
     purger();
 
-    const en: EnAttente = {
+    const socle: EnAttente = {
       carteId: carte.id,
       mise: carte.mise,
       base: carte.misesEncaissees,
-      envoyee: false,
+      operationId: null,
+      envoyee: true,
     };
 
-    if (!contexte.current.collecteurId) {
-      // Sans identifiant de collecteur, rien ne partira jamais : `ecrire` le
-      // découvre déjà, mais seulement six secondes plus tard. Sur une session
-      // qu'on sait morte d'avance, faire attendre le décompte à chaque appui
-      // n'apprend rien de plus — le dire tout de suite. Le garde-fou dans
-      // `ecrire` reste en place : `purger` et `reessayer` l'atteignent par
-      // d'autres chemins que celui-ci.
-      poser({ ...en, envoyee: true, echec: SESSION_PERDUE });
+    const id = contexte.current.collecteurId;
+    if (!id) {
+      // Sans identifiant de collecteur, aucune base ne s'ouvre : le dire tout
+      // de suite plutôt qu'au bout d'une attente.
+      poser({ ...socle, echec: SESSION_PERDUE });
+      return;
+    }
+
+    ecriture.current = true;
+    if (monte.current) setOccupe(true);
+    let resultat: Awaited<ReturnType<typeof enregistrerMise>>;
+    try {
+      resultat = await enregistrerMise(id, carte.id, carte.mise, new Date(), {
+        sursisMs: SURSIS_MS,
+      });
+    } catch {
+      poser({ ...socle, echec: ENREGISTREMENT_INCERTAIN });
+      return;
+    } finally {
+      ecriture.current = false;
+      if (monte.current) setOccupe(false);
+    }
+
+    if (!resultat.ok) {
+      // Refusée par le téléphone — carte clôturée, disque plein : rien n'a été
+      // écrit, la case ne se remplit pas.
+      poser({ ...socle, echec: resultat.echec.message });
+      return;
+    }
+
+    const operationId = resultat.operationId;
+    const en: EnAttente = { ...socle, operationId, envoyee: false };
+    if (!monte.current) {
+      // La fiche s'est fermée pendant l'enregistrement : la mise est sur le
+      // disque, et personne ne verra « Annuler ». Elle part tout de suite.
+      faireAvancer(operationId);
       return;
     }
 
     poser(en);
     setRestant(SURSIS_S);
-
     decompte.current = window.setInterval(
       () => setRestant((seconde) => Math.max(0, seconde - 1)),
       1000,
@@ -745,23 +795,49 @@ function CartesEnCours({
       arreter();
       // L'attente a pu être annulée ou remplacée entre-temps.
       if (enCours.current !== en) return;
-      const partie: EnAttente = { ...en, envoyee: true };
-      poser(partie);
-      void ecrire(partie);
+      poser({ ...en, envoyee: true });
     }, SURSIS_MS);
+
+    // En dernier, et hors de tout `try` : un rappel qui lève n'a rien à voir
+    // avec l'enregistrement, qui a réussi. Pris dans le `catch`, il afficherait
+    // un échec sur une mise enregistrée — avec un « Réessayer » qui en
+    // écrirait une seconde.
+    contexte.current.onEcriture();
   }
 
-  function annuler() {
+  async function annuler() {
+    const en = enCours.current;
+    const id = contexte.current.collecteurId;
+    if (!en || en.envoyee || en.operationId === null || !id) return;
     arreter();
-    poser(null);
+
+    let issue: 'annulee' | 'partie' | 'absente';
+    try {
+      issue = await annulerMise(id, en.operationId);
+    } catch {
+      // Base illisible : l'opération ne peut pas être retirée, elle partira.
+      issue = 'partie';
+    }
+    if (enCours.current !== en) return;
+
+    if (issue === 'annulee') {
+      poser(null);
+      contexte.current.onEcriture();
+      return;
+    }
+    // L'échéance était passée, ou l'opération a déjà quitté la file : elle est
+    // partie. Le bandeau cesse de proposer ce qu'il ne peut plus tenir.
+    poser({ ...en, envoyee: true });
   }
 
   function reessayer() {
     const en = enCours.current;
     if (!en) return;
-    const repris: EnAttente = { ...en, envoyee: true, echec: undefined };
-    poser(repris);
-    void ecrire(repris);
+    const carte = actives.find(({ carte: c }) => c.id === en.carteId)?.carte;
+    poser(null);
+    // Un appui neuf : un refus n'a rien écrit, et un échec incertain a demandé
+    // de regarder la carte avant.
+    if (carte) void encaisser(carte);
   }
 
   useEffect(() => {
@@ -779,8 +855,9 @@ function CartesEnCours({
 
   useEffect(() => {
     function surMasquage() {
-      // L'application passe en arrière-plan : le sursis n'a plus de témoin, et
-      // le système peut la tuer sans prévenir. Ce qui attendait part maintenant.
+      // L'application passe en arrière-plan : plus personne ne regarde
+      // « Annuler », et le système peut la tuer sans prévenir. Ce qui attendait
+      // part maintenant.
       if (document.visibilityState === 'hidden') purger();
     }
     document.addEventListener('visibilitychange', surMasquage);
@@ -796,29 +873,37 @@ function CartesEnCours({
 
   useEffect(() => {
     if (!attente) return;
-    if (reelles === null || estRattrapee(reelles, attente)) poser(null);
+    if (reelles === null) {
+      poser(null);
+      return;
+    }
+    // Pendant le sursis, le bandeau reste même quand la relecture compte déjà
+    // la mise : c'est lui qui porte « Annuler ». Il s'efface une fois
+    // l'échéance passée et la mise comptée par la tournée.
+    if (attente.envoyee && estRattrapee(reelles, attente)) poser(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attente, reelles]);
 
   const courant = actives.find(({ carte }) => carte.id === visibleId) ?? actives[0];
   const { carte } = courant;
   const misesCourantes = misesAffichees(carte.id, carte.misesEncaissees, attente);
-  // Tant que la mise du jour peut encore être annulée sur cette carte, le
-  // cycle n'est pas vraiment terminé : rien n'est inscrit en base. Proposer
+  // Tant que la mise du jour peut encore être annulée sur cette carte, le cycle
+  // n'est pas vraiment terminé : un appui peut encore la retirer. Proposer
   // « Aller au retrait » à cet instant rendrait de l'argent sur un dépôt qui
-  // n'existe pas encore — et « Aller au retrait » démonte cette section, ce
-  // qui purge et commet la mise avant la fin des six secondes, en silence.
+  // peut disparaître.
   const miseEnSursisSurCetteCarte =
     attente !== null && attente.carteId === carte.id && !attente.envoyee;
   const complete = misesCourantes >= MISES_PAR_CYCLE && !miseEnSursisSurCetteCarte;
   const solde = formatMontant(soldeRestituable(misesCourantes, carte.mise));
+  /** Ce qui, sur la carte regardée, n'a pas encore quitté le téléphone (§8.3). */
+  const attenteCarte = phraseAttenteCarte(enAttenteSurCarte(operations, carte.id));
 
   function rendreAction(item: CarteItem, choisie: boolean) {
     const trouvee = actives.find(({ carte: c }) => c.id === item.id);
     if (!trouvee) return null;
     const { carte: c } = trouvee;
 
-    // Le bandeau passe avant le choix : une mise qui part doit rester sous les
+    // Le bandeau passe avant le choix : une mise qui attend doit rester sous les
     // yeux même quand on est allé regarder la carte d'à côté. C'est la seule
     // chose qu'une carte non choisie ait le droit de montrer.
     if (attente && attente.carteId === c.id) {
@@ -826,7 +911,7 @@ function CartesEnCours({
         <BandeauSursis
           attente={attente}
           restant={restant}
-          onAnnuler={annuler}
+          onAnnuler={() => void annuler()}
           onReessayer={reessayer}
         />
       );
@@ -846,8 +931,9 @@ function CartesEnCours({
         // Le nom accessible porte le montant en toutes lettres, quelle que soit
         // la largeur : à 160 px le libellé se raccourcit, la mise annoncée non.
         aria-label={`Encaisser ${formatMontant(c.mise)} FCFA`}
-        onClick={() => encaisser(c)}
-        className="anim-pression w-full min-h-11 px-4 rounded-md bg-primary text-primary-foreground border border-primary font-body font-semibold text-base flex items-center justify-center gap-2 cursor-pointer @max-[240px]:min-h-11 @max-[240px]:px-2 @max-[240px]:text-xs @max-[240px]:gap-1"
+        disabled={occupe}
+        onClick={() => void encaisser(c)}
+        className="anim-pression w-full min-h-11 px-4 rounded-md bg-primary text-primary-foreground border border-primary font-body font-semibold text-base flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 @max-[240px]:min-h-11 @max-[240px]:px-2 @max-[240px]:text-xs @max-[240px]:gap-1"
       >
         <Icone nom="circle-dollar-sign" taille={16} />
         <span aria-hidden="true" className="@max-[240px]:hidden">
@@ -883,6 +969,12 @@ function CartesEnCours({
         rendreAction={rendreAction}
       />
 
+      {/* « Pas encore envoyée » sur la carte regardée (§8.3). C'est aussi ce qui
+          dit pourquoi le retrait attend. */}
+      {attenteCarte && (
+        <p className="font-body text-xs font-medium text-info mt-2 mb-0">{attenteCarte}</p>
+      )}
+
       {complete && (
         <div className="bg-positive-tint rounded-md p-3 mt-3 space-y-3">
           <div>
@@ -895,33 +987,35 @@ function CartesEnCours({
               est dû.
             </p>
           </div>
-          <Bouton variante="contour" icone="arrow-up-right" onClick={() => onRetrait(nomClient)}>
+          <Bouton
+            variante="contour"
+            icone="arrow-up-right"
+            // La clôture recalcule au serveur ce qui est rendu : tant qu'une
+            // opération de la carte est sur le téléphone, ce calcul en manquerait
+            // une (§7). Et elle exige le réseau.
+            disabled={attenteCarte !== null || !enLigne}
+            onClick={() => onRetrait(nomClient)}
+          >
             Aller au retrait
           </Bouton>
+          {attenteCarte === null && !enLigne && (
+            <p className="font-body text-xs text-muted-foreground m-0">
+              Le retrait demande le réseau.
+            </p>
+          )}
         </div>
       )}
 
       {/* Hors du panneau de fin de cycle, et sans condition d'avancement.
           `cartes_multiples` nomme deux besoins, pas un : « un client épargne
           pour deux choses à deux rythmes » autant que « un client qui a rempli
-          sa carte veut continuer ». Seul le second avait une porte, si bien
-          qu'un client à 12/31 ne pouvait pas ouvrir de seconde carte — il
-          fallait attendre 31/31, ou repasser par la création d'un client.
+          sa carte veut continuer ». Ouvrir une carte passe par la file : le
+          geste reste permis hors ligne (§1.2).
 
           La mise préremplie est celle de la carte regardée au moment où ce bloc
           est monté, et elle ne suit pas le carrousel ensuite : `ActiverCarte`
           la lit dans un `useState` initial. C'est délibéré — la remonter à
-          chaque défilement demanderait de remonter le composant, ce qui
-          effacerait une saisie en cours. Et ce n'est qu'un défaut : la carte
-          qu'on ouvre est celle du client, pas celle qu'on regarde, et le
-          montant se corrige avant d'enregistrer.
-
-          `identifiant`, lui, suit bien le carrousel — c'est une propriété lue à
-          chaque rendu, pas un état. Après un défilement, le champ porte donc
-          l'`id` de la carte B tandis que sa valeur vient de la carte A. Sans
-          conséquence : l'`id` ne sert qu'à lier le libellé au champ, et les
-          deux changent dans le même rendu. La relecture qui suit toute écriture
-          remonte le bloc et resynchronise le tout. */}
+          chaque défilement effacerait une saisie en cours. */}
       <div className="mt-3">
         <ActiverCarte
           collecteurId={collecteurId}

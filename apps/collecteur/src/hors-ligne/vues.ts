@@ -337,3 +337,40 @@ export function identifiantsEnAttente(operations: readonly Operation[]): Set<str
   }
   return ids;
 }
+
+/** Ce qui, sur une carte, n'a pas encore quitté le téléphone. */
+export interface AttenteCarte {
+  mises: number;
+  /** La carte elle-même est encore en file — ouverte seule, ou avec son client. */
+  creation: boolean;
+}
+
+export function enAttenteSurCarte(operations: readonly Operation[], carteId: string): AttenteCarte {
+  let mises = 0;
+  let creation = false;
+  for (const o of operations) {
+    if (o.type === 'mise' && o.charge.carteId === carteId) mises += 1;
+    if (
+      (o.type === 'carte' && o.charge.id === carteId) ||
+      (o.type === 'client_carte' && o.charge.carte.id === carteId)
+    ) {
+      creation = true;
+    }
+  }
+  return { mises, creation };
+}
+
+/**
+ * Pourquoi le retrait de cette carte attend, ou `null` (spec J2b §7).
+ *
+ * La clôture recalcule au serveur ce qui est rendu, depuis les mises qu'il a
+ * reçues. Tant qu'une opération de la carte est sur le téléphone, ce calcul en
+ * manquerait une : le client repartirait avec moins que son dû, ou la clôture
+ * tomberait sur une mise encore en route (`CARTE_CLOTUREE`).
+ */
+export function phraseAttenteCarte(attente: AttenteCarte): string | null {
+  if (attente.creation) return 'Cette carte n’est pas encore envoyée.';
+  if (attente.mises === 0) return null;
+  const s = attente.mises > 1 ? 's' : '';
+  return `${attente.mises} mise${s} de cette carte pas encore envoyée${s}.`;
+}

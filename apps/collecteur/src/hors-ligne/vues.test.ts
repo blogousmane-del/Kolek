@@ -17,10 +17,12 @@ import {
 import { chargeUtileDe, type MiseLocale, type ProfilLocal } from './modele';
 import {
   TourneeAbsente,
+  enAttenteSurCarte,
   etatFileDepuis,
   ficheDepuis,
   identifiantsEnAttente,
   listeDepuis,
+  phraseAttenteCarte,
   profilDepuis,
   rapprochementDepuis,
   tableauDepuis,
@@ -379,5 +381,36 @@ describe('ce que la file contient (§8.1)', () => {
       operationCaisse(4, { cashDeclare: 0 }),
     ]);
     expect([...ids].sort()).toEqual(['c2', 'k2', 'k3', 'mise-2']);
+  });
+});
+
+describe('ce qui attend sur une carte (§7)', () => {
+  it('compte les mises de la carte, et elles seules', () => {
+    const file = [
+      operationMise(1, { carteId: 'k1' }),
+      operationMise(2, { carteId: 'k1' }),
+      operationMise(3, { carteId: 'k2' }),
+    ];
+
+    expect(enAttenteSurCarte(file, 'k1')).toEqual({ mises: 2, creation: false });
+    expect(phraseAttenteCarte(enAttenteSurCarte(file, 'k1'))).toBe(
+      '2 mises de cette carte pas encore envoyées.',
+    );
+    expect(phraseAttenteCarte(enAttenteSurCarte(file, 'k2'))).toBe(
+      '1 mise de cette carte pas encore envoyée.',
+    );
+  });
+
+  it('dit la carte elle-même pas encore envoyée, qu’elle vienne d’une inscription ou non', () => {
+    expect(
+      enAttenteSurCarte([operationClientCarte(1, { clientId: 'c1', carteId: 'k1' })], 'k1'),
+    ).toEqual({ mises: 0, creation: true });
+    expect(
+      phraseAttenteCarte(enAttenteSurCarte([operationCarte(1, { carteId: 'k2', clientId: 'c1' })], 'k2')),
+    ).toBe('Cette carte n’est pas encore envoyée.');
+  });
+
+  it('se tait quand rien de la carte n’est en file', () => {
+    expect(phraseAttenteCarte(enAttenteSurCarte([operationCaisse(1, { cashDeclare: 0 })], 'k1'))).toBeNull();
   });
 });
