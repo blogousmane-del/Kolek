@@ -6,6 +6,7 @@ import {
   lireErreurOAuthCourante,
   nettoyerUrlOAuth,
 } from './erreurOAuth';
+import { compterOperationsSurCeTelephone } from './hors-ligne/stockage-local';
 import { supabase } from './supabase';
 
 /** La vitrine, pour le lien de retour. En dur plutôt qu'en variable
@@ -57,6 +58,29 @@ export function Connexion() {
     nettoyerUrlOAuth();
   }, []);
 
+  // Une session finie ne vide pas la file : ce qui a été encaissé attend sur le
+  // téléphone, dans la base du collecteur (spec J2b §8.6). Le dire ici, avant
+  // qu'on se connecte avec un autre compte et qu'on croie l'argent perdu.
+  // Rien qu'un nombre : aucun nom, aucun montant avant la connexion.
+  const [avis, setAvis] = useState<string | null>(null);
+  useEffect(() => {
+    let vivant = true;
+    compterOperationsSurCeTelephone().then(
+      (n) => {
+        if (!vivant || n === null || n === 0) return;
+        setAvis(
+          n === 1
+            ? '1 opération attend sur ce téléphone. Reconnecte-toi avec le même compte pour l’envoyer.'
+            : `${n} opérations attendent sur ce téléphone. Reconnecte-toi avec le même compte pour les envoyer.`,
+        );
+      },
+      () => {},
+    );
+    return () => {
+      vivant = false;
+    };
+  }, []);
+
   return (
     <EcranConnexion
       titre="Kolek"
@@ -64,6 +88,7 @@ export function Connexion() {
       retourAccueil={VITRINE}
       motDePasseOublie="/mot-de-passe-oublie"
       erreurInitiale={erreurRetour}
+      avis={avis}
       federee={{
         libelle: 'Continuer avec Google',
         onActiver: async () => {

@@ -57,7 +57,7 @@ function quand(iso: string): string {
 export function Avis({ onRetour, revision }: { onRetour: () => void; revision: number }) {
   const { donnees: etat, erreur } = useDonnees('avis', () => chargerEtatAvis(), {
     revision,
-    messageErreur: 'Avis indisponibles. Vérifie le réseau.',
+    messageErreur: 'Cet écran demande le réseau.',
   });
 
   const eteint = !etat?.canal || etat.canal === 'aucun';

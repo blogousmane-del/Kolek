@@ -1,8 +1,17 @@
-import { soldeRestituable } from '@kolek/core';
+import { formatMontant, soldeRestituable } from '@kolek/core';
 
 import type { TableauCollecteur } from '../lectures';
 import type { FicheClient, Profil, Rapprochement } from '../lectures-ecrans';
-import type { Operation, ProfilLocal, RefusLocal, Tournee, TypeOperation } from './modele';
+import { phraseRefus } from '../phrases';
+import {
+  JOURS_ALERTE_ATTENTE,
+  chargeUtileDe,
+  type Operation,
+  type ProfilLocal,
+  type RefusLocal,
+  type Tournee,
+  type TypeOperation,
+} from './modele';
 
 /**
  * Ce que les écrans de collecte lisent, calculé sur la tournée du téléphone.
@@ -376,4 +385,186 @@ export function phraseAttenteCarte(attente: AttenteCarte): string | null {
   if (attente.mises === 0) return null;
   const s = attente.mises > 1 ? 's' : '';
   return `${attente.mises} mise${s} de cette carte pas encore envoyée${s}.`;
+}
+
+/** Un refus, tel que l'écran des alertes le montre (spec J2b §8.4). */
+export interface RefusAffiche {
+  /** L'identifiant de l'opération, qui est aussi celui de la ligne de `synchro_rejets`. */
+  id: string;
+  /** Qui et combien : « Awa — mise de 1 000 FCFA ». */
+  titre: string;
+  /** Le motif, en clair et au passé. */
+  detail: string;
+  /** L'heure réelle du geste ; `null` quand la charge ne la porte pas. */
+  quand: string | null;
+}
+
+type Brut = Record<string, unknown>;
+
+function objet(valeur: unknown): Brut | null {
+  return typeof valeur === 'object' && valeur !== null && !Array.isArray(valeur)
+    ? (valeur as Brut)
+    : null;
+}
+
+function champ(o: Brut | null, cle: string): Brut | null {
+  return objet(o?.[cle]);
+}
+
+function texte(o: Brut | null, cle: string): string | null {
+  const valeur = o?.[cle];
+  return typeof valeur === 'string' && valeur !== '' ? valeur : null;
+}
+
+function nombre(o: Brut | null, cle: string): number | null {
+  const valeur = o?.[cle];
+  return typeof valeur === 'number' && Number.isFinite(valeur) ? valeur : null;
+}
+
+/**
+ * Les refus à montrer, du geste le plus récent au plus ancien.
+ *
+ * Deux sources, toutes deux lisibles sans réseau : la copie des refus consignés,
+ * et les opérations refusées dont la consignation n'est pas encore faite. Une
+ * opération présente des deux côtés — consignée, pas encore retirée de la file —
+ * n'est montrée qu'une fois : deux lignes feraient croire à deux gestes.
+ *
+ * Une charge consignée est lue sans lui faire confiance. Elle a pu être écrite
+ * par une autre version de l'application, il y a des semaines : un champ absent
+ * ou d'un autre type ne fait pas tomber l'écran, le titre se replie sur ce
+ * qu'on sait lire, jusqu'à « Opération refusée ».
+ *
+ * Le nom du client vient de la tournée, puis des charges d'inscription et
+ * d'ouverture de carte de toute la file : un client refusé n'est jamais entré
+ * dans la tournée, ni la carte de la mise qui dépendait de lui.
+ */
+export function refusAffichables(
+  refus: readonly RefusLocal[],
+  operations: readonly Operation[],
+  tournee: Tournee | null,
+): RefusAffiche[] {
+  const vus = new Set<string>();
+  const sources: { id: string; motif: string; charge: Brut | null }[] = [];
+  for (const r of refus) {
+    if (vus.has(r.id)) continue;
+    vus.add(r.id);
+    sources.push({ id: r.id, motif: r.motif, charge: objet(r.chargeUtile) });
+  }
+  for (const o of operations) {
+    if (o.etat !== 'refusee_a_consigner' || vus.has(o.id)) continue;
+    vus.add(o.id);
+    sources.push({ id: o.id, motif: o.motif ?? 'INCONNU', charge: objet(chargeUtileDe(o)) });
+  }
+
+  const noms = new Map<string, string>();
+  const clientDeCarte = new Map<string, string>();
+  for (const c of tournee?.clients ?? []) noms.set(c.id, c.nom);
+  for (const k of tournee?.cartes ?? []) clientDeCarte.set(k.id, k.clientId);
+  const charges = [
+    ...sources.map((s) => s.charge),
+    ...operations.map((o) => objet(chargeUtileDe(o))),
+  ];
+  for (const cu of charges) {
+    const charge = champ(cu, 'charge');
+    const type = texte(cu, 'type');
+    if (type === 'client_carte') {
+      const clientId = texte(champ(charge, 'client'), 'id');
+      const nom = texte(champ(charge, 'client'), 'nom');
+      const carteId = texte(champ(charge, 'carte'), 'id');
+      if (clientId !== null && nom !== null && !noms.has(clientId)) noms.set(clientId, nom);
+      if (clientId !== null && carteId !== null && !clientDeCarte.has(carteId)) {
+        clientDeCarte.set(carteId, clientId);
+      }
+    } else if (type === 'carte') {
+      const carteId = texte(charge, 'id');
+      const clientId = texte(charge, 'clientId');
+      if (clientId !== null && carteId !== null && !clientDeCarte.has(carteId)) {
+        clientDeCarte.set(carteId, clientId);
+      }
+    }
+  }
+
+  const nomDuClient = (clientId: string | null) =>
+    clientId === null ? null : (noms.get(clientId) ?? null);
+  const nomDeLaCarte = (carteId: string | null) =>
+    carteId === null ? null : nomDuClient(clientDeCarte.get(carteId) ?? null);
+  /** « Awa — mise de 1 000 FCFA », ou « Mise de 1 000 FCFA » quand le nom manque. */
+  const pour = (nom: string | null, quoi: string) =>
+    nom === null ? quoi.charAt(0).toUpperCase() + quoi.slice(1) : `${nom} — ${quoi}`;
+
+  const titre = (cu: Brut | null): string => {
+    const charge = champ(cu, 'charge');
+    const type = texte(cu, 'type');
+    if (type === 'mise') {
+      const montant = nombre(charge, 'montant');
+      if (montant !== null) {
+        return pour(nomDeLaCarte(texte(charge, 'carteId')), `mise de ${formatMontant(montant)} FCFA`);
+      }
+    } else if (type === 'client_carte') {
+      const mise = nombre(champ(charge, 'carte'), 'mise');
+      if (mise !== null) {
+        return pour(
+          texte(champ(charge, 'client'), 'nom'),
+          `inscription et carte de ${formatMontant(mise)} FCFA`,
+        );
+      }
+    } else if (type === 'carte') {
+      const mise = nombre(charge, 'mise');
+      if (mise !== null) {
+        return pour(nomDuClient(texte(charge, 'clientId')), `carte de ${formatMontant(mise)} FCFA`);
+      }
+    } else if (type === 'caisse') {
+      const date = texte(charge, 'date');
+      const declare = nombre(charge, 'cashDeclare');
+      if (date !== null && declare !== null) {
+        return `Caisse du ${date} — ${formatMontant(declare)} FCFA déclarés`;
+      }
+    }
+    return 'Opération refusée';
+  };
+
+  const affiches = sources.map((s) => {
+    const faiteLe = texte(s.charge, 'faiteLe');
+    return {
+      id: s.id,
+      titre: titre(s.charge),
+      detail: phraseRefus(s.motif),
+      quand: faiteLe !== null && !Number.isNaN(Date.parse(faiteLe)) ? faiteLe : null,
+    };
+  });
+  const instant = (quand: string | null) =>
+    quand === null ? Number.NEGATIVE_INFINITY : Date.parse(quand);
+  // `sort` est stable : à heure égale, l'ordre des sources est gardé.
+  return affiches.sort((a, b) => {
+    const ecart = instant(b.quand) - instant(a.quand);
+    return Number.isNaN(ecart) ? 0 : ecart;
+  });
+}
+
+/** Jours entiers écoulés depuis `iso`. Jamais négatif : une horloge en avance n'invente pas d'attente. */
+export function joursDAttente(iso: string | null, maintenant: number): number {
+  if (iso === null) return 0;
+  const ecoule = maintenant - Date.parse(iso);
+  return Number.isNaN(ecoule) ? 0 : Math.max(0, Math.floor(ecoule / 86_400_000));
+}
+
+const NATURE_EN_ATTENTE: Readonly<Record<TypeOperation, string>> = {
+  mise: 'Une mise',
+  client_carte: 'Une inscription',
+  carte: 'Une carte',
+  caisse: 'Une déclaration de caisse',
+};
+
+/**
+ * L'avertissement de l'accueil quand le plus ancien geste en attente approche
+ * de la fenêtre du serveur, ou `null` (spec J2b §4.7, §8.8).
+ *
+ * Il nomme ce qui attend. « Une mise » quand c'est une inscription enverrait
+ * le collecteur chercher une mise qu'il ne trouvera pas.
+ */
+export function phraseAttenteLongue(file: EtatFile | null, maintenant: number): string | null {
+  if (file === null || file.plusAncienne === null || file.plusAncienneType === null) return null;
+  const jours = joursDAttente(file.plusAncienne, maintenant);
+  if (jours < JOURS_ALERTE_ATTENTE) return null;
+  return `${NATURE_EN_ATTENTE[file.plusAncienneType]} attend depuis ${jours} jours. Retrouve du réseau avant 90 jours.`;
 }

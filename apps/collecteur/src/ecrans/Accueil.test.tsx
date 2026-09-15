@@ -159,3 +159,53 @@ describe('le compteur de la file sur l’accueil (§8.2)', () => {
     expect(document.body.textContent).not.toMatch(/synchronisés dès connexion/);
   });
 });
+
+describe('ce que l’accueil signale de la file (§8.4, §8.7, §8.8)', () => {
+  it('mène aux refus par un bandeau qui ne bloque rien', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    etatHorsLigne = horsLigne({ file: { ...FILE_VIDE, refusees: 2 } });
+    const onNaviguer = vi.fn();
+    rendre({ onNaviguer });
+
+    fireEvent.click(await screen.findByRole('button', { name: '2 opérations refusées — à voir' }));
+
+    expect(onNaviguer).toHaveBeenCalledWith('alertes');
+  });
+
+  it('prévient quand le plus ancien geste attend depuis 75 jours ou plus', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    etatHorsLigne = horsLigne({
+      file: {
+        ...FILE_VIDE,
+        mises: 1,
+        enAttente: 1,
+        // Une seconde de plus que 76 jours : la division ne tombe pas sur la frontière.
+        plusAncienne: new Date(Date.now() - 76 * 86_400_000 - 1000).toISOString(),
+        plusAncienneType: 'mise',
+      },
+    });
+    rendre();
+
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Une mise attend depuis 76 jours. Retrouve du réseau avant 90 jours.',
+    );
+  });
+
+  it('dit une fois par lancement que le stockage n’est pas garanti', async () => {
+    // La seule épreuve du fichier qui passe par `non_garanti` : le drapeau
+    // « déjà dit » vit dans le module, pour toute la durée du lancement.
+    const PHRASE =
+      'Ce téléphone peut effacer les données de Kolek s’il manque de place. Garde l’application installée et envoie dès que possible.';
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    etatHorsLigne = horsLigne({ stockage: 'non_garanti' });
+
+    rendre();
+    expect(await screen.findByText(PHRASE)).toBeTruthy();
+
+    // Retour sur l'accueil pendant le même lancement.
+    cleanup();
+    rendre();
+    expect(await screen.findByRole('button', { name: 'Encaisser sur la carte de Mariam' })).toBeTruthy();
+    expect(screen.queryByText(PHRASE)).toBeNull();
+  });
+});

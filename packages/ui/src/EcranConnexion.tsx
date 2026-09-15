@@ -33,6 +33,10 @@ interface Props {
       **redirige**, et le motif arrive accroché à l'adresse. L'écran doit donc
       pouvoir démarrer sur une erreur, pas seulement en produire une. */
   erreurInitiale?: string | null;
+  /** Une information à lire avant de se connecter, qui n'est pas une erreur :
+      « 3 opérations attendent sur ce téléphone ». `role="status"` et non
+      `alert` — rien n'a échoué. */
+  avis?: string | null;
 }
 
 /** Le « G » de Google, tracé. Un fichier d'image serait bloqué par la CSP des
@@ -78,6 +82,7 @@ export function EcranConnexion({
   retourAccueil,
   motDePasseOublie,
   erreurInitiale = null,
+  avis = null,
 }: Props) {
   const [email, setEmail] = useState('');
   const [motDePasse, setMotDePasse] = useState('');
@@ -152,6 +157,12 @@ export function EcranConnexion({
               <span className="h-px flex-1 bg-white/10" />
             </div>
           </>
+        )}
+
+        {avis && (
+          <p role="status" className="mb-4 rounded-md bg-white/10 p-3 font-body text-sm text-white">
+            {avis}
+          </p>
         )}
 
         <Champ

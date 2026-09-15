@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { viderCache } from '../cache';
 
@@ -23,6 +23,8 @@ import { viderCache } from '../cache';
 afterEach(() => {
   cleanup();
   viderCache();
+  // L'état réseau simulé par une épreuve ne doit pas survivre à la suivante.
+  delete (window.navigator as unknown as { onLine?: boolean }).onLine;
 });
 
 // Importer `../lectures-ecrans`, même pour n'en remplacer qu'une fonction,
@@ -39,6 +41,24 @@ vi.mock('../lectures-ecrans', async (original) => ({
   ...((await original()) as object),
   chargerProfil: () => profil(),
 }));
+
+const FILE_VIDE = {
+  mises: 0,
+  clients: 0,
+  cartes: 0,
+  caisses: 0,
+  enAttente: 0,
+  aConsigner: 0,
+  refusees: 0,
+  plusAncienne: null,
+  plusAncienneType: null,
+};
+let etatHorsLigne: Record<string, unknown> = {};
+vi.mock('../hors-ligne/useHorsLigne', () => ({ useHorsLigne: () => etatHorsLigne }));
+
+beforeEach(() => {
+  etatHorsLigne = { operations: [], refus: [], tournee: null, file: FILE_VIDE, stockage: 'persistant' };
+});
 
 const { Plus } = await import('./Plus');
 
@@ -84,5 +104,31 @@ describe('le bouton de renouvellement', () => {
     (await screen.findByRole('button', { name: /Renouveler/ })).click();
 
     expect(onAbonnement).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ce que « Plus » dit du téléphone (spec J2b §8.7)', () => {
+  it('garde en permanence l’avertissement du stockage non garanti', async () => {
+    profil.mockResolvedValue(PROFIL);
+    etatHorsLigne = { ...etatHorsLigne, stockage: 'non_garanti' };
+    afficher();
+
+    expect(
+      await screen.findByText(
+        'Ce téléphone peut effacer les données de Kolek s’il manque de place. Garde l’application installée et envoie dès que possible.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('dit ce qui marche sans réseau, et ce qui attend sur le téléphone', async () => {
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    profil.mockResolvedValue(PROFIL);
+    etatHorsLigne = { ...etatHorsLigne, file: { ...FILE_VIDE, mises: 2, enAttente: 1, aConsigner: 1 } };
+    afficher();
+
+    expect(await screen.findByText(/^Sans réseau, tu peux encaisser, inscrire un client/)).toBeTruthy();
+    expect(screen.getByText('2 opérations sur ce téléphone pas encore envoyées.')).toBeTruthy();
+    // La phrase d'avant J2b, qui aurait fait refuser des encaissements possibles.
+    expect(document.body.textContent).not.toMatch(/aucun encaissement ne peut être enregistré/);
   });
 });

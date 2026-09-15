@@ -29,7 +29,7 @@ export function Recus({ onRetour, revision }: { onRetour: () => void; revision: 
   const estCollaborateur = useEstCollaborateur();
   const { donnees: recus, erreur } = useDonnees('recus', () => chargerRecus(), {
     revision,
-    messageErreur: 'Reçus indisponibles. Vérifie le réseau.',
+    messageErreur: 'Cet écran demande le réseau.',
   });
   const [ouvert, setOuvert] = useState<string | null>(null);
   // La cascade ne joue qu'à l'ouverture de l'écran. `revision` relit la liste

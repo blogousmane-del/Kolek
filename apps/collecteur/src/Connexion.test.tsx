@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Le retour de Google, quand il rapporte une erreur.
@@ -14,14 +14,24 @@ vi.mock('./supabase', () => ({
   supabase: { auth: { signInWithOAuth: vi.fn(), signInWithPassword: vi.fn() } },
 }));
 
+const compter = vi.fn();
+vi.mock('./hors-ligne/stockage-local', () => ({
+  compterOperationsSurCeTelephone: () => compter(),
+}));
+
 const { Connexion } = await import('./Connexion');
 
 const RETOUR_EN_ECHEC =
   '/?error=server_error&error_code=unexpected_failure' +
   '&error_description=Unable+to+exchange+external+code%3A+4%2F0A';
 
+beforeEach(() => {
+  compter.mockResolvedValue(0);
+});
+
 afterEach(() => {
   cleanup();
+  compter.mockReset();
   window.history.replaceState(null, '', '/');
 });
 
@@ -48,5 +58,34 @@ describe('écran de connexion du collecteur', () => {
     render(<Connexion />);
 
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('ce qui attend sur le téléphone (spec J2b §8.6)', () => {
+  it('annonce les opérations en attente, sans nom ni montant', async () => {
+    compter.mockResolvedValue(3);
+    render(<Connexion />);
+
+    expect((await screen.findByRole('status')).textContent).toBe(
+      '3 opérations attendent sur ce téléphone. Reconnecte-toi avec le même compte pour les envoyer.',
+    );
+  });
+
+  it('accorde la phrase à une seule opération', async () => {
+    compter.mockResolvedValue(1);
+    render(<Connexion />);
+
+    expect((await screen.findByRole('status')).textContent).toBe(
+      '1 opération attend sur ce téléphone. Reconnecte-toi avec le même compte pour l’envoyer.',
+    );
+  });
+
+  it('se tait quand le navigateur ne sait pas compter', async () => {
+    compter.mockResolvedValue(null);
+    render(<Connexion />);
+    // Laisser le compte aboutir avant de constater l'absence.
+    await act(async () => {});
+
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });

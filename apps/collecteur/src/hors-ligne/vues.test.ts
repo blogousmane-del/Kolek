@@ -1,4 +1,4 @@
-import { soldeRestituable } from '@kolek/core';
+import { formatMontant, soldeRestituable } from '@kolek/core';
 import { describe, expect, it } from 'vitest';
 
 import { appliquer, reappliquer } from './appliquer';
@@ -14,17 +14,28 @@ import {
   operationMise,
   tournee,
 } from './fabriques';
-import { chargeUtileDe, type MiseLocale, type ProfilLocal } from './modele';
+import {
+  chargeUtileDe,
+  type ChargeUtileRefus,
+  type MiseLocale,
+  type Operation,
+  type ProfilLocal,
+  type RefusLocal,
+  type TypeOperation,
+} from './modele';
 import {
   TourneeAbsente,
   enAttenteSurCarte,
   etatFileDepuis,
   ficheDepuis,
   identifiantsEnAttente,
+  joursDAttente,
   listeDepuis,
   phraseAttenteCarte,
+  phraseAttenteLongue,
   profilDepuis,
   rapprochementDepuis,
+  refusAffichables,
   tableauDepuis,
 } from './vues';
 
@@ -423,5 +434,162 @@ describe('ce qui attend sur une carte (§7)', () => {
 
   it('se tait quand rien de la carte n’est en file', () => {
     expect(phraseAttenteCarte(enAttenteSurCarte([operationCaisse(1, { cashDeclare: 0 })], 'k1'))).toBeNull();
+  });
+});
+
+describe('les refus, lisibles sans réseau (§8.4)', () => {
+  const refusDe = (op: Operation, motif: string): RefusLocal => ({
+    id: op.id,
+    motif,
+    chargeUtile: chargeUtileDe(op),
+    creeLe: INSTANT,
+  });
+
+  it('titre chaque nature de geste, du plus récent au plus ancien', () => {
+    const t = tournee({ clients: [client('c1', 'Awa')], cartes: [carte('k1', 'c1')] });
+    const refus = [
+      refusDe(
+        operationMise(1, { carteId: 'k1', montant: 1000 }, { faiteLe: '2026-09-10T08:00:00.000Z' }),
+        'CARTE_CLOTUREE',
+      ),
+      refusDe(
+        operationCarte(2, { carteId: 'k2', clientId: 'c1', mise: 2000 }, { faiteLe: '2026-09-12T08:00:00.000Z' }),
+        'ABONNEMENT_INACTIF',
+      ),
+      refusDe(
+        operationCaisse(3, { cashDeclare: 5000, date: '2026-09-12' }, { faiteLe: '2026-09-11T08:00:00.000Z' }),
+        'CONFLIT_UNIQUE',
+      ),
+    ];
+
+    // Les montants passent par `formatMontant` : son séparateur est une
+    // insécable, qu'on ne tape jamais à la main dans une épreuve.
+    expect(refusAffichables(refus, [], t)).toEqual([
+      {
+        id: 'op-2',
+        titre: `Awa — carte de ${formatMontant(2000)} FCFA`,
+        detail: 'L’abonnement n’était plus actif.',
+        quand: '2026-09-12T08:00:00.000Z',
+      },
+      {
+        id: 'op-3',
+        titre: `Caisse du 2026-09-12 — ${formatMontant(5000)} FCFA déclarés`,
+        detail: 'Le serveur avait déjà une ligne à cette place.',
+        quand: '2026-09-11T08:00:00.000Z',
+      },
+      {
+        id: 'op-1',
+        titre: `Awa — mise de ${formatMontant(1000)} FCFA`,
+        detail: 'La carte avait été clôturée.',
+        quand: '2026-09-10T08:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('montre aussi les refus pas encore consignés, une seule fois chacun', () => {
+    const t = tournee({ clients: [client('c1', 'Awa')], cartes: [carte('k1', 'c1')] });
+    const aConsigner = operationMise(
+      4,
+      { carteId: 'k1' },
+      { etat: 'refusee_a_consigner', motif: 'CYCLE_COMPLET' },
+    );
+    const enAttente = operationMise(5, { carteId: 'k1' });
+    // La consignation est arrivée au serveur, la file n'a pas encore été
+    // vidée : la même opération est des deux côtés, pour un seul geste.
+    const dejaConsignee = operationMise(
+      6,
+      { carteId: 'k1' },
+      { etat: 'refusee_a_consigner', motif: 'CARTE_CLOTUREE' },
+    );
+
+    const vus = refusAffichables(
+      [refusDe(dejaConsignee, 'CARTE_CLOTUREE')],
+      [aConsigner, enAttente, dejaConsignee],
+      t,
+    );
+
+    expect(vus.map((r) => [r.id, r.detail])).toEqual([
+      ['op-6', 'La carte avait été clôturée.'],
+      ['op-4', 'Le cycle de 31 mises était déjà complet.'],
+    ]);
+  });
+
+  it('nomme le client d’une inscription refusée, et la mise qui en dépendait', () => {
+    // Ni ce client ni sa carte ne sont jamais entrés dans la tournée : le nom
+    // n'existe que dans la charge de l'inscription.
+    const inscription = operationClientCarte(1, { clientId: 'c9', carteId: 'k9', nom: 'Bintou', mise: 500 });
+    const mise = operationMise(
+      2,
+      { carteId: 'k9', montant: 500 },
+      { etat: 'refusee_a_consigner', motif: 'PARENT_REFUSE', dependDe: ['op-1'] },
+    );
+
+    expect(refusAffichables([refusDe(inscription, 'ABONNEMENT_INACTIF')], [mise], tournee())).toEqual([
+      {
+        id: 'op-1',
+        titre: `Bintou — inscription et carte de ${formatMontant(500)} FCFA`,
+        detail: 'L’abonnement n’était plus actif.',
+        quand: INSTANT,
+      },
+      {
+        id: 'op-2',
+        titre: `Bintou — mise de ${formatMontant(500)} FCFA`,
+        detail: 'L’opération dont elle dépendait a été refusée.',
+        quand: INSTANT,
+      },
+    ]);
+  });
+
+  it('se replie sur ce qu’elle sait lire d’une charge d’une autre version', () => {
+    const inconnue: RefusLocal = {
+      id: 'x',
+      motif: 'MOTIF_FUTUR',
+      chargeUtile: {} as unknown as ChargeUtileRefus,
+      creeLe: INSTANT,
+    };
+    const sansNom = refusDe(operationMise(7, { carteId: 'absente' }), 'CARTE_INTROUVABLE');
+
+    expect(refusAffichables([inconnue, sansNom], [], null)).toEqual([
+      {
+        id: 'op-7',
+        titre: `Mise de ${formatMontant(1000)} FCFA`,
+        detail: 'Le serveur ne connaissait pas cette carte.',
+        quand: INSTANT,
+      },
+      {
+        id: 'x',
+        titre: 'Opération refusée',
+        detail: 'Le serveur a refusé cette opération.',
+        quand: null,
+      },
+    ]);
+  });
+});
+
+describe('l’attente du plus ancien geste (§4.7, §8.8)', () => {
+  it('compte les jours entiers écoulés, jamais en négatif', () => {
+    expect(joursDAttente(null, MAINTENANT)).toBe(0);
+    expect(joursDAttente('2026-06-29T12:00:01.000Z', MAINTENANT)).toBe(75);
+    expect(joursDAttente('2026-06-28T12:00:00.000Z', MAINTENANT)).toBe(77);
+    // Une horloge de téléphone en avance n'invente pas une attente.
+    expect(joursDAttente('2026-09-14T12:00:00.000Z', MAINTENANT)).toBe(0);
+  });
+
+  it('prévient à partir de 75 jours, en nommant ce qui attend', () => {
+    const avec = (plusAncienne: string | null, plusAncienneType: TypeOperation | null) => ({
+      ...etatFileDepuis([], []),
+      plusAncienne,
+      plusAncienneType,
+    });
+
+    expect(phraseAttenteLongue(avec('2026-07-01T12:00:00.000Z', 'mise'), MAINTENANT)).toBeNull();
+    expect(phraseAttenteLongue(avec('2026-06-30T12:00:00.000Z', 'mise'), MAINTENANT)).toBe(
+      'Une mise attend depuis 75 jours. Retrouve du réseau avant 90 jours.',
+    );
+    expect(phraseAttenteLongue(avec('2026-06-25T12:00:00.000Z', 'caisse'), MAINTENANT)).toBe(
+      'Une déclaration de caisse attend depuis 80 jours. Retrouve du réseau avant 90 jours.',
+    );
+    expect(phraseAttenteLongue(avec(null, null), MAINTENANT)).toBeNull();
+    expect(phraseAttenteLongue(null, MAINTENANT)).toBeNull();
   });
 });
