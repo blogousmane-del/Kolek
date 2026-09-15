@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { operationMise } from '../hors-ligne/fabriques';
+
 /**
  * L'écran de retrait : son vocabulaire, ses deux portes, et son filtre.
  *
@@ -76,6 +78,18 @@ vi.mock('../supabase', () => ({
   supabase: { auth: { getUser: () => Promise.resolve({ data: { user: { id: 'col1' } } }) } },
 }));
 
+/** La file du téléphone, telle que l'écran la lit. Vide par défaut. */
+let operationsEnFile: unknown[] = [];
+vi.mock('../hors-ligne/useHorsLigne', () => ({
+  useHorsLigne: () => ({
+    operations: operationsEnFile,
+    refus: [],
+    tournee: null,
+    file: null,
+    stockage: 'inconnu',
+  }),
+}));
+
 const { Retrait } = await import('./Retrait');
 
 /** Hj tient deux cartes : une pleine, une en cours. Ka en tient une pleine. */
@@ -138,6 +152,8 @@ afterEach(() => {
   cloturerCarte.mockReset();
   ouvrirCarte.mockReset();
   rafraichir.mockReset();
+  operationsEnFile = [];
+  delete (window.navigator as unknown as { onLine?: boolean }).onLine;
 });
 
 describe('vocabulaire de l’écran de retrait', () => {
@@ -226,5 +242,30 @@ describe('le filtre par client', () => {
 
     expect(screen.getAllByRole('button', { name: 'Faire le retrait' })).toHaveLength(3);
     expect(screen.queryByText(/Cartes de/)).toBeNull();
+  });
+});
+
+describe('le retrait attend la file et le réseau (§7)', () => {
+  it('refuse le retrait d’une carte dont une mise attend l’envoi, et le dit', () => {
+    // Le montant rendu est recalculé au serveur depuis les mises qu'il a
+    // reçues. Tant qu'une mise de la carte est sur le téléphone, le client
+    // repartirait avec moins que son dû.
+    operationsEnFile = [operationMise(1, { carteId: 'k1' })];
+    rendre();
+
+    const boutons = screen.getAllByRole('button', { name: 'Faire le retrait' }) as HTMLButtonElement[];
+
+    expect(boutons.map((b) => b.disabled)).toEqual([true, false, false]);
+    expect(screen.getByText('1 mise de cette carte pas encore envoyée.')).toBeTruthy();
+  });
+
+  it('demande le réseau pour rendre l’argent', () => {
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    rendre();
+
+    const boutons = screen.getAllByRole('button', { name: 'Faire le retrait' }) as HTMLButtonElement[];
+
+    expect(boutons.every((b) => b.disabled)).toBe(true);
+    expect(screen.getAllByText('Le retrait demande le réseau.')).toHaveLength(3);
   });
 });

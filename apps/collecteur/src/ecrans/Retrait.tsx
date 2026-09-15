@@ -1,10 +1,12 @@
 import { MISES_PAR_CYCLE, formatMontant } from '@kolek/core';
-import { Bouton, Carte, Icone, Squelette } from '@kolek/ui';
+import { Bouton, Carte, Icone, Squelette, useEnLigne } from '@kolek/ui';
 import { useState } from 'react';
 
 import type { ClientCible } from '../Coquille';
 import { useDonnees } from '../cache';
 import { cloturerCarte } from '../ecritures-ecrans';
+import { useHorsLigne } from '../hors-ligne/useHorsLigne';
+import { enAttenteSurCarte, phraseAttenteCarte } from '../hors-ligne/vues';
 import { chargerCartesCloturables, type CarteCloturable } from '../lectures-ecrans';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { useEstCollaborateur } from './commission';
@@ -65,6 +67,8 @@ export function Retrait({
   onToutesLesCartes?: () => void;
 }) {
   const estCollaborateur = useEstCollaborateur();
+  const enLigne = useEnLigne();
+  const { operations } = useHorsLigne();
   const [aConfirmer, setAConfirmer] = useState<CarteCloturable | null>(null);
   // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit.
   const premier = usePremierRendu();
@@ -82,7 +86,7 @@ export function Retrait({
     rafraichir,
   } = useDonnees('cartes-cloturables', chargerCartesCloturables, {
     revision: revision + tourLocal,
-    messageErreur: 'Cartes indisponibles. Vérifie le réseau.',
+    messageErreur: 'Cet écran demande le réseau.',
   });
   const [erreurEcriture, setErreurEcriture] = useState<string | null>(null);
   const erreur = erreurEcriture ?? erreurLecture;
@@ -212,6 +216,11 @@ export function Retrait({
             <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 lg:items-start">
               {visibles?.map((carte, rang) => {
               const enConfirmation = aConfirmer?.carteId === carte.carteId;
+              // Pourquoi le retrait de cette carte attend : une opération encore
+              // sur le téléphone, ou pas de réseau pour la clôture.
+              const retraitBloque =
+                phraseAttenteCarte(enAttenteSurCarte(operations, carte.carteId)) ??
+                (enLigne ? null : 'Le retrait demande le réseau.');
 
               return (
                 <Carte
@@ -269,9 +278,18 @@ export function Retrait({
                     // carte en cours, elle prélèverait une commission — la
                     // première mise du nouveau cycle — que personne n'a demandée.
                     <div className="flex flex-wrap gap-2">
-                      <Bouton variante="contour" onClick={() => setAConfirmer(carte)}>
+                      <Bouton
+                        variante="contour"
+                        disabled={retraitBloque !== null}
+                        onClick={() => setAConfirmer(carte)}
+                      >
                         Faire le retrait
                       </Bouton>
+                      {retraitBloque && (
+                        <p className="basis-full font-body text-xs text-muted-foreground m-0">
+                          {retraitBloque}
+                        </p>
+                      )}
                       {carte.cycleComplet && (
                         <ActiverCarte
                           collecteurId={collecteurId}

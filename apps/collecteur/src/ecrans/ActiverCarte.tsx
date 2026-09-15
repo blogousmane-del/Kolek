@@ -74,12 +74,14 @@ export function ActiverCarte({
     try {
       resultat = await ouvrirCarte(collecteurId, clientId, mise);
     } catch {
-      // Un rejet plutôt qu'un `{ ok: false }` : le réseau est tombé pendant
-      // l'écriture. Sans ce filet, `envoi` resterait vrai et verrouillerait les
-      // deux boutons du bloc — il faudrait recharger l'application pour en
-      // sortir, debout dans un marché.
+      // Un rejet plutôt qu'un `{ ok: false }`. Depuis J2b l'ouverture passe par
+      // la file du téléphone, qui rend `{ ok: false }` sur tout refus connu : un
+      // rejet ne dit pas si la carte a été écrite avant. Sans ce filet, `envoi`
+      // resterait vrai et verrouillerait les deux boutons du bloc.
       setEnvoi(false);
-      setErreur("Le réseau a coupé pendant l'ouverture. Vérifie la carte du client avant de réessayer.");
+      setErreur(
+        'L’ouverture n’a pas pu être confirmée sur ce téléphone. Vérifie les cartes du client avant de réessayer.',
+      );
       return;
     }
     setEnvoi(false);
