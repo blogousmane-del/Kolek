@@ -1,8 +1,8 @@
 import { soldeRestituable } from '@kolek/core';
 
 import type { TableauCollecteur } from '../lectures';
-import type { FicheClient, Profil } from '../lectures-ecrans';
-import type { ProfilLocal, Tournee } from './modele';
+import type { FicheClient, Profil, Rapprochement } from '../lectures-ecrans';
+import type { Operation, ProfilLocal, Tournee } from './modele';
 
 /**
  * Ce que les écrans de collecte lisent, calculé sur la tournée du téléphone.
@@ -188,5 +188,64 @@ export function profilDepuis(p: ProfilLocal | null, t: Tournee): Profil {
     titulaireId: p.titulaireId,
     clients: t.clients.length,
     cartesActives: t.cartes.filter((k) => k.statut === 'active').length,
+  };
+}
+
+/**
+ * La caisse du jour (spec J2b §5.4, §6.4).
+ *
+ * **Le jour du serveur, en UTC.** `cash_attendu_du_jour` découpe la journée sur
+ * `(encaisse_le at time zone 'UTC')::date`, explicitement. Même découpage ici,
+ * sans quoi le collecteur déclarerait son cash pour une journée que le serveur
+ * calcule autrement, et l'écart apparaîtrait sans cause visible. Abidjan est à
+ * UTC+0 toute l'année : cela ne change rien aujourd'hui, par géographie et non
+ * par intention.
+ *
+ * **Provisoire** tant que le téléphone sait quelque chose que le serveur n'a
+ * pas encore compté — une mise ou une déclaration du jour en file — ou que la
+ * tournée n'a pas été relue aujourd'hui. L'attendu est alors recalculé avec les
+ * termes du serveur : les mises du jour, moins les restitutions du jour (depuis
+ * le 2026-08-25).
+ */
+export function rapprochementDepuis(
+  t: Tournee,
+  operations: readonly Operation[],
+  maintenant: number,
+): Rapprochement {
+  const date = new Date(maintenant).toISOString().slice(0, 10);
+  const duJour = (iso: string) => new Date(iso).toISOString().slice(0, 10) === date;
+
+  const enAttente = operations.some(
+    (o) =>
+      o.etat === 'en_attente' &&
+      ((o.type === 'mise' && duJour(o.charge.encaisseLe)) ||
+        (o.type === 'caisse' && o.charge.date === date)),
+  );
+  const relueAujourdhui = t.lueLe !== null && duJour(t.lueLe);
+  const ligne = t.caisses.find((c) => c.date === date) ?? null;
+
+  if (ligne && ligne.cashAttendu !== null && ligne.ecart !== null && !enAttente && relueAujourdhui) {
+    return {
+      date,
+      cashAttendu: ligne.cashAttendu,
+      cashDeclare: ligne.cashDeclare,
+      ecart: ligne.ecart,
+      provisoire: false,
+    };
+  }
+
+  const encaisse = t.mises.filter((m) => duJour(m.encaisseLe)).reduce((s, m) => s + m.montant, 0);
+  const restitue = t.retraits
+    .filter((r) => duJour(r.effectueLe))
+    .reduce((s, r) => s + r.montantRestitue, 0);
+  const cashAttendu = encaisse - restitue;
+  const cashDeclare = ligne?.cashDeclare ?? null;
+
+  return {
+    date,
+    cashAttendu,
+    cashDeclare,
+    ecart: cashDeclare === null ? null : cashDeclare - cashAttendu,
+    provisoire: ligne !== null || enAttente || !relueAujourdhui,
   };
 }

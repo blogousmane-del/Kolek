@@ -3,7 +3,7 @@ import { MISES_PAR_CYCLE, formatMontant, soldeRestituable } from '@kolek/core';
 import type { Carte, MiseRecente } from './lectures';
 import { chargerTout } from './pagination';
 import { lectureCourante } from './hors-ligne/moteur';
-import { ficheDepuis, profilDepuis } from './hors-ligne/vues';
+import { TourneeAbsente, ficheDepuis, profilDepuis, rapprochementDepuis } from './hors-ligne/vues';
 import { supabase } from './supabase';
 
 /**
@@ -23,23 +23,6 @@ import { supabase } from './supabase';
  * vide qui l'assume vaut mieux qu'un chiffre plausible. C'est le défaut qu'on a
  * corrigé sur l'accueil le 2026-08-20, et il ne doit pas revenir par la fenêtre.
  */
-
-/**
- * Le jour au sens du serveur, en UTC.
- *
- * `cash_attendu_du_jour` découpe la journée sur `(encaisse_le at time zone
- * 'UTC')::date`, explicitement et non selon le fuseau de la session. Le
- * rapprochement doit donc demander la même date, sans quoi le collecteur
- * déclarerait son cash pour une journée que le serveur calcule autrement, et
- * l'écart apparaîtrait sans cause visible.
- *
- * Abidjan étant à UTC+0 toute l'année, cela ne change rien aujourd'hui — par
- * géographie, pas par intention. Un téléphone réglé sur un autre fuseau
- * déplacerait la frontière du jour.
- */
-function dateUtcDuJour(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /** Minuit local, il y a `jours` jours. Sert aux tranches du bilan. */
 function ilYA(jours: number): Date {
@@ -394,90 +377,23 @@ export async function chargerAlertes(): Promise<Alerte[]> {
 
 export interface Rapprochement {
   date: string;
-  /** Calculé par le serveur depuis les mises. Le collecteur ne l'écrit jamais. */
+  /** Posé par le serveur depuis les mises ; recalculé sur le téléphone tant que
+      `provisoire`. Le collecteur ne l'écrit jamais. */
   cashAttendu: number;
   /** Ce que le collecteur déclare avoir en main. `null` s'il n'a rien déclaré. */
   cashDeclare: number | null;
   ecart: number | null;
-  /** Identifiant de la ligne du jour, s'il en existe déjà une. */
-  ligneId: string | null;
+  /** Le téléphone compte ce que le serveur n'a pas encore reçu — ou la tournée
+      date d'avant aujourd'hui. Les chiffres du serveur reviennent au
+      rafraîchissement. */
+  provisoire: boolean;
 }
 
+/** La caisse du jour, lue sur la tournée du téléphone (spec J2b §5.4). */
 export async function chargerRapprochement(): Promise<Rapprochement> {
-  const date = dateUtcDuJour();
-
-  // Les mises et les retraits du jour épuisent leurs pages : ils font une somme,
-  // et une somme tronquée ment vers le bas sans rien casser (voir `chargerBilan`).
-  // Mesuré le 2026-09-11 : 250 mises en une journée pour le plus actif des
-  // collecteurs, le quart de `max_rows`.
-  const [rCaisse, rMises, rRetraits] = await Promise.all([
-    supabase
-      .from('caisses_jour')
-      .select('id, cash_attendu, cash_declare, ecart')
-      .eq('date', date)
-      .maybeSingle(),
-    chargerTout((debut, fin) =>
-      supabase
-        .from('mises')
-        .select('montant, encaisse_le')
-        .gte('encaisse_le', `${date}T00:00:00Z`)
-        .order('id')
-        .range(debut, fin),
-    ),
-    chargerTout((debut, fin) =>
-      supabase
-        .from('retraits')
-        .select('montant_restitue, effectue_le')
-        .gte('effectue_le', `${date}T00:00:00Z`)
-        .order('id')
-        .range(debut, fin),
-    ),
-  ]);
-
-  const ligne = rCaisse.data as {
-    id: string;
-    cash_attendu: number;
-    cash_declare: number;
-    ecart: number;
-  } | null;
-
-  if (ligne) {
-    return {
-      date,
-      cashAttendu: ligne.cash_attendu,
-      cashDeclare: ligne.cash_declare,
-      ecart: ligne.ecart,
-      ligneId: ligne.id,
-    };
-  }
-
-  // Aucune déclaration encore : on montre l'attendu tel que le serveur le
-  // calculerait, sans rien écrire. Même découpage de journée — UTC — que
-  // `cash_attendu_du_jour`, sinon le chiffre affiché avant l'enregistrement et
-  // celui posé par le déclencheur ne coïncideraient pas.
-  const dujour = ((rMises.data ?? []) as Array<{ montant: number; encaisse_le: string }>).filter(
-    (m) => m.encaisse_le.slice(0, 10) === date,
-  );
-
-  // Et les restitutions du jour se soustraient, comme côté serveur depuis le
-  // 2026-08-25. Deux calculs du même nombre à deux endroits : celui-ci existe
-  // parce qu'aucune ligne n'est encore écrite, donc aucune fonction n'a été
-  // appelée. S'ils divergent, le collecteur voit un attendu changer au moment
-  // où il déclare — c'est-à-dire au moment où il compte son argent.
-  const restitue = ((rRetraits.data ?? []) as Array<{
-    montant_restitue: number;
-    effectue_le: string;
-  }>)
-    .filter((r) => r.effectue_le.slice(0, 10) === date)
-    .reduce((t, r) => t + r.montant_restitue, 0);
-
-  return {
-    date,
-    cashAttendu: dujour.reduce((t, m) => t + m.montant, 0) - restitue,
-    cashDeclare: null,
-    ecart: null,
-    ligneId: null,
-  };
+  const { tournee, operations } = await lectureCourante();
+  if (tournee.lueLe === null) throw new TourneeAbsente();
+  return rapprochementDepuis(tournee, operations, Date.now());
 }
 
 /* -------------------------------- Profil --------------------------------- */

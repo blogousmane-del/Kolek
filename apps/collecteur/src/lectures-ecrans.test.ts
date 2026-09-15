@@ -39,7 +39,6 @@ const {
   chargerAlertes,
   chargerCartesCloturables,
   chargerEtatAvis,
-  chargerRapprochement,
   chargerRecus,
 } = await import('./lectures-ecrans');
 
@@ -191,30 +190,6 @@ describe('les alertes d’un collecteur au-delà de mille lignes', () => {
     expect(alertes.find((a) => a.cle === 'complete-k1000')?.titre).toBe(
       'Dernière — cycle terminé',
     );
-  });
-});
-
-describe('le rapprochement d’une journée au-delà de mille lignes', () => {
-  it('compte toutes les mises et tous les retraits du jour', async () => {
-    // Aucune déclaration encore : l'attendu est calculé ici. Coupées à mille,
-    // les deux listes rendraient 100 000 − 10 000 = 90 000 au lieu de 90 090.
-    tables = {
-      caisses_jour: [],
-      mises: Array.from({ length: 1001 }, (_, i) => ({
-        id: `m${rang(i)}`,
-        montant: 100,
-        encaisse_le: MAINTENANT,
-      })),
-      retraits: Array.from({ length: 1001 }, (_, i) => ({
-        id: `r${rang(i)}`,
-        montant_restitue: 10,
-        effectue_le: MAINTENANT,
-      })),
-    };
-
-    const rapprochement = await chargerRapprochement();
-
-    expect(rapprochement.cashAttendu).toBe(100_100 - 10_010);
   });
 });
 

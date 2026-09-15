@@ -1,9 +1,16 @@
 import { soldeRestituable } from '@kolek/core';
 import { describe, expect, it } from 'vitest';
 
-import { INSTANT, carte, client, tournee } from './fabriques';
+import { INSTANT, caisse, carte, client, operationMise, tournee } from './fabriques';
 import type { MiseLocale, ProfilLocal } from './modele';
-import { TourneeAbsente, ficheDepuis, listeDepuis, profilDepuis, tableauDepuis } from './vues';
+import {
+  TourneeAbsente,
+  ficheDepuis,
+  listeDepuis,
+  profilDepuis,
+  rapprochementDepuis,
+  tableauDepuis,
+} from './vues';
 
 const MAINTENANT = Date.parse('2026-09-13T12:00:00.000Z');
 const ilYA = (ms: number) => new Date(MAINTENANT - ms).toISOString();
@@ -170,5 +177,68 @@ describe('le profil', () => {
 
   it('refuse d’inventer un profil jamais lu sur ce téléphone', () => {
     expect(() => profilDepuis(null, tournee())).toThrow(TourneeAbsente);
+  });
+});
+
+describe('la caisse du jour (§6.4)', () => {
+  const MIDI = Date.parse('2026-09-13T12:00:00.000Z');
+  const RELUE = '2026-09-13T08:00:00.000Z';
+
+  it('reprend les chiffres du serveur quand rien du jour n’attend', () => {
+    const t = tournee({
+      lueLe: RELUE,
+      caisses: [caisse({ id: 'l1', date: '2026-09-13', cashAttendu: 5000, cashDeclare: 4500, ecart: -500 })],
+    });
+
+    expect(rapprochementDepuis(t, [], MIDI)).toEqual({
+      date: '2026-09-13',
+      cashAttendu: 5000,
+      cashDeclare: 4500,
+      ecart: -500,
+      provisoire: false,
+    });
+  });
+
+  it('recalcule un attendu provisoire quand une mise du jour attend l’envoi', () => {
+    const op = operationMise(1, { carteId: 'k1', encaisseLe: '2026-09-13T11:00:00.000Z' });
+    // La tournée arrive réappliquée : la mise en file y est déjà.
+    const t = tournee({
+      lueLe: RELUE,
+      mises: [mise('m0', 'k1', '2026-09-13T09:00:00.000Z'), mise(op.charge.id, 'k1', op.charge.encaisseLe)],
+      retraits: [{ id: 'r1', carteId: 'k2', montantRestitue: 300, effectueLe: '2026-09-13T10:00:00.000Z' }],
+      caisses: [caisse({ date: '2026-09-13', cashAttendu: 1000, cashDeclare: 1000, ecart: 0 })],
+    });
+
+    expect(rapprochementDepuis(t, [op], MIDI)).toEqual({
+      date: '2026-09-13',
+      cashAttendu: 1700,
+      cashDeclare: 1000,
+      ecart: -700,
+      provisoire: true,
+    });
+  });
+
+  it('sans déclaration ni attente, calcule ce que le serveur calculera', () => {
+    const t = tournee({ lueLe: RELUE, mises: [mise('m1', 'k1', '2026-09-13T09:00:00.000Z')] });
+
+    expect(rapprochementDepuis(t, [], MIDI)).toEqual({
+      date: '2026-09-13',
+      cashAttendu: 1000,
+      cashDeclare: null,
+      ecart: null,
+      provisoire: false,
+    });
+  });
+
+  it('se dit provisoire sur une tournée qui n’a pas été relue aujourd’hui', () => {
+    expect(rapprochementDepuis(tournee({ lueLe: '2026-09-12T18:00:00.000Z' }), [], MIDI).provisoire).toBe(true);
+  });
+
+  it('découpe la journée en UTC, comme cash_attendu_du_jour', () => {
+    const t = tournee({
+      lueLe: RELUE,
+      mises: [mise('veille', 'k1', '2026-09-12T23:30:00.000Z'), mise('jour', 'k1', '2026-09-13T00:30:00.000Z')],
+    });
+    expect(rapprochementDepuis(t, [], MIDI).cashAttendu).toBe(1000);
   });
 });

@@ -1,4 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import 'fake-indexeddb/auto';
+
+import { IDBFactory } from 'fake-indexeddb';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { carte, client, tournee } from './hors-ligne/fabriques';
+import {
+  CLE_INSTANTANE,
+  CLE_PROFIL,
+  compterFile,
+  fermerBases,
+  lireOperations,
+  ouvrirBase,
+} from './hors-ligne/stockage-local';
 
 /**
  * Ce que voit le collecteur quand le serveur refuse.
@@ -33,14 +46,25 @@ vi.mock('./supabase', () => ({
   },
 }));
 
+// Le moteur est remplacé : ce fichier vérifie qu'un geste le réveille, pas ce
+// qu'une passe fait. Sans collecteur courant, les retouches de la tournée après
+// une écriture en ligne ne s'appliquent pas — elles ont leur épreuve ailleurs.
+const apresGeste = vi.fn();
+vi.mock('./hors-ligne/moteur', () => ({
+  apresGeste: () => apresGeste(),
+  collecteurCourant: () => null,
+  demanderRafraichissement: () => {},
+}));
+
 const {
+  annulerMise,
   codeDErreur,
   creerClientAvecCarte,
   definirConsentementAvis,
   enregistrerMise,
   modifierClient,
-} =
-  await import('./ecritures');
+  ouvrirCarte,
+} = await import('./ecritures');
 
 const COLLECTEUR = '11111111-1111-4111-8111-111111111111';
 const CARTE = '22222222-2222-4222-8222-222222222222';
@@ -131,86 +155,152 @@ describe('traduction des refus du serveur', () => {
   });
 
   it('préfère le message du déclencheur au SQLSTATE', () => {
-    // Un doublon remonte parfois en 23505 depuis la clé primaire, parfois en
-    // P0001 depuis le déclencheur qui l'intercepte en premier. Les deux doivent
-    // donner la même phrase.
-    expect(codeDErreur({ code: '23505', message: 'duplicate key' })).toBe('DOUBLON');
+    // `mises_avant_insert` lève `DOUBLON` sous 23505, avant toute autre règle.
+    expect(codeDErreur({ code: '23505', message: 'DOUBLON' })).toBe('DOUBLON');
     expect(codeDErreur({ code: 'P0001', message: 'DOUBLON' })).toBe('DOUBLON');
   });
-});
 
-describe('refus décidés avant tout aller-retour', () => {
-  it('refuse un nom vide sans écrire', async () => {
-    insert.mockReset();
-    const r = await creerClientAvecCarte(COLLECTEUR, { nom: '   ', mise: 1000 });
-
-    expect(r.ok).toBe(false);
-    expect(insert).not.toHaveBeenCalled();
+  it('ne prend pour un doublon qu’une clé primaire violée (écart 1)', () => {
+    // Trois tables écrites par le collecteur ont d'autres unicités. Traduire
+    // leur violation en « déjà enregistrée » annonçait un succès qui n'a pas eu lieu.
+    const doublon = (contrainte: string) => ({
+      code: '23505',
+      message: `duplicate key value violates unique constraint "${contrainte}"`,
+    });
+    expect(codeDErreur(doublon('mises_pkey'))).toBe('DOUBLON');
+    expect(codeDErreur(doublon('caisses_jour_collecteur_id_date_key'))).toBe('CONFLIT_UNIQUE');
+    expect(codeDErreur(doublon('mises_une_commission_par_carte'))).toBe('CONFLIT_UNIQUE');
+    expect(codeDErreur({ code: '23505', message: 'duplicate key' })).toBe('CONFLIT_UNIQUE');
   });
 
-  it('refuse une mise hors bornes sans écrire', async () => {
-    insert.mockReset();
-    const r = await enregistrerMise(COLLECTEUR, CARTE, 250);
-
-    expect(r.ok).toBe(false);
-    expect(insert).not.toHaveBeenCalled();
+  it('nomme la fenêtre de date au lieu de dire « réessaie » (écart 2)', () => {
+    expect(codeDErreur({ code: 'P0001', message: 'DATE_INVALIDE' })).toBe('DATE_INVALIDE');
   });
 });
 
-describe('ce que le téléphone envoie, et ce qu’il n’envoie pas', () => {
-  it('engendre l’identifiant de la mise lui-même', async () => {
-    // C'est tout le mécanisme anti-double-comptage : un rejeu de la file de
-    // synchro porte le même identifiant, viole la clé primaire, et se voit
-    // répondre DOUBLON. Laisser la base l'engendrer ferait de chaque rejeu une
-    // seconde mise — de l'argent compté deux fois.
-    insert.mockReset().mockResolvedValue({ error: null });
+describe('les gestes de la collecte entrent dans la file du téléphone (J2b)', () => {
+  beforeEach(async () => {
+    await fermerBases();
+    globalThis.indexedDB = new IDBFactory() as unknown as typeof indexedDB;
+    insert.mockReset();
+    apresGeste.mockReset();
+    const base = await ouvrirBase(COLLECTEUR);
+    await base.put(
+      'tournee',
+      tournee({
+        clients: [client(CLIENT, 'Awa')],
+        cartes: [carte(CARTE, CLIENT, { mise: 1000, misesEncaissees: 3 })],
+      }),
+      CLE_INSTANTANE,
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('écrit la mise sur le téléphone, sans aller-retour réseau, et réveille le moteur', async () => {
     const r = await enregistrerMise(COLLECTEUR, CARTE, 1000);
 
     expect(r.ok).toBe(true);
-    const ligne = insert.mock.calls[0]![0] as Record<string, unknown>;
-    expect(typeof ligne.id).toBe('string');
-    expect((ligne.id as string).length).toBe(36);
+    expect(insert).not.toHaveBeenCalled();
+    const [op] = await lireOperations(await ouvrirBase(COLLECTEUR));
+    expect(op).toMatchObject({
+      type: 'mise',
+      collecteurId: COLLECTEUR,
+      charge: { carteId: CARTE, montant: 1000 },
+    });
+    if (!r.ok || op?.type !== 'mise') throw new Error('mise');
+    expect(r.miseId).toBe(op.charge.id);
+    expect(r.operationId).toBe(op.id);
+    expect(apresGeste).toHaveBeenCalledTimes(1);
   });
 
-  it('n’envoie jamais est_commission — le serveur en décide', async () => {
-    // Si le téléphone le décidait, un collecteur pourrait marquer chaque mise
-    // du cycle comme sa commission.
-    insert.mockReset().mockResolvedValue({ error: null });
-    await enregistrerMise(COLLECTEUR, CARTE, 1000);
+  it('garde la mise de la fiche annulable six secondes, et l’annule', async () => {
+    const r = await enregistrerMise(COLLECTEUR, CARTE, 1000, new Date(), { sursisMs: 6000 });
+    if (!r.ok) throw new Error('mise');
+    const [op] = await lireOperations(await ouvrirBase(COLLECTEUR));
+    expect(Date.parse(op!.envoyableApres) - Date.parse(op!.faiteLe)).toBe(6000);
 
-    const ligne = insert.mock.calls[0]![0] as Record<string, unknown>;
-    expect(ligne).not.toHaveProperty('est_commission');
-    expect(ligne).not.toHaveProperty('mises_encaissees');
+    expect(await annulerMise(COLLECTEUR, r.operationId)).toBe('annulee');
+    expect(await compterFile(await ouvrirBase(COLLECTEUR))).toBe(0);
   });
 
-  it('dit que le client est enregistré quand seule la carte échoue', async () => {
-    // Deux instructions sans transaction : PostgREST n'en propose pas. Un client
-    // sans carte est un état que le produit connaît et affiche — le filtre
-    // « Sans carte » existe. Le message doit le dire, sinon le collecteur
-    // ressaisit le client et en crée un doublon.
-    insert
-      .mockReset()
-      .mockResolvedValueOnce({ error: null })
-      .mockResolvedValueOnce({ error: { code: '23514', message: 'check' } });
-
-    const r = await creerClientAvecCarte(COLLECTEUR, { nom: 'Awa', mise: 1000 });
-
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.echec.message).toContain('Awa est enregistré');
-      expect(r.echec.message).toContain('carte');
-    }
+  it('refuse une mise hors bornes, ou sur une carte absente du téléphone, sans rien écrire', async () => {
+    expect(await enregistrerMise(COLLECTEUR, CARTE, 250)).toMatchObject({
+      ok: false,
+      echec: { code: 'MISE_HORS_BORNES' },
+    });
+    expect(await enregistrerMise(COLLECTEUR, 'carte-inconnue', 1000)).toMatchObject({
+      ok: false,
+      echec: { code: 'CARTE_ABSENTE' },
+    });
+    expect(await compterFile(await ouvrirBase(COLLECTEUR))).toBe(0);
+    expect(apresGeste).not.toHaveBeenCalled();
   });
 
-  it('vide les champs facultatifs en null plutôt qu’en chaîne vide', async () => {
-    // Une chaîne vide passerait les bornes de longueur et s'afficherait comme
-    // un téléphone renseigné mais illisible. `null` dit « pas de valeur ».
-    insert.mockReset().mockResolvedValue({ error: null });
-    await creerClientAvecCarte(COLLECTEUR, { nom: 'Awa', telephone: '  ', mise: 1000 });
+  it('inscrit le client et sa carte en une seule opération, champs vides en null', async () => {
+    const r = await creerClientAvecCarte(COLLECTEUR, { nom: ' Bintou ', telephone: '  ', mise: 1000 });
 
-    const ligne = insert.mock.calls[0]![0] as Record<string, unknown>;
-    expect(ligne.telephone).toBeNull();
-    expect(ligne.marche).toBeNull();
+    const ops = await lireOperations(await ouvrirBase(COLLECTEUR));
+    expect(ops).toHaveLength(1);
+    const [op] = ops;
+    if (!r.ok || op?.type !== 'client_carte') throw new Error('inscription');
+    expect(r.resultat).toEqual({ clientId: op.charge.client.id, carteId: op.charge.carte.id });
+    expect(op.charge.client).toMatchObject({ nom: 'Bintou', telephone: null, marche: null });
+  });
+
+  it('ouvre une carte de plus sur un client du téléphone', async () => {
+    const r = await ouvrirCarte(COLLECTEUR, CLIENT, 2000);
+
+    const [op] = await lireOperations(await ouvrirBase(COLLECTEUR));
+    if (!r.ok || op?.type !== 'carte') throw new Error('carte');
+    expect(r.carteId).toBe(op.charge.id);
+    expect(op.charge).toMatchObject({ clientId: CLIENT, mise: 2000 });
+  });
+
+  it('refuse l’inscription et la carte quand le dernier statut connu n’est pas actif', async () => {
+    const base = await ouvrirBase(COLLECTEUR);
+    await base.put(
+      'profil',
+      {
+        nom: 'Awa',
+        telephone: '+2250700000000',
+        zone: null,
+        palier: 'pro',
+        abonnementStatut: 'suspendu',
+        abonnementEcheance: null,
+        titulaireId: null,
+        lueLe: '2026-09-13T09:00:00.000Z',
+      },
+      CLE_PROFIL,
+    );
+
+    expect(await creerClientAvecCarte(COLLECTEUR, { nom: 'Bintou', mise: 1000 })).toMatchObject({
+      ok: false,
+      echec: { code: 'ABONNEMENT_INACTIF' },
+    });
+    expect(await ouvrirCarte(COLLECTEUR, CLIENT, 1000)).toMatchObject({
+      ok: false,
+      echec: { code: 'ABONNEMENT_INACTIF' },
+    });
+    // L'encaissement, lui, reste permis (§7).
+    expect((await enregistrerMise(COLLECTEUR, CARTE, 1000)).ok).toBe(true);
+  });
+
+  it('dit « stockage » quand la base du téléphone ne s’ouvre pas, et ne montre rien', async () => {
+    await fermerBases();
+    vi.stubGlobal('indexedDB', {
+      open: () => {
+        throw new Error('stockage bloqué');
+      },
+    });
+
+    expect(await enregistrerMise(COLLECTEUR, CARTE, 1000)).toMatchObject({
+      ok: false,
+      echec: { code: 'STOCKAGE' },
+    });
+    expect(apresGeste).not.toHaveBeenCalled();
   });
 });
 
