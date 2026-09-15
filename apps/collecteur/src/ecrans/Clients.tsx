@@ -18,7 +18,8 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { ClientCible } from '../Coquille';
 import { creerClientAvecCarte, definirConsentementAvis } from '../ecritures';
-import { TourneeAbsente } from '../hors-ligne/vues';
+import { useHorsLigne } from '../hors-ligne/useHorsLigne';
+import { TourneeAbsente, identifiantsEnAttente } from '../hors-ligne/vues';
 import { chargerListeClients } from '../lectures';
 import { LIGNES_AFFICHEES_PAR_PAGE } from '../pagination';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
@@ -195,6 +196,9 @@ export function Clients({
   const [recherche, setRecherche] = useState('');
   const [filtre, setFiltre] = useState<Filtre>('Tous');
   const enLigne = useEnLigne();
+  const { file, operations } = useHorsLigne();
+  /** Ce qui n'a pas encore quitté le téléphone, pour « pas encore envoyé » (§8.3). */
+  const pasEnvoyes = useMemo(() => identifiantsEnAttente(operations), [operations]);
 
   useEffect(() => {
     let vivant = true;
@@ -414,7 +418,7 @@ export function Clients({
             <Icone nom="log-out" className="text-white" taille={18} />
           </button>
         </div>
-        {!enLigne && <BandeauHorsLigne className="mt-3 relative z-10" />}
+        <BandeauHorsLigne enLigne={enLigne} compte={file} className="mt-3 relative z-10" />
       </div>
 
       {/* Résumé — trois nombres clés */}
@@ -635,6 +639,13 @@ export function Clients({
           >
           <LigneClient
             ligne={ligne}
+            mentionEnvoi={
+              pasEnvoyes.has(ligne.client.id)
+                ? 'Pas encore envoyé'
+                : ligne.cartes.some((k) => pasEnvoyes.has(k.id))
+                  ? 'Carte pas encore envoyée'
+                  : null
+            }
             onEcriture={onEcriture}
             onOuvrirFiche={() => setFiche(ligne.client.id)}
             onRetrait={() => onRetrait({ id: ligne.client.id, nom: ligne.client.nom })}
@@ -674,11 +685,14 @@ export function Clients({
 
 function LigneClient({
   ligne,
+  mentionEnvoi,
   onEcriture,
   onOuvrirFiche,
   onRetrait,
 }: {
   ligne: Ligne;
+  /** « Pas encore envoyé » quand le client, ou une de ses cartes, attend encore sur le téléphone. */
+  mentionEnvoi: string | null;
   /** Une écriture a eu lieu sur cette ligne — le consentement aux avis — et la
       liste doit se relire. La propriété s'appelait `onConsentementChange` quand
       c'était la seule écriture possible ici ; elle en a porté deux tant que la
@@ -754,6 +768,9 @@ function LigneClient({
       <div className="flex-1 min-w-0">
         <p className="font-body font-semibold text-base text-ink truncate group-hover:text-primary transition-colors">{client.nom}</p>
         <p className="text-xs xs:text-sm text-muted-foreground font-body truncate">{sousTitre}</p>
+        {mentionEnvoi && (
+          <p className="text-xs font-body font-medium text-info">{mentionEnvoi}</p>
+        )}
         {carte && (
           <div className="w-full h-1.5 bg-muted rounded-pill mt-2 overflow-hidden">
             <div

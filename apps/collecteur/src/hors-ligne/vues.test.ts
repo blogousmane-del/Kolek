@@ -2,11 +2,24 @@ import { soldeRestituable } from '@kolek/core';
 import { describe, expect, it } from 'vitest';
 
 import { appliquer, reappliquer } from './appliquer';
-import { COLLECTEUR, INSTANT, caisse, carte, client, operationMise, tournee } from './fabriques';
-import type { MiseLocale, ProfilLocal } from './modele';
+import {
+  COLLECTEUR,
+  INSTANT,
+  caisse,
+  carte,
+  client,
+  operationCaisse,
+  operationCarte,
+  operationClientCarte,
+  operationMise,
+  tournee,
+} from './fabriques';
+import { chargeUtileDe, type MiseLocale, type ProfilLocal } from './modele';
 import {
   TourneeAbsente,
+  etatFileDepuis,
   ficheDepuis,
+  identifiantsEnAttente,
   listeDepuis,
   profilDepuis,
   rapprochementDepuis,
@@ -305,5 +318,66 @@ describe('la caisse du jour (§6.4)', () => {
       mises: [mise('veille', 'k1', '2026-09-12T23:30:00.000Z'), mise('jour', 'k1', '2026-09-13T00:30:00.000Z')],
     });
     expect(rapprochementDepuis(t, [], MIDI, COLLECTEUR).cashAttendu).toBe(1000);
+  });
+});
+
+describe('ce que la file contient (§8.1)', () => {
+  it('compte toute la file par nature, et sépare l’attente des refus à consigner', () => {
+    const file = [
+      operationMise(1, { carteId: 'k1' }, { faiteLe: '2026-07-01T08:00:00.000Z' }),
+      operationMise(
+        2,
+        { carteId: 'k1' },
+        { etat: 'refusee_a_consigner', motif: 'CARTE_CLOTUREE', faiteLe: '2026-06-01T08:00:00.000Z' },
+      ),
+      operationClientCarte(3, { clientId: 'c2', carteId: 'k2' }),
+      operationCaisse(4, { cashDeclare: 5000 }),
+    ];
+    const refus = [
+      {
+        id: 'ancien',
+        motif: 'INCONNU',
+        chargeUtile: chargeUtileDe(operationCarte(9, { carteId: 'k9', clientId: 'c9' })),
+        creeLe: INSTANT,
+      },
+    ];
+
+    // La plus ancienne **en attente** : un refus à consigner ne sera plus
+    // envoyé, la fenêtre des 90 jours ne le menace pas.
+    expect(etatFileDepuis(file, refus)).toEqual({
+      mises: 2,
+      clients: 1,
+      cartes: 0,
+      caisses: 1,
+      enAttente: 3,
+      aConsigner: 1,
+      refusees: 2,
+      plusAncienne: '2026-07-01T08:00:00.000Z',
+      plusAncienneType: 'mise',
+    });
+  });
+
+  it('ne dit rien de plus ancien sur une file vide', () => {
+    expect(etatFileDepuis([], [])).toEqual({
+      mises: 0,
+      clients: 0,
+      cartes: 0,
+      caisses: 0,
+      enAttente: 0,
+      aConsigner: 0,
+      refusees: 0,
+      plusAncienne: null,
+      plusAncienneType: null,
+    });
+  });
+
+  it('désigne ce qui n’a pas encore quitté le téléphone : clients, cartes et mises', () => {
+    const ids = identifiantsEnAttente([
+      operationClientCarte(1, { clientId: 'c2', carteId: 'k2' }),
+      operationMise(2, { carteId: 'k2' }),
+      operationCarte(3, { carteId: 'k3', clientId: 'c1' }),
+      operationCaisse(4, { cashDeclare: 0 }),
+    ]);
+    expect([...ids].sort()).toEqual(['c2', 'k2', 'k3', 'mise-2']);
   });
 });

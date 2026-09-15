@@ -2,6 +2,8 @@ import { MISES_PAR_CYCLE } from '@kolek/core';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { operationCarte, operationClientCarte } from '../hors-ligne/fabriques';
+
 /**
  * La liste de travail du collecteur, une fois qu'un client peut tenir plusieurs
  * carnets.
@@ -21,6 +23,17 @@ vi.mock('../lectures', () => ({ chargerListeClients: () => chargerListeClients()
 vi.mock('../supabase', () => ({ supabase: {} }));
 
 vi.mock('./FicheClient', () => ({ FicheClient: () => null }));
+
+let operationsEnFile: unknown[] = [];
+vi.mock('../hors-ligne/useHorsLigne', () => ({
+  useHorsLigne: () => ({
+    operations: operationsEnFile,
+    refus: [],
+    tournee: null,
+    file: null,
+    stockage: 'inconnu',
+  }),
+}));
 
 const { LIGNES_AFFICHEES_PAR_PAGE } = await import('../pagination');
 const { Clients } = await import('./Clients');
@@ -99,6 +112,7 @@ function rendre(supplement: Record<string, unknown> = {}) {
 afterEach(() => {
   cleanup();
   chargerListeClients.mockReset();
+  operationsEnFile = [];
 });
 
 describe('liste des clients redevenue liste de personnes', () => {
@@ -517,5 +531,28 @@ describe('la tournée pas encore chargée sur le téléphone', () => {
     // que son carnet a disparu.
     expect(await screen.findByText(/pas encore sur ce téléphone/)).toBeTruthy();
     expect(screen.queryByText('Aucun client pour l’instant.')).toBeNull();
+  });
+});
+
+describe('ce qui n’a pas encore quitté le téléphone (§8.3)', () => {
+  it('marque le client inscrit hors ligne, et lui seul', async () => {
+    operationsEnFile = [operationClientCarte(1, { clientId: 'cli2', carteId: 'kx' })];
+    brancherTournee();
+    rendre();
+
+    const ligne = (await screen.findByText('Ka')).closest('.bg-surface') as HTMLElement;
+
+    expect(within(ligne).getByText('Pas encore envoyé')).toBeTruthy();
+    expect(screen.getAllByText('Pas encore envoyé')).toHaveLength(1);
+  });
+
+  it('marque la carte ouverte hors ligne sur un client déjà envoyé', async () => {
+    operationsEnFile = [operationCarte(1, { carteId: 'k1', clientId: 'cli1' })];
+    brancherTournee();
+    rendre();
+
+    const ligne = (await screen.findByText('Hj')).closest('.bg-surface') as HTMLElement;
+
+    expect(within(ligne).getByText('Carte pas encore envoyée')).toBeTruthy();
   });
 });

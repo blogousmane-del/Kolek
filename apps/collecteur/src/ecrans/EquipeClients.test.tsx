@@ -15,8 +15,8 @@ import { viderCache } from '../cache';
  * **Le refus hors ligne, écrit.** Encaisser pour un coéquipier passe par une
  * Edge Function : rien n'entre dans la file de synchro, et rien ne partira à la
  * reconnexion. Un bouton mort sans explication laisserait croire à une panne
- * passagère ; le bandeau générique `BandeauHorsLigne`, lui, promettrait une
- * synchro qui n'aura pas lieu.
+ * passagère ; le bandeau générique `BandeauHorsLigne`, lui, compterait une file
+ * où cet encaissement n'entre pas.
  */
 
 afterEach(() => {
@@ -109,9 +109,10 @@ describe('la tournée d’un coéquipier', () => {
     afficher(false);
 
     expect(await screen.findByText('Aya Koffi')).toBeTruthy();
-    // `BandeauHorsLigne` dit « les encaissements seront synchronisés dès
-    // connexion ». C'est vrai de la tournée du collecteur, et faux ici : cet
-    // encaissement passe par une Edge Function et n'entre dans aucune file.
+    // Jusqu'à J2b, `BandeauHorsLigne` disait « les encaissements seront
+    // synchronisés dès connexion ». Cet encaissement passe par une Edge
+    // Function et n'entre dans aucune file : cette phrase ne doit jamais
+    // reparaître ici.
     expect(document.body.textContent).not.toContain('synchronisés dès connexion');
   });
 

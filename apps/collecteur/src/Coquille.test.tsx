@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -30,8 +30,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * structurelles, et celles-là il les voit.
  */
 
-const maybeSingle = vi.fn();
 const signOut = vi.fn();
+const chargerProfil = vi.fn();
+const compterFileDe = vi.fn();
+const effacerTourneeDe = vi.fn();
 const invoke = vi.fn();
 
 vi.mock('./supabase', () => ({
@@ -39,7 +41,6 @@ vi.mock('./supabase', () => ({
     auth: {
       signOut: () => signOut(),
     },
-    from: () => ({ select: () => ({ maybeSingle: () => maybeSingle() }) }),
     // La coquille réconcilie les paiements en silence à chaque ouverture — c'est
     // ce qui remplace un cron. Sans ce témoin, l'appel lève dans un effet, hors
     // de toute assertion : la suite affiche sept erreurs et sort en échec en
@@ -55,9 +56,12 @@ vi.mock('./cache', () => ({ viderCache: vi.fn() }));
 const demarrerMoteur = vi.fn((..._args: unknown[]) => () => {});
 const ecouterChangements = vi.fn((..._args: unknown[]) => () => {});
 vi.mock('./hors-ligne/moteur', () => ({
+  compterFileDe: (id: string) => compterFileDe(id),
   demarrerMoteur: (...args: unknown[]) => demarrerMoteur(...args),
   ecouterChangements: (...args: unknown[]) => ecouterChangements(...args),
+  effacerTourneeDe: (id: string) => effacerTourneeDe(id),
 }));
+vi.mock('./lectures-ecrans', () => ({ chargerProfil: () => chargerProfil() }));
 
 // Les dix écrans sont remplacés par des témoins : ce test porte sur la
 // coquille, pas sur ce qu'elle affiche.
@@ -184,7 +188,9 @@ vi.mock('./ecrans/Retrait', () => ({
 const { Coquille } = await import('./Coquille');
 
 beforeEach(() => {
-  maybeSingle.mockResolvedValue({ data: { nom: 'Awa' } });
+  chargerProfil.mockResolvedValue({ nom: 'Awa', palier: 'pro', telephone: '+2250700000000' });
+  compterFileDe.mockResolvedValue(0);
+  effacerTourneeDe.mockResolvedValue(undefined);
   invoke.mockResolvedValue({ data: { credites: 0, enAttente: 0, echeance: null }, error: null });
   // `window.scrollTo` n'existe pas dans jsdom : sans ce témoin, chaque rendu
   // écrit une erreur « Not implemented » dans la sortie du test.
@@ -198,7 +204,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
   demarrerMoteur.mockClear();
   ecouterChangements.mockClear();
-  maybeSingle.mockReset();
+  chargerProfil.mockReset();
+  compterFileDe.mockReset();
+  effacerTourneeDe.mockReset();
   signOut.mockReset();
   invoke.mockReset();
   window.history.replaceState({}, '', '/');
@@ -394,5 +402,69 @@ describe('le moteur du hors-ligne', () => {
     act(() => signaler());
 
     expect(await screen.findByText('révision 1')).toBeTruthy();
+  });
+});
+
+describe('la déconnexion ne détruit rien (§4.5, §8.5)', () => {
+  const sortir = () => fireEvent.click(screen.getByRole('button', { name: 'Déconnexion' }));
+
+  it('est refusée tant que des opérations attendent sur le téléphone', async () => {
+    compterFileDe.mockResolvedValue(3);
+    const onDeconnexion = vi.fn();
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={onDeconnexion} />);
+
+    sortir();
+
+    expect(
+      await screen.findByText('3 opérations pas encore envoyées. Retrouve du réseau avant de te déconnecter.'),
+    ).toBeTruthy();
+    expect(compterFileDe).toHaveBeenCalledWith('collecteur-1');
+    expect(signOut).not.toHaveBeenCalled();
+    expect(effacerTourneeDe).not.toHaveBeenCalled();
+    expect(onDeconnexion).not.toHaveBeenCalled();
+  });
+
+  it('parle au singulier d’une seule opération', async () => {
+    compterFileDe.mockResolvedValue(1);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
+
+    sortir();
+
+    expect(
+      await screen.findByText('1 opération pas encore envoyée. Retrouve du réseau avant de te déconnecter.'),
+    ).toBeTruthy();
+  });
+
+  it('est refusée quand la file ne peut pas être comptée : on ne sort pas sur un doute', async () => {
+    compterFileDe.mockResolvedValue(null);
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
+
+    sortir();
+
+    expect(
+      await screen.findByText('Impossible de vérifier les opérations de ce téléphone. Réessaie.'),
+    ).toBeTruthy();
+    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it('efface la tournée et sort quand la file est vide', async () => {
+    signOut.mockResolvedValue({ error: null });
+    const onDeconnexion = vi.fn();
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={onDeconnexion} />);
+
+    sortir();
+
+    await waitFor(() => expect(onDeconnexion).toHaveBeenCalled());
+    expect(effacerTourneeDe).toHaveBeenCalledWith('collecteur-1');
+  });
+});
+
+describe('qui est connecté, hors ligne', () => {
+  it('montre le nom du profil gardé sur le téléphone', async () => {
+    chargerProfil.mockResolvedValue({ nom: 'Awa Traoré', palier: 'pro', telephone: '+2250700000000' });
+
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
+
+    expect(await screen.findByText('Awa Traoré')).toBeTruthy();
   });
 });

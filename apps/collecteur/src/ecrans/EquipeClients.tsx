@@ -25,11 +25,10 @@ import { CorpsEcran, EnTeteEcran } from './EnTeteEcran';
  * été élargie** : le dépannage passe par une porte dédiée plutôt que par un
  * assouplissement de l'isolation.
  *
- * La conséquence se paie ici. Rien n'entre dans la file de synchro, donc rien ne
- * partira à la reconnexion, et `BandeauHorsLigne` — qui promet « les
- * encaissements seront synchronisés dès connexion » — serait un mensonge sur cet
- * écran précis. D'où la phrase dédiée, qui dit la limite et rappelle qu'elle ne
- * vaut que là.
+ * La conséquence se paie ici. Rien n'entre dans la file du téléphone, donc rien
+ * ne partira à la reconnexion, et `BandeauHorsLigne` — qui compte la file du
+ * collecteur — ne dirait rien de juste sur cet écran précis. D'où la phrase
+ * dédiée, qui dit la limite et rappelle qu'elle ne vaut que là.
  */
 export function EquipeClients({
   collaborateur,

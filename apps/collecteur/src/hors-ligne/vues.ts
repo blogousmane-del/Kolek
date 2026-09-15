@@ -2,7 +2,7 @@ import { soldeRestituable } from '@kolek/core';
 
 import type { TableauCollecteur } from '../lectures';
 import type { FicheClient, Profil, Rapprochement } from '../lectures-ecrans';
-import type { Operation, ProfilLocal, Tournee } from './modele';
+import type { Operation, ProfilLocal, RefusLocal, Tournee, TypeOperation } from './modele';
 
 /**
  * Ce que les écrans de collecte lisent, calculé sur la tournée du téléphone.
@@ -264,4 +264,76 @@ function recompterAttendu(t: Tournee, collecteurId: string, duJour: (iso: string
     .filter((r) => r.restituePar === collecteurId && duJour(r.effectueLe))
     .reduce((s, r) => s + r.montantRestitue, 0);
   return encaisse - restitue;
+}
+
+/**
+ * Ce que la file contient, pour le bandeau, l'accueil et les alertes.
+ *
+ * Les quatre comptes par nature portent **toute** la file, en attente comme
+ * refusée à consigner : c'est ce qui n'a pas quitté le téléphone, donc ce que
+ * la déconnexion attend (§7) et ce que le bandeau doit annoncer. Sans cela, le
+ * bandeau dirait « rien en attente » à un collecteur à qui la déconnexion est
+ * refusée.
+ */
+export interface EtatFile {
+  mises: number;
+  clients: number;
+  cartes: number;
+  caisses: number;
+  /** Encore à envoyer. */
+  enAttente: number;
+  /** Refusées par le serveur, refus pas encore écrit dans `synchro_rejets`. */
+  aConsigner: number;
+  /** Les refus à montrer : ceux déjà consignés, et ceux à consigner. */
+  refusees: number;
+  /** Le plus ancien geste en attente : c'est lui que la fenêtre de 90 jours menace (§4.7). */
+  plusAncienne: string | null;
+  plusAncienneType: TypeOperation | null;
+}
+
+export function etatFileDepuis(
+  operations: readonly Operation[],
+  refus: readonly RefusLocal[],
+): EtatFile {
+  const par = (type: TypeOperation) => operations.filter((o) => o.type === type).length;
+  const enAttente = operations.filter((o) => o.etat === 'en_attente');
+  const aConsigner = operations.length - enAttente.length;
+  const ancienne =
+    [...enAttente].sort(
+      (a, b) => Date.parse(a.faiteLe) - Date.parse(b.faiteLe) || a.sequence - b.sequence,
+    )[0] ?? null;
+
+  return {
+    mises: par('mise'),
+    clients: par('client_carte'),
+    cartes: par('carte'),
+    caisses: par('caisse'),
+    enAttente: enAttente.length,
+    aConsigner,
+    refusees: refus.length + aConsigner,
+    plusAncienne: ancienne?.faiteLe ?? null,
+    plusAncienneType: ancienne?.type ?? null,
+  };
+}
+
+/** Les clients, cartes et mises qui n'ont pas encore quitté le téléphone — « pas encore envoyé » (§8.3). */
+export function identifiantsEnAttente(operations: readonly Operation[]): Set<string> {
+  const ids = new Set<string>();
+  for (const o of operations) {
+    switch (o.type) {
+      case 'mise':
+        ids.add(o.charge.id);
+        break;
+      case 'client_carte':
+        ids.add(o.charge.client.id);
+        ids.add(o.charge.carte.id);
+        break;
+      case 'carte':
+        ids.add(o.charge.id);
+        break;
+      case 'caisse':
+        break;
+    }
+  }
+  return ids;
 }

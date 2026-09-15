@@ -20,6 +20,7 @@ import {
 
 import { useDonnees } from '../cache';
 import type { CarteChoisie, Page } from '../Coquille';
+import { useHorsLigne } from '../hors-ligne/useHorsLigne';
 import { chargerTableauCollecteur } from '../lectures';
 import { usePremierRendu } from '../premier-rendu';
 import { useEstTitulaire } from './commission';
@@ -61,9 +62,10 @@ export function Accueil({
 }) {
   const enLigne = useEnLigne();
   const estTitulaire = useEstTitulaire();
+  const { file } = useHorsLigne();
   const { donnees: tableau, erreur } = useDonnees('accueil', chargerTableauCollecteur, {
     revision,
-    messageErreur: 'Chiffres indisponibles. Vérifie le réseau.',
+    messageErreur: 'Chiffres indisponibles sur ce téléphone. Connecte-toi une fois au réseau pour charger ta tournée.',
   });
 
   /** Extraite une fois : les commandes posées sous la carte s'y réfèrent
@@ -161,7 +163,10 @@ export function Accueil({
           </span>
         </div>
 
-        {!enLigne && <BandeauHorsLigne className="mt-4 relative z-10" />}
+        {/* Toujours rendu : il se tait seul quand la file est vide et le réseau là.
+            En ligne avec une file, il reste — le compteur ne quitte l'accueil
+            qu'une fois tout parti (§8.2). */}
+        <BandeauHorsLigne enLigne={enLigne} compte={file} className="mt-4 relative z-10" />
       </div>
 
       {/* Résumé du jour — trois indicateurs avec badges d'icônes */}
