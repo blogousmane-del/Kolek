@@ -238,7 +238,7 @@ export async function rafraichir(
       lueLe: instant,
     };
 
-    const tx = base.transaction(['tournee', 'profil', 'refus'], 'readwrite');
+    const tx = base.transaction(['tournee', 'profil', 'refus'], 'readwrite', { durability: 'strict' });
     await dans(tx, async () => {
       await tx.objectStore('tournee').put(tournee, CLE_INSTANTANE);
       await tx.objectStore('profil').put(profil, CLE_PROFIL);
@@ -254,9 +254,12 @@ export async function rafraichir(
       }
     });
     return 'fait';
-  } catch {
-    // Le constructeur de requête de supabase-js est un « thenable » : une
-    // coupure franche le fait rejeter. Rien n'a été écrit.
+  } catch (erreur) {
+    // Rien n'a été écrit : `dans` avorte la transaction. Une réponse en panne ou
+    // coupée par son délai rend `error` et s'arrête plus haut ; ce qui arrive
+    // ici est un défaut de code ou de stockage. Tracé : sans quoi la tournée ne
+    // se chargerait jamais, et rien ne le dirait.
+    console.error(erreur);
     return 'impossible';
   }
 }

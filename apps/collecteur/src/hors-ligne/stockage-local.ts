@@ -165,7 +165,7 @@ export async function modifierInstantane(
   base: BaseLocale,
   modifier: (t: Tournee) => void,
 ): Promise<void> {
-  const tx = base.transaction('tournee', 'readwrite');
+  const tx = base.transaction('tournee', 'readwrite', { durability: 'strict' });
   await dans(tx, async () => {
     const t = (await tx.store.get(CLE_INSTANTANE)) ?? tourneeVide();
     modifier(t);
@@ -175,7 +175,7 @@ export async function modifierInstantane(
 
 /** La déconnexion : tournée, profil et copie des refus. La file n'est jamais touchée ici. */
 export async function effacerDonneesDeTournee(base: BaseLocale): Promise<void> {
-  const tx = base.transaction(['tournee', 'profil', 'refus'], 'readwrite');
+  const tx = base.transaction(['tournee', 'profil', 'refus'], 'readwrite', { durability: 'strict' });
   await dans(tx, () =>
     Promise.all([
       tx.objectStore('tournee').clear(),

@@ -54,7 +54,10 @@ export async function ajouter<O extends Operation>(
   construire: Construction<O>,
 ): Promise<ResultatAjout<O>> {
   try {
-    const tx = base.transaction(['file', 'tournee'], 'readwrite');
+    // Stricte, comme chaque écriture du hors-ligne : la transaction ne se termine
+    // qu'une fois la donnée écrite sur le disque, et non remise au système
+    // (§4.1 ; `durabilite.test.ts`).
+    const tx = base.transaction(['file', 'tournee'], 'readwrite', { durability: 'strict' });
     const file = tx.objectStore('file');
     return await dans(tx, async () => {
       const [instantane, operations] = await Promise.all([
@@ -93,7 +96,7 @@ export async function annuler(
   operationId: string,
   maintenant: number = Date.now(),
 ): Promise<'annulee' | 'partie' | 'absente'> {
-  const tx = base.transaction('file', 'readwrite');
+  const tx = base.transaction('file', 'readwrite', { durability: 'strict' });
   return dans(tx, async () => {
     const op = await tx.store.get(operationId);
     if (!op) return 'absente' as const;
@@ -109,7 +112,7 @@ export async function avancer(
   operationId: string,
   maintenant: number = Date.now(),
 ): Promise<void> {
-  const tx = base.transaction('file', 'readwrite');
+  const tx = base.transaction('file', 'readwrite', { durability: 'strict' });
   await dans(tx, async () => {
     const op = await tx.store.get(operationId);
     if (op && Date.parse(op.envoyableApres) > maintenant) {
@@ -120,7 +123,7 @@ export async function avancer(
 
 /** Réécrit une opération encore en file. Ne ressuscite jamais une opération retirée entre-temps. */
 export async function mettreAJour(base: BaseLocale, op: Operation): Promise<void> {
-  const tx = base.transaction('file', 'readwrite');
+  const tx = base.transaction('file', 'readwrite', { durability: 'strict' });
   await dans(tx, async () => {
     if (await tx.store.get(op.id)) await tx.store.put(op);
   });
@@ -128,7 +131,7 @@ export async function mettreAJour(base: BaseLocale, op: Operation): Promise<void
 
 /** Le serveur a l'opération : elle quitte la file et entre dans l'instantané, ensemble. */
 export async function retirerAcceptee(base: BaseLocale, op: Operation): Promise<void> {
-  const tx = base.transaction(['file', 'tournee'], 'readwrite');
+  const tx = base.transaction(['file', 'tournee'], 'readwrite', { durability: 'strict' });
   const tournee = tx.objectStore('tournee');
   await dans(tx, async () => {
     const instantane = (await tournee.get(CLE_INSTANTANE)) ?? tourneeVide();
@@ -151,7 +154,7 @@ export async function retirerEnRefus(
   op: Operation,
   maintenant: number = Date.now(),
 ): Promise<number> {
-  const tx = base.transaction(['file', 'refus'], 'readwrite');
+  const tx = base.transaction(['file', 'refus'], 'readwrite', { durability: 'strict' });
   return dans(tx, async () => {
     await tx.objectStore('refus').put({
       id: op.id,

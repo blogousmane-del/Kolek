@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { IDBFactory } from 'fake-indexeddb';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { tableFactice, type Ligne } from '../postgrest-factice';
 import { client, operationMise, tournee } from './fabriques';
@@ -158,6 +158,25 @@ describe('ce qui n’est jamais écrit', () => {
     const base = await baseAvecAncienInstantane();
 
     expect(await rafraichir(clientFactice(), base, 'col-1', MAINTENANT)).toBe('impossible');
+  });
+
+  it('un défaut qui lève se trace : une tournée qui ne se charge jamais le dit quelque part', async () => {
+    // Une réponse du serveur, même en panne, ne lève pas : elle rend `error`.
+    // Ce qui arrive ici est un défaut de code ou de stockage, qui rendrait
+    // « impossible » à chaque tour sans un mot.
+    const defaut = new Error('défaut de construction');
+    tables.clients = {
+      select: () => {
+        throw defaut;
+      },
+    };
+    const trace = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const base = await baseAvecAncienInstantane();
+
+    expect(await rafraichir(clientFactice(), base, 'col-1', MAINTENANT)).toBe('impossible');
+    expect(trace).toHaveBeenCalledWith(defaut);
+    expect((await lireTournee(base)).tournee.clients.map((c) => c.id)).toEqual(['c-hier']);
+    trace.mockRestore();
   });
 
   it('la file : elle n’est jamais touchée, et reste montrée par-dessus', async () => {
