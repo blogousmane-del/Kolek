@@ -3312,18 +3312,27 @@ if (JSON.stringify(avant.calme) !== JSON.stringify(apres.calme)) {
 }
 
 const ecarts = [];
-const parcourir = (a, b, chemin) => {
-  const cles = new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})]);
-  for (const cle of cles) {
-    const [x, y] = [a?.[cle], b?.[cle]];
-    if (x && y && typeof x === 'object' && typeof y === 'object') parcourir(x, y, `${chemin}.${cle}`);
-    else if (JSON.stringify(x) !== JSON.stringify(y)) ecarts.push(`${chemin}.${cle} : ${x} → ${y}`);
+
+/**
+ * Compare deux valeurs de même chemin.
+ *
+ * Les chaînes se comparent entières : les parcourir par index rendrait un écart
+ * par caractère d'une empreinte md5, et trente-deux lignes pour un seul fait.
+ */
+const comparer = (x, y, chemin) => {
+  const estObjet = (v) => v !== null && typeof v === 'object';
+  if (estObjet(x) && estObjet(y)) {
+    for (const cle of new Set([...Object.keys(x), ...Object.keys(y)])) {
+      comparer(x[cle], y[cle], `${chemin}.${cle}`);
+    }
+    return;
   }
+  if (JSON.stringify(x) !== JSON.stringify(y)) ecarts.push(`${chemin} : ${x} → ${y}`);
 };
 
-for (const cle of Object.keys({ ...avant, ...apres })) {
+for (const cle of new Set([...Object.keys(avant), ...Object.keys(apres)])) {
   if (cle === 'calme') continue;
-  parcourir(avant[cle], apres[cle], cle);
+  comparer(avant[cle], apres[cle], cle);
 }
 
 if (ecarts.length > 0) {
@@ -3339,7 +3348,11 @@ Créer `$TMP/mouvements/definitions.sql` — l'empreinte des quatre fonctions et
 ```sql
 select jsonb_object_agg(
          p.oid::regprocedure::text,
-         md5(pg_get_functiondef(p.oid)) || ' ' || coalesce(p.proacl::text, 'sans acl')
+         -- `chr(13)` retiré : les migrations du dépôt sont en CRLF et le corps
+         -- stocké porte ces retours chariot, tandis que le fichier de retour,
+         -- écrit par Node, est en LF. Le même code rendrait sinon deux
+         -- empreintes différentes pour cette seule raison.
+         md5(replace(pg_get_functiondef(p.oid), chr(13), '')) || ' ' || coalesce(p.proacl::text, 'sans acl')
        ) as releve
   from pg_proc p
  where p.pronamespace = 'public'::regnamespace
@@ -3558,8 +3571,10 @@ Attendu : `Relevés identiques.`, puis dans `vue.json` : `lignes_tables` égal �
 
 - [ ] **Étape 7 : répéter le retour arrière**
 
+`supabase db query` refuse un fichier à plusieurs instructions — « cannot insert multiple commands into a prepared statement ». En local, le retour passe donc par `psql` dans le conteneur. En production il ne passerait jamais par là : il serait copié en migration et poussé sur accord, pour que l'historique des migrations reste vrai.
+
 ```bash
-npx supabase db query --local -f supabase/retour/mouvements-registre.sql
+docker exec -i supabase_db_Kolek psql -U postgres -v ON_ERROR_STOP=1 -q < supabase/retour/mouvements-registre.sql
 node "$TMP/mouvements/releve.mjs" local "$TMP/mouvements/definitions.sql" "$TMP/mouvements/definitions-retour.json"
 node "$TMP/mouvements/comparer.mjs" "$TMP/mouvements/definitions-avant.json" "$TMP/mouvements/definitions-retour.json"
 node "$TMP/mouvements/releve.mjs" local supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/apres-retour.json"
