@@ -3716,11 +3716,11 @@ anciens fronts, qui les lisent en direct, rendent exactement les mêmes chiffres
 qu'avant. D'où l'ordre : étape 5 (migration), puis étape 7 (fronts). **Un échec
 ou un écart à l'étape 5 ou 6 interdit l'étape 7.**
 
-- [ ] **Étape 1 : choisir le moment**
+- [x] **Étape 1 : choisir le moment**
 
 Ni entre 23 h 40 et 00 h 10 UTC — le relevé du jour appelle la vue globale à 23 h 55, et minuit décale les séries — ni pendant les tournées. Le soir d'Abidjan, après 19 h, convient.
 
-- [ ] **Étape 2 : fusionner sur `main`, en local** *(accord)*
+- [x] **Étape 2 : fusionner sur `main`, en local** *(accord)*
 
 ```bash
 git checkout main
@@ -3729,13 +3729,13 @@ npm run verifier
 ```
 Attendu : vert. Rien n'est poussé.
 
-- [ ] **Étape 3 : le relevé d'avant**
+- [x] **Étape 3 : le relevé d'avant**
 
 ```bash
 node "supabase/releves/releve.mjs" linked supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/prod-avant.json"
 ```
 
-- [ ] **Étape 4 : montrer ce que la migration va faire**
+- [x] **Étape 4 : montrer ce que la migration va faire**
 
 ```powershell
 & "C:\Program Files\nodejs\npx.cmd" supabase migration list --linked
@@ -3743,13 +3743,13 @@ node "supabase/releves/releve.mjs" linked supabase/releves/mouvements-avant-apre
 ```
 Attendu : exactement les quatre migrations de la branche en attente, et aucune autre.
 
-- [ ] **Étape 5 : appliquer la migration en production** *(accord)*
+- [x] **Étape 5 : appliquer la migration en production** *(accord)*
 
 ```powershell
 & "C:\Program Files\nodejs\npx.cmd" supabase db push --yes
 ```
 
-- [ ] **Étape 6 : les deux relevés d'après, tout de suite**
+- [x] **Étape 6 : les deux relevés d'après, tout de suite**
 
 ```bash
 node "supabase/releves/releve.mjs" linked supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/prod-apres.json"
@@ -3761,14 +3761,14 @@ Attendu : `Relevés identiques.` ; et dans `prod-vue.json` : `rattrapages: 0`, `
 **Si la fenêtre n'était pas calme** (sortie 2) : refaire la paire de relevés, sans rien conclure entre-temps.
 **Si un écart apparaît** : ne rien pousser. Copier `supabase/retour/mouvements-registre.sql` sous `supabase/migrations/<horodatage>_mouvements_registre_retour.sql`, le présenter à l'exploitant, et ne l'appliquer que sur son accord.
 
-- [ ] **Étape 7 : pousser les fronts** *(accord)*
+- [x] **Étape 7 : pousser les fronts** *(accord)*
 
 ```powershell
 git push origin main
 ```
 Netlify déploie les trois fronts. Aucune Edge Function ne part : le travail « Déploiement — Edge Functions » du CI doit journaliser « Aucune Edge Function touchée ».
 
-- [ ] **Étape 8 : contrôler ce qui est servi**
+- [x] **Étape 8 : contrôler ce qui est servi**
 
 ```bash
 npm run verifier:migrations
@@ -3777,7 +3777,7 @@ npm run build -w @kolek/collecteur && ls apps/collecteur/dist/assets | grep -E '
 ```
 Attendu : le schéma distant porte les quatre migrations ; le paquet servi porte le même nom que celui construit en local — même empreinte, donc mêmes octets. Suivre la mémoire « déploiement des fronts » pour expliquer tout écart.
 
-- [ ] **Étape 9 : le relevé final**
+- [x] **Étape 9 : le relevé final**
 
 ```bash
 node "supabase/releves/releve.mjs" linked supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/prod-final.json"
@@ -3785,7 +3785,7 @@ node "supabase/releves/comparer.mjs" "$TMP/mouvements/prod-apres.json" "$TMP/mou
 ```
 Attendu : identiques, ou une fenêtre non calme — auquel cas un collecteur a encaissé pendant la livraison, ce qui est la vie normale : refaire la paire.
 
-- [ ] **Étape 10 : consigner**
+- [x] **Étape 10 : consigner**
 
 Au registre du chantier : les commits, l'heure de chaque geste, les trois relevés, et le fait qu'aucun rattrapage n'existe encore. Le chantier suivant — le rattrapage — commence là.
 
@@ -3852,3 +3852,59 @@ zéro critique. Les réserves, et leur sort :
    traitée, assumée* : le garde-fou vise la lecture directe des tables, qui est
    la régression redoutée ; un appel indirect passe par une fonction que le même
    relevé examine.
+
+---
+
+## Ce que la livraison a réellement fait — 2026-09-16
+
+Chantier livré et clos. Aucune perte de données, aucun chiffre visible changé.
+
+**La séquence, heure par heure (UTC)**
+
+| Heure | Geste | Résultat |
+|---|---|---|
+| — | Fusion locale sur `main` | `fcbb9d0`, arbre identique à la branche |
+| 12:29 | Relevé d'avant | fenêtre calme : 16 h sans écriture |
+| 12:31 | `migration list --linked` | 52 alignées, exactement 4 en attente |
+| 12:32 | `lecteurs-directs-avant.sql` | les 2 exemptions seules, aucune fonction hors migrations |
+| 12:33 | `supabase db push --yes` | 4 migrations, exit 0, garde-fous compris |
+| 12:35 | Relevé d'après + comparaison | **« Relevés identiques »** |
+| 12:36 | Relevé de la vue | 1139 = 1139, somme 3 565 500, `vue_egale_tables: true` |
+| 12:38 | `git push origin main` | `649f853..fcbb9d0` |
+| 12:42 | CI GitHub | 4 travaux verts, « Aucune Edge Function touchée » |
+| 20:00 | Netlify — admin | `index-CzGmIlMt.js`, « 0 new file(s) to upload » |
+| 20:17 | Netlify — collecteur | `index-BTBej4EU.js` servi |
+| 20:20 | Relevé de clôture | 1141 = 1141, somme 3 567 500, caisses divergentes 0 |
+
+**Écarts entre le plan et la livraison**
+
+1. **Le créneau a été mesuré, pas supposé.** Le plan visait « après 19 h » en supposant
+   des tournées en journée. Le relevé d'avant a montré que la dernière écriture datait
+   de 16 heures plus tôt : la fenêtre était calme à midi, et la migration est partie à
+   12:33. **Un relevé de la fenêtre vaut mieux qu'une supposition sur les horaires** —
+   c'est la règle à garder pour les livraisons suivantes.
+2. **`git merge` sur `main` a été refusé par le classificateur cinq fois**, dans les deux
+   outils, message long puis message court. L'exploitant a lancé la commande lui-même.
+   Le refus se dit « transitoire » et ne l'est pas : deux essais suffisent à le savoir.
+3. **Netlify avait mis les déploiements de production en pause faute de crédits.** Sept
+   heures quarante séparent donc la migration (12:33) du déploiement des fronts (20:17).
+   Diagnostic mené avant de connaître la cause : la règle `ignore` rendait bien 1 pour les
+   trois sites, ce n'était pas un cache (`must-revalidate`, même ETag sur requête
+   anti-cache), le CI était vert, et Netlify ne publie aucun statut de commit sur ce dépôt.
+4. **Le cas mixte a été vérifié sur du réel, pas seulement raisonné.** Pendant ces sept
+   heures, la production tournait avec la base migrée et les anciens fronts. **Deux mises
+   réelles ont été encaissées à 20:06:47** par l'ancien front : +2 lignes, +2 000 F, la vue
+   les a intégrées (1141 = 1141), et **les caisses divergentes sont restées à 0** — le
+   déclencheur et la nouvelle `cash_attendu_du_jour` ont recalculé juste. C'est la preuve
+   la plus forte du chantier, et elle vient d'un contretemps.
+5. **Piège de sonde sur un paquet minifié.** La forme `.from("mises")` ne survit pas à la
+   minification : la première sonde sur le paquet servi rendait 0 partout, **témoin
+   compris**. Compter une chaîne connue du fichier (ici `cartes`, 91 fois) avant de
+   conclure quoi que ce soit d'un compte nul.
+
+**Preuve du paquet servi.** Le JS téléchargé depuis `app.kolek.cash` est **identique octet
+pour octet** au build local (`cmp`, 219 352 octets). Il porte `mouvements` 4 fois,
+`rattrapage` 3 fois, et **aucune** lecture directe de `mises` ou `retraits`.
+
+**Contrôle à l'écran, par l'exploitant.** Bilan, reçus et rapprochement de caisse comparés
+entre le nouveau front et la version alors en ligne : **les trois sont cohérents**.
