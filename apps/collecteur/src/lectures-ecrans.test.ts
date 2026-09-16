@@ -101,7 +101,7 @@ describe('alerte d’une carte au bout de son cycle', () => {
           ouverte_le: '2026-07-01T08:00:00.000Z',
         },
       ],
-      mises: [{ id: 'm1', carte_id: 'k1', encaisse_le: MAINTENANT }],
+      mouvements: [{ id: 'm1', sens: 1, carte_id: 'k1', survenu_le: MAINTENANT }],
     };
   });
 
@@ -164,13 +164,14 @@ describe('les alertes d’un collecteur au-delà de mille lignes', () => {
           ouverte_le: '2026-08-12T08:00:00.000Z',
         },
       ],
-      mises: [
+      mouvements: [
         ...Array.from({ length: 1000 }, (_, i) => ({
           id: `m${rang(i)}`,
+          sens: 1,
           carte_id: 'k1',
-          encaisse_le: '2026-09-11T09:00:00.000Z',
+          survenu_le: '2026-09-11T09:00:00.000Z',
         })),
-        { id: 'm1000', carte_id: 'k2', encaisse_le: '2026-09-10T09:00:00.000Z' },
+        { id: 'm1000', sens: 1, carte_id: 'k2', survenu_le: '2026-09-10T09:00:00.000Z' },
       ],
     };
 
@@ -183,7 +184,7 @@ describe('les alertes d’un collecteur au-delà de mille lignes', () => {
 
   it('signale la carte pleine d’un client au-delà du millième, et le nomme', async () => {
     const { clients, cartes } = parc(1001);
-    tables = { clients, cartes, mises: [] };
+    tables = { clients, cartes, mouvements: [] };
 
     const alertes = await chargerAlertes();
 
@@ -229,8 +230,16 @@ describe('les comptes et les noms au-delà de mille lignes', () => {
     tables = {
       clients,
       cartes,
-      mises: [
-        { id: 'm1', carte_id: 'k1000', montant: 500, est_commission: false, encaisse_le: MAINTENANT },
+      mouvements: [
+        {
+          id: 'm1',
+          nature: 'mise',
+          sens: 1,
+          carte_id: 'k1000',
+          montant: 500,
+          est_commission: false,
+          survenu_le: MAINTENANT,
+        },
       ],
     };
 

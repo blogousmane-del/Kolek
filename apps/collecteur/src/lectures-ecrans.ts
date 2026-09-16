@@ -1,6 +1,6 @@
 import { MISES_PAR_CYCLE, formatMontant, soldeRestituable } from '@kolek/core';
 
-import type { Carte, MiseRecente } from './lectures';
+import type { Carte } from './lectures';
 import { chargerTout } from './pagination';
 import { collecteurCourant, lectureCourante } from './hors-ligne/moteur';
 import { TourneeAbsente, ficheDepuis, profilDepuis, rapprochementDepuis } from './hors-ligne/vues';
@@ -64,7 +64,7 @@ export interface Bilan {
 export async function chargerBilan(): Promise<Bilan> {
   const depuis = ilYA(30).toISOString();
 
-  // ## Pourquoi ces quatre lectures épuisent leurs pages
+  // ## Pourquoi ces trois lectures épuisent leurs pages
   //
   // PostgREST applique `max_rows = 1000` sans erreur ni en-tête. Le bilan
   // **somme de l'argent** : une troncature ne casse rien visiblement, elle rend
@@ -72,18 +72,18 @@ export async function chargerBilan(): Promise<Bilan> {
   // s'en apercevoir.
   //
   // Le cas n'est pas théorique. Trente jours à cinquante encaissements par jour
-  // font mille cinq cents lignes de `mises` : au-delà du millier, « encaissé sur
-  // 30 jours » se met à mentir vers le bas. `cartes` et `clients` sont, elles,
-  // sans borne de date et grandissent avec l'ancienneté du collecteur.
+  // font mille cinq cents lignes de mouvements : au-delà du millier, « encaissé
+  // sur 30 jours » se met à mentir vers le bas. `cartes` et `clients` sont,
+  // elles, sans borne de date et grandissent avec l'ancienneté du collecteur.
   //
   // `order('id')` avant `range` : une pagination sur un ordre non total peut
   // rendre deux fois la même ligne et en sauter une autre.
-  const [rMises, rCartes, rClients, rRetraits] = await Promise.all([
+  const [rMouvements, rCartes, rClients] = await Promise.all([
     chargerTout((debut, fin) =>
       supabase
-        .from('mises')
-        .select('montant, est_commission, encaisse_le')
-        .gte('encaisse_le', depuis)
+        .from('mouvements')
+        .select('nature, sens, montant, est_commission, survenu_le')
+        .gte('survenu_le', depuis)
         .order('id')
         .range(debut, fin),
     ),
@@ -97,20 +97,14 @@ export async function chargerBilan(): Promise<Bilan> {
     chargerTout((debut, fin) =>
       supabase.from('clients').select('id').order('id').range(debut, fin),
     ),
-    chargerTout((debut, fin) =>
-      supabase
-        .from('retraits')
-        .select('montant_restitue, effectue_le')
-        .gte('effectue_le', depuis)
-        .order('id')
-        .range(debut, fin),
-    ),
   ]);
 
-  const mises = (rMises.data ?? []) as Array<{
+  const mouvements = (rMouvements.data ?? []) as Array<{
+    nature: string;
+    sens: number;
     montant: number;
     est_commission: boolean;
-    encaisse_le: string;
+    survenu_le: string;
   }>;
   const cartes = (rCartes.data ?? []) as Array<{
     id: string;
@@ -119,10 +113,6 @@ export async function chargerBilan(): Promise<Bilan> {
     mises_encaissees: number;
     ouverte_le: string;
     cloturee_le: string | null;
-  }>;
-  const retraits = (rRetraits.data ?? []) as Array<{
-    montant_restitue: number;
-    effectue_le: string;
   }>;
 
   const bornes: Array<[string, number]> = [
@@ -134,18 +124,23 @@ export async function chargerBilan(): Promise<Bilan> {
   const tranches = bornes.map(([libelle, recul]) => {
     const seuil = ilYA(recul).getTime();
     const dedans = (quand: string) => new Date(quand).getTime() >= seuil;
-    const retenues = mises.filter((m) => dedans(m.encaisse_le));
+    const retenus = mouvements.filter((m) => dedans(m.survenu_le));
+    // Les entrées : mises et rattrapages. Un rattrapage est de l'argent
+    // réellement encaissé — une mise que le serveur a refusée.
+    const entrees = retenus.filter((m) => m.sens === 1);
 
     return {
       libelle,
-      encaisse: retenues.reduce((t, m) => t + m.montant, 0),
-      commissions: retenues.filter((m) => m.est_commission).reduce((t, m) => t + m.montant, 0),
-      nombreMises: retenues.length,
+      encaisse: entrees.reduce((t, m) => t + m.montant, 0),
+      commissions: entrees.filter((m) => m.est_commission).reduce((t, m) => t + m.montant, 0),
+      nombreMises: entrees.length,
       cartesOuvertes: cartes.filter((c) => dedans(c.ouverte_le)).length,
       cartesCloturees: cartes.filter((c) => c.cloturee_le !== null && dedans(c.cloturee_le)).length,
-      restitue: retraits
-        .filter((r) => dedans(r.effectue_le))
-        .reduce((t, r) => t + r.montant_restitue, 0),
+      // Les retraits seuls : une sortie de caisse n'est pas toujours une
+      // restitution de carte.
+      restitue: retenus
+        .filter((m) => m.nature === 'retrait')
+        .reduce((t, m) => t + m.montant, 0),
     };
   });
 
@@ -169,6 +164,8 @@ export interface Recu {
   encaisseLe: string;
   /** Mise du carnet : permet de vérifier qu'on a encaissé le bon montant. */
   mise: number;
+  /** `rattrapage` : une mise que le serveur a refusée, enregistrée comme dette. */
+  nature: 'mise' | 'rattrapage';
 }
 
 /**
@@ -180,11 +177,12 @@ export interface Recu {
  * synchronisation. Ses huit premiers caractères suffisent à retrouver la ligne.
  */
 export async function chargerRecus(limite = 50): Promise<Recu[]> {
-  const [rMises, rCartes, rClients] = await Promise.all([
+  const [rVersements, rCartes, rClients] = await Promise.all([
     supabase
-      .from('mises')
-      .select('id, carte_id, montant, est_commission, encaisse_le')
-      .order('encaisse_le', { ascending: false })
+      .from('mouvements')
+      .select('id, nature, carte_id, montant, est_commission, survenu_le')
+      .eq('sens', 1)
+      .order('survenu_le', { ascending: false })
       .limit(limite),
     // Cartes et clients servent à nommer les reçus : coupés, un reçu récent
     // s'afficherait « Client inconnu », à une mise de 0. Voir `chargerBilan`.
@@ -206,15 +204,25 @@ export async function chargerRecus(limite = 50): Promise<Recu[]> {
     ((rClients.data ?? []) as Array<{ id: string; nom: string }>).map((c) => [c.id, c.nom]),
   );
 
-  return ((rMises.data ?? []) as MiseRecente[]).map((m) => {
+  return (
+    (rVersements.data ?? []) as Array<{
+      id: string;
+      nature: 'mise' | 'rattrapage';
+      carte_id: string;
+      montant: number;
+      est_commission: boolean;
+      survenu_le: string;
+    }>
+  ).map((m) => {
     const carte = cartes.get(m.carte_id);
     return {
       id: m.id,
       clientNom: (carte ? noms.get(carte.client_id) : undefined) ?? 'Client inconnu',
       montant: m.montant,
       estCommission: m.est_commission,
-      encaisseLe: m.encaisse_le,
+      encaisseLe: m.survenu_le,
       mise: carte?.mise ?? 0,
+      nature: m.nature,
     };
   });
 }
@@ -271,10 +279,11 @@ export async function chargerAlertes(): Promise<Alerte[]> {
     ),
     chargerTout((debut, fin) =>
       supabase
-        .from('mises')
-        .select('carte_id, encaisse_le')
-        .gte('encaisse_le', fenetre)
-        .order('encaisse_le', { ascending: false })
+        .from('mouvements')
+        .select('carte_id, survenu_le')
+        .eq('sens', 1)
+        .gte('survenu_le', fenetre)
+        .order('survenu_le', { ascending: false })
         .order('id')
         .range(debut, fin),
     ),
@@ -285,10 +294,11 @@ export async function chargerAlertes(): Promise<Alerte[]> {
     ((rClients.data ?? []) as Array<{ id: string; nom: string }>).map((c) => [c.id, c.nom]),
   );
 
-  /** Dernière mise connue par carte. La liste arrive déjà triée décroissante. */
+  /** Dernier versement connu par carte — mise ou rattrapage. La liste arrive
+      déjà triée décroissante. */
   const derniereMise = new Map<string, string>();
-  for (const m of (rMises.data ?? []) as Array<{ carte_id: string; encaisse_le: string }>) {
-    if (!derniereMise.has(m.carte_id)) derniereMise.set(m.carte_id, m.encaisse_le);
+  for (const m of (rMises.data ?? []) as Array<{ carte_id: string; survenu_le: string }>) {
+    if (!derniereMise.has(m.carte_id)) derniereMise.set(m.carte_id, m.survenu_le);
   }
 
   const alertes: Alerte[] = [];
@@ -657,12 +667,13 @@ export async function chargerFicheClient(clientId: string): Promise<FicheClient 
  */
 export interface EvenementCarte {
   id: string;
-  genre: 'mise' | 'retrait';
-  /** Pour une mise, le montant versé. Pour un retrait, ce qui a été rendu. */
+  genre: 'mise' | 'retrait' | 'rattrapage';
+  /** Pour une mise ou un rattrapage, le montant versé. Pour un retrait, ce qui
+      a été rendu. */
   montant: number;
   /** ISO 8601, tel que la base l'a écrit. */
   date: string;
-  /** La seule mise que la base a marquée commission. Toujours faux pour un retrait. */
+  /** La seule mise que la base a marquée commission. Toujours faux ailleurs. */
   estCommission: boolean;
 }
 
@@ -673,7 +684,8 @@ export interface EvenementCarte {
  *
  * Borné par construction : une carte porte `MISES_PAR_CYCLE` cases, donc au
  * plus 31 mises, et `retraits.carte_id` est unique — donc au plus un retrait.
- * Trente-deux lignes, pour toujours. C'est tout l'intérêt d'avoir pris la carte
+ * Trente-et-une mises, un retrait, et un rattrapage par refus : quelques
+ * dizaines de lignes, bornées par le cycle. C'est tout l'intérêt d'avoir pris la carte
  * pour unité plutôt que le mois : le mois n'a pas de borne, la carte en a une,
  * et elle est dans le schéma.
  *
@@ -688,36 +700,28 @@ export interface EvenementCarte {
  * lectures de ce fichier lèvent déjà pour la même raison.
  */
 export async function chargerHistoriqueCarte(carteId: string): Promise<EvenementCarte[]> {
-  const [rMises, rRetraits] = await Promise.all([
-    supabase
-      .from('mises')
-      .select('id, montant, encaisse_le, est_commission')
-      .eq('carte_id', carteId)
-      .order('encaisse_le', { ascending: false }),
-    supabase.from('retraits').select('id, montant_restitue, effectue_le').eq('carte_id', carteId),
-  ]);
+  const { data, error } = await supabase
+    .from('mouvements')
+    .select('id, nature, montant, survenu_le, est_commission')
+    .eq('carte_id', carteId)
+    .order('survenu_le', { ascending: false });
 
-  if (rMises.error) throw rMises.error;
-  if (rRetraits.error) throw rRetraits.error;
+  if (error) throw error;
 
-  const mises: EvenementCarte[] = (
-    (rMises.data ?? []) as Array<Record<string, string | number | boolean>>
+  const evenements: EvenementCarte[] = (
+    (data ?? []) as Array<{
+      id: string;
+      nature: EvenementCarte['genre'];
+      montant: number;
+      survenu_le: string;
+      est_commission: boolean;
+    }>
   ).map((m) => ({
     id: String(m.id),
-    genre: 'mise',
+    genre: m.nature,
     montant: Number(m.montant),
-    date: String(m.encaisse_le),
+    date: String(m.survenu_le),
     estCommission: Boolean(m.est_commission),
-  }));
-
-  const retraits: EvenementCarte[] = (
-    (rRetraits.data ?? []) as Array<Record<string, string | number>>
-  ).map((r) => ({
-    id: String(r.id),
-    genre: 'retrait',
-    montant: Number(r.montant_restitue),
-    date: String(r.effectue_le),
-    estCommission: false,
   }));
 
   // Les dates sont des ISO 8601 en UTC, donc l'ordre lexicographique est
@@ -727,9 +731,7 @@ export async function chargerHistoriqueCarte(carteId: string): Promise<Evenement
   // dirait « a avant b » **et** « b avant a » pour deux horodatages identiques,
   // et deux mises encaissées dans la même seconde est un cas ordinaire au
   // marché.
-  return [...mises, ...retraits].sort((a, b) =>
-    a.date < b.date ? 1 : a.date > b.date ? -1 : 0,
-  );
+  return evenements.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }
 
 /* ---------------------------- L'équipe (titulaire) ----------------------- */
