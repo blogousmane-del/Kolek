@@ -279,6 +279,16 @@ AS $function$
     ), '[]'::jsonb)
   );
 $function$;
+
+alter function public.admin_vue_globale() owner to postgres;
+
+-- `create or replace` garde l'ACL : ces deux lignes ne changent donc rien à une
+-- base déjà en règle. Elles sont écrites quand même, comme dans chacune des
+-- quatre migrations qui ont repris cette fonction avant celle-ci : une ACL ne se
+-- relit dans aucun corps de fonction, et une migration qui la tait laisserait
+-- croire qu'elle n'a pas d'avis. Le garde-fou, plus bas, la vérifie.
+revoke all on function public.admin_vue_globale() from public, anon, authenticated;
+grant execute on function public.admin_vue_globale() to service_role;
 -- ---------------------------------------------------------------------------
 -- 2. Les tendances du tableau de bord
 -- ---------------------------------------------------------------------------
@@ -635,6 +645,15 @@ begin
   end if;
   if not has_function_privilege('authenticated', 'public.equipe_vue()', 'execute') then
     raise exception 'GARDE_FOU : equipe_vue n''est exécutable par personne.';
+  end if;
+
+  if has_function_privilege('anon', 'public.admin_vue_globale()', 'execute')
+     or has_function_privilege('authenticated', 'public.admin_vue_globale()', 'execute') then
+    raise exception
+      'GARDE_FOU : admin_vue_globale() est exécutable par anon ou authenticated.';
+  end if;
+  if not has_function_privilege('service_role', 'public.admin_vue_globale()', 'execute') then
+    raise exception 'GARDE_FOU : admin_vue_globale() n''est exécutable par personne.';
   end if;
 
   -- Et le contrôle propre à cette migration : les trois lisent le registre, et

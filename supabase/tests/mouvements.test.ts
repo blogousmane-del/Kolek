@@ -151,6 +151,12 @@ describe('à qui la vue rend', () => {
     const { data } = await a.client.from('mouvements').select('id, collecteur_id');
     const lignes = (data ?? []) as Array<{ id: string; collecteur_id: string }>;
 
+    // `every` est vrai sur une liste vide, et `not.toContain` aussi : une vue qui
+    // ne rendrait plus rien du tout passerait cette épreuve d'isolation sans rien
+    // isoler. On compte donc le jeu de A avant de regarder à qui il appartient.
+    expect(lignes).toHaveLength(32); // 30 mises + 1 retrait + 1 rattrapage
+    expect(lignes.map((l) => l.id)).toContain(jeuA.rattrapageId);
+
     expect(lignes.every((l) => l.collecteur_id === a.id)).toBe(true);
     expect(lignes.map((l) => l.id)).not.toContain(jeuB.rattrapageId);
   });
@@ -183,8 +189,9 @@ describe('à qui la vue rend', () => {
     const carte2 = crypto.randomUUID();
     await admin.from('clients').insert({ id: client2, collecteur_id: awa.id, nom: 'Cliente du patron' });
     await admin.from('cartes').insert({ id: carte2, collecteur_id: awa.id, client_id: client2, mise: MISE_PIEGE });
+    const miseId = crypto.randomUUID();
     await admin.from('mises').insert({
-      id: crypto.randomUUID(),
+      id: miseId,
       collecteur_id: awa.id,
       carte_id: carte2,
       montant: MISE_PIEGE,
@@ -213,6 +220,12 @@ describe('à qui la vue rend', () => {
       ]
         .map((l) => l.id)
         .sort();
+
+      // Deux listes vides sont égales : l'égalité ne prouve rien tant qu'aucune
+      // ligne connue n'a été vue passer. On l'exige de la propriétaire des
+      // cartes ; pour le titulaire, seule l'égalité est affirmée ici — ce que la
+      // RLS lui accorde au juste est le sujet des épreuves d'équipe.
+      if (qui === awa) expect(depuisLesTables).toContain(miseId);
 
       expect(((vue.data ?? []) as Array<{ id: string }>).map((l) => l.id).sort()).toEqual(depuisLesTables);
     }

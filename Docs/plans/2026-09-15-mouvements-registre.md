@@ -3258,13 +3258,20 @@ select jsonb_build_object(
 ) as releve;
 ```
 
-- [ ] **Étape 3 : écrire les outils de relevé, hors dépôt**
+- [ ] **Étape 3 : écrire les outils de relevé**
 
-Créer `$TMP/mouvements/releve.mjs` :
+Ces quatre fichiers sont **versionnés**, sous `supabase/releves/`, et non posés
+dans le répertoire temporaire. La raison est la tâche 10 : la livraison en
+production les appelle, et un outil qui disparaît avec la session ne peut ni
+être relu avant le geste, ni rejoué après. Leurs **sorties**, elles, restent
+dans le temporaire — ce sont des relevés d'un instant, et certains portent des
+comptes de production.
+
+Créer `supabase/releves/releve.mjs` :
 
 ```js
 // Exécute un relevé en lecture seule et garde son résultat.
-// Usage, depuis la racine : node "$TMP/mouvements/releve.mjs" <local|linked> <fichier.sql> <sortie.json>
+// Usage, depuis la racine : node "supabase/releves/releve.mjs" <local|linked> <fichier.sql> <sortie.json>
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -3295,11 +3302,11 @@ writeFileSync(sortie, JSON.stringify(rows[0].releve, null, 2));
 console.log(`relevé ${cible} écrit : ${sortie}`);
 ```
 
-Créer `$TMP/mouvements/comparer.mjs` :
+Créer `supabase/releves/comparer.mjs` :
 
 ```js
 // Compare deux relevés. Sortie non nulle au premier écart.
-// Usage : node "$TMP/mouvements/comparer.mjs" <avant.json> <apres.json>
+// Usage : node "supabase/releves/comparer.mjs" <avant.json> <apres.json>
 import { readFileSync } from 'node:fs';
 
 const [avant, apres] = process.argv.slice(2).map((f) => JSON.parse(readFileSync(f, 'utf8')));
@@ -3343,7 +3350,7 @@ if (ecarts.length > 0) {
 console.log('Relevés identiques.');
 ```
 
-Créer `$TMP/mouvements/definitions.sql` — l'empreinte des quatre fonctions et de leurs droits, pour contrôler le retour arrière :
+Créer `supabase/releves/definitions.sql` — l'empreinte des quatre fonctions et de leurs droits, pour contrôler le retour arrière :
 
 ```sql
 select jsonb_object_agg(
@@ -3361,12 +3368,12 @@ select jsonb_object_agg(
 
 - [ ] **Étape 4 : écrire la migration de retour**
 
-Créer `$TMP/mouvements/construire-retour.mjs` :
+Créer `supabase/releves/construire-retour.mjs` :
 
 ```js
 // Écrit supabase/retour/mouvements-registre.sql : les définitions d'avant,
 // recopiées mot pour mot depuis les migrations qui les portent.
-// Usage, depuis la racine : node "$TMP/mouvements/construire-retour.mjs"
+// Usage, depuis la racine : node "supabase/releves/construire-retour.mjs"
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const MIGRATIONS = 'supabase/migrations/';
@@ -3428,7 +3435,7 @@ console.log('supabase/retour/mouvements-registre.sql écrit.');
 Puis :
 
 ```bash
-node "$TMP/mouvements/construire-retour.mjs"
+node "supabase/releves/construire-retour.mjs"
 ```
 
 - [ ] **Étape 5 : écrire le peuplement de la répétition**
@@ -3556,16 +3563,16 @@ console.log(`peuplé : 4 cartes (${k1.mises + k2.mises + k3.mises + k4.mises} mi
 ```bash
 npx supabase db reset --local --version 20260912090000
 node "$TMP/mouvements/peupler.mjs"
-node "$TMP/mouvements/releve.mjs" local supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/avant.json"
-node "$TMP/mouvements/releve.mjs" local "$TMP/mouvements/definitions.sql" "$TMP/mouvements/definitions-avant.json"
+node "supabase/releves/releve.mjs" local supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/avant.json"
+node "supabase/releves/releve.mjs" local "supabase/releves/definitions.sql" "$TMP/mouvements/definitions-avant.json"
 ```
 Attendu : la base revient à l'état de `main`, le peuplement annonce ses cartes, et les deux relevés s'écrivent.
 
 ```bash
 npx supabase migration up --local
-node "$TMP/mouvements/releve.mjs" local supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/apres.json"
-node "$TMP/mouvements/comparer.mjs" "$TMP/mouvements/avant.json" "$TMP/mouvements/apres.json"
-node "$TMP/mouvements/releve.mjs" local supabase/releves/mouvements-apres.sql "$TMP/mouvements/vue.json"
+node "supabase/releves/releve.mjs" local supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/apres.json"
+node "supabase/releves/comparer.mjs" "$TMP/mouvements/avant.json" "$TMP/mouvements/apres.json"
+node "supabase/releves/releve.mjs" local supabase/releves/mouvements-apres.sql "$TMP/mouvements/vue.json"
 ```
 Attendu : `Relevés identiques.`, puis dans `vue.json` : `lignes_tables` égal à `lignes_vue`, `somme_vue` égale à `somme_tables`, `rattrapages: 0`, `vue_egale_tables: true`.
 
@@ -3575,10 +3582,10 @@ Attendu : `Relevés identiques.`, puis dans `vue.json` : `lignes_tables` égal �
 
 ```bash
 docker exec -i supabase_db_Kolek psql -U postgres -v ON_ERROR_STOP=1 -q < supabase/retour/mouvements-registre.sql
-node "$TMP/mouvements/releve.mjs" local "$TMP/mouvements/definitions.sql" "$TMP/mouvements/definitions-retour.json"
-node "$TMP/mouvements/comparer.mjs" "$TMP/mouvements/definitions-avant.json" "$TMP/mouvements/definitions-retour.json"
-node "$TMP/mouvements/releve.mjs" local supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/apres-retour.json"
-node "$TMP/mouvements/comparer.mjs" "$TMP/mouvements/avant.json" "$TMP/mouvements/apres-retour.json"
+node "supabase/releves/releve.mjs" local "supabase/releves/definitions.sql" "$TMP/mouvements/definitions-retour.json"
+node "supabase/releves/comparer.mjs" "$TMP/mouvements/definitions-avant.json" "$TMP/mouvements/definitions-retour.json"
+node "supabase/releves/releve.mjs" local supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/apres-retour.json"
+node "supabase/releves/comparer.mjs" "$TMP/mouvements/avant.json" "$TMP/mouvements/apres-retour.json"
 ```
 Attendu : `Relevés identiques.` deux fois — les quatre fonctions sont revenues à la définition et aux droits d'avant, et les chiffres avec elles.
 
@@ -3698,6 +3705,17 @@ Arrêter Chrome et le serveur de prévisualisation. La pile locale reste debout.
 
 **Aucune étape de cette tâche ne se fait sans un accord explicite, demandé pour ce geste-là.** Les tâches 1 à 9 ne touchent que la machine locale ; celle-ci touche l'argent réel.
 
+**L'ordre des gestes n'est pas négociable : la migration part avant les fronts.**
+Un front de cette branche servi sur une base non migrée demande une vue
+`mouvements` qui n'existe pas encore. PostgREST répond une erreur, et les
+lectures du collecteur écrivent toutes `data ?? []` : l'écran afficherait
+**zéro encaissé, zéro reçu, une caisse à zéro — sans un seul message d'erreur**.
+Un collecteur croirait sa journée perdue et pourrait tout ressaisir. L'inverse
+est sans danger : une base migrée garde `mises` et `retraits` intactes, et les
+anciens fronts, qui les lisent en direct, rendent exactement les mêmes chiffres
+qu'avant. D'où l'ordre : étape 5 (migration), puis étape 7 (fronts). **Un échec
+ou un écart à l'étape 5 ou 6 interdit l'étape 7.**
+
 - [ ] **Étape 1 : choisir le moment**
 
 Ni entre 23 h 40 et 00 h 10 UTC — le relevé du jour appelle la vue globale à 23 h 55, et minuit décale les séries — ni pendant les tournées. Le soir d'Abidjan, après 19 h, convient.
@@ -3714,7 +3732,7 @@ Attendu : vert. Rien n'est poussé.
 - [ ] **Étape 3 : le relevé d'avant**
 
 ```bash
-node "$TMP/mouvements/releve.mjs" linked supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/prod-avant.json"
+node "supabase/releves/releve.mjs" linked supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/prod-avant.json"
 ```
 
 - [ ] **Étape 4 : montrer ce que la migration va faire**
@@ -3734,9 +3752,9 @@ Attendu : exactement les quatre migrations de la branche en attente, et aucune a
 - [ ] **Étape 6 : les deux relevés d'après, tout de suite**
 
 ```bash
-node "$TMP/mouvements/releve.mjs" linked supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/prod-apres.json"
-node "$TMP/mouvements/comparer.mjs" "$TMP/mouvements/prod-avant.json" "$TMP/mouvements/prod-apres.json"
-node "$TMP/mouvements/releve.mjs" linked supabase/releves/mouvements-apres.sql "$TMP/mouvements/prod-vue.json"
+node "supabase/releves/releve.mjs" linked supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/prod-apres.json"
+node "supabase/releves/comparer.mjs" "$TMP/mouvements/prod-avant.json" "$TMP/mouvements/prod-apres.json"
+node "supabase/releves/releve.mjs" linked supabase/releves/mouvements-apres.sql "$TMP/mouvements/prod-vue.json"
 ```
 Attendu : `Relevés identiques.` ; et dans `prod-vue.json` : `rattrapages: 0`, `lignes_tables` égal à `lignes_vue`, `somme_vue` égale à `somme_tables`, `vue_egale_tables: true`.
 
@@ -3762,8 +3780,8 @@ Attendu : le schéma distant porte les quatre migrations ; le paquet servi porte
 - [ ] **Étape 9 : le relevé final**
 
 ```bash
-node "$TMP/mouvements/releve.mjs" linked supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/prod-final.json"
-node "$TMP/mouvements/comparer.mjs" "$TMP/mouvements/prod-apres.json" "$TMP/mouvements/prod-final.json"
+node "supabase/releves/releve.mjs" linked supabase/releves/mouvements-avant-apres.sql "$TMP/mouvements/prod-final.json"
+node "supabase/releves/comparer.mjs" "$TMP/mouvements/prod-apres.json" "$TMP/mouvements/prod-final.json"
 ```
 Attendu : identiques, ou une fenêtre non calme — auquel cas un collecteur a encaissé pendant la livraison, ce qui est la vie normale : refaire la paire.
 
@@ -3788,9 +3806,49 @@ Ce que ce plan fait autrement que la spec, ou qu'elle ne disait pas. **À soumet
 9. **La répétition de la livraison se fait en local**, migrations comprises, par `db reset --local --version`, `migration up --local` et l'application du retour arrière. C'est ce qui rend la séquence de production sûre avant de la jouer.
 10. **Le regard à l'écran est remplacé par une comparaison de code à code** (tâche 9, étapes 5 et 6). Les lectures de `main` et celles de la branche tournent sur **la même base et le même collecteur**, et doivent rendre des objets identiques : bilan, reçus, historique et alertes côté serveur ; accueil, fiche et rapprochement côté téléphone. C'est la même question — « les mêmes chiffres qu'avant » — posée sur les valeurs plutôt que sur des pixels, et elle ne dépend ni d'un libellé de bouton ni d'une barre de navigation. Les écrans eux-mêmes ne changent pas : la branche ne touche aucun composant, seulement deux types. Les copies de `main` sont déposées par `git show`, éprouvées, puis retirées ; elles ne sont jamais commitées.
 
+---
 
+## Réserves de la revue finale, et ce qu'on en a fait
 
+Revue de branche du 2026-09-16 (fable), verdict « prêt à fusionner — oui »,
+zéro critique. Les réserves, et leur sort :
 
-
-
-
+1. **Les outils de relevé n'existaient que dans le répertoire temporaire.**
+   *Traitée* : `releve.mjs`, `comparer.mjs`, `construire-retour.mjs` et
+   `definitions.sql` sont versionnés sous `supabase/releves/`, et le plan les y
+   appelle (tâches 8 et 10).
+2. **L'ordre migration → fronts est vital.** *Traitée* : écrit en tête de la
+   tâche 10, avec sa raison — un front neuf sur base non migrée affiche zéro
+   sans erreur.
+3. **Les droits d'`admin_vue_globale()` n'étaient pas réécrits** par la migration
+   qui la recopie, alors que les quatre migrations précédentes le faisaient.
+   *Traitée* : `revoke`/`grant` posés, et le garde-fou de la migration les
+   relit (exécutable par `service_role`, par personne d'autre).
+4. **Le bloc `do` de la migration 4 peut échouer en production** si une fonction
+   posée hors migrations lit encore l'argent en direct — et les trois migrations
+   précédentes seraient alors déjà appliquées. *Traitée* : `supabase/releves/lecteurs-directs-avant.sql`
+   pose la même question **avant** de pousser, par la même expression régulière,
+   sans rien créer. Attendu : exactement les deux exemptions,
+   `admin_reglages()` et `mises_avant_insert()`.
+5. **Deux assertions de `supabase/tests/mouvements.test.ts` étaient vertes sur un
+   jeu vide** (`every` sur liste vide ; deux listes vides égales). *Traitée* :
+   l'isolation compte d'abord les 32 lignes de A et cite son rattrapage ;
+   l'égalité vue/tables exige de voir passer une mise connue.
+6. **Les clés des empreintes de relevé sont « molles »** : les listes qu'elles
+   résument sont bornées (200 mouvements dans les tendances, par exemple), donc
+   une empreinte identique ne prouve l'égalité que sur la borne. *Non traitée,
+   assumée* : c'est la même borne avant et après, sur la même base ; et
+   l'égalité ligne à ligne de `mouvements-apres.sql` (`vue_egale_tables`), elle,
+   n'est pas bornée. À ne pas confondre avec une preuve d'égalité totale.
+7. **Le coût du `join cartes`** de la vue n'est pas mesuré en production.
+   *Reportée* : à regarder au chantier A, quand la table `rattrapages` cessera
+   d'être vide. Aucune des lectures n'a de plan d'exécution nouveau en B : les
+   mêmes tables, le même filtre RLS.
+8. **Bornes et index de `rattrapages`** (borne de date, index sur
+   `collecteur_id`, `carte_id`). *Reportée au chantier A*, où la table
+   commencera à recevoir des lignes — voir les écarts 6 et 8 ci-dessus.
+9. **Le motif de `lecteurs_directs_argent()` n'attrape pas `.rpc`** : une
+   fonction qui appellerait `mises` par un détour ne serait pas vue. *Non
+   traitée, assumée* : le garde-fou vise la lecture directe des tables, qui est
+   la régression redoutée ; un appel indirect passe par une fonction que le même
+   relevé examine.
