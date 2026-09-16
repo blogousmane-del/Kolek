@@ -23,8 +23,8 @@ exact dans lequel les écrans affichent leur squelette d'attente
 (`Retrait.tsx:201` : `{!cartes && !erreur && …}`).
 
 **La note de J2b disait « l'écran reste vide », et c'était inexact.** Vérifié le
-2026-09-16 : les onze écrans disent tous quelque chose pendant l'attente — neuf
-montrent des squelettes, `Avis` et `Rapprochement` affichent « Lecture… ».
+2026-09-16 : les écrans concernés disent tous quelque chose pendant l'attente —
+neuf montrent des squelettes, `Avis` et `Rapprochement` affichent « Lecture… ».
 
 Le défaut n'en est que plus sérieux. Un écran muet laisse le collecteur dans le
 doute ; un squelette lui **promet des données**. Pendant sept secondes,
@@ -33,9 +33,39 @@ pas pouvoir charger. Un collecteur qui apprend que l'écran promet pour rien
 cesse de le croire quand il dit vrai — c'est l'argument que `Bandeaux.tsx`
 oppose déjà à un autre mensonge d'interface, lignes 23-27.
 
-Ce n'est pas un défaut de l'écran Retrait. `useDonnees` sert **onze écrans** :
-Accueil, Alertes, Avis, Bilan, Équipe, EquipeClients, HistoriqueClient, Plus,
-Rapprochement, Reçus, Retrait. Tous ont le même trou.
+Ce n'est pas un défaut du seul écran Retrait. Mais **ce n'est pas non plus le
+défaut de tous**, et la première rédaction de cette spec s'est trompée là-dessus.
+
+**Correction du 2026-09-16, après la relecture de la tâche 1.** Cette spec
+affirmait « `useDonnees` sert onze écrans, tous ont le même trou ». Les deux
+moitiés étaient fausses. Il y a **quatorze appels**, pas onze — trois vivent
+dans `ecrans/commission.ts`, que la première lecture n'avait pas vu. Et six de
+ces quatorze **réussissent hors ligne** : leur chargeur lit le disque du
+téléphone, pas le réseau.
+
+| Appel | Chargeur | Lit |
+|---|---|---|
+| `Accueil.tsx:83` | `chargerTableauCollecteur` | **disque** |
+| `commission.ts:26,60,73` | `chargerProfil` (×3) | **disque** |
+| `Plus.tsx:31` | `chargerProfil` | **disque** |
+| `Rapprochement.tsx:44` | `chargerRapprochement` | **disque** |
+| `Alertes.tsx:59` | `chargerAlertes` | réseau |
+| `Avis.tsx:58` | `chargerEtatAvis` | réseau |
+| `Bilan.tsx:24` | `chargerBilan` | réseau |
+| `Equipe.tsx:41` | `chargerEquipe` | réseau |
+| `EquipeClients.tsx:48` | `chargerClientsCollaborateur` | réseau |
+| `HistoriqueClient.tsx:202` | `chargerHistoriqueCarte` | réseau |
+| `Recus.tsx:30` | `chargerRecus` | réseau |
+| `Retrait.tsx:87` | `chargerCartesCloturables` | réseau |
+
+Les trois chargeurs de disque passent par `lectureCourante()`
+(`hors-ligne/moteur.ts:181-196`) : `ouvrirBase`, `lireTournee`, `lireRefus`,
+`lireProfil` — IndexedDB, jamais Supabase. **C'est le cœur de J2b**, et
+l'en-tête de `cache.ts` le disait déjà : « La tournée des écrans de collecte,
+elle, est sur le disque depuis J2b ».
+
+L'erreur venait d'une généralisation : le symptôme a été observé sur Retrait,
+qui lit bien le réseau, et étendu aux autres sans vérifier ce que chacun lit.
 
 Deux autres écrans mentent, par des messages placés au mauvais endroit. Et deux
 notes de relecture de J2b sont trop vagues pour être corrigées de confiance.
@@ -55,8 +85,9 @@ Les cinq mineurs de J2b retenus, et une extension que le premier appelle :
 | 3 | L'avis rouge de session perdue reste affiché | `FicheClient.tsx:753` | mineur J2b |
 | 4 | Le bandeau « Envoi en cours » ne montre aucun progrès | `Bandeaux.tsx` | mineur J2b, **à reproduire** |
 | 5 | L'alerte au premier lancement | `Accueil.tsx` | mineur J2b, **à reproduire** |
+
 **Ce qui n'entre pas, après vérification.** La première rédaction de cette spec
-ajoutait un sixième point : « rendre l'attente visible dans les onze écrans ».
+ajoutait un sixième point : « rendre l'attente visible dans tous les écrans ».
 Il est retiré — c'est **déjà fait**. Neuf écrans montrent des squelettes, et les
 deux derniers affichent « Lecture… ». Rien à construire.
 
@@ -77,17 +108,36 @@ durabilité, commentaire faux d'`Abonnement.tsx`.
 
 ## 3. Architecture
 
-**Un seul endroit décide, les écrans ne font qu'afficher.**
+**Un seul endroit décide, les écrans déclarent.**
 
-`useDonnees` gagne la connaissance de l'état réseau et rend un état d'attente
-lisible. Aucun écran n'interroge le réseau pour décider s'il doit lire : cette
-règle vaut déjà et ne doit pas se défaire, sinon onze écrans porteront onze
-variantes de la même logique.
+`useDonnees` reste le seul à lire l'état du réseau et à en tirer une
+conséquence. Aucun écran ne teste `navigator.onLine`, ne compte de relances, ni
+ne décide d'afficher un squelette plutôt qu'une erreur : sans cette règle,
+quatorze appels porteraient quatorze variantes de la même logique.
+
+Ce que les écrans fournissent est un fait qu'eux seuls connaissent — leur
+chargeur a-t-il besoin du réseau — et non une décision.
 
 ### 3.1 Couper la requête qu'on sait vouée à l'échec
 
-Sans valeur gardée utilisable et avec `navigator.onLine === false`, `useDonnees`
-pose `erreur = messageErreur` immédiatement et **ne lance pas la requête**.
+`useDonnees` gagne une option, `besoinReseau`. Sans valeur gardée utilisable,
+avec `besoinReseau: true` et `navigator.onLine === false`, il pose
+`erreur = messageErreur` immédiatement et **ne lance pas la requête**.
+
+**Pourquoi une déclaration, et pas une détection.** Le crochet reçoit une
+fonction opaque : il ne peut pas savoir si elle ouvre une connexion ou lit
+IndexedDB. Seul l'appelant le sait. Toute tentative de deviner — un nom de
+chargeur, une liste d'exemptions — se tromperait en silence le jour où un
+chargeur change de nature.
+
+**Le défaut est le silence.** `besoinReseau` absent vaut `false` : on ne coupe
+rien. Une inattention future ne peut donc que laisser les sept secondes sur un
+écran qui les avait déjà — jamais couper une lecture locale et casser le
+hors-ligne. C'est le sens sûr de l'erreur, et il est délibéré.
+
+**Huit appels le déclarent**, ceux du tableau ci-dessus marqués « réseau ». Les
+six lectures de disque ne le déclarent pas et gardent exactement le comportement
+d'aujourd'hui.
 
 **Pourquoi c'est sûr.** `packages/ui/src/Bandeaux.tsx` (lignes 70-75) écrit que
 `useEnLigne` informe et ne décide de rien, parce que `navigator.onLine` ne
@@ -101,20 +151,27 @@ part, et un wifi menteur retombe sur les trois relances et ses sept secondes.
 Une valeur gardée reste affichée quoi qu'il arrive, en ligne comme hors ligne :
 une revalidation qui échoue n'efface jamais des chiffres déjà à l'écran.
 
-### 3.2 Les écrans n'ont rien à changer
+### 3.2 Ce que les écrans changent, et ce qu'ils ne changent pas
 
-C'est la conséquence heureuse du point précédent, et elle mérite d'être écrite
-pour qu'on ne la défasse pas plus tard.
+**Huit lignes, et rien d'autre.** Les huit appels réseau ajoutent
+`besoinReseau: true` à leur bloc d'options. Aucun rendu, aucune condition,
+aucun message n'est touché.
 
 Les écrans affichent leur squelette sur la condition `!donnees && !erreur`.
 Poser l'erreur immédiatement rend cette condition fausse immédiatement : le
-squelette ne s'affiche plus, le message d'erreur prend sa place, et **aucune
-ligne de ces onze écrans n'est modifiée**. La correction se fait entièrement
-dans `useDonnees`.
+squelette ne s'affiche plus, le message d'erreur prend sa place, et **aucun
+rendu n'est modifié**. La frontière tient : les écrans décrivent quoi montrer
+selon l'état, `useDonnees` décide de l'état.
 
-C'est le signe que la frontière était juste depuis le début : les écrans
-décrivent quoi montrer selon l'état, `useDonnees` décide de l'état. Un correctif
-qui aurait dû toucher onze fichiers en touche un.
+Ce qu'ils ajoutent n'est pas de la logique, c'est une **déclaration** : « cette
+lecture a besoin du réseau ». Elle vit à l'endroit qui la connaît, sur une seule
+ligne, à côté du chargeur qu'elle décrit.
+
+**Une leçon de la première tentative.** La rédaction d'avant affirmait qu'aucun
+écran n'aurait à changer, et s'en félicitait. C'était le signe d'un défaut, pas
+d'une élégance : le crochet ne pouvait pas savoir ce que ses quatorze appelants
+lisaient, et l'économie apparente reposait sur une information qu'il n'avait
+pas. Huit lignes déclarées valent mieux qu'une devinette centralisée.
 
 ### 3.3 Les messages au bon endroit
 
