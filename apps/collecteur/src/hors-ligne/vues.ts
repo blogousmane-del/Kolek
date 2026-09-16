@@ -1,4 +1,4 @@
-import { formatMontant, soldeRestituable } from '@kolek/core';
+import { argentTenu, formatMontant, mouvementsDepuis, soldeRestituable, versementsDe } from '@kolek/core';
 
 import type { TableauCollecteur } from '../lectures';
 import type { FicheClient, Profil, Rapprochement } from '../lectures-ecrans';
@@ -47,6 +47,19 @@ function plusRecentDabord(a: string, b: string): number {
   return Date.parse(b) - Date.parse(a);
 }
 
+/**
+ * Le registre de la tournée : la règle de la vue `mouvements`, appliquée aux
+ * lignes brutes du téléphone.
+ *
+ * La tournée ne porte aucun rattrapage aujourd'hui — le geste qui en crée
+ * appartient au chantier suivant, et le rechargement ne les copie pas encore.
+ * La liste vide est donc exacte, et c'est le seul endroit à changer le jour où
+ * elle ne le sera plus.
+ */
+function registreDe(t: Tournee) {
+  return mouvementsDepuis({ mises: t.mises, retraits: t.retraits, rattrapages: [] });
+}
+
 export function tableauDepuis(t: Tournee, maintenant: number): TableauCollecteur {
   const noms = new Map(t.clients.map((c) => [c.id, c.nom]));
   const cartes = new Map(t.cartes.map((k) => [k.id, k]));
@@ -54,8 +67,9 @@ export function tableauDepuis(t: Tournee, maintenant: number): TableauCollecteur
   // Minuit local, pas UTC : « aujourd'hui » est la journée du collecteur, à Abidjan.
   const minuit = new Date(maintenant);
   minuit.setHours(0, 0, 0, 0);
-  const encaisseAujourdhui = t.mises
-    .filter((m) => Date.parse(m.encaisseLe) >= minuit.getTime())
+  const versements = versementsDe(registreDe(t));
+  const encaisseAujourdhui = versements
+    .filter((m) => Date.parse(m.survenuLe) >= minuit.getTime())
     .reduce((somme, m) => somme + m.montant, 0);
 
   const actives = t.cartes.filter((k) => k.statut === 'active');
@@ -79,8 +93,8 @@ export function tableauDepuis(t: Tournee, maintenant: number): TableauCollecteur
           solde: soldeRestituable(plusAvancee.misesEncaissees, plusAvancee.mise),
         }
       : null,
-    dernieres: [...t.mises]
-      .sort((a, b) => plusRecentDabord(a.encaisseLe, b.encaisseLe) || parId(a, b))
+    dernieres: [...versements]
+      .sort((a, b) => plusRecentDabord(a.survenuLe, b.survenuLe) || parId(a, b))
       .slice(0, 5)
       .map((m) => {
         const carte = cartes.get(m.carteId);
@@ -88,7 +102,7 @@ export function tableauDepuis(t: Tournee, maintenant: number): TableauCollecteur
           nom: (carte && noms.get(carte.clientId)) ?? 'Client',
           montant: m.montant,
           estCommission: m.estCommission,
-          quand: m.encaisseLe,
+          quand: m.survenuLe,
         };
       }),
   };
@@ -170,14 +184,14 @@ export function ficheDepuis(t: Tournee, clientId: string): FicheClient | null {
     })),
     // Les mises des cartes actives et celles du jour (§5.1). L'historique
     // complet d'une carte clôturée reste un écran en ligne.
-    mises: t.mises
+    mises: versementsDe(registreDe(t))
       .filter((m) => siennes.has(m.carteId))
-      .sort((a, b) => plusRecentDabord(a.encaisseLe, b.encaisseLe) || parId(a, b))
+      .sort((a, b) => plusRecentDabord(a.survenuLe, b.survenuLe) || parId(a, b))
       .slice(0, MISES_SUR_FICHE)
       .map((m) => ({
         id: m.id,
         montant: m.montant,
-        encaisseLe: m.encaisseLe,
+        encaisseLe: m.survenuLe,
         estCommission: m.estCommission,
       })),
   };
@@ -264,15 +278,11 @@ export function rapprochementDepuis(
   };
 }
 
-/** Les mises du jour moins les restitutions du jour, passées par cette main. */
+/** Ce qui est passé par cette main aujourd'hui : entrées moins sorties. */
 function recompterAttendu(t: Tournee, collecteurId: string, duJour: (iso: string) => boolean): number {
-  const encaisse = t.mises
-    .filter((m) => m.encaissePar === collecteurId && duJour(m.encaisseLe))
-    .reduce((s, m) => s + m.montant, 0);
-  const restitue = t.retraits
-    .filter((r) => r.restituePar === collecteurId && duJour(r.effectueLe))
-    .reduce((s, r) => s + r.montantRestitue, 0);
-  return encaisse - restitue;
+  return argentTenu(
+    registreDe(t).filter((m) => m.mainId === collecteurId && duJour(m.survenuLe)),
+  );
 }
 
 /**
