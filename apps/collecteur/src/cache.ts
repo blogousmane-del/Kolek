@@ -194,11 +194,14 @@ export function useDonnees<T>(
       // Poser l'erreur tout de suite est la seule chose vraie qu'on puisse
       // dire, et les écrans s'y accordent sans être modifiés.
       //
-      // Une valeur gardée fraîche ne passe pas ici : elle est déjà à l'écran,
-      // rien ne ment, et la revalidation peut tenter sa chance. Une valeur
-      // gardée périmée par la révision, elle, fait rendre `null` à `lireCache`
-      // — elle est donc bien absente du point de vue de `garde`, et passe ici
-      // comme n'importe quelle absence.
+      // Une valeur gardée fraîche ne passe jamais ici : elle sort plus haut,
+      // au `if (garde.frais)`, avant même d'atteindre ce bloc. Une valeur
+      // gardée périmée par le temps ne passe pas ici non plus : elle reste
+      // affichée, et c'est elle — et seulement elle — que la revalidation de
+      // fond, plus bas, va tenter de rafraîchir, sans jamais consulter cette
+      // garde. Une valeur gardée périmée par la révision, elle, fait rendre
+      // `null` à `lireCache` — elle est donc bien absente du point de vue de
+      // `garde`, et passe ici comme n'importe quelle absence.
       if (besoinReseau && horsLigne()) {
         setErreur(messageErreur);
         setEnCours(false);

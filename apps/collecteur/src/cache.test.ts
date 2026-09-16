@@ -205,13 +205,86 @@ describe('useDonnees hors ligne', () => {
     expect(result.current.erreur).toBeNull();
   });
 
-  it('en ligne, lance la requête comme avant', async () => {
+  it('avec besoinReseau et le réseau présent, lance bien la requête', async () => {
+    // La contre-épreuve de la première du bloc : même déclaration de
+    // `besoinReseau`, mais en ligne. Sans elle, remplacer la garde de
+    // `cache.ts` par `if (besoinReseau)` — qui couperait huit écrans même en
+    // ligne — laisserait tout le fichier vert.
     const chargeur = vi.fn().mockResolvedValue({ encaisse: 12_000 });
 
-    const { result } = renderHook(() => useDonnees('bilan', chargeur, { messageErreur: MESSAGE }));
+    const { result } = renderHook(() =>
+      useDonnees('bilan', chargeur, { messageErreur: MESSAGE, besoinReseau: true }),
+    );
 
     await waitFor(() => expect(result.current.donnees).toEqual({ encaisse: 12_000 }));
     expect(chargeur).toHaveBeenCalledTimes(1);
     expect(result.current.erreur).toBeNull();
+  });
+
+  /**
+   * `enCours` après un retour anticipé.
+   *
+   * Deux retours anticipés de l'effet — la valeur fraîche (`cache.ts:184`) et
+   * la garde hors-ligne (`cache.ts:204`) — posent `enCours` à `false` avant de
+   * sortir. Rien ne les éprouvait : les retirer ne fait tomber aucune épreuve
+   * ci-dessus. Sans eux, une requête restée en vol au moment du retour
+   * anticipé laisserait l'écran indiquer un chargement qui n'a plus cours.
+   */
+  it('remet enCours à false quand une révision plus fraîche fait sortir l’effet par une valeur gardée', async () => {
+    let resoudre: (valeur: { encaisse: number }) => void = () => {};
+    const chargeur = vi.fn(
+      () =>
+        new Promise<{ encaisse: number }>((resolve) => {
+          resoudre = resolve;
+        }),
+    );
+
+    const { result, rerender } = renderHook(
+      ({ revision }) => useDonnees('bilan', chargeur, { messageErreur: MESSAGE, revision }),
+      { initialProps: { revision: 0 } },
+    );
+
+    await waitFor(() => expect(chargeur).toHaveBeenCalledTimes(1));
+    expect(result.current.enCours).toBe(true);
+
+    // Un encaissement réussi ailleurs pendant que cette requête est en vol :
+    // une valeur fraîche apparaît à la révision suivante.
+    ecrireCache('bilan', { encaisse: 20_000 }, 1);
+    rerender({ revision: 1 });
+
+    expect(result.current.donnees).toEqual({ encaisse: 20_000 });
+    expect(result.current.enCours).toBe(false);
+    expect(chargeur).toHaveBeenCalledTimes(1);
+
+    resoudre({ encaisse: 12_000 });
+  });
+
+  it('remet enCours à false quand une coupure réseau fait sortir l’effet par la garde, après un changement de révision', async () => {
+    let resoudre: (valeur: { encaisse: number }) => void = () => {};
+    const chargeur = vi.fn(
+      () =>
+        new Promise<{ encaisse: number }>((resolve) => {
+          resoudre = resolve;
+        }),
+    );
+
+    const { result, rerender } = renderHook(
+      ({ revision }) => useDonnees('bilan', chargeur, { messageErreur: MESSAGE, besoinReseau: true, revision }),
+      { initialProps: { revision: 0 } },
+    );
+
+    await waitFor(() => expect(chargeur).toHaveBeenCalledTimes(1));
+    expect(result.current.enCours).toBe(true);
+
+    // Le réseau tombe pendant que cette première requête est en vol, et la
+    // coquille relit sur une révision qui n'a rien de gardé.
+    couper();
+    rerender({ revision: 1 });
+
+    expect(result.current.erreur).toBe(MESSAGE);
+    expect(result.current.enCours).toBe(false);
+    expect(chargeur).toHaveBeenCalledTimes(1);
+
+    resoudre({ encaisse: 12_000 });
   });
 });
