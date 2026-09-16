@@ -138,6 +138,22 @@ export interface Lecture<T> {
  * relancerait la requête en boucle. Il est gardé dans une référence, ce qui
  * garantit que l'appel utilise toujours la dernière version sans la surveiller.
  */
+
+/**
+ * Le réseau est-il **certainement** absent ?
+ *
+ * `navigator.onLine` ne prouve jamais qu'Internet répond — c'est ce que dit
+ * `packages/ui/src/Bandeaux.tsx` (lignes 70-75), et c'est vrai. Mais son erreur
+ * n'est que dans un sens : il ment quand il dit « en ligne », jamais quand il
+ * dit « hors ligne », où l'interface réseau est baissée. Cette fonction ne lit
+ * donc que le `false`, la seule information fiable qu'il donne.
+ *
+ * `typeof navigator` est gardé pour le rendu hors navigateur.
+ */
+function horsLigne(): boolean {
+  return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
 export function useDonnees<T>(
   cle: string,
   chargeur: () => Promise<T>,
@@ -168,6 +184,19 @@ export function useDonnees<T>(
       if (garde.frais) return;
     } else {
       setDonnees(null);
+      // Rien à montrer, et le réseau certainement absent : la requête échouera
+      // au bout de trois relances de postgrest-js — sept secondes pendant
+      // lesquelles `donnees` et `erreur` valent tous deux `null`, l'état où les
+      // écrans affichent leur squelette. L'écran promettrait des données qu'il
+      // sait impossibles. Poser l'erreur tout de suite est la seule chose vraie
+      // qu'on puisse dire, et les écrans s'y accordent sans être modifiés.
+      //
+      // Une valeur gardée, même périmée, ne passe pas ici : elle est déjà à
+      // l'écran, rien ne ment, et la revalidation peut tenter sa chance.
+      if (horsLigne()) {
+        setErreur(messageErreur);
+        return;
+      }
     }
 
     setEnCours(true);

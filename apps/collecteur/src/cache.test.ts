@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { renderHook, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PEREMPTION_MS, ecrireCache, lireCache, tailleCache, viderCache } from './cache';
+import { PEREMPTION_MS, ecrireCache, lireCache, tailleCache, useDonnees, viderCache } from './cache';
 
 /**
  * Le cache de navigation.
@@ -121,5 +122,62 @@ describe('la déconnexion', () => {
     expect(tailleCache()).toBe(0);
     expect(lireCache('bilan')).toBeNull();
     expect(lireCache('recus')).toBeNull();
+  });
+});
+
+/**
+ * `useDonnees` hors ligne.
+ *
+ * Le défaut corrigé : sans valeur gardée, le hook lançait la requête même en
+ * sachant le réseau absent. `postgrest-js` la retente trois fois — sept
+ * secondes — et pendant ce temps `donnees` et `erreur` valent tous deux `null`,
+ * l'état exact dans lequel les onze écrans affichent leur squelette. L'écran ne
+ * restait pas muet : il **promettait** des données impossibles.
+ *
+ * L'épreuve qui compte est `expect(chargeur).not.toHaveBeenCalled()`. On
+ * n'affirme pas « c'est plus rapide » — un délai ne s'éprouve pas — on affirme
+ * que la requête n'a pas lieu.
+ */
+describe('useDonnees hors ligne', () => {
+  const MESSAGE = 'Cet écran demande le réseau.';
+
+  const couper = () =>
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+
+  afterEach(() => {
+    delete (window.navigator as unknown as { onLine?: boolean }).onLine;
+  });
+
+  it('sans rien de gardé, pose l’erreur sans lancer la requête', async () => {
+    couper();
+    const chargeur = vi.fn().mockResolvedValue({ encaisse: 12_000 });
+
+    const { result } = renderHook(() => useDonnees('bilan', chargeur, { messageErreur: MESSAGE }));
+
+    await waitFor(() => expect(result.current.erreur).toBe(MESSAGE));
+    expect(chargeur).not.toHaveBeenCalled();
+    expect(result.current.donnees).toBeNull();
+    expect(result.current.enCours).toBe(false);
+  });
+
+  it('avec une valeur gardée, l’affiche et ne pose aucune erreur', async () => {
+    ecrireCache('bilan', { encaisse: 12_000 });
+    couper();
+    const chargeur = vi.fn().mockResolvedValue({ encaisse: 99_000 });
+
+    const { result } = renderHook(() => useDonnees('bilan', chargeur, { messageErreur: MESSAGE }));
+
+    await waitFor(() => expect(result.current.donnees).toEqual({ encaisse: 12_000 }));
+    expect(result.current.erreur).toBeNull();
+  });
+
+  it('en ligne, lance la requête comme avant', async () => {
+    const chargeur = vi.fn().mockResolvedValue({ encaisse: 12_000 });
+
+    const { result } = renderHook(() => useDonnees('bilan', chargeur, { messageErreur: MESSAGE }));
+
+    await waitFor(() => expect(result.current.donnees).toEqual({ encaisse: 12_000 }));
+    expect(chargeur).toHaveBeenCalledTimes(1);
+    expect(result.current.erreur).toBeNull();
   });
 });
