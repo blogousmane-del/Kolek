@@ -47,7 +47,10 @@ export interface LigneZone {
 }
 
 export interface Mouvement {
-  type: 'mise' | 'commission' | 'restitution';
+  /** `rattrapage` : une mise refusée par le serveur, enregistrée comme dette.
+      Le libellé et le filtre de l'écran arrivent avec le chantier du
+      rattrapage ; jusque-là, l'administration l'affiche comme une mise. */
+  type: 'mise' | 'commission' | 'restitution' | 'rattrapage';
   client: string;
   collecteur_id: string;
   collecteur: string;
