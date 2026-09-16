@@ -3786,6 +3786,7 @@ Ce que ce plan fait autrement que la spec, ou qu'elle ne disait pas. **À soumet
 7. **Deux migrations préliminaires n'existent pas.** Le relevé d'avant n'appelle que des fonctions déjà en place ; rien n'est déployé en production avant la migration du chantier.
 8. **Supprimer un collecteur qui porte un rattrapage** échouerait sur une clé étrangère `restrict`, avec le message illisible que `admin-supprimer-collecteur` évite pour les mises et les retraits. Aucune ligne n'est possible en B ; à traiter au chantier A.
 9. **La répétition de la livraison se fait en local**, migrations comprises, par `db reset --local --version`, `migration up --local` et l'application du retour arrière. C'est ce qui rend la séquence de production sûre avant de la jouer.
+10. **Le regard à l'écran est remplacé par une comparaison de code à code** (tâche 9, étapes 5 et 6). Les lectures de `main` et celles de la branche tournent sur **la même base et le même collecteur**, et doivent rendre des objets identiques : bilan, reçus, historique et alertes côté serveur ; accueil, fiche et rapprochement côté téléphone. C'est la même question — « les mêmes chiffres qu'avant » — posée sur les valeurs plutôt que sur des pixels, et elle ne dépend ni d'un libellé de bouton ni d'une barre de navigation. Les écrans eux-mêmes ne changent pas : la branche ne touche aucun composant, seulement deux types. Les copies de `main` sont déposées par `git show`, éprouvées, puis retirées ; elles ne sont jamais commitées.
 
 
 
