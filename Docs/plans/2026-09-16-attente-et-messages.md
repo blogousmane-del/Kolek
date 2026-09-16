@@ -4,7 +4,7 @@
 
 **But :** un collecteur hors ligne ne voit plus sept secondes de squelette qui lui promet des données impossibles, et une fiche non chargée ne se dit plus supprimée.
 
-**Architecture :** un seul endroit décide, `useDonnees` dans `apps/collecteur/src/cache.ts`. Quand aucune valeur n'est gardée et que `navigator.onLine` vaut `false`, l'erreur est posée immédiatement et la requête n'est pas lancée. Les onze écrans qui l'utilisent affichent déjà leur squelette sur `!donnees && !erreur` : poser l'erreur tout de suite rend cette condition fausse tout de suite, et **aucun écran n'est modifié**.
+**Architecture :** un seul endroit décide, `useDonnees` dans `apps/collecteur/src/cache.ts`. Il gagne une option `besoinReseau` : quand elle vaut `true`, qu'aucune valeur n'est gardée et que `navigator.onLine` vaut `false`, l'erreur est posée immédiatement et la requête n'est pas lancée. Huit des quatorze appels la déclarent — les six autres lisent le disque du téléphone et réussissent hors ligne. Les écrans affichent déjà leur squelette sur `!donnees && !erreur` : poser l'erreur rend cette condition fausse, et **aucun rendu n'est modifié**.
 
 **Pile :** React 19, TypeScript, Vitest 4 sous `jsdom`, `@testing-library/react`.
 
@@ -28,10 +28,10 @@
 | `apps/collecteur/src/cache.test.ts` | Éprouve les fonctions pures du cache | **Étendu** — `useDonnees` n'a aujourd'hui aucune épreuve directe |
 | `apps/collecteur/src/ecrans/FicheClient.tsx` | La fiche d'un client | **Modifié** — un message, ligne 136 |
 | `apps/collecteur/src/ecrans/FicheClient.test.tsx` | Épreuves de la fiche | **Étendu** |
-| `apps/collecteur/src/ecrans/Retrait.test.tsx` | Épreuves de l'écran de retrait | **Étendu** — l'épreuve qui dit que l'écran ne promet plus |
+| ~~`apps/collecteur/src/ecrans/Retrait.test.tsx`~~ | Épreuves de l'écran de retrait | **Retiré du chantier** — ce fichier remplace `../cache` en bloc (`vi.mock`, ligne 41) : une épreuve écrite là éprouverait le remplaçant, pas le crochet. Le cas est tenu dans `cache.test.ts`. |
 | `Docs/plans/2026-09-16-attente-et-messages.md` | Ce plan | **Complété** à la tâche 3 |
 
-Aucun autre fichier n'est touché. En particulier : aucun des onze écrans, et rien dans `packages/ui`.
+Les huit appels réseau gagnent une ligne d'option chacun — `Alertes`, `Avis`, `Bilan`, `Equipe`, `EquipeClients`, `HistoriqueClient`, `Recus`, `Retrait`. Aucun rendu n'est touché, et rien dans `packages/ui`.
 
 ---
 
@@ -43,7 +43,7 @@ Aucun autre fichier n'est touché. En particulier : aucun des onze écrans, et r
 
 **Interfaces :**
 - Consomme : rien des autres tâches.
-- Produit : aucun changement de signature. `useDonnees(cle, chargeur, { revision?, messageErreur })` rend toujours `{ donnees, erreur, enCours, rafraichir }`. Seul le **moment** où `erreur` est posée change.
+- Produit : `useDonnees(cle, chargeur, { revision?, messageErreur, besoinReseau? })` — l'option est nouvelle et vaut `false` par défaut. Le retour est inchangé : `{ donnees, erreur, enCours, rafraichir }`. Seul le **moment** où `erreur` est posée change, et seulement pour les appels qui déclarent `besoinReseau: true`.
 
 - [ ] **Étape 1 : écrire les trois épreuves qui tombent**
 
@@ -67,7 +67,7 @@ Puis, à la fin du fichier :
  * Le défaut corrigé : sans valeur gardée, le hook lançait la requête même en
  * sachant le réseau absent. `postgrest-js` la retente trois fois — sept
  * secondes — et pendant ce temps `donnees` et `erreur` valent tous deux `null`,
- * l'état exact dans lequel les onze écrans affichent leur squelette. L'écran ne
+ * l'état exact dans lequel les écrans affichent leur squelette. L'écran ne
  * restait pas muet : il **promettait** des données impossibles.
  *
  * L'épreuve qui compte est `expect(chargeur).not.toHaveBeenCalled()`. On
@@ -213,7 +213,7 @@ fix(cache): ne plus promettre des donnees que le telephone sait impossibles
 
 Hors ligne et sans valeur gardee, useDonnees lancait la requete quand meme.
 postgrest-js la retente trois fois : sept secondes pendant lesquelles donnees
-et erreur valent tous deux null — l'etat exact ou les onze ecrans affichent
+et erreur valent tous deux null — l'etat exact ou les ecrans affichent
 leur squelette. L'ecran ne restait pas muet, il promettait.
 
 Il pose desormais l'erreur tout de suite, et ne lance rien. On ne coupe que
@@ -472,8 +472,8 @@ Au registre du chantier : les commits, les épreuves ajoutées, ce que la tâche
 
 ## Écarts relevés en écrivant ce plan
 
-1. **`useDonnees` n'avait aucune épreuve directe.** `cache.test.ts` n'éprouvait que les fonctions pures — `ecrireCache`, `lireCache`, `viderCache`. Le hook, qui porte la logique de lecture des onze écrans, n'était couvert qu'indirectement. Les trois épreuves de la tâche 1 sont donc aussi son premier filet.
+1. **`useDonnees` n'avait aucune épreuve directe.** `cache.test.ts` n'éprouvait que les fonctions pures — `ecrireCache`, `lireCache`, `viderCache`. Le hook, qui porte la lecture de quatorze appels, n'était couvert qu'indirectement. Les épreuves de la tâche 1 sont donc aussi son premier filet.
 
-2. **Aucun écran n'a besoin d'être modifié**, alors que la première rédaction de la spec prévoyait d'en toucher onze. Les écrans affichent leur squelette sur `!donnees && !erreur` ; poser l'erreur rend la condition fausse. La frontière posée par le cache était juste, et le plan la laisse intacte.
+2. **La conception de la tâche 1 était fausse, et la relecture l'a arrêtée.** Ce plan affirmait qu'aucun écran n'aurait à changer, et s'en félicitait. C'était le signe d'un défaut : six des quatorze appels lisent le disque du téléphone et réussissent hors ligne — les couper cassait le hors-ligne de J2b, jusqu'à promettre à un collaborateur la commission de la première mise. Le crochet ne pouvait pas le deviner ; huit appels le déclarent désormais par `besoinReseau: true`. Voir la spec, section 1, corrigée le 2026-09-16.
 
 3. **La tâche 4 est délibérément vide.** Un plan qui décrirait la correction de trois défauts non reproduits ne serait pas un plan mais une supposition. Elle s'écrit après la tâche 3.
