@@ -120,7 +120,9 @@ describe('le cash attendu', () => {
       .eq('id', patron.id);
     await admin.from('collecteurs').update({ titulaire_id: patron.id }).eq('id', awa.id);
 
-    const jour = jourUtc(1);
+    // Jamais hier : `tendances.test.ts` affirme qu'hier est un jour creux pour
+    // toute la plateforme, et une mise posée là ferait tomber son épreuve.
+    const jour = jourUtc(2);
     const carteId = await carteAvecMises(awa, jour, 1);
     const rejetId = await poserRefus(awa, { carteId, jour });
 

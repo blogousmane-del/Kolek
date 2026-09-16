@@ -1152,7 +1152,9 @@ describe('le cash attendu', () => {
       .eq('id', patron.id);
     await admin.from('collecteurs').update({ titulaire_id: patron.id }).eq('id', awa.id);
 
-    const jour = jourUtc(1);
+    // Jamais hier : `tendances.test.ts` affirme qu'hier est un jour creux pour
+    // toute la plateforme, et une mise posée là ferait tomber son épreuve.
+    const jour = jourUtc(2);
     const carteId = await carteAvecMises(awa, jour, 1);
     const rejetId = await poserRefus(awa, { carteId, jour });
 
@@ -2291,13 +2293,16 @@ describe('les alertes', () => {
       encaisse_le: `${jourUtc(10)}T09:00:00Z`,
     });
 
-    const hier = jourUtc(1);
-    const rejetId = await poserRefus(dormeur, { carteId, jour: hier });
-    await poserRattrapage(dormeur, { clientId, carteId, rejetId, jour: hier });
+    // Avant-hier, et jamais hier : `tendances.test.ts` affirme qu'hier est un
+    // jour creux pour toute la plateforme, et un rattrapage est un versement.
+    // Deux jours restent loin des sept de la dormance.
+    const avantHier = jourUtc(2);
+    const rejetId = await poserRefus(dormeur, { carteId, jour: avantHier });
+    await poserRattrapage(dormeur, { clientId, carteId, rejetId, jour: avantHier });
 
     const alertes = await chargerAlertes();
 
-    // Le client a versé hier : la carte n'est pas endormie, même si le serveur
+    // Le client a versé avant-hier : la carte n'est pas endormie, même si le serveur
     // a refusé ce versement-là.
     expect(alertes.find((a) => a.cle === `dormante-${carteId}`)).toBeUndefined();
 
