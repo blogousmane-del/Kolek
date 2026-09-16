@@ -12,14 +12,26 @@ ce que l'écran montre pendant qu'il attend, et ce qu'il dit quand il échoue.
 
 ## 1. Le problème
 
-Un collecteur hors ligne ouvre l'écran Retrait. Rien ne s'affiche pendant sept
-secondes. Aucun message, aucune roue, rien — puis une phrase d'erreur.
+Un collecteur hors ligne ouvre l'écran Retrait. Pendant sept secondes, il voit
+des **squelettes de chargement** — puis une phrase d'erreur.
 
 La cause est dans `apps/collecteur/src/cache.ts`, fonction `useDonnees`
 (lignes 156-199). Sans valeur gardée, l'effet fait `setDonnees(null)` puis lance
 la requête. `postgrest-js` la retente trois fois avant d'abandonner. Pendant
-toute cette attente, l'écran a `donnees = null` **et** `erreur = null` : il n'a
-rien à montrer, et rien à dire.
+toute cette attente, l'écran a `donnees = null` **et** `erreur = null` — l'état
+exact dans lequel les écrans affichent leur squelette d'attente
+(`Retrait.tsx:201` : `{!cartes && !erreur && …}`).
+
+**La note de J2b disait « l'écran reste vide », et c'était inexact.** Vérifié le
+2026-09-16 : les onze écrans disent tous quelque chose pendant l'attente — neuf
+montrent des squelettes, `Avis` et `Rapprochement` affichent « Lecture… ».
+
+Le défaut n'en est que plus sérieux. Un écran muet laisse le collecteur dans le
+doute ; un squelette lui **promet des données**. Pendant sept secondes,
+l'application affirme qu'elle est en train de charger ce qu'elle sait déjà ne
+pas pouvoir charger. Un collecteur qui apprend que l'écran promet pour rien
+cesse de le croire quand il dit vrai — c'est l'argument que `Bandeaux.tsx`
+oppose déjà à un autre mensonge d'interface, lignes 23-27.
 
 Ce n'est pas un défaut de l'écran Retrait. `useDonnees` sert **onze écrans** :
 Accueil, Alertes, Avis, Bilan, Équipe, EquipeClients, HistoriqueClient, Plus,
@@ -38,16 +50,22 @@ Les cinq mineurs de J2b retenus, et une extension que le premier appelle :
 
 | # | Défaut | Où | Origine |
 |---|---|---|---|
-| 1 | Hors ligne sans cache, l'écran reste vide ~7 s | `cache.ts` | mineur J2b |
+| 1 | Hors ligne sans cache, l'écran promet ~7 s par un squelette | `cache.ts` | mineur J2b |
 | 2 | « Fiche introuvable » là où il faut « pas encore sur ce téléphone » | `FicheClient.tsx:136` | mineur J2b |
 | 3 | L'avis rouge de session perdue reste affiché | `FicheClient.tsx:753` | mineur J2b |
 | 4 | Le bandeau « Envoi en cours » ne montre aucun progrès | `Bandeaux.tsx` | mineur J2b, **à reproduire** |
 | 5 | L'alerte au premier lancement | `Accueil.tsx` | mineur J2b, **à reproduire** |
-| 6 | L'attente légitime (réseau lent) ne se voit pas non plus | les 11 écrans | extension du n° 1 |
+**Ce qui n'entre pas, après vérification.** La première rédaction de cette spec
+ajoutait un sixième point : « rendre l'attente visible dans les onze écrans ».
+Il est retiré — c'est **déjà fait**. Neuf écrans montrent des squelettes, et les
+deux derniers affichent « Lecture… ». Rien à construire.
 
-Le n° 6 n'est pas un mineur de J2b. Il entre ici parce que corriger le n° 1 sans
-lui laisserait le même écran vide dès que le réseau est lent au lieu d'absent :
-on aurait traité la cause fréquente en laissant le symptôme intact.
+Reste une incohérence cosmétique : `Avis` et `Rapprochement` utilisent encore le
+« Lecture… » que `packages/ui/src/Squelette.tsx` dit en toutes lettres vouloir
+remplacer (« Remplace les "Chargement…" et "Lecture…" austères par des formes
+douces »). **Hors chantier** : c'est un défaut d'uniformité, il ne coûte rien au
+collecteur, et le mêler ici diluerait un chantier qui tient en quatre
+correctifs.
 
 **Hors chantier**, renvoyés au second volet : « Prévenir » non gardé par la file,
 écriture dans la file après effacement de tournée, enfant en sursis sous
@@ -83,15 +101,20 @@ part, et un wifi menteur retombe sur les trois relances et ses sept secondes.
 Une valeur gardée reste affichée quoi qu'il arrive, en ligne comme hors ligne :
 une revalidation qui échoue n'efface jamais des chiffres déjà à l'écran.
 
-### 3.2 Rendre l'attente visible
+### 3.2 Les écrans n'ont rien à changer
 
-`useDonnees` expose déjà `enCours`. Les onze écrans l'ignorent. Ils afficheront
-un état d'attente tant que `enCours` est vrai **et** que `donnees` est `null` —
-jamais pendant une revalidation de fond, où les chiffres sont déjà là et où une
-roue les ferait clignoter sans raison.
+C'est la conséquence heureuse du point précédent, et elle mérite d'être écrite
+pour qu'on ne la défasse pas plus tard.
 
-L'état d'attente est un composant unique, dans `packages/ui`, pour que les onze
-écrans disent la même chose de la même façon.
+Les écrans affichent leur squelette sur la condition `!donnees && !erreur`.
+Poser l'erreur immédiatement rend cette condition fausse immédiatement : le
+squelette ne s'affiche plus, le message d'erreur prend sa place, et **aucune
+ligne de ces onze écrans n'est modifiée**. La correction se fait entièrement
+dans `useDonnees`.
+
+C'est le signe que la frontière était juste depuis le début : les écrans
+décrivent quoi montrer selon l'état, `useDonnees` décide de l'état. Un correctif
+qui aurait dû toucher onze fichiers en touche un.
 
 ### 3.3 Les messages au bon endroit
 
@@ -136,10 +159,11 @@ correction ne prouve rien.
 - `cache.test.ts` : hors ligne **avec** cache, la valeur gardée s'affiche et
   aucune erreur n'est posée.
 - `cache.test.ts` : en ligne, le comportement actuel est inchangé.
-- `Retrait.test.tsx` : l'état d'attente est visible tant que rien n'est lu, et
-  disparaît dès que les données arrivent. C'est l'écran d'où vient le défaut ;
-  les dix autres reçoivent le même composant sans épreuve propre, la règle
-  vivant dans `useDonnees` et non dans chacun d'eux.
+- `Retrait.test.tsx` : hors ligne et sans cache, **le squelette ne s'affiche
+  pas** et le message d'erreur est là. C'est l'épreuve qui dit que l'écran ne
+  promet plus rien. Elle porte sur Retrait parce que le défaut vient de là ; les
+  dix autres écrans n'en reçoivent pas, la règle vivant dans `useDonnees` et non
+  dans chacun d'eux.
 - `FicheClient.test.tsx` : hors ligne, une fiche absente dit « pas encore sur ce
   téléphone » et **non** « peut-être supprimée ».
 
