@@ -41,6 +41,7 @@ export function Equipe({
   const { donnees: equipe, erreur } = useDonnees('equipe', chargerEquipe, {
     revision,
     messageErreur: 'Équipe indisponible. Vérifie le réseau.',
+    besoinReseau: true,
   });
   const abonnementActif = useAbonnementActif();
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);

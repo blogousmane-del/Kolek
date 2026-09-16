@@ -87,6 +87,7 @@ export function Retrait({
   } = useDonnees('cartes-cloturables', chargerCartesCloturables, {
     revision: revision + tourLocal,
     messageErreur: 'Cet écran demande le réseau.',
+    besoinReseau: true,
   });
   const [erreurEcriture, setErreurEcriture] = useState<string | null>(null);
   const erreur = erreurEcriture ?? erreurLecture;

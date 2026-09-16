@@ -58,6 +58,7 @@ export function Avis({ onRetour, revision }: { onRetour: () => void; revision: n
   const { donnees: etat, erreur } = useDonnees('avis', () => chargerEtatAvis(), {
     revision,
     messageErreur: 'Cet écran demande le réseau.',
+    besoinReseau: true,
   });
 
   const eteint = !etat?.canal || etat.canal === 'aucun';

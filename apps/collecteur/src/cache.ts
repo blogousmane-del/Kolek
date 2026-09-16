@@ -131,15 +131,6 @@ export interface Lecture<T> {
 }
 
 /**
- * Lit une donnée d'écran, avec cache.
- *
- * `chargeur` est délibérément **hors** des dépendances de l'effet : les écrans
- * le déclarent en ligne, donc son identité change à chaque rendu et l'inclure
- * relancerait la requête en boucle. Il est gardé dans une référence, ce qui
- * garantit que l'appel utilise toujours la dernière version sans la surveiller.
- */
-
-/**
  * Le réseau est-il **certainement** absent ?
  *
  * `navigator.onLine` ne prouve jamais qu'Internet répond — c'est ce que dit
@@ -154,12 +145,20 @@ function horsLigne(): boolean {
   return typeof navigator !== 'undefined' && navigator.onLine === false;
 }
 
+/**
+ * Lit une donnée d'écran, avec cache.
+ *
+ * `chargeur` est délibérément **hors** des dépendances de l'effet : les écrans
+ * le déclarent en ligne, donc son identité change à chaque rendu et l'inclure
+ * relancerait la requête en boucle. Il est gardé dans une référence, ce qui
+ * garantit que l'appel utilise toujours la dernière version sans la surveiller.
+ */
 export function useDonnees<T>(
   cle: string,
   chargeur: () => Promise<T>,
-  options: { revision?: number; messageErreur: string },
+  options: { revision?: number; messageErreur: string; besoinReseau?: boolean },
 ): Lecture<T> {
-  const { revision = 0, messageErreur } = options;
+  const { revision = 0, messageErreur, besoinReseau = false } = options;
 
   const chargeurRef = useRef(chargeur);
   chargeurRef.current = chargeur;
@@ -181,20 +180,28 @@ export function useDonnees<T>(
       // `rafraichir` a déjà retiré l'entrée avant d'incrémenter `tour` : si
       // une valeur est là et qu'elle est fraîche, c'est bien qu'aucune
       // relecture n'a été demandée.
-      if (garde.frais) return;
+      if (garde.frais) {
+        setEnCours(false);
+        return;
+      }
     } else {
       setDonnees(null);
-      // Rien à montrer, et le réseau certainement absent : la requête échouera
-      // au bout de trois relances de postgrest-js — sept secondes pendant
-      // lesquelles `donnees` et `erreur` valent tous deux `null`, l'état où les
-      // écrans affichent leur squelette. L'écran promettrait des données qu'il
-      // sait impossibles. Poser l'erreur tout de suite est la seule chose vraie
-      // qu'on puisse dire, et les écrans s'y accordent sans être modifiés.
+      // Rien à montrer, le chargeur a besoin du réseau, et le réseau est
+      // certainement absent : la requête échouera au bout de trois relances de
+      // postgrest-js — sept secondes pendant lesquelles `donnees` et `erreur`
+      // valent tous deux `null`, l'état où les écrans affichent leur
+      // squelette. L'écran promettrait des données qu'il sait impossibles.
+      // Poser l'erreur tout de suite est la seule chose vraie qu'on puisse
+      // dire, et les écrans s'y accordent sans être modifiés.
       //
-      // Une valeur gardée, même périmée, ne passe pas ici : elle est déjà à
-      // l'écran, rien ne ment, et la revalidation peut tenter sa chance.
-      if (horsLigne()) {
+      // Une valeur gardée fraîche ne passe pas ici : elle est déjà à l'écran,
+      // rien ne ment, et la revalidation peut tenter sa chance. Une valeur
+      // gardée périmée par la révision, elle, fait rendre `null` à `lireCache`
+      // — elle est donc bien absente du point de vue de `garde`, et passe ici
+      // comme n'importe quelle absence.
+      if (besoinReseau && horsLigne()) {
         setErreur(messageErreur);
+        setEnCours(false);
         return;
       }
     }

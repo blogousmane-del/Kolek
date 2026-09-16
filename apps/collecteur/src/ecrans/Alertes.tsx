@@ -59,6 +59,7 @@ export function Alertes({ onRetour, revision }: { onRetour: () => void; revision
   const { donnees: alertes, erreur } = useDonnees('alertes', chargerAlertes, {
     revision,
     messageErreur: 'Cet écran demande le réseau.',
+    besoinReseau: true,
   });
   const { operations, refus, tournee } = useHorsLigne();
   const refusees = useMemo(

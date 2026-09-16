@@ -48,7 +48,7 @@ export function EquipeClients({
   const { donnees: clients, erreur } = useDonnees(
     `equipe-clients:${collaborateur.id}`,
     () => chargerClientsCollaborateur(collaborateur.id),
-    { revision, messageErreur: 'Tournée indisponible. Vérifie le réseau.' },
+    { revision, messageErreur: 'Tournée indisponible. Vérifie le réseau.', besoinReseau: true },
   );
 
   return (

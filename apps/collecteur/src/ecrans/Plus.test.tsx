@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ecrireCache, viderCache } from '../cache';
+import { viderCache } from '../cache';
 
 /**
  * L'abonnement, sur l'écran « Plus ».
@@ -123,13 +123,6 @@ describe('ce que « Plus » dit du téléphone (spec J2b §8.7)', () => {
   it('dit ce qui marche sans réseau, et ce qui attend sur le téléphone', async () => {
     Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
     profil.mockResolvedValue(PROFIL);
-    // Depuis la tâche 1 (`useDonnees` hors ligne) : sans valeur gardée et le
-    // réseau coupé, le hook pose l'erreur et ne lance plus `chargerProfil` du
-    // tout — `profil` resterait `null`, et cet écran ne montre la carte
-    // « Application » (l'objet de ce test) que si `profil` est peuplé. Une
-    // valeur gardée simule le cas réel visé ici : le profil lu avant la
-    // coupure, encore affiché pendant qu'elle dure.
-    ecrireCache('profil', PROFIL);
     etatHorsLigne = { ...etatHorsLigne, file: { ...FILE_VIDE, mises: 2, enAttente: 1, aConsigner: 1 } };
     afficher();
 
