@@ -13347,7 +13347,6 @@ Relevés en relecture ou au regard, jugés sans perte d'argent ni de données. �
 - L'alerte au premier lancement (`Accueil.tsx`) — **pas reproduit le 2026-09-17**, à préciser : profil neuf, `persisted()` à `false`, l'avis s'affiche une fois puis se tait quand on revient sur l'accueil, et `Profil` le porte en permanence — conforme à §8.7. Seul écart consigné, sans tâche : `stockageDejaSignale` est une variable de module, donc un relais de collecteur sans rechargement de page ne le revoit pas (Docs/plans/2026-09-16-attente-et-messages.md).
 - Une écriture dans la file juste après un effacement subi de la tournée (`file.ts`, `moteur.ts`).
 - Un enfant encore en sursis quand son parent est refusé (`PARENT_REFUSE`, `FicheClient.tsx`).
-- Le bandeau « Envoi en cours » ne montre aucun progrès — **reproduit le 2026-09-17** : « Envoi en cours · 4 restantes » figé onze secondes, puis disparition d'un coup. Corrigé par la tâche 4 de Docs/plans/2026-09-16-attente-et-messages.md.
 - Le commentaire du 42501 sous `anon` (`synchroniseur.ts`).
 - Deux onglets ouverts sur le même compte.
 - Les angles morts de l'épreuve de durabilité (raccourcis `idb`, sous-dossiers, `.tsx`).
@@ -13363,3 +13362,12 @@ laissait passer un montant que la colonne ne porte pas ; PostgreSQL rendait
 arrête la passe. Huit minutes et demie pendant lesquelles les mises encaissées
 derrière la déclaration ne partaient pas, puis le motif `INCONNU`. Livré sur
 `main` en `e86b0ae`.
+
+**Clos le 2026-09-17 :** « Le bandeau « Envoi en cours » ne montre aucun
+progrès ». Reproduit sur la pile locale avant d’être touché : quatre mises
+posées hors ligne, retour en ligne avec 1 500 ms de latence par requête, le
+bandeau a tenu « Envoi en cours · 4 restantes » onze secondes puis a disparu
+d’un coup. `signalerChangement()` n’était appelé qu’au rappel de fin de passe.
+`passe` annonce maintenant chaque opération sortie de la file. Le même regard,
+après : 4, 3, 2, 1, puis plus de bandeau. Tâche 4 de
+`Docs/plans/2026-09-16-attente-et-messages.md`.
