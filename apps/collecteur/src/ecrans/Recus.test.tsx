@@ -237,6 +237,42 @@ describe('la pagination', () => {
     expect(screen.queryByText('Client 00')).toBeNull();
   });
 
+  /**
+   * Le compte à côté d'un jour dit la journée, pas la page.
+   *
+   * Le regroupement se fait après la pagination, donc une journée chargée se
+   * retrouve à cheval sur deux pages. Si le compte se prenait sur les lignes
+   * affichées, l'écran écrirait « 15 lignes » sous un jour qui en porte
+   * dix-huit — et un collecteur qui répond à un client qui conteste son
+   * décompte lirait ce chiffre-là comme le décompte du jour.
+   */
+  it('dit la journée entière quand la page la coupe en deux', async () => {
+    journal.mockResolvedValue(
+      Array.from({ length: 18 }, (_, i) =>
+        mise(`m${i}`, `Client ${String(i).padStart(2, '0')}`, 1),
+      ),
+    );
+
+    rendre();
+    await screen.findByText('Client 00');
+
+    expect(screen.getByText('15 sur 18 lignes')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Page suivante' }));
+
+    // Page 2 : trois lignes affichées, toujours dix-huit ce jour-là.
+    expect(screen.getByText('3 sur 18 lignes')).toBeTruthy();
+  });
+
+  it('ne dit « sur » que lorsque la page coupe vraiment', async () => {
+    journal.mockResolvedValue([mise('m1', 'Awa Traoré', 1), mise('m2', 'Moussa Bamba', 1)]);
+
+    rendre();
+    await screen.findByText('Awa Traoré');
+
+    expect(screen.getByText('2 lignes')).toBeTruthy();
+  });
+
   it('revient en page 1 quand un filtre rétrécit la liste', async () => {
     journal.mockResolvedValue(
       Array.from({ length: 18 }, (_, i) =>

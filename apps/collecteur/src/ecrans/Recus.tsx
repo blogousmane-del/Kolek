@@ -177,17 +177,30 @@ export function Recus({
    * d'abord obligerait à paginer des jours entiers, donc à montrer trois lignes
    * sur une page et quarante sur la suivante. Un jour peut donc s'étaler sur
    * deux pages, et c'est le moindre des deux défauts.
+   *
+   * Ce qui n'était pas le moindre : chaque groupe porte `duJour`, le compte
+   * du jour **entier**, pris sur la liste filtrée avant qu'on la coupe en
+   * pages. Sans lui, un jour coupé par la pagination annonçait « 4 lignes »
+   * pour une journée qui en porte douze — et sur un écran de reçus, où l'on
+   * répond à un client qui conteste un décompte, c'est le pire chiffre qu'on
+   * puisse écrire.
    */
   const parJour = useMemo(() => {
-    const groupes: Array<{ jour: string; lignes: EvenementRecu[] }> = [];
+    const duJour = new Map<string, number>();
+    for (const evenement of filtres) {
+      const jour = clefDuJour(evenement.survenuLe);
+      duJour.set(jour, (duJour.get(jour) ?? 0) + 1);
+    }
+
+    const groupes: Array<{ jour: string; lignes: EvenementRecu[]; duJour: number }> = [];
     for (const evenement of visibles) {
       const jour = clefDuJour(evenement.survenuLe);
       const dernier = groupes.at(-1);
       if (dernier && dernier.jour === jour) dernier.lignes.push(evenement);
-      else groupes.push({ jour, lignes: [evenement] });
+      else groupes.push({ jour, lignes: [evenement], duJour: duJour.get(jour) ?? 1 });
     }
     return groupes;
-  }, [visibles]);
+  }, [filtres, visibles]);
 
   function basculerNature(nature: NatureEvenement) {
     setNatures((choisies) =>
@@ -318,14 +331,18 @@ export function Recus({
               />
             )}
 
-            {parJour.map(({ jour, lignes }, rangGroupe) => (
+            {parJour.map(({ jour, lignes, duJour }, rangGroupe) => (
               <section key={jour} className="flex flex-col gap-2">
                 <div className="flex items-baseline justify-between gap-3 pt-1">
                   <h2 className="font-headings font-bold text-sm text-ink">
                     {titreDuJour(lignes[0]!.survenuLe)}
                   </h2>
+                  {/* « 4 sur 12 » quand la page coupe la journée, dans les
+                      mêmes mots que le sous-titre de l'écran, qui dit déjà
+                      « N sur M événements ». */}
                   <span className="font-body text-xs text-muted-foreground tabular-nums">
-                    {lignes.length} ligne{lignes.length > 1 ? 's' : ''}
+                    {duJour > lignes.length ? `${lignes.length} sur ${duJour}` : duJour} ligne
+                    {duJour > 1 ? 's' : ''}
                   </span>
                 </div>
 
