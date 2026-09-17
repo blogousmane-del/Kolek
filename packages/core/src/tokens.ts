@@ -69,23 +69,47 @@ export const couleurs = {
   negativeTint: '#F6E4DF',
   info: '#3D6E8E',
   infoTint: '#E6EEF4',
-  // Deux familles fonctionnelles, ajoutées le 2026-09-09 pour `ActionsRapides`.
+  // Les quatre aplats de tuile — Design System §3.1, révisé le 2026-09-17.
   //
-  // L'écran d'accueil du collecteur affiche huit boutons ensemble. Cinq
-  // portaient des hexadécimaux en dur ; les ramener aux jetons sémantiques
-  // existants aurait rendu *Retrait* et *Bilan* identiques — deux boutons
-  // voisins, dont l'un sort de l'argent. La palette sémantique décrit des
-  // **états** (succès, erreur, information) ; elle n'a jamais eu vocation à
-  // distinguer neuf destinations.
+  // ## Ce qu'ils remplacent
   //
-  // `ocre` n'est pas l'or. `or` est une couleur de marque, que le Design
-  // System §1 interdit sur les surfaces qui manipulent l'argent ; `ocre` est
-  // beaucoup plus sombre et sert de repère fonctionnel, jamais d'ornement. Un
-  // test tient cet écart plutôt qu'un commentaire.
-  ardoise: '#475569',
-  ardoiseTint: '#EFF2F9',
-  ocre: '#7D6B35',
-  ocreTint: '#F8F5EC',
+  // `ardoise`/`ardoiseTint` et `ocre`/`ocreTint`, posés le 2026-09-09 pour
+  // `ActionsRapides`. Leur raison d'être tenait : la palette sémantique décrit
+  // des **états** (succès, erreur, information), et n'a jamais eu vocation à
+  // distinguer des **destinations**. C'est leur emploi qui a échoué.
+  //
+  // Les tuiles empruntaient alors les teintes d'alerte comme fonds, et ces
+  // teintes sont conçues pour porter un message par-dessus, pas pour être vues
+  // les unes à côté des autres. Sur l'épreuve d'écran du 2026-09-17, quatre
+  // familles s'y lisaient comme **trois** : `positiveTint` (#E6F3EC) et
+  // `secondary` (#E8F0EA) ne diffèrent que de sept unités sur un canal, et
+  // *Encaisser* était donc de la même couleur que *Souscrire*. Une famille
+  // qu'on ne distingue pas ne classe rien.
+  //
+  // ## Comment ces quatre-là sont choisis
+  //
+  // Quatre teintes, franchement séparées — au moins vingt-sept unités d'écart
+  // sur un canal entre deux fonds quelconques — et à luminance voisine, entre
+  // 0,735 et 0,784. Les deux conditions vont ensemble : l'écart fait qu'on les
+  // distingue en couleur, la luminance proche fait qu'aucune ne saute au visage
+  // ni ne disparaît en niveaux de gris, ce qui est la vue d'un daltonien comme
+  // celle d'un téléphone en plein soleil.
+  //
+  // Chaque encre tient **4,5:1 sur son propre fond**, et non 3:1 : ces couleurs
+  // portent maintenant le libellé de la tuile, pas seulement son icône. C'est ce
+  // qui a changé avec la forme — l'aplat est la tuile, le texte vit dedans.
+  //
+  // `tuileGestionEncre` n'est pas l'or, et le test le tient : `or` est une
+  // couleur de marque que le Design System §1 interdit sur les surfaces qui
+  // manipulent l'argent.
+  tuileArgent: '#CBE5D4',
+  tuileArgentEncre: '#14563A',
+  tuileClient: '#F0DCE4',
+  tuileClientEncre: '#8A3A5E',
+  tuileAnalyse: '#D2E2F4',
+  tuileAnalyseEncre: '#2A5480',
+  tuileGestion: '#F1E4C9',
+  tuileGestionEncre: '#6A5218',
   // Data-viz — une échelle de clarté, et non quatre teintes à la même
   // luminance. Refondue le 2026-09-04.
   //

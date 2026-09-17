@@ -42,16 +42,43 @@ export type FamilleAction = 'argent' | 'client' | 'analyse' | 'gestion';
  * sur du blanc. Ici la couleur porte toute la surface, l'icône est un trait
  * posé dessus, et il ne reste qu'un objet là où il y en avait deux.
  *
- * Les quatre paires tiennent le seuil AA sur leur propre fond : 4,68:1 pour
- * argent, 7,01:1 pour client, 6,76:1 pour analyse, 4,78:1 pour gestion. Elles
- * sont mesurées sur les jetons de `packages/core/src/tokens.ts`, pas choisies à
- * l'œil.
+ * ## Les fonds viennent d'un jeu dédié, et c'est une correction
+ *
+ * La première version empruntait les **teintes d'alerte** — `positiveTint`,
+ * `secondary`, `ardoiseTint`, `ocreTint`. Elles sont faites pour porter un
+ * message par-dessus, pas pour être vues les unes à côté des autres : sur
+ * l'épreuve d'écran, les quatre familles se lisaient comme trois, parce que
+ * `positiveTint` et `secondary` ne diffèrent que de sept unités sur un canal.
+ * *Encaisser* avait donc la couleur de *Souscrire*, et une famille qu'on ne
+ * distingue pas ne classe rien.
+ *
+ * Les jetons `tuile*` de `packages/core/src/tokens.ts` sont franchement séparés
+ * en teinte et voisins en luminance, et deux épreuves tiennent ces deux
+ * conditions ensemble.
  */
 const FAMILLES: Record<FamilleAction, string> = {
-  argent: 'bg-positive-tint text-positive',
-  client: 'bg-secondary text-accent',
-  analyse: 'bg-ardoise-tint text-ardoise',
-  gestion: 'bg-ocre-tint text-ocre',
+  argent: 'bg-tuile-argent text-tuile-argent-encre',
+  client: 'bg-tuile-client text-tuile-client-encre',
+  analyse: 'bg-tuile-analyse text-tuile-analyse-encre',
+  gestion: 'bg-tuile-gestion text-tuile-gestion-encre',
+};
+
+/**
+ * Ce que la dernière tuile occupe quand la rangée n'est pas pleine.
+ *
+ * Dix actions dans trois colonnes laissent *Plus* seule, avec deux cases vides
+ * à sa droite : sur l'épreuve d'écran du 2026-09-17, ça se lit comme une grille
+ * qui s'est arrêtée en chemin, pas comme une intention. La dernière tuile prend
+ * donc la place qui reste sur sa rangée.
+ *
+ * Seulement sur téléphone : à cinq colonnes, dix actions font deux rangées
+ * pleines, et l'étirement n'aurait plus rien à rattraper. Les classes sont
+ * écrites en toutes lettres parce que Tailwind lit la source, et qu'une classe
+ * assemblée à l'exécution n'existerait dans aucune feuille de style.
+ */
+const RESTE_DE_RANGEE: Record<number, string> = {
+  1: 'col-span-3 sm:col-span-1',
+  2: 'col-span-2 sm:col-span-1',
 };
 
 export interface ActionRapide {
@@ -70,6 +97,9 @@ interface Props {
 }
 
 export function ActionsRapides({ actions, compact = false, anime = false }: Props) {
+  const colonnes = compact ? 2 : 3;
+  const reste = actions.length % colonnes;
+
   return (
     <div
       className={`grid gap-2 xs:gap-2.5 ${
@@ -78,6 +108,8 @@ export function ActionsRapides({ actions, compact = false, anime = false }: Prop
     >
       {actions.map((action, rang) => {
         const teintes = FAMILLES[action.famille ?? 'gestion'];
+        const derniere = rang === actions.length - 1;
+        const etirement = derniere ? (RESTE_DE_RANGEE[reste] ?? '') : '';
 
         return (
           <button
@@ -95,14 +127,20 @@ export function ActionsRapides({ actions, compact = false, anime = false }: Prop
               `justify-between` tient la diagonale de la capture : l'icône en
               haut à gauche, le libellé en bas à droite. C'est ce qui fait qu'une
               tuile se lit d'un coup d'œil sans encadrer son texte.
+
+              Hauteur fixe plutôt que proportion : une tuile étirée sur la fin
+              d'une rangée garde alors exactement la hauteur de ses voisines,
+              alors qu'un `aspect-ratio` la ferait grandir avec sa largeur. Les
+              128 px de bureau viennent de l'épreuve du 2026-09-17, où les
+              tuiles à 96 px se lisaient comme des bandeaux.
             */
-            className={`anim-pression flex flex-col justify-between rounded-lg text-left ${teintes} ${
-              compact ? 'min-h-20 p-2.5' : 'min-h-24 p-3'
+            className={`anim-pression flex flex-col justify-between rounded-lg text-left ${teintes} ${etirement} ${
+              compact ? 'h-20 p-2.5' : 'h-24 sm:h-32 p-3'
             } ${anime ? 'anim-cascade' : ''} ${
               action.onActiver ? 'cursor-pointer' : 'opacity-60 cursor-default'
             }`}
           >
-            <Icone nom={action.icone} taille={compact ? 20 : 24} />
+            <Icone nom={action.icone} taille={compact ? 20 : 26} />
             <span className="font-body font-semibold text-xs leading-tight text-right self-end">
               {action.libelle}
             </span>

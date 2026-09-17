@@ -26,10 +26,14 @@
   --color-negative-tint: #F6E4DF;
   --color-info: #3D6E8E;
   --color-info-tint: #E6EEF4;
-  --color-ardoise: #475569;
-  --color-ardoise-tint: #EFF2F9;
-  --color-ocre: #7D6B35;
-  --color-ocre-tint: #F8F5EC;
+  --color-tuile-argent: #CBE5D4;
+  --color-tuile-argent-encre: #14563A;
+  --color-tuile-client: #F0DCE4;
+  --color-tuile-client-encre: #8A3A5E;
+  --color-tuile-analyse: #D2E2F4;
+  --color-tuile-analyse-encre: #2A5480;
+  --color-tuile-gestion: #F1E4C9;
+  --color-tuile-gestion-encre: #6A5218;
   --color-chart-mint: #D1E8D4;
   --color-chart-teal: #9ACDBE;
   --color-chart-blue: #82ACCC;
