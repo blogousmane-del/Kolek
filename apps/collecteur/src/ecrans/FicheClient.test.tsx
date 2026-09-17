@@ -319,6 +319,7 @@ function rendreFiche(proprietes: Partial<Parameters<typeof FicheClient>[0]> = {}
       onFermer={vi.fn()}
       onEcriture={vi.fn()}
       onRetrait={vi.fn()}
+      onRecus={vi.fn()}
       {...proprietes}
     />,
   );
@@ -336,6 +337,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
         onFermer={vi.fn()}
         onEcriture={vi.fn()}
         onRetrait={vi.fn()}
+        onRecus={vi.fn()}
       />,
     );
 
@@ -365,6 +367,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
         onFermer={vi.fn()}
         onEcriture={vi.fn()}
         onRetrait={vi.fn()}
+        onRecus={vi.fn()}
       />,
     );
 
@@ -384,6 +387,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
         onFermer={vi.fn()}
         onEcriture={vi.fn()}
         onRetrait={vi.fn()}
+        onRecus={vi.fn()}
       />,
     );
 
@@ -418,6 +422,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
         onFermer={vi.fn()}
         onEcriture={vi.fn()}
         onRetrait={vi.fn()}
+        onRecus={vi.fn()}
       />,
     );
 
@@ -438,6 +443,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
         onFermer={vi.fn()}
         onEcriture={vi.fn()}
         onRetrait={vi.fn()}
+        onRecus={vi.fn()}
       />,
     );
 
@@ -751,6 +757,7 @@ describe('ce qui attend part quand on cesse de regarder', () => {
           onFermer={vi.fn()}
           onEcriture={vi.fn()}
           onRetrait={vi.fn()}
+          onRecus={vi.fn()}
         />,
       );
     });
@@ -810,6 +817,7 @@ describe('ce qui attend part quand on cesse de regarder', () => {
           onFermer={vi.fn()}
           onEcriture={vi.fn()}
           onRetrait={vi.fn()}
+          onRecus={vi.fn()}
         />,
       );
     });
@@ -846,6 +854,7 @@ describe('ce qui attend part quand on cesse de regarder', () => {
           onFermer={vi.fn()}
           onEcriture={vi.fn()}
           onRetrait={vi.fn()}
+          onRecus={vi.fn()}
         />,
       );
     });
@@ -870,6 +879,7 @@ describe('numéro de cycle : l’ancienneté, jamais l’avancement', () => {
         onFermer={vi.fn()}
         onEcriture={vi.fn()}
         onRetrait={vi.fn()}
+        onRecus={vi.fn()}
       />,
     );
 
@@ -911,6 +921,7 @@ describe('client sans carte active : le bloc d’ouverture reste atteignable', (
         onFermer={vi.fn()}
         onEcriture={vi.fn()}
         onRetrait={vi.fn()}
+        onRecus={vi.fn()}
       />,
     );
 
@@ -931,6 +942,7 @@ describe('client sans carte active : le bloc d’ouverture reste atteignable', (
         onFermer={vi.fn()}
         onEcriture={vi.fn()}
         onRetrait={vi.fn()}
+        onRecus={vi.fn()}
       />,
     );
 
@@ -1024,6 +1036,7 @@ describe('la carte choisie survit à la relecture qui suit un encaissement', () 
           onFermer={vi.fn()}
           onEcriture={vi.fn()}
           onRetrait={vi.fn()}
+          onRecus={vi.fn()}
         />,
       );
     });
@@ -1217,208 +1230,7 @@ describe('les gestes restés en ligne attendent la file et le réseau', () => {
     ).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Ne plus prévenir' }) as HTMLButtonElement).disabled).toBe(true);
   });
-
-  it('marque « pas encore envoyée » la mise en file, et elle seule, dans les derniers versements', async () => {
-    operationsEnFile = [operationMise(1, { carteId: 'seule' })];
-    chargerFicheClient.mockResolvedValue({
-      ...FICHE_UNE_CARTE_EN_COURS,
-      mises: [
-        { id: 'mise-1', montant: 1000, encaisseLe: '2026-09-13T09:00:00.000Z', estCommission: false },
-        { id: 'ancienne', montant: 1000, encaisseLe: '2026-09-12T09:00:00.000Z', estCommission: false },
-      ],
-    });
-    rendreFiche({ clientId: 'cli7' });
-
-    expect(await screen.findByText('1 mise de cette carte pas encore envoyée.')).toBeTruthy();
-    expect(screen.getAllByText(/· pas encore envoyée$/)).toHaveLength(1);
-  });
 });
-
-/**
- * L'historique complet, et la pilule dessinée à la main qui le précédait.
- *
- * ## Ce que la section « Cartes précédentes » cachait
- *
- * Elle vivait sous un `fiche.cartes.length > 1` — donc invisible pour un client
- * qui n'a qu'une carte, c'est-à-dire la majorité. Un historique court reste un
- * historique, et le cacher surprend le jour où il compte.
- *
- * ## La pilule
- *
- * Elle était dessinée à la main, avec ses propres classes et ses propres mots :
- * « Cycle tenu » et « Rendue avant la fin ». Ni l'un ni l'autre n'est dans
- * l'union `Statut`, et la règle 4.11 du système de design dit « une seule
- * table ». Le compte X/31, à deux centimètres de là, porte déjà la nuance que
- * « Rendue avant la fin » voulait dire.
- */
-describe('la porte vers l’historique complet', () => {
-  it('mène à l’écran de toutes les cartes', async () => {
-    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
-
-    render(
-      <FicheClient
-        clientId="cli5"
-        revision={0}
-        collecteurId="col1"
-        onFermer={vi.fn()}
-        onEcriture={vi.fn()}
-        onRetrait={vi.fn()}
-      />,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: /historique complet/i }));
-
-    expect(await screen.findByText(/toutes les cartes/i)).toBeTruthy();
-  });
-
-  it('propose cette porte même à un client qui n’a qu’une carte', async () => {
-    // Le défaut d'origine : la section entière était sous `cartes.length > 1`.
-    chargerFicheClient.mockResolvedValue(FICHE_CARTE_PRESQUE_COMPLETE);
-
-    render(
-      <FicheClient
-        clientId="cli6"
-        revision={0}
-        collecteurId="col1"
-        onFermer={vi.fn()}
-        onEcriture={vi.fn()}
-        onRetrait={vi.fn()}
-      />,
-    );
-
-    expect(await screen.findByRole('button', { name: /historique complet/i })).toBeTruthy();
-  });
-
-  it('revient à la fiche sans la refermer', async () => {
-    // La flèche de l'historique remonte d'un cran. `onFermer` de la fiche ne
-    // doit pas être appelé : le collecteur perdrait le client qu'il consultait.
-    const fermetures: number[] = [];
-    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
-
-    render(
-      <FicheClient
-        clientId="cli5"
-        revision={0}
-        collecteurId="col1"
-        onFermer={() => fermetures.push(1)}
-        onEcriture={vi.fn()}
-        onRetrait={vi.fn()}
-      />,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: /historique complet/i }));
-    await screen.findByText(/toutes les cartes/i);
-
-    fireEvent.click(screen.getByLabelText('Revenir à la fiche'));
-
-    expect(await screen.findByRole('button', { name: /historique complet/i })).toBeTruthy();
-    expect(fermetures).toEqual([]);
-  });
-
-  it('n’écrit plus « Rendue avant la fin » — le statut vient de BadgeStatut', async () => {
-    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
-
-    render(
-      <FicheClient
-        clientId="cli5"
-        revision={0}
-        collecteurId="col1"
-        onFermer={vi.fn()}
-        onEcriture={vi.fn()}
-        onRetrait={vi.fn()}
-      />,
-    );
-
-    await screen.findByText(/Cartes précédentes/);
-
-    expect(screen.queryByText(/rendue avant la fin/i)).toBeNull();
-    expect(screen.queryByText(/cycle tenu/i)).toBeNull();
-  });
-
-  it('dit les mots de la table commune, et eux seuls', async () => {
-    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
-
-    render(
-      <FicheClient
-        clientId="cli5"
-        revision={0}
-        collecteurId="col1"
-        onFermer={vi.fn()}
-        onEcriture={vi.fn()}
-        onRetrait={vi.fn()}
-      />,
-    );
-
-    const section = (await screen.findByText(/Cartes précédentes/)).parentElement!;
-
-    // k9 : 31/31, donc « Cycle terminé ». k8 : 10/31, donc « Clôturée ».
-    expect(within(section).getByText('Cycle terminé')).toBeTruthy();
-    expect(within(section).getByText('Clôturée')).toBeTruthy();
-  });
-});
-
-/**
- * Le défilement du fond, pendant que l'historique est ouvert.
- *
- * `Feuille` pose `document.body.style.overflow = 'hidden'` et le restaure en se
- * démontant. L'historique **remplace** la `Feuille` — c'est un plein écran, et
- * l'imbriquer empilerait deux en-têtes — donc son ouverture rendait le
- * défilement au document derrière l'écran. Sur un téléphone, ça se voit tout de
- * suite : on fait défiler l'historique, on arrive au bout, et c'est la liste des
- * clients qui se met à bouger dessous.
- *
- * Défaut introduit par le plein écran, corrigé au même endroit. `jsdom`
- * n'applique pas les styles, mais il tient bien la propriété — c'est elle que
- * ces deux épreuves lisent.
- */
-describe('l’historique ne rend pas le défilement au fond', () => {
-  it('bloque le document pendant qu’il est ouvert', async () => {
-    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
-
-    render(
-      <FicheClient
-        clientId="cli5"
-        revision={0}
-        collecteurId="col1"
-        onFermer={vi.fn()}
-        onEcriture={vi.fn()}
-        onRetrait={vi.fn()}
-      />,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: /historique complet/i }));
-    await screen.findByText(/toutes les cartes/i);
-
-    expect(document.body.style.overflow).toBe('hidden');
-  });
-
-  it('le rend en revenant à la fiche, et pas avant', async () => {
-    chargerFicheClient.mockResolvedValue(FICHE_TOUTES_CLOTUREES);
-
-    const { unmount } = render(
-      <FicheClient
-        clientId="cli5"
-        revision={0}
-        collecteurId="col1"
-        onFermer={vi.fn()}
-        onEcriture={vi.fn()}
-        onRetrait={vi.fn()}
-      />,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: /historique complet/i }));
-    await screen.findByText(/toutes les cartes/i);
-    fireEvent.click(screen.getByLabelText('Revenir à la fiche'));
-
-    // Toujours bloqué : la `Feuille` est revenue, et c'est elle qui bloque.
-    await screen.findByRole('button', { name: /historique complet/i });
-    expect(document.body.style.overflow).toBe('hidden');
-
-    unmount();
-    expect(document.body.style.overflow).toBe('');
-  });
-});
-
 /**
  * La correction d'une fiche.
  *
@@ -1451,6 +1263,7 @@ describe('corriger la fiche d’un client', () => {
         onFermer={vi.fn()}
         onEcriture={onEcriture}
         onRetrait={vi.fn()}
+        onRecus={vi.fn()}
       />,
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Corriger la fiche' }));
@@ -1606,6 +1419,7 @@ describe('la correction résiste à ce qui se passe autour', () => {
       onFermer: vi.fn(),
       onEcriture: vi.fn(),
       onRetrait: vi.fn(),
+      onRecus: vi.fn(),
     };
     const { rerender } = render(<FicheClient {...proprietes} revision={0} />);
 
@@ -1632,6 +1446,7 @@ describe('la correction résiste à ce qui se passe autour', () => {
         onFermer={vi.fn()}
         onEcriture={vi.fn()}
         onRetrait={vi.fn()}
+        onRecus={vi.fn()}
       />,
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Corriger la fiche' }));

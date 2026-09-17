@@ -156,27 +156,70 @@ export async function chargerBilan(): Promise<Bilan> {
 
 /* -------------------------------- Reçus ---------------------------------- */
 
-export interface Recu {
+export type NatureEvenement = 'mise' | 'commission' | 'rattrapage' | 'cloture';
+
+/**
+ * Une ligne du journal : ce qui s'est passé, et qu'on doit pouvoir relire.
+ *
+ * ## Pourquoi une clôture de carte est un reçu
+ *
+ * Jusqu'au 2026-09-17, l'écran « Reçus » ne portait que des versements, et le
+ * passé des cartes vivait sur la fiche du client — « Cartes précédentes », avec
+ * son propre bouton vers un historique complet. Trois endroits pour une seule
+ * question : « qu'est-ce qui s'est passé sur ce compte ? »
+ *
+ * Ils sont réunis ici. Une carte close est un événement de la même vie que les
+ * mises qui l'ont remplie, et un collecteur qui répond à un client ne fait pas
+ * la différence entre « le 12 tu as versé » et « le 12 ta carte s'est fermée ».
+ * Ce qui les sépare est une nature, pas un écran.
+ *
+ * ## Le montant ne dit pas la même chose selon la nature
+ *
+ * Pour un versement, c'est ce qui a été encaissé. Pour une clôture, c'est le
+ * **total** encaissé sur la carte — la seule somme qui a un sens à cet instant,
+ * puisque la carte ne reçoit plus rien. Les deux sont des francs, et c'est bien
+ * pour ça qu'il faut que la nature soit lisible à côté.
+ */
+export interface EvenementRecu {
   id: string;
+  nature: NatureEvenement;
+  clientId: string;
   clientNom: string;
+  /** L'instant de l'événement, en ISO. */
+  survenuLe: string;
+  /** Versement : ce qui a été encaissé. Clôture : le total encaissé sur la carte. */
   montant: number;
-  estCommission: boolean;
-  encaisseLe: string;
-  /** Mise du carnet : permet de vérifier qu'on a encaissé le bon montant. */
+  /** La mise du carnet : elle dit si on a encaissé le bon montant. */
   mise: number;
-  /** `rattrapage` : une mise que le serveur a refusée, enregistrée comme dette. */
-  nature: 'mise' | 'rattrapage';
+  /** Clôture seulement : l'identifiant de la carte, pour aller chercher son
+      détail à la demande. Les mises d'une carte close sont souvent hors de
+      la fenêtre du journal, et c'est précisément celles qu'on vient lire
+      quand un client conteste un cycle ancien. */
+  carteId?: string;
+  /** Clôture seulement : où en était le cycle, et depuis quand la carte courait. */
+  cycle?: { misesEncaissees: number; ouverteLe: string };
 }
 
 /**
- * Les derniers encaissements, relisibles à voix haute devant le client.
+ * Le journal complet, relisible à voix haute devant le client.
  *
- * L'identifiant montré est celui de la mise, engendré par le téléphone. Ce n'est
- * pas un numéro d'ordre, et ça ne peut pas l'être : deux téléphones encaissent
- * en même temps, et un compteur croissant côté client se contredirait à la
- * synchronisation. Ses huit premiers caractères suffisent à retrouver la ligne.
+ * Deux sources, un seul ordre. Les versements viennent de `mouvements`, les
+ * clôtures de `cartes` : ni l'une ni l'autre ne connaît l'autre, et c'est ici
+ * qu'on les met sur la même frise, la plus récente d'abord.
+ *
+ * ## La limite est une fenêtre, et l'écran le dit
+ *
+ * On ne charge pas tout. Un collecteur de deux ans a des dizaines de milliers
+ * de mouvements, et les ramener pour en montrer vingt serait payer la 3G du
+ * marché pour rien. La fenêtre est donc bornée, et l'écran écrit combien il
+ * tient : une liste qui s'arrête sans le dire est un mensonge, une liste qui
+ * annonce sa borne est un outil.
+ *
+ * Cartes et clients sont chargés entiers, eux, parce qu'ils **nomment** les
+ * lignes : coupés, un reçu récent s'afficherait « Client inconnu » à une mise
+ * de 0. C'est le même raisonnement que `chargerBilan`.
  */
-export async function chargerRecus(limite = 50): Promise<Recu[]> {
+export async function chargerJournal(limite = 200): Promise<EvenementRecu[]> {
   const [rVersements, rCartes, rClients] = await Promise.all([
     supabase
       .from('mouvements')
@@ -184,27 +227,37 @@ export async function chargerRecus(limite = 50): Promise<Recu[]> {
       .eq('sens', 1)
       .order('survenu_le', { ascending: false })
       .limit(limite),
-    // Cartes et clients servent à nommer les reçus : coupés, un reçu récent
-    // s'afficherait « Client inconnu », à une mise de 0. Voir `chargerBilan`.
     chargerTout((debut, fin) =>
-      supabase.from('cartes').select('id, client_id, mise').order('id').range(debut, fin),
+      supabase
+        .from('cartes')
+        .select('id, client_id, mise, statut, mises_encaissees, ouverte_le, cloturee_le')
+        .order('id')
+        .range(debut, fin),
     ),
     chargerTout((debut, fin) =>
       supabase.from('clients').select('id, nom').order('id').range(debut, fin),
     ),
   ]);
 
-  const cartes = new Map(
-    ((rCartes.data ?? []) as Array<{ id: string; client_id: string; mise: number }>).map((c) => [
-      c.id,
-      c,
-    ]),
-  );
+  type LigneCarte = {
+    id: string;
+    client_id: string;
+    mise: number;
+    statut: 'active' | 'cloturee';
+    mises_encaissees: number;
+    ouverte_le: string;
+    cloturee_le: string | null;
+  };
+
+  const lignesCartes = (rCartes.data ?? []) as LigneCarte[];
+  const cartes = new Map(lignesCartes.map((c) => [c.id, c]));
   const noms = new Map(
     ((rClients.data ?? []) as Array<{ id: string; nom: string }>).map((c) => [c.id, c.nom]),
   );
+  const nommer = (clientId: string | undefined) =>
+    (clientId ? noms.get(clientId) : undefined) ?? 'Client inconnu';
 
-  return (
+  const versements = (
     (rVersements.data ?? []) as Array<{
       id: string;
       nature: 'mise' | 'rattrapage';
@@ -213,19 +266,44 @@ export async function chargerRecus(limite = 50): Promise<Recu[]> {
       est_commission: boolean;
       survenu_le: string;
     }>
-  ).map((m) => {
+  ).map((m): EvenementRecu => {
     const carte = cartes.get(m.carte_id);
     return {
       id: m.id,
-      clientNom: (carte ? noms.get(carte.client_id) : undefined) ?? 'Client inconnu',
+      // La commission passe avant le rattrapage : une première mise refusée
+      // puis rattrapée reste une commission, et c'est ce que le client entend.
+      nature: m.est_commission ? 'commission' : m.nature === 'rattrapage' ? 'rattrapage' : 'mise',
+      clientId: carte?.client_id ?? '',
+      clientNom: nommer(carte?.client_id),
+      survenuLe: m.survenu_le,
       montant: m.montant,
-      estCommission: m.est_commission,
-      encaisseLe: m.survenu_le,
       mise: carte?.mise ?? 0,
-      nature: m.nature,
     };
   });
+
+  const clotures = lignesCartes
+    .filter((c): c is LigneCarte & { cloturee_le: string } =>
+      Boolean(c.statut === 'cloturee' && c.cloturee_le),
+    )
+    .sort((a, b) => b.cloturee_le.localeCompare(a.cloturee_le))
+    .slice(0, limite)
+    .map(
+      (c): EvenementRecu => ({
+        id: `cloture-${c.id}`,
+        nature: 'cloture',
+        carteId: c.id,
+        clientId: c.client_id,
+        clientNom: nommer(c.client_id),
+        survenuLe: c.cloturee_le,
+        montant: c.mises_encaissees * c.mise,
+        mise: c.mise,
+        cycle: { misesEncaissees: c.mises_encaissees, ouverteLe: c.ouverte_le },
+      }),
+    );
+
+  return [...versements, ...clotures].sort((a, b) => b.survenuLe.localeCompare(a.survenuLe));
 }
+
 
 /* ------------------------------- Alertes --------------------------------- */
 

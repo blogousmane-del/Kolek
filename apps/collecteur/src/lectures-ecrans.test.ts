@@ -39,7 +39,7 @@ const {
   chargerAlertes,
   chargerCartesCloturables,
   chargerEtatAvis,
-  chargerRecus,
+  chargerJournal,
 } = await import('./lectures-ecrans');
 
 /** L'instant des épreuves. Seul `Date` est figé : les promesses tournent. */
@@ -225,7 +225,7 @@ describe('l’écran Retrait au-delà de mille cartes', () => {
 });
 
 describe('les comptes et les noms au-delà de mille lignes', () => {
-  it('chargerRecus nomme le client d’une carte au-delà de la millième', async () => {
+  it('chargerJournal nomme le client d’une carte au-delà de la millième', async () => {
     const { clients, cartes } = parc(1001);
     tables = {
       clients,
@@ -243,11 +243,127 @@ describe('les comptes et les noms au-delà de mille lignes', () => {
       ],
     };
 
-    const [recu] = await chargerRecus();
+    const [recu] = await chargerJournal();
 
     // Coupé à mille, ce reçu disait « Client inconnu », pour une mise de 0.
     expect(recu?.clientNom).toBe('Dernière');
     expect(recu?.mise).toBe(500);
+  });
+
+  /**
+   * Le tri du journal, qui vient de deux tables.
+   *
+   * Les versements arrivent de `mouvements`, les clôtures de `cartes` : deux
+   * requêtes, deux ordres, et c'est `chargerJournal` qui les met sur une seule
+   * frise. Rien d'autre ne trie ensuite — l'écran rend la liste telle qu'il la
+   * reçoit, et la regroupe par jour dans cet ordre.
+   *
+   * Un banc de rendu qui semait le cache à la main a montré ce que ça donne
+   * quand l'ordre est faux : la carte close tombait en queue de liste, trois
+   * jours après sa place. À l'écran ça ressemble à une donnée manquante.
+   */
+  it('chargerJournal met clôtures et versements sur un seul ordre', async () => {
+    tables = {
+      clients: [{ id: 'c1', nom: 'Aya Koffi' }],
+      cartes: [
+        {
+          id: 'k1',
+          client_id: 'c1',
+          mise: 3000,
+          statut: 'cloturee',
+          mises_encaissees: MISES_PAR_CYCLE,
+          ouverte_le: '2026-08-01T10:00:00.000Z',
+          cloturee_le: '2026-09-10T10:00:00.000Z',
+        },
+      ],
+      mouvements: [
+        {
+          id: 'avant',
+          nature: 'mise',
+          sens: 1,
+          carte_id: 'k1',
+          montant: 3000,
+          est_commission: false,
+          survenu_le: '2026-09-09T10:00:00.000Z',
+        },
+        {
+          id: 'apres',
+          nature: 'mise',
+          sens: 1,
+          carte_id: 'k1',
+          montant: 3000,
+          est_commission: false,
+          survenu_le: '2026-09-11T09:00:00.000Z',
+        },
+      ],
+    };
+
+    const journal = await chargerJournal();
+
+    // La clôture s'insère entre les deux mises, à sa date, et non en bout de
+    // liste parce qu'elle vient d'une autre table.
+    expect(journal.map((e) => e.id)).toEqual(['apres', 'cloture-k1', 'avant']);
+  });
+
+  /**
+   * Ce qu'une clôture porte, et que les versements n'ont pas.
+   *
+   * Le montant d'une clôture n'est pas un versement : c'est le total encaissé
+   * sur la carte, la seule somme qui ait un sens une fois qu'elle ne reçoit
+   * plus rien. Et `carteId` est ce qui permet d'aller chercher son détail au
+   * dépli — sans lui, les mises d'un vieux cycle sont hors d'atteinte.
+   */
+  it('chargerJournal chiffre une clôture au total encaissé, et garde sa carte', async () => {
+    tables = {
+      clients: [{ id: 'c1', nom: 'Aya Koffi' }],
+      cartes: [
+        {
+          id: 'k1',
+          client_id: 'c1',
+          mise: 3000,
+          statut: 'cloturee',
+          mises_encaissees: 31,
+          ouverte_le: '2026-08-01T10:00:00.000Z',
+          cloturee_le: '2026-09-10T10:00:00.000Z',
+        },
+      ],
+      mouvements: [],
+    };
+
+    const [cloture] = await chargerJournal();
+
+    expect(cloture?.nature).toBe('cloture');
+    expect(cloture?.clientNom).toBe('Aya Koffi');
+    expect(cloture?.montant).toBe(31 * 3000);
+    expect(cloture?.carteId).toBe('k1');
+    expect(cloture?.cycle?.misesEncaissees).toBe(31);
+  });
+
+  /**
+   * Une carte encore ouverte n'est pas un événement.
+   *
+   * Le journal dit ce qui s'est **passé**. Une carte active est en train de se
+   * passer, et la faire entrer ici la ferait apparaître chaque jour dans la
+   * liste sans que rien ne lui soit arrivé.
+   */
+  it('chargerJournal ignore les cartes encore actives', async () => {
+    tables = {
+      clients: [{ id: 'c1', nom: 'Aya Koffi' }],
+      cartes: [
+        {
+          id: 'k1',
+          client_id: 'c1',
+          mise: 3000,
+          statut: 'active',
+          mises_encaissees: 4,
+          ouverte_le: '2026-09-01T10:00:00.000Z',
+          cloturee_le: null,
+        },
+      ],
+      mouvements: [],
+    };
+
+    expect(await chargerJournal()).toEqual([]);
   });
 
   it('chargerEtatAvis compte tous les clients qui acceptent les avis', async () => {

@@ -104,6 +104,7 @@ function rendre(supplement: Record<string, unknown> = {}) {
       onDeconnexion={vi.fn()}
       onEcriture={vi.fn()}
       onRetrait={vi.fn()}
+      onRecus={vi.fn()}
       {...supplement}
     />,
   );
