@@ -1,4 +1,4 @@
-import { formatMontant } from '@kolek/core';
+import { CAISSE_MAX, formatMontant, validerCaisse } from '@kolek/core';
 import { Bouton, Carte, Champ, Icone } from '@kolek/ui';
 import { useEffect, useState } from 'react';
 
@@ -58,8 +58,15 @@ export function Rapprochement({ collecteurId, revision, onRetour }: {
   async function enregistrer() {
     if (!donnees || !collecteurId || envoi) return;
     const montant = Number.parseInt(saisie.replace(/\s/g, ''), 10);
-    if (!Number.isInteger(montant) || montant < 0) {
-      setErreurEcriture('Entre le montant en francs, sans centimes.');
+    if (!validerCaisse(montant)) {
+      // Deux refus, deux phrases : « sans centimes » n’apprend rien à qui a
+      // tapé onze chiffres. Le geste porte la même règle en dessous — c’est
+      // lui qui protège la file — mais l'écran parle sans attendre.
+      setErreurEcriture(
+        montant > CAISSE_MAX
+          ? 'Ce montant est trop grand. Vérifie le nombre de chiffres.'
+          : 'Entre le montant en francs, sans centimes.',
+      );
       return;
     }
 

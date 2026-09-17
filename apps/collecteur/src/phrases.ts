@@ -40,6 +40,7 @@ export const PHRASES: Readonly<Record<string, string>> = {
   NOM_VIDE: 'Le nom du client est obligatoire.',
   MISE_HORS_BORNES: `La mise doit être d’au moins ${MISE_MIN} FCFA.`,
   CAISSE_INVALIDE: 'Le montant déclaré doit être un nombre positif.',
+  MONTANT_TROP_GRAND: 'Ce montant est trop grand. Vérifie le nombre de chiffres.',
   CARTE_ABSENTE:
     'Cette carte n’est pas sur ce téléphone. Connecte-toi une fois au réseau pour recharger ta tournée.',
   CLIENT_INTROUVABLE:
@@ -58,6 +59,7 @@ export const PHRASES_REFUS: Readonly<Record<string, string>> = {
     'La date sortait de la fenêtre du serveur : plus de 90 jours d’attente, ou l’horloge du téléphone en avance.',
   BORNE: 'Une des informations saisies était trop longue.',
   BORNE_MONTANT: 'Le serveur a refusé ce montant.',
+  MONTANT_TROP_GRAND: 'Le serveur a refusé ce montant : il dépassait ce qu’une ligne peut porter.',
   CONFLIT_UNIQUE: 'Le serveur avait déjà une ligne à cette place.',
   PARENT_ABSENT: 'Le client ou la carte n’existait pas au serveur.',
   PARENT_REFUSE: 'L’opération dont elle dépendait a été refusée.',

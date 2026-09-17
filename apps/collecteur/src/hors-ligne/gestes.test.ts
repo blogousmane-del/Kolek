@@ -1,3 +1,4 @@
+import { CAISSE_MAX } from '@kolek/core';
 import { describe, expect, it } from 'vitest';
 
 import { carte, caisse, client, operationClientCarte, tournee } from './fabriques';
@@ -158,6 +159,24 @@ describe('déclarer la caisse (§6.4)', () => {
       echec: { code: 'CAISSE_INVALIDE' },
     });
     expect(construireCaisse(CTX, { date: '2026-09-13', montant: 10.5 })(tournee(), [], 1).ok).toBe(false);
+  });
+
+  it('refuse un montant plus grand que ce qu’une colonne integer porte', () => {
+    const r = construireCaisse(CTX, { date: '2026-09-13', montant: CAISSE_MAX + 1 })(tournee(), [], 1);
+
+    expect(r).toMatchObject({ ok: false, echec: { code: 'MONTANT_TROP_GRAND' } });
+    // La phrase compte autant que le code : sans entrée dans PHRASES,
+    // `phraseEcriture` retombe sur celle d'INCONNU, qui ne dit rien de juste.
+    expect(r.ok === false && r.echec.message).toBe(
+      'Ce montant est trop grand. Vérifie le nombre de chiffres.',
+    );
+  });
+
+  it('accepte la borne exacte', () => {
+    const r = construireCaisse(CTX, { date: '2026-09-13', montant: CAISSE_MAX })(tournee(), [], 1);
+
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.operation.charge.cashDeclare).toBe(CAISSE_MAX);
   });
 
   it('reprend l’identifiant de la ligne du jour', () => {

@@ -1,4 +1,4 @@
-import { MISES_PAR_CYCLE, validerMise } from '@kolek/core';
+import { CAISSE_MAX, MISES_PAR_CYCLE, validerCaisse, validerMise } from '@kolek/core';
 
 import { phraseEcriture, type EchecEcriture } from '../phrases';
 import type { Construction } from './file';
@@ -194,7 +194,13 @@ export function construireCaisse(
   saisie: { date: string; montant: number },
 ): Construction<OperationCaisse> {
   return (tournee, _operations, sequence) => {
-    if (!Number.isInteger(saisie.montant) || saisie.montant < 0) return refus('CAISSE_INVALIDE');
+    // `validerCaisse` porte les trois conditions ; les deux motifs restent
+    // distincts parce que les deux phrases le sont. « Le montant déclaré doit
+    // être un nombre positif » enverrait un collecteur qui a tapé onze
+    // chiffres vérifier un signe qui est déjà juste.
+    if (!validerCaisse(saisie.montant)) {
+      return refus(saisie.montant > CAISSE_MAX ? 'MONTANT_TROP_GRAND' : 'CAISSE_INVALIDE');
+    }
 
     // Tirée à la première déclaration du jour, réutilisée ensuite (§6.4). La
     // tournée montrée porte déjà la ligne du serveur ou une déclaration en file.

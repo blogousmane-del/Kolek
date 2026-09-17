@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CAISSE_MAX,
+  ENTIER_MAX,
   MISES_PAR_CYCLE,
   MISE_INHABITUELLE,
   MISE_MAX_RESTITUABLE,
@@ -9,6 +11,7 @@ import {
   peutEncaisser,
   progression,
   soldeRestituable,
+  validerCaisse,
   validerMise,
 } from './calcul';
 import type { Carte } from './types';
@@ -133,5 +136,48 @@ describe('peutEncaisser', () => {
 
   it('refuse une carte au cycle complet', () => {
     expect(peutEncaisser(carte({ misesEncaissees: 31 }))).toBe(false);
+  });
+});
+
+
+/**
+ * La borne de la caisse déclarée.
+ *
+ * `caisses_jour.cash_declare` est un `integer`, et n'a qu'une borne basse en
+ * base (`check (cash_declare >= 0)`). Au-dessus de 2 147 483 647, PostgreSQL
+ * rend `22003` — mesuré contre la pile locale le 2026-09-17 — que la file ne
+ * savait pas lire.
+ */
+describe('validerCaisse', () => {
+  it('accepte zéro, un montant courant, et la borne exacte', () => {
+    for (const m of [0, 4500, 250_000, CAISSE_MAX]) {
+      expect(validerCaisse(m), `${m} doit être acceptée`).toBe(true);
+    }
+  });
+
+  it('refuse au-dessus de la borne, sous zéro, et ce qui n’est pas entier', () => {
+    expect(validerCaisse(CAISSE_MAX + 1)).toBe(false);
+    expect(validerCaisse(-1)).toBe(false);
+    expect(validerCaisse(1.5)).toBe(false);
+    expect(validerCaisse(Number.NaN)).toBe(false);
+  });
+
+  it('borne exactement ce qu’une colonne integer porte', () => {
+    expect(CAISSE_MAX).toBe(2_147_483_647);
+    expect(ENTIER_MAX).toBe(2_147_483_647);
+  });
+});
+
+/**
+ * Le témoin du chantier.
+ *
+ * `MISE_MAX_RESTITUABLE` écrivait `2_147_483_647` en clair dans son calcul ;
+ * il dérive maintenant d'`ENTIER_MAX`. Cette épreuve écrit la valeur attendue
+ * en dur, sans la recalculer : recalculer reproduirait l'erreur qu'on cherche
+ * à exclure.
+ */
+describe('nommer ENTIER_MAX n’a rien déplacé', () => {
+  it('laisse MISE_MAX_RESTITUABLE à sa valeur', () => {
+    expect(MISE_MAX_RESTITUABLE).toBe(71_582_788);
   });
 });

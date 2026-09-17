@@ -130,3 +130,33 @@ describe('le reste', () => {
     expect(classer(erreur('PGRST116', 'JSON object requested', 406), 'mise')).toEqual({ cas: 'inconnu' });
   });
 });
+
+/**
+ * `22003` — dépassement d'entier.
+ *
+ * Mesuré contre la pile locale le 2026-09-17 : PostgREST rend HTTP 400 avec
+ * `code: "22003"` et le message de PostgreSQL mot pour mot. Aucune branche ne
+ * le reconnaissait : il tombait en `inconnu`, le seul classement qui arrête la
+ * passe — cinq tentatives, huit minutes et demie, et rien ne quitte le
+ * téléphone pendant ce temps.
+ */
+describe('22003 : un montant que la colonne ne porte pas', () => {
+  const HORS_BORNE = 'value "99999999999" is out of range for type integer';
+
+  it('est un refus, jamais un inconnu', () => {
+    expect(classer(erreur('22003', HORS_BORNE, 400), 'caisse')).toEqual({
+      cas: 'refus',
+      motif: 'MONTANT_TROP_GRAND',
+    });
+  });
+
+  it.each(['mise', 'client', 'carte', 'caisse', 'consignation'] as Portee[])(
+    'vaut pour la portée « %s » : le dépassement ne dépend pas de la table',
+    (portee) => {
+      expect(classer(erreur('22003', HORS_BORNE, 400), portee)).toEqual({
+        cas: 'refus',
+        motif: 'MONTANT_TROP_GRAND',
+      });
+    },
+  );
+});

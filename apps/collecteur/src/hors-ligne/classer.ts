@@ -88,6 +88,12 @@ export function classer(reponse: ReponseServeur, portee: Portee): Classement {
     if (message.includes(cle)) return { cas: 'refus', motif: cle };
   }
 
+  // Dépassement d'entier : une colonne `integer` ne porte pas la valeur. Jamais
+  // passager — la même requête rendra la même réponse pour toujours — donc
+  // jamais `inconnu`, qui arrête la passe et fait attendre huit minutes et demie
+  // tout ce qui suit dans la file avant de consigner la même chose.
+  if (code === '22003') return { cas: 'refus', motif: 'MONTANT_TROP_GRAND' };
+
   if (code === '23514') {
     return {
       cas: 'refus',
