@@ -423,13 +423,13 @@ t+11.2s : (aucun bandeau)
 
 Onze secondes à « 4 restantes », puis plus rien. Jamais 3, jamais 2, jamais 1. Hors ligne, en revanche, le compte monte à chaque geste — parce que chaque geste passe par `apresGeste()`, qui appelle `signalerChangement()`.
 
-**La cause, au code :** `signalerChangement()` n'est appelé, pendant un envoi, qu'au rappel de fin de passe (`moteur.ts:135`, `if (bilan.traitees > 0 || rafraichie)`), alors que `passe` (`synchroniseur.ts:161`) boucle en `for (;;)` sur toute la file et incrémente `traitees` à **cinq** endroits sans rien annoncer. Les écrans ne relisent qu'à ce signal : `Coquille.tsx:154`, `ecouterChangements(() => setRevision((r) => r + 1))`.
+**La cause, au code :** `signalerChangement()` n'est appelé, pendant un envoi, qu'au rappel de fin de passe (`moteur.ts:144`, `if (bilan.traitees > 0 || rafraichie)`), alors que `passe` (`synchroniseur.ts:192`) boucle en `for (;;)` sur toute la file et incrémente `traitees` à **cinq** endroits sans rien annoncer. Les écrans ne relisent qu'à ce signal : `Coquille.tsx:157`, `ecouterChangements(() => setRevision((r) => r + 1))`.
 
 **Pourquoi ça compte pour un collecteur.** Le bandeau est la seule chose qui lui dit si son argent est parti. Figé, il ne distingue pas « ça avance » de « ça a calé ». Sur un réseau de marché, une passe de vingt mises tient plusieurs minutes : il lit « 20 restantes » tout du long, et peut fermer l'application en croyant que rien ne part.
 
 **Fichiers :**
 - Modifier : `apps/collecteur/src/hors-ligne/synchroniseur.ts` (`Dependances`, et les cinq `traitees += …`)
-- Modifier : `apps/collecteur/src/hors-ligne/moteur.ts` (l'appel à `passe`, ligne 104)
+- Modifier : `apps/collecteur/src/hors-ligne/moteur.ts` (l'appel à `passe`, ligne 105)
 - Éprouver : `apps/collecteur/src/hors-ligne/synchroniseur.test.ts`
 
 **Interfaces :**
@@ -539,13 +539,16 @@ Puis, dans `passe`, juste après `let traitees = 0;` :
 
 Et les **cinq** incréments deviennent des appels :
 
-| Ligne | Avant | Après |
+| Ligne, **avant** le correctif | Avant | Après |
 | --- | --- | --- |
 | 206 | `traitees += 1 + (await retirerEnRefus(deps.base, aConsigner, maintenant()));` | `avancer(1 + (await retirerEnRefus(deps.base, aConsigner, maintenant())));` |
 | 256 | `traitees += 1;` (parent refusé) | `avancer();` |
 | 271 | `traitees += 1;` (acceptée) | `avancer();` |
 | 284 | `traitees += 1;` (refusée) | `avancer();` |
 | 307 | `traitees += 1;` (inconnue, au-delà de `TENTATIVES_MAX`) | `avancer();` |
+
+Les numéros ci-dessus sont ceux d’**avant** le correctif. Une fois `avancer()` posée,
+les cinq appels vivent aux lignes 222, 272, 287, 300 et 323.
 
 Rien d'autre ne change dans ce fichier : les `return bilan(…)` des échecs passagers, de session et d'attente ne touchent pas `traitees`, donc n'annoncent rien — ce que la seconde épreuve tient.
 
@@ -569,7 +572,7 @@ Dans `moteur.ts`, le seul câblage :
         ),
 ```
 
-Le rappel de fin de passe (`moteur.ts:135`) **ne change pas**. Il annonce aussi le rechargement de tournée (`rafraichie`), que `surProgres` ne couvre pas ; le retirer priverait les écrans de la relecture après rafraîchissement.
+Le rappel de fin de passe (`moteur.ts:144`) **ne change pas**. Il annonce aussi le rechargement de tournée (`rafraichie`), que `surProgres` ne couvre pas ; le retirer priverait les écrans de la relecture après rafraîchissement.
 
 - [ ] **Étape 4 : les faire passer**
 
@@ -607,13 +610,13 @@ git commit -m "fix(envoi): le bandeau decroit pendant la passe, au lieu de tombe
 
 ### Ce que la tâche 3 a écarté, et pourquoi
 
-**L'avis rouge « Session perdue » — pas reproduit, et pas reproductible.** L'état vient d'un seul endroit, `FicheClient.tsx:763`, atteint quand `contexte.current.collecteurId` est absent. Or il ne l'est jamais : `App.tsx:205` monte `Coquille` avec un `collecteurId: string`, `Coquille.tsx:326` le passe à `Clients` et `Clients.tsx:669` à `FicheClient`, et `Coquille.tsx:452` ne rend le contenu que si `moteurDe === collecteurId`. Le `string | null` des props est une prudence de signature, pas un état joignable. La note décrivait donc du code mort.
+**L'avis rouge « Session perdue » — pas reproduit, et pas reproductible.** L'état vient d'un seul endroit, `FicheClient.tsx:711`, atteint quand `contexte.current.collecteurId` est absent. Or il ne l'est jamais : `App.tsx:205` monte `Coquille` avec un `collecteurId: string`, `Coquille.tsx:345` le passe à `Clients` et `Clients.tsx:676` à `FicheClient`, et `Coquille.tsx:479` ne rend le contenu que si `moteurDe === collecteurId`. Le `string | null` des props est une prudence de signature, pas un état joignable. La note décrivait donc du code mort.
 
 Ce qui est vrai, et qui reste : les deux **autres** échecs d'encaissement (`ENREGISTREMENT_INCERTAIN`, et le message d'un refus) partagent le même socle `{ operationId: null, envoyee: true }`, donc le même sort — `purger()` sort tôt (`if (!en || en.envoyee || en.operationId === null) return`), et l'effet d'effacement demande `estRattrapee(reelles, attente)`, c'est-à-dire `reelles > attente.base`, qui n'arrivera jamais puisque rien n'a été écrit. Seuls « Réessayer », la disparition de la carte ou le démontage de la fiche les enlèvent. **Ce n'est pas un défaut** : ces deux-là n'ont rien écrit, le collecteur doit décider, et le bandeau porte « Réessayer ». C'était le reproche de la note — « une reconnexion ne l'efface pas » — qui visait le seul cas où il aurait tenu, et ce cas n'existe pas.
 
 **L'alerte du premier lancement — rien d'anormal.** Vu le 2026-09-17, profil neuf, `navigator.storage.persisted()` à `false` : l'accueil affiche « Ce téléphone peut effacer les données de Kolek s'il manque de place… », il ne le réaffiche pas quand on quitte l'accueil et qu'on y revient, et l'écran `Profil` le porte en permanence. C'est mot pour mot la spec J2b §8.7.
 
-Un seul écart, mineur, consigné sans tâche : `stockageDejaSignale` est une variable de module (`Accueil.tsx:35`), donc une **seconde connexion sans rechargement de page** — deux collecteurs qui se relaient sur le même téléphone — ne revoit pas l'avis. Vérifié : première connexion « AVIS », déconnexion, reconnexion dans la même page « PAS D AVIS ». L'avertissement reste accessible sur `Profil`, et la spec dit « une fois par lancement » sans trancher ce que vaut un relais. À reprendre si J2b le remonte, pas à corriger sur une lecture.
+Un seul écart, mineur, consigné sans tâche : `stockageDejaSignale` est une variable de module (`Accueil.tsx:33`), donc une **seconde connexion sans rechargement de page** — deux collecteurs qui se relaient sur le même téléphone — ne revoit pas l'avis. Vérifié : première connexion « AVIS », déconnexion, reconnexion dans la même page « PAS D AVIS ». L'avertissement reste accessible sur `Profil`, et la spec dit « une fois par lancement » sans trancher ce que vaut un relais. À reprendre si J2b le remonte, pas à corriger sur une lecture.
 
 ### Deux choses vues en montant le regard, sans rapport avec les notes
 

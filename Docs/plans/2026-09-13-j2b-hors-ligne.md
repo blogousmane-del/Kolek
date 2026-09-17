@@ -13351,7 +13351,7 @@ Relevés en relecture ou au regard, jugés sans perte d'argent ni de données. �
 - Deux onglets ouverts sur le même compte.
 - Les angles morts de l'épreuve de durabilité (raccourcis `idb`, sous-dossiers, `.tsx`).
 - La fiche d'un client sur une tournée jamais chargée dit « Fiche introuvable » au lieu de « pas encore sur ce téléphone ».
-- L'avis rouge de déconnexion reste affiché — **pas reproduit le 2026-09-17**, à préciser : l'état ne vient que de `FicheClient.tsx:763`, atteint si `collecteurId` est absent, ce que le montage de `Coquille` interdit. Les deux autres échecs d'encaissement restent bien affichés jusqu'à « Réessayer » — ils n'ont rien écrit, c'est voulu.
+- L'avis rouge de déconnexion reste affiché — **pas reproduit le 2026-09-17**, à préciser : l'état ne vient que de `FicheClient.tsx:711`, atteint si `collecteurId` est absent, ce que le montage de `Coquille` interdit. Les deux autres échecs d'encaissement restent bien affichés jusqu'à « Réessayer » — ils n'ont rien écrit, c'est voulu.
 - Hors ligne, file vide, l'écran Retrait reste vide ~7 s (trois relances de postgrest-js).
 - Le commentaire d'`Abonnement.tsx` (« seul geste qui exige le réseau ») est faux.
 
