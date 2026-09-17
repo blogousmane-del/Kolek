@@ -1,3 +1,4 @@
+import { CAISSE_MAX } from '@kolek/core';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -80,5 +81,35 @@ describe('déclarer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Déclarer' }));
 
     await waitFor(() => expect(declarerCaisse).toHaveBeenCalledWith('col-1', '2026-09-13', 4500));
+  });
+
+  it('refuse un montant trop grand sans rien mettre dans la file', async () => {
+    chargerRapprochement.mockResolvedValue(DU_JOUR);
+
+    render(<Rapprochement collecteurId="col-1" revision={0} onRetour={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText('Cash déclaré (FCFA)'), {
+      target: { value: String(CAISSE_MAX + 1) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Déclarer' }));
+
+    expect(
+      await screen.findByText('Ce montant est trop grand. Vérifie le nombre de chiffres.'),
+    ).toBeTruthy();
+    expect(declarerCaisse).not.toHaveBeenCalled();
+  });
+
+  it('accepte la borne exacte', async () => {
+    chargerRapprochement.mockResolvedValue(DU_JOUR);
+    declarerCaisse.mockResolvedValue({ ok: true });
+
+    render(<Rapprochement collecteurId="col-1" revision={0} onRetour={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText('Cash déclaré (FCFA)'), {
+      target: { value: String(CAISSE_MAX) },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Déclarer' }));
+
+    await waitFor(() =>
+      expect(declarerCaisse).toHaveBeenCalledWith('col-1', '2026-09-13', CAISSE_MAX),
+    );
   });
 });
