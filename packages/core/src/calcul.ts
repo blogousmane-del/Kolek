@@ -13,6 +13,14 @@ export const MISE_MIN = 500;
 export const MISE_INHABITUELLE = 10_000;
 
 /**
+ * Ce qu'une colonne `integer` de PostgreSQL porte au plus.
+ *
+ * Nommé parce que deux bornes en dérivent, et qu'un nombre nu écrit deux fois
+ * finit par diverger. La valeur de `MISE_MAX_RESTITUABLE` ne change pas.
+ */
+export const ENTIER_MAX = 2_147_483_647;
+
+/**
  * La plus grande mise que le chemin de l'argent porte de bout en bout.
  *
  * Ce n'est pas la borne d'une colonne mais celle d'une **opération** : la
@@ -27,7 +35,7 @@ export const MISE_INHABITUELLE = 10_000;
  * `cartes.mise` — 2 147 483 647 — est trente fois plus haute et n'aurait rien
  * protégé.
  */
-export const MISE_MAX_RESTITUABLE = Math.floor(2_147_483_647 / (MISES_PAR_CYCLE - 1));
+export const MISE_MAX_RESTITUABLE = Math.floor(ENTIER_MAX / (MISES_PAR_CYCLE - 1));
 
 function verifierEntrees(misesEncaissees: number, mise: number): void {
   if (!Number.isInteger(misesEncaissees) || misesEncaissees < 0 || misesEncaissees > MISES_PAR_CYCLE) {
@@ -40,6 +48,27 @@ function verifierEntrees(misesEncaissees: number, mise: number): void {
 
 export function validerMise(montant: number): boolean {
   return Number.isInteger(montant) && montant >= MISE_MIN && montant <= MISE_MAX_RESTITUABLE;
+}
+
+/**
+ * La plus grande caisse qu'un collecteur puisse déclarer.
+ *
+ * Contrairement à la mise, elle n'alimente qu'une opération : `ecart`, colonne
+ * générée `cash_declare - cash_attendu`. `cash_attendu` est calculé par le
+ * serveur depuis des mises toutes positives, donc `ecart` ne dépasse jamais
+ * `cash_declare` : la borne d'opération et la borne de colonne coïncident ici,
+ * et il n'y a pas à diviser comme pour la mise.
+ *
+ * Décision de l'exploitant, le 2026-09-17 : pas de plafond de plausibilité. Le
+ * téléphone refuse exactement ce que la base refuse, ni plus ni moins. Un
+ * plafond métier attraperait la faute de frappe plus tôt, mais demanderait un
+ * chiffre que rien dans le schéma ne justifie.
+ */
+export const CAISSE_MAX = ENTIER_MAX;
+
+/** Un montant que `caisses_jour.cash_declare` accepte. */
+export function validerCaisse(montant: number): boolean {
+  return Number.isInteger(montant) && montant >= 0 && montant <= CAISSE_MAX;
 }
 
 /**
