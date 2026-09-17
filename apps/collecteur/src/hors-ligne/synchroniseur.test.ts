@@ -117,6 +117,54 @@ describe('l’ordre (§6.6)', () => {
     expect(envoyer).toHaveBeenCalledTimes(1);
     expect(await lireOperations(base)).toHaveLength(2);
   });
+
+  it('annonce chaque opération sortie de la file, et non la passe entière', async () => {
+    const base = await baseAvec(
+      operationMise(1, { carteId: 'k1' }),
+      operationMise(2, { carteId: 'k1' }),
+      operationMise(3, { carteId: 'k1' }),
+    );
+    const surProgres = vi.fn();
+    // Ce que `surProgres` avait déjà annoncé au moment de chaque envoi. C'est la
+    // seule chose qui distingue « pendant la passe » de « à la fin » : une
+    // annonce unique posée après la boucle rendrait [0, 0, 0] tout en gardant
+    // le compte d'appels juste.
+    const annoncesAvantChaqueEnvoi: number[] = [];
+    const envoyer = vi.fn(async () => {
+      annoncesAvantChaqueEnvoi.push(surProgres.mock.calls.length);
+      return { issue: 'acceptee' as const };
+    });
+
+    const bilan = await passe({
+      client: authFactice().client,
+      base,
+      collecteurId: 'col-1',
+      maintenant: () => T,
+      envoyer,
+      surProgres,
+    });
+
+    expect(bilan.traitees).toBe(3);
+    expect(surProgres).toHaveBeenCalledTimes(3);
+    expect(annoncesAvantChaqueEnvoi).toEqual([0, 1, 2]);
+  });
+
+  it('n’annonce rien quand rien ne sort de la file', async () => {
+    const base = await baseAvec(operationMise(1, { carteId: 'k1' }), operationMise(2, { carteId: 'k1' }));
+    const surProgres = vi.fn();
+
+    const bilan = await passe({
+      client: authFactice().client,
+      base,
+      collecteurId: 'col-1',
+      maintenant: () => T,
+      envoyer: envoiScenarise({ issue: 'passager' }),
+      surProgres,
+    });
+
+    expect(bilan.etat).toBe('hors_ligne');
+    expect(surProgres).not.toHaveBeenCalled();
+  });
 });
 
 describe('le sursis (§7)', () => {
