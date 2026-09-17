@@ -9,11 +9,9 @@ import {
   EnteteSection,
   Icone,
   LienBloc,
-  LigneTransaction,
   Rosace,
   Squelette,
   SqueletteKPI,
-  SqueletteLigne,
   useEnLigne,
   type ActionRapide,
 } from '@kolek/ui';
@@ -95,15 +93,20 @@ export function Accueil({
   // `onActiver`, ce qui était honnête tant que rien n'existait, mais illisible
   // pour qui n'a pas lu le code — six pastilles éteintes se lisent comme une
   // application cassée, pas comme une application en cours de construction.
+  //
+  // La `famille` dit ce que la destination fait, et c'est l'écran qui le sait —
+  // pas le composant, et surtout pas le dessin de l'icône. Voir le commentaire
+  // de `FamilleAction` dans `@kolek/ui` : quatre familles s'apprennent, neuf
+  // couleurs ne se mémorisent pas.
   const actions: ActionRapide[] = [
-    { icone: 'circle-dollar-sign', libelle: 'Encaisser', onActiver: () => onNaviguer('clients') },
-    { icone: 'user-plus', libelle: 'Souscrire', onActiver: onSouscrire },
-    { icone: 'arrow-up-right', libelle: 'Retrait', onActiver: () => onNaviguer('retrait') },
-    { icone: 'bar-chart-2', libelle: 'Bilan', onActiver: () => onNaviguer('bilans') },
-    { icone: 'refresh-cw', libelle: 'Rapproch.', onActiver: () => onNaviguer('rapprochement') },
-    { icone: 'receipt', libelle: 'Reçus', onActiver: () => onNaviguer('recus') },
-    { icone: 'bell', libelle: 'Alertes', onActiver: () => onNaviguer('alertes') },
-    { icone: 'message-square', libelle: 'Avis', onActiver: () => onNaviguer('avis') },
+    { icone: 'circle-dollar-sign', libelle: 'Encaisser', famille: 'argent', onActiver: () => onNaviguer('clients') },
+    { icone: 'user-plus', libelle: 'Souscrire', famille: 'client', onActiver: onSouscrire },
+    { icone: 'arrow-up-right', libelle: 'Retrait', famille: 'argent', onActiver: () => onNaviguer('retrait') },
+    { icone: 'bar-chart-2', libelle: 'Bilan', famille: 'analyse', onActiver: () => onNaviguer('bilans') },
+    { icone: 'refresh-cw', libelle: 'Rapproch.', famille: 'analyse', onActiver: () => onNaviguer('rapprochement') },
+    { icone: 'receipt', libelle: 'Reçus', famille: 'gestion', onActiver: () => onNaviguer('recus') },
+    { icone: 'bell', libelle: 'Alertes', famille: 'gestion', onActiver: () => onNaviguer('alertes') },
+    { icone: 'message-square', libelle: 'Avis', famille: 'gestion', onActiver: () => onNaviguer('avis') },
     // Seulement pour un titulaire. Montrer la porte à un collaborateur le
     // mènerait sur un écran définitivement vide — `equipe_vue()` ne lui rendra
     // jamais rien — et lui ferait croire à une panne.
@@ -112,11 +115,12 @@ export function Accueil({
           {
             icone: 'users' as const,
             libelle: 'Équipe',
+            famille: 'client' as const,
             onActiver: () => onNaviguer('equipe'),
           },
         ]
       : []),
-    { icone: 'more-horizontal', libelle: 'Plus', onActiver: () => onNaviguer('plus') },
+    { icone: 'more-horizontal', libelle: 'Plus', famille: 'gestion', onActiver: () => onNaviguer('plus') },
   ];
 
   // Voir `Recus` : l'escalier ne rejoue pas quand l'écran se relit après une
@@ -130,9 +134,18 @@ export function Accueil({
 
   return (
     <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-large">
-      {/* En-tête sombre immersif */}
-      <div className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pt-entete pb-7 shadow-lg lg:rounded-3xl lg:pt-6">
-        {/* Rosace décorative en filigrane */}
+      {/*
+        L'en-tête sombre, et c'est désormais un des deux seuls du produit.
+
+        Quatorze écrans le portaient au 2026-09-16 ; il ne reste qu'ici — la
+        journée qui s'ouvre — et sur l'encaissement, le geste qui la paie. Un
+        moment qui se répète quatorze fois n'est plus un moment. Voir le
+        commentaire d'en-tête de `EnTeteEcran`.
+      */}
+      <div className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pt-entete pb-7 shadow-lg lg:rounded-xl lg:pt-6">
+        {/* Rosace décorative en filigrane. Elle ne vit plus que sur cet écran :
+            ailleurs, c'était un motif qui tournait sans rien dire, à 90 s par
+            tour, sur le compositeur d'un téléphone d'entrée de gamme. */}
         <Rosace
           petales={18}
           excentricite={0.35}
@@ -140,42 +153,47 @@ export function Accueil({
           className="pointer-events-none absolute -right-[15%] -top-[20%] w-[65vmin] text-or/10 lg:w-96"
         />
 
+        {/* La pastille « Collecteur actif » et son point vert sont partis le
+            2026-09-17. Le point était vert tous les jours et par tous les temps :
+            il n'encodait aucun état, il décorait. Ce qui reste dit qui tient le
+            téléphone, ce qui est la seule chose que cette ligne apprenait. */}
         <div className="relative z-10 flex items-center justify-between mb-5">
-          <div className="min-w-0">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-white/10 text-white/70 text-xs font-body font-medium mb-1 backdrop-blur-xs">
-              <span className="w-1.5 h-1.5 rounded-pill bg-chart-mint" />
-              Collecteur actif
-            </span>
-            <p className="text-white font-headings font-bold text-2xl truncate tracking-tight">{nom}</p>
-          </div>
+          <p className="min-w-0 text-white font-headings font-bold text-2xl truncate tracking-tight">
+            {nom}
+          </p>
           <div className="flex items-center gap-2.5 shrink-0">
             <button
               type="button"
               onClick={onDeconnexion}
               aria-label="Se déconnecter"
-              className="anim-pression w-10 h-10 rounded-pill bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-md flex items-center justify-center cursor-pointer transition-colors shadow-xs"
+              className="anim-pression w-10 h-10 rounded-pill bg-white/10 border border-white/15 flex items-center justify-center cursor-pointer"
             >
               <Icone nom="log-out" className="text-white" taille={18} />
             </button>
-            <Avatar nom={nom} className="w-10 h-10 ring-2 ring-white/25 shadow-xs" />
+            <Avatar nom={nom} className="w-10 h-10 ring-2 ring-white/25" />
           </div>
         </div>
 
         <div className="relative z-10 mb-2">
-          <p className="text-white/70 text-xs font-body font-medium uppercase tracking-wider mb-1">
-            Encaissé aujourd’hui
-          </p>
+          {/* « ENCAISSÉ AUJOURD'HUI » était en capitales espacées. Le rythme de
+              gabarit en moins, et une ligne de hauteur récupérée sur un écran
+              qui en manque. */}
+          <p className="text-white/70 text-xs font-body font-medium mb-1">Encaissé aujourd’hui</p>
           <p className="anim-montant font-headings font-bold text-white text-3xl xs:text-4xl leading-[1.1] tabular-nums tracking-tight">
             {chiffre(tableau?.encaisseAujourdhui)}{' '}
-            <span className="text-sm xs:text-base font-body font-semibold px-2 py-0.5 rounded-md bg-white/15 text-white/90 backdrop-blur-xs ml-1 border border-white/15 align-middle">
-              FCFA
-            </span>
+            {/* L'unité n'est pas un badge : elle ne se clique pas, elle ne
+                change pas d'état, et l'encadrer d'une pastille de verre en
+                faisait un objet de plus à lire avant le nombre. */}
+            <span className="text-base xs:text-lg font-body font-medium text-white/70">FCFA</span>
           </p>
         </div>
 
         <div className="relative z-10 flex items-center gap-2 text-white/60 text-xs font-body">
           <span className="inline-flex items-center gap-1">
-            <Icone nom="check-circle" taille={14} className="text-chart-mint" />
+            {/* Sans teinte : l'icône prend la couleur de sa ligne. Elle portait
+                `chart-mint`, un jeton d'échelle de données employé en
+                ornement. */}
+            <Icone nom="check-circle" taille={14} />
             {tableau ? `${tableau.cartesActives} carte${tableau.cartesActives > 1 ? 's' : ''} active${tableau.cartesActives > 1 ? 's' : ''}` : 'Chargement…'}
           </span>
         </div>
@@ -186,8 +204,14 @@ export function Accueil({
         <BandeauHorsLigne enLigne={enLigne} compte={file} className="mt-4 relative z-10" />
       </div>
 
-      {/* Résumé du jour — trois indicateurs avec badges d'icônes */}
-      <div className="mx-4 -mt-5 relative z-20 bg-surface rounded-2xl border border-hairline/80 p-3.5 xs:p-4 grid grid-cols-3 gap-2 xs:gap-3 shadow-md backdrop-blur-xs">
+      {/* Résumé du jour : trois indicateurs.
+
+          Le `backdrop-blur-xs` est parti le 2026-09-17. Il était posé sur
+          `bg-surface`, une surface opaque : rien ne transparaissait, donc il ne
+          floutait rien. Un `backdrop-filter` par-dessus un dégradé fait
+          repeindre la zone à chaque défilement, et celui-ci le faisait pour un
+          effet strictement nul. */}
+      <div className="mx-4 -mt-5 relative z-20 bg-surface rounded-xl border border-hairline p-3.5 xs:p-4 grid grid-cols-3 gap-2 xs:gap-3 shadow-md">
         <div className="text-center min-w-0">
           <div className="flex items-center justify-center gap-1 mb-1 text-muted-foreground">
             <Icone nom="users" taille={13} />
@@ -253,7 +277,7 @@ export function Accueil({
               onClick={() => onNaviguer('alertes')}
               className="anim-pression w-full cursor-pointer rounded-md border border-negative bg-surface p-3 text-left text-sm font-body font-medium text-negative"
             >
-              {`${refusees} opération${refusees > 1 ? 's' : ''} refusée${refusees > 1 ? 's' : ''} — à voir`}
+              {`${refusees} opération${refusees > 1 ? 's' : ''} refusée${refusees > 1 ? 's' : ''}, à voir`}
             </button>
           )}
           {avisStockage && (
@@ -360,40 +384,15 @@ export function Accueil({
         )}
       </div>
 
-      <div className="mx-4 mt-5 lg:mx-0">
-        <EnteteSection
-          titre="Dernières mises"
-          className="mb-2"
-          action={<LienBloc libelle="Tout voir" onActiver={() => onNaviguer('clients')} />}
-        />
-        <Carte className="overflow-hidden">
-          {!tableau ? (
-            <div className="divide-y divide-hairline">
-              <SqueletteLigne />
-              <SqueletteLigne />
-              <SqueletteLigne />
-            </div>
-          ) : tableau.dernieres.length === 0 ? (
-            <p className="px-4 py-5 text-base font-body text-muted-foreground m-0">
-              Aucune mise encaissée pour l’instant.
-            </p>
-          ) : (
-            tableau.dernieres.map((ligne, i) => (
-              <LigneTransaction
-                key={`${ligne.quand}-${i}`}
-                nom={ligne.nom}
-                meta={`${new Date(ligne.quand).toLocaleDateString('fr-FR', {
-                  day: 'numeric',
-                  month: 'short',
-                })} · ${ligne.estCommission ? 'Commission' : 'Mise'}`}
-                montant={`+${formatMontant(ligne.montant)}`}
-                type={ligne.estCommission ? 'neutre' : 'positive'}
-                derniere={i === tableau.dernieres.length - 1}
-              />
-            ))
-          )}
-        </Carte>
-      </div>
+      {/* « Dernières mises » vivait ici jusqu'au 2026-09-17.
+      
+          Cinq lignes d'historique sur l'écran qu'on ouvre pour agir, et un
+          « Tout voir » qui menait à la liste des clients — c'est-à-dire pas
+          à l'historique. Tout le passé est maintenant dans « Reçus », sur une
+          seule frise, avec ses filtres ; la tuile « Reçus » plus bas y mène.
+      
+          Ce que l'accueil garde : la carte du jour, le résumé, et les
+          actions. Ce qu'on fait, et non ce qu'on a fait. */}
 
       </div>
 

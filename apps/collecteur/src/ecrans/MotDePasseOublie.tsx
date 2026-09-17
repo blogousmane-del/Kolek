@@ -56,12 +56,12 @@ export function MotDePasseOublie() {
 
       <form
         onSubmit={soumettre}
-        className="relative z-10 w-full max-w-formulaire rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-lg backdrop-blur-xl"
+        className="relative z-10 w-full max-w-formulaire rounded-xl border border-white/10 bg-white/[0.04] p-6 shadow-lg backdrop-blur-xl"
       >
         <h1 className="mb-2 font-headings text-xl font-bold leading-tight text-white">
           Mot de passe oublié
         </h1>
-        <p className="mb-6 font-body text-sm text-white/50">
+        <p className="mb-6 font-body text-sm text-white/55">
           Saisis l’adresse de ton compte. On t’envoie un lien pour en choisir un nouveau.
         </p>
 
@@ -100,7 +100,7 @@ export function MotDePasseOublie() {
 
         <a
           href="/"
-          className="mt-5 block text-center font-body text-sm text-white/40 transition-colors hover:text-white/70"
+          className="mt-5 block text-center font-body text-sm text-white/55 transition-colors hover:text-white/70"
         >
           ← Retour à la connexion
         </a>

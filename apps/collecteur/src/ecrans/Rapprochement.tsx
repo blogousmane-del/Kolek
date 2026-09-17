@@ -1,4 +1,4 @@
-import { formatMontant } from '@kolek/core';
+import { CAISSE_MAX, formatMontant, validerCaisse } from '@kolek/core';
 import { Bouton, Carte, Champ, Icone } from '@kolek/ui';
 import { useEffect, useState } from 'react';
 
@@ -58,8 +58,15 @@ export function Rapprochement({ collecteurId, revision, onRetour }: {
   async function enregistrer() {
     if (!donnees || !collecteurId || envoi) return;
     const montant = Number.parseInt(saisie.replace(/\s/g, ''), 10);
-    if (!Number.isInteger(montant) || montant < 0) {
-      setErreurEcriture('Entre le montant en francs, sans centimes.');
+    if (!validerCaisse(montant)) {
+      // Deux refus, deux phrases : « sans centimes » n’apprend rien à qui a
+      // tapé onze chiffres. Le geste porte la même règle en dessous — c’est
+      // lui qui protège la file — mais l'écran parle sans attendre.
+      setErreurEcriture(
+        montant > CAISSE_MAX
+          ? 'Ce montant est trop grand. Vérifie le nombre de chiffres.'
+          : 'Entre le montant en francs, sans centimes.',
+      );
       return;
     }
 
@@ -87,21 +94,21 @@ export function Rapprochement({ collecteurId, revision, onRetour }: {
         largeur="saisie"
         enfants={
           donnees && (
-            <div className="bg-white/10 rounded-lg p-4">
-              <p className="text-white/60 text-xs font-body mb-0.5">
+            <div className="bg-surface rounded-lg border border-hairline p-4">
+              <p className="text-xs font-body text-muted-foreground mb-0.5">
                 {/* Provisoire : le chiffre vient du téléphone — une mise que le
                     serveur n'a pas encore comptée, un geste en ligne pas encore
                     relu. Le dire évite qu'un écart d'attente se lise comme un
                     manquant. */}
                 {donnees.provisoire
-                  ? 'Cash attendu — provisoire, le serveur recalculera'
-                  : 'Cash attendu — calculé par le serveur'}
+                  ? 'Cash attendu (provisoire, le serveur recalculera)'
+                  : 'Cash attendu (calculé par le serveur)'}
               </p>
-              <p className="text-white font-headings font-bold text-3xl tabular-nums">
+              <p className="font-headings font-bold text-3xl text-ink tabular-nums">
                 {formatMontant(donnees.cashAttendu)}{' '}
-                <span className="text-base font-body font-medium text-white/60">FCFA</span>
+                <span className="text-base font-body font-medium text-muted-foreground">FCFA</span>
               </p>
-              <p className="text-white/50 text-xs font-body mt-1">
+              <p className="text-xs font-body text-muted-foreground mt-1">
                 Somme de tes mises du {donnees.date}
               </p>
             </div>

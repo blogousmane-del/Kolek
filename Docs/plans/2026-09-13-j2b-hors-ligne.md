@@ -13350,9 +13350,16 @@ Relevés en relecture ou au regard, jugés sans perte d'argent ni de données. �
 - Le bandeau « Envoi en cours » ne montre aucun progrès — **reproduit le 2026-09-17** : « Envoi en cours · 4 restantes » figé onze secondes, puis disparition d'un coup. Corrigé par la tâche 4 de Docs/plans/2026-09-16-attente-et-messages.md.
 - Le commentaire du 42501 sous `anon` (`synchroniseur.ts`).
 - Deux onglets ouverts sur le même compte.
-- La borne `integer` de `cash_declare` (`gestes.ts`).
 - Les angles morts de l'épreuve de durabilité (raccourcis `idb`, sous-dossiers, `.tsx`).
 - La fiche d'un client sur une tournée jamais chargée dit « Fiche introuvable » au lieu de « pas encore sur ce téléphone ».
 - L'avis rouge de déconnexion reste affiché — **pas reproduit le 2026-09-17**, à préciser : l'état ne vient que de `FicheClient.tsx:763`, atteint si `collecteurId` est absent, ce que le montage de `Coquille` interdit. Les deux autres échecs d'encaissement restent bien affichés jusqu'à « Réessayer » — ils n'ont rien écrit, c'est voulu.
 - Hors ligne, file vide, l'écran Retrait reste vide ~7 s (trois relances de postgrest-js).
 - Le commentaire d'`Abonnement.tsx` (« seul geste qui exige le réseau ») est faux.
+
+**Clos le 2026-09-17 :** « La borne `integer` de `cash_declare` (`gestes.ts`) »,
+par `Docs/specs/2026-09-17-borne-caisse-design.md` et son plan. Le téléphone
+laissait passer un montant que la colonne ne porte pas ; PostgreSQL rendait
+`22003`, que `classer` ne lisait pas, donc `inconnu` — le seul classement qui
+arrête la passe. Huit minutes et demie pendant lesquelles les mises encaissées
+derrière la déclaration ne partaient pas, puis le motif `INCONNU`. Livré sur
+`main` en `e86b0ae`.

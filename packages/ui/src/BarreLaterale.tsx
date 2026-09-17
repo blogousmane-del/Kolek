@@ -186,7 +186,7 @@ function Section({
 }) {
   return (
     <div className={className}>
-      <p className="text-xs font-body font-semibold uppercase tracking-widest text-white/30 px-2 mb-2">
+      <p className="text-xs font-body font-semibold uppercase tracking-widest text-white/55 px-2 mb-2">
         {titre}
       </p>
       {entrees.map((entree) => {
@@ -203,13 +203,16 @@ function Section({
             title={entree.disponible ? undefined : 'Écran à venir'}
             onClick={() => onNaviguer(entree.cle)}
             className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md mb-0.5 ${
-              estActif ? 'bg-white/10 border-l-2 border-chart-mint' : ''
+              estActif ? 'bg-white/10 border-l-2 border-marqueur-actif' : ''
             } ${entree.disponible ? 'cursor-pointer' : 'cursor-default'}`}
           >
             <Icone
               nom={entree.icone}
               className={
-                estActif ? 'text-chart-mint' : entree.disponible ? 'text-white/50' : 'text-white/25'
+                // Couleurs d'icône, donc objets graphiques : 3:1 suffit
+                // (WCAG 1.4.11), et l'entrée indisponible est exemptée par la
+                // 1.4.3. La garde lit cette ligne-ci, elle doit donc le dire.
+                estActif ? 'text-marqueur-actif' : entree.disponible ? 'text-white/50' : 'text-white/25'
               }
             />
             <span
@@ -289,7 +292,7 @@ function SelecteurEspace({
         <span className="text-white/80 text-sm font-body font-medium truncate">
           {courant.libelle}
         </span>
-        <Icone nom="chevrons-up-down" taille={14} className="text-white/50 flex-shrink-0" />
+        <Icone nom="chevrons-up-down" taille={14} className="text-white/55 flex-shrink-0" />
       </button>
 
       {ouvert && (
@@ -442,7 +445,7 @@ export function BarreLaterale({
           onClick={onDeconnexion}
           className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer"
         >
-          <Icone nom="log-out" className="text-white/50" />
+          <Icone nom="log-out" className="text-white/55" />
           <span className="text-base font-body font-medium text-white/60">Déconnexion</span>
         </button>
       </div>

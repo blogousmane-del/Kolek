@@ -82,7 +82,7 @@ export function NouveauMotDePasse() {
 
       <form
         onSubmit={soumettre}
-        className="relative z-10 w-full max-w-formulaire rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-lg backdrop-blur-xl"
+        className="relative z-10 w-full max-w-formulaire rounded-xl border border-white/10 bg-white/[0.04] p-6 shadow-lg backdrop-blur-xl"
       >
         <h1 className="mb-2 font-headings text-xl font-bold leading-tight text-white">
           Choisis ton mot de passe
@@ -123,7 +123,7 @@ export function NouveauMotDePasse() {
 
         {session === true && !pose && (
           <>
-            <p className="mb-6 font-body text-sm text-white/50">
+            <p className="mb-6 font-body text-sm text-white/55">
               Au moins 10 caractères. Évite un mot de passe déjà utilisé ailleurs.
             </p>
 

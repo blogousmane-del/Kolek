@@ -316,7 +316,7 @@ export function Pagination({
         aria-live="polite"
         className="hidden sm:block text-xs font-body text-muted-foreground"
       >
-        Page {formatMontant(page)} sur {formatMontant(pages)} — {formatMontant(total)} au total
+        Page {formatMontant(page)} sur {formatMontant(pages)}, {formatMontant(total)} au total
       </p>
 
       <div className="flex items-center gap-2">

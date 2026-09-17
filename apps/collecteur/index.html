@@ -17,12 +17,22 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="theme-color" content="#0E2E1F" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@400;600;700;800&display=swap"
-      rel="stylesheet"
-    />
+    <!--
+      Aucun lien vers Google Fonts, et c'est un retrait du 2026-09-16 plutôt
+      qu'un oubli.
+
+      Ce document en portait un, qui réclamait les deux mêmes familles que
+      `src/main.tsx` importe déjà depuis `@fontsource`. Les deux moitiés
+      faisaient le même travail, et la moitié réseau le faisait mal : une
+      feuille de style distante bloque le rendu, coûte deux résolutions DNS et
+      deux poignées de main TLS, et ne répond pas du tout hors connexion — sur
+      une application qui est précisément conçue pour travailler hors ligne, au
+      marché, sans réseau.
+
+      Elle réclamait en plus Sora en 400, 600 et 800, trois graisses que le
+      produit n'emploie nulle part. L'admin n'a jamais eu ce lien : la
+      divergence était l'indice, pas une intention.
+    -->
     <title>Kolek — Collecteur</title>
     <!--
       La feuille de l'écran d'attente, écrite ici plutôt qu'en attributs `style`

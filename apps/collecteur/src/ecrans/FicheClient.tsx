@@ -1,12 +1,12 @@
 import { MISES_PAR_CYCLE, formatMontant, soldeRestituable } from '@kolek/core';
 import {
-  BadgeStatut,
+
   Bouton,
   CarrouselCartes,
   Champ,
   Feuille,
   Icone,
-  LigneTransaction,
+
   useEnLigne,
   type CarteItem,
 } from '@kolek/ui';
@@ -34,7 +34,7 @@ import { enAttenteSurCarte, identifiantsEnAttente, phraseAttenteCarte } from '..
 import { chargerFicheClient, type CarteFiche, type FicheClient as Fiche } from '../lectures-ecrans';
 import { ActiverCarte } from './ActiverCarte';
 import { ChoixMise } from './ChoixMise';
-import { HistoriqueClient } from './HistoriqueClient';
+
 import { useEstCollaborateur } from './commission';
 
 /**
@@ -93,6 +93,7 @@ export function FicheClient({
   onFermer,
   onEcriture,
   onRetrait,
+  onRecus,
 }: {
   clientId: string | null;
   /** Donné par la coquille, qui le lit une fois à l'ouverture. Les blocs
@@ -106,6 +107,11 @@ export function FicheClient({
       demande : l'écran doit pouvoir le nommer même quand il ne lui reste
       aucune carte à montrer. */
   onRetrait: (clientNom: string) => void;
+  /** Renvoie vers « Reçus », la recherche déjà remplie de son nom. Même
+      forme que `onRetrait`, et pour la même raison : c'est la fiche qui
+      connaît le nom sûrement. Depuis le 2026-09-17, tout le passé de ce
+      client vit là-bas, et cette porte est le seul chemin depuis ici. */
+  onRecus: (clientNom: string) => void;
 }) {
   const [fiche, setFiche] = useState<Fiche | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -116,7 +122,7 @@ export function FicheClient({
   // resterait à la merci du moindre démontage — et se réinitialiserait sur la
   // carte la plus avancée, pas sur celle qu'on vient de payer.
   const [visibleId, setVisibleId] = useState<string | null>(null);
-  const [historiqueOuvert, setHistoriqueOuvert] = useState(false);
+
   // Le brouillon de correction vit ici, et non dans `CorrigerFiche` — même
   // raison que `visibleId` ci-dessus. Jusqu'à J2b, chaque écriture faisait
   // repasser la fiche par `null` et démontait le formulaire : un brouillon
@@ -174,38 +180,15 @@ export function FicheClient({
     // bouger — c'est justement ce que l'effet précédent provoque en
     // interne, sans que le collecteur ait rien décidé.
     setVisibleId(null);
-    // L'historique se referme avec le client : rester dedans en changeant de
-    // client montrerait les cartes de l'un sous le nom de l'autre.
-    setHistoriqueOuvert(false);
+
     // Le brouillon de correction aussi : le garder en changeant de client
     // corrigerait la fiche de l'un avec la saisie de l'autre.
     setBrouillon(null);
   }, [clientId]);
 
-  /**
-   * Le défilement du document, pendant que l'historique est ouvert.
-   *
-   * `Feuille` bloque `document.body` et le rend en se démontant. L'historique
-   * **remplace** la feuille — c'est un plein écran, et l'imbriquer empilerait
-   * deux en-têtes — donc son ouverture rendait le défilement au document
-   * derrière lui. Sur un téléphone ça se voit tout de suite : on fait défiler
-   * l'historique, on arrive au bout, et c'est la liste des clients qui se met à
-   * bouger dessous.
-   *
-   * La valeur précédente est restaurée plutôt qu'écrasée par `''`, exactement
-   * comme le fait `Feuille` : deux panneaux imbriqués ne doivent pas se rendre
-   * le défilement par le premier qui ferme.
-   */
-  useEffect(() => {
-    if (!historiqueOuvert) return;
-
-    const precedent = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = precedent;
-    };
-  }, [historiqueOuvert]);
+  /* Le verrou de défilement du plein écran d'historique a été retiré le
+     2026-09-17 avec le plein écran lui-même : `Feuille` tient déjà le sien,
+     et il n'y a plus de second panneau à empiler par-dessus. */
 
   // Le numéro de cycle est une donnée chronologique — la énième carte que ce
   // client a ouverte — et se lit dans la position au sein de `fiche.cartes`,
@@ -230,23 +213,6 @@ export function FicheClient({
       ? 'Client pas encore envoyé : sa fiche se corrige une fois arrivé au serveur.'
       : null;
 
-  // Plein écran, et non dans la `Feuille` : `HistoriqueClient` porte son propre
-  // bandeau et attend toute la hauteur. Le glisser dans un panneau modal lui
-  // ferait empiler deux en-têtes. La fiche, elle, reste montée sous cet
-  // écran — le collecteur la retrouve où il l'avait laissée, carte choisie
-  // comprise.
-  if (historiqueOuvert && fiche) {
-    return (
-      <div className="fixed inset-0 z-50 bg-canvas overflow-y-auto flex flex-col">
-        <HistoriqueClient
-          nomClient={fiche.nom}
-          cartes={fiche.cartes}
-          revision={revision}
-          onFermer={() => setHistoriqueOuvert(false)}
-        />
-      </div>
-    );
-  }
 
   return (
     <Feuille
@@ -336,44 +302,26 @@ export function FicheClient({
             />
           )}
 
-          {/* Le `fiche.cartes.length > 1` qui gardait cette section est tombé
-              le 2026-09-10 : il la rendait invisible pour un client qui n'a
-              qu'une carte, c'est-à-dire la majorité. `Historique` se tait déjà
-              seul quand aucune carte n'est close. */}
-          <Historique cartes={fiche.cartes} />
+          {/* Le passé du client est parti dans « Reçus » le 2026-09-17.
 
-          {fiche.cartes.length > 0 && (
-            <Bouton
-              variante="contour"
-              pleineLargeur
-              onClick={() => setHistoriqueOuvert(true)}
-            >
-              Historique complet
-            </Bouton>
-          )}
+              Trois blocs vivaient ici — « Cartes précédentes », « Historique
+              complet » en plein écran, et « Derniers versements ». Ils
+              répondaient à la même question que l'écran des reçus, en plus
+              court et pour un seul client, et la fiche s'allongeait d'autant
+              alors que ce qu'on vient y faire est encaisser, corriger ou
+              restituer.
 
-          {fiche.mises.length > 0 && (
-            <section>
-              <p className="font-headings font-bold text-base text-ink mb-2">Derniers versements</p>
-              <div className="rounded-lg border border-hairline overflow-hidden">
-                {fiche.mises.slice(0, 8).map((m, i, liste) => (
-                  <LigneTransaction
-                    key={m.id}
-                    nom={m.estCommission ? 'Commission' : 'Mise'}
-                    meta={`${new Date(m.encaisseLe).toLocaleDateString('fr-FR', {
-                      day: 'numeric',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}${pasEnvoyes.has(m.id) ? ' · pas encore envoyée' : ''}`}
-                    montant={`+${formatMontant(m.montant)}`}
-                    type={m.estCommission ? 'neutre' : 'positive'}
-                    derniere={i === Math.min(liste.length, 8) - 1}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
+              Rien n'est perdu : les mises, les commissions, les rattrapages
+              **et** les cartes closes sont là-bas sur une seule frise, avec
+              leurs filtres. Le nom part avec la demande pour que la recherche
+              y soit déjà remplie — sans ça, le collecteur arriverait sur le
+              journal de tout le portefeuille et devrait retaper un nom qu'il
+              a sous les yeux. */}
+          <Bouton variante="contour" pleineLargeur onClick={() => onRecus(fiche.nom)}>
+            Tous ses reçus
+          </Bouton>
+
+
         </>
       )}
     </Feuille>
@@ -992,7 +940,7 @@ function CartesEnCours({
         <div className="bg-positive-tint rounded-md p-3 mt-3 space-y-3">
           <div>
             <p className="font-body text-sm text-ink m-0">
-              Cycle terminé — {MISES_PAR_CYCLE} mises sur {MISES_PAR_CYCLE}.
+              Cycle terminé : {MISES_PAR_CYCLE} mises sur {MISES_PAR_CYCLE}.
             </p>
             <p className="font-body text-xs text-muted-foreground mt-1">
               Tu peux lui rendre ses {solde} FCFA, ou lui activer une carte de plus juste en
@@ -1176,57 +1124,6 @@ function NouvelleCarte({
       >
         {envoi ? 'Ouverture…' : 'Ouvrir la carte'}
       </Bouton>
-    </section>
-  );
-}
-
-/** Les cartes précédentes. Un client qui en a tenu quatre l'a mérité. */
-function Historique({ cartes }: { cartes: Fiche['cartes'] }) {
-  const passees = cartes.filter((k) => k.statut === 'cloturee');
-  if (passees.length === 0) return null;
-
-  return (
-    <section>
-      <p className="font-headings font-bold text-base text-ink mb-2">
-        Cartes précédentes ({passees.length})
-      </p>
-      <div className="flex flex-col gap-2">
-        {passees.map((k) => (
-          <div
-            key={k.id}
-            className="flex items-center justify-between gap-3 bg-canvas rounded-md px-3 py-2"
-          >
-            <span className="min-w-0">
-              <span className="block font-body text-sm text-ink tabular-nums">
-                {formatMontant(k.mise)} FCFA · {k.misesEncaissees}/{MISES_PAR_CYCLE}
-              </span>
-              <span className="block font-body text-xs text-muted-foreground">
-                {new Date(k.ouverteLe).toLocaleDateString('fr-FR', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                })}
-                {k.clotureeLe &&
-                  ` → ${new Date(k.clotureeLe).toLocaleDateString('fr-FR', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                  })}`}
-              </span>
-            </span>
-            {/* Pilule dessinée à la main jusqu'au 2026-09-10, avec ses propres
-                classes et ses propres mots — « Cycle tenu », « Rendue avant la
-                fin ». Ni l'un ni l'autre n'est dans l'union `Statut`, et la
-                règle 4.11 du système de design dit « une seule table ». La
-                nuance que « Rendue avant la fin » portait est déjà dite à deux
-                centimètres de là, par le compte X/31. */}
-            <BadgeStatut
-              statut={k.misesEncaissees >= MISES_PAR_CYCLE ? 'Cycle terminé' : 'Clôturée'}
-              className="px-2.5 py-1 shrink-0"
-            />
-          </div>
-        ))}
-      </div>
     </section>
   );
 }

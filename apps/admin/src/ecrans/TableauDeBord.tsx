@@ -344,21 +344,25 @@ export function TableauDeBord({
                   {
                     icone: 'users',
                     libelle: 'Collecteurs',
+                    famille: 'client',
                     onActiver: () => onNaviguer('collecteurs'),
                   },
                   {
                     icone: 'wallet',
                     libelle: 'Encours',
+                    famille: 'argent',
                     onActiver: () => onNaviguer('encours'),
                   },
                   {
                     icone: 'credit-card',
                     libelle: 'Abonnements',
+                    famille: 'argent',
                     onActiver: () => onNaviguer('abonnements'),
                   },
                   {
                     icone: 'user-plus',
                     libelle: 'Ajouter un collecteur',
+                    famille: 'client',
                     onActiver: () => onNaviguer('collecteurs'),
                   },
                 ]}

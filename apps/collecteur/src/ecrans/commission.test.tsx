@@ -41,14 +41,16 @@ const profil = vi.fn();
 vi.mock('../lectures-ecrans', async (original) => ({
   ...((await original()) as object),
   chargerProfil: () => profil(),
-  chargerRecus: () =>
+  chargerJournal: () =>
     Promise.resolve([
       {
         id: 'r1',
+        nature: 'commission',
+        clientId: 'cli1',
         clientNom: 'Aya Koffi',
         montant: 2000,
-        encaisseLe: new Date('2026-09-02T09:00:00Z').toISOString(),
-        estCommission: true,
+        mise: 2000,
+        survenuLe: new Date('2026-09-02T09:00:00Z').toISOString(),
       },
     ]),
   chargerBilan: () =>
@@ -120,14 +122,14 @@ describe('les reçus', () => {
     profilAvecTitulaire(null);
     render(<Recus revision={0} onRetour={() => {}} />);
 
-    expect(await screen.findByText('commission')).toBeTruthy();
+    expect(await screen.findByText('Commission')).toBeTruthy();
   });
 
   it('marque « commission titulaire » à un collaborateur', async () => {
     profilAvecTitulaire('patron-1');
     render(<Recus revision={0} onRetour={() => {}} />);
 
-    expect(await screen.findByText('commission titulaire')).toBeTruthy();
+    expect(await screen.findByText('Commission titulaire')).toBeTruthy();
   });
 });
 

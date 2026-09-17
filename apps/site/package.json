@@ -11,10 +11,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource-variable/instrument-sans": "^5.3.0",
     "@fontsource/bodoni-moda": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
-    "@fontsource/plus-jakarta-sans": "^5.3.0",
-    "@fontsource/sora": "^5.3.0",
     "@kolek/core": "^0.1.0",
     "@kolek/ui": "^0.1.0",
     "gsap": "^3.15.0",

@@ -58,6 +58,13 @@ téléphone, pas le réseau.
 | `Recus.tsx:30` | `chargerRecus` | réseau |
 | `Retrait.tsx:87` | `chargerCartesCloturables` | réseau |
 
+> **Dépassé le 2026-09-17, sur deux lignes.** `HistoriqueClient.tsx` n'existe
+> plus et `chargerRecus` a été renommée : le passé du client — cartes closes
+> comprises — tient maintenant sur le seul écran « Reçus », qui lit
+> `chargerJournal`. Toujours du **réseau**, donc le classement de ces lignes
+> ne change pas ; seuls les noms sont morts. Le détail d'une carte close passe
+> encore par `chargerHistoriqueCarte`, appelée au dépli depuis `Recus.tsx`.
+
 Les trois chargeurs de disque passent par `lectureCourante()`
 (`hors-ligne/moteur.ts:181-196`) : `ouvrirBase`, `lireTournee`, `lireRefus`,
 `lireProfil` — IndexedDB, jamais Supabase. **C'est le cœur de J2b**, et

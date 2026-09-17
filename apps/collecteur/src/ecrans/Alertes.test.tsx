@@ -60,7 +60,7 @@ describe('les refus en tête des alertes (§8.4)', () => {
     expect(await screen.findByText('Les autres alertes demandent le réseau.')).toBeTruthy();
     // Espaces ordinaires : `getByText` ramène l'insécable de `formatMontant` à
     // une espace avant de comparer.
-    expect(screen.getByText('Awa — mise de 1 000 FCFA')).toBeTruthy();
+    expect(screen.getByText('Awa : mise de 1 000 FCFA')).toBeTruthy();
     expect(screen.getByText('La carte avait été clôturée.')).toBeTruthy();
     expect(screen.getByText(/^Geste du /)).toBeTruthy();
     expect(screen.getByText('1 refusée')).toBeTruthy();

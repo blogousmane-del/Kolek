@@ -178,48 +178,128 @@ describe('taille de champ', () => {
 });
 
 /**
- * Les deux familles ajoutées le 2026-09-09 pour `ActionsRapides`.
+ * Les quatre aplats de tuile.
  *
- * L'écran d'accueil du collecteur affiche huit boutons d'action ensemble. Cinq
- * portaient des hexadécimaux en dur, contre la règle « aucune valeur visuelle
- * en dur » du README. Les ramener aux jetons sémantiques existants aurait rendu
- * *Retrait* et *Bilan* identiques — deux boutons voisins, dont l'un sort de
- * l'argent.
+ * Ils remplacent `ardoise` et `ocre` le 2026-09-17. La raison de ces deux-là
+ * tenait — la palette sémantique décrit des états, pas des destinations — mais
+ * les tuiles empruntaient les **teintes d'alerte** comme fonds, et ces teintes
+ * sont faites pour porter un message par-dessus, pas pour être vues côte à
+ * côte. Quatre familles s'y lisaient comme trois : `positiveTint` et
+ * `secondary` ne diffèrent que de sept unités sur un canal, donc *Encaisser*
+ * avait la couleur de *Souscrire*.
  *
- * ## Pourquoi 3:1 et non 4,5:1
- *
- * Ces couleurs habillent un `div` qui ne contient que l'icône ; le libellé est
- * en `ink` à côté. Le seuil applicable est donc celui des objets graphiques
- * (WCAG 1.4.11), pas celui du texte. Exiger 4,5:1 ici assombrirait neuf pastilles
- * pour une raison qui ne s'applique pas — et une règle qu'on ne peut pas
- * justifier finit par être desserrée en bloc.
+ * Ces épreuves tiennent les deux conditions qui font qu'un jeu de fonds
+ * fonctionne, et elles doivent être tenues ensemble : **séparés en teinte**
+ * pour qu'on les distingue, **voisins en luminance** pour qu'aucun ne saute au
+ * visage et qu'aucun ne disparaisse en niveaux de gris — la vue d'un daltonien
+ * comme celle d'un téléphone en plein soleil.
  */
-describe('familles ajoutées pour les actions rapides', () => {
-  const SUR_TEINTE: Array<[string, string, string]> = [
-    ['ardoise sur sa teinte', couleurs.ardoise, couleurs.ardoiseTint],
-    ['ocre sur sa teinte', couleurs.ocre, couleurs.ocreTint],
+/**
+ * Le marqueur d'état actif des navigations.
+ *
+ * Ces épreuves tiennent ce qui fait que ce jeton mérite d'exister à côté de
+ * `chartMint`, dont il reprend l'emploi : s'il en était indiscernable, ce
+ * serait un renommage, et le couplage qu'on vient de défaire reviendrait par
+ * la ressemblance.
+ */
+describe("le marqueur d'état actif", () => {
+  it('tient 4,5:1 sur la barre latérale', () => {
+    // 4,5 et non 3 : le jeton teinte l'icône **et** l'intitulé de l'entrée
+    // active. C'est donc le seuil du texte qui s'applique.
+    expect(contraste(couleurs.marqueurActif, couleurs.sidebar)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("ne se confond pas avec le vert de l'échelle data-viz", () => {
+    const canaux = (hex: string): [number, number, number] => [
+      Number.parseInt(hex.slice(1, 3), 16),
+      Number.parseInt(hex.slice(3, 5), 16),
+      Number.parseInt(hex.slice(5, 7), 16),
+    ];
+
+    const [rm, vm, bm] = canaux(couleurs.marqueurActif);
+    const [rc, vc, bc] = canaux(couleurs.chartMint);
+    const ecart = Math.max(Math.abs(rm - rc), Math.abs(vm - vc), Math.abs(bm - bc));
+
+    expect(ecart).toBeGreaterThanOrEqual(27);
+  });
+
+  it("n'est pas un or déguisé", () => {
+    // La barre latérale est une surface d'application, et le Design System §1
+    // y interdit l'or. Le marqueur est un vert : sa composante bleue le tient
+    // loin d'un jaune, où elle s'effondre.
+    const bleu = Number.parseInt(couleurs.marqueurActif.slice(5, 7), 16);
+    const bleuOr = Number.parseInt(couleurs.or.slice(5, 7), 16);
+
+    expect(bleu).toBeGreaterThan(bleuOr);
+  });
+});
+
+describe('les quatre aplats de tuile', () => {
+  interface Tuile {
+    nom: string;
+    encre: string;
+    fond: string;
+  }
+
+  const TUILES: Tuile[] = [
+    { nom: 'argent', encre: couleurs.tuileArgentEncre, fond: couleurs.tuileArgent },
+    { nom: 'client', encre: couleurs.tuileClientEncre, fond: couleurs.tuileClient },
+    { nom: 'analyse', encre: couleurs.tuileAnalyseEncre, fond: couleurs.tuileAnalyse },
+    { nom: 'gestion', encre: couleurs.tuileGestionEncre, fond: couleurs.tuileGestion },
   ];
 
-  for (const [nom, icone, fond] of SUR_TEINTE) {
-    it(`tient 3:1 comme objet graphique — ${nom}`, () => {
-      expect(contraste(icone, fond)).toBeGreaterThanOrEqual(3);
+  /** Les trois canaux d'un hexadécimal, en triplet plutôt qu'en tableau : le
+      triplet se déstructure, et déstructurer évite d'indexer. */
+  const canaux = (hex: string): [number, number, number] => [
+    Number.parseInt(hex.slice(1, 3), 16),
+    Number.parseInt(hex.slice(3, 5), 16),
+    Number.parseInt(hex.slice(5, 7), 16),
+  ];
+
+  for (const { nom, encre, fond } of TUILES) {
+    it(`tient 4,5:1 — ${nom}`, () => {
+      // 4,5:1 et non 3:1 : depuis que l'aplat **est** la tuile, ces couleurs
+      // portent le libellé et pas seulement l'icône. C'est le seuil du texte
+      // qui s'applique, pas celui des objets graphiques.
+      expect(contraste(encre, fond)).toBeGreaterThanOrEqual(4.5);
     });
   }
 
-  it('reste distinguable des familles voisines', () => {
-    // Le point de l'ajout : sans cet écart, autant réutiliser un jeton existant.
-    // `ardoise` doit se voir contre `info`, et `ocre` contre `or` — ce dernier
-    // parce que le Design System interdit l'or dans les applications et que
-    // deux valeurs proches feraient croire à une infraction.
-    expect(contraste(couleurs.ardoiseTint, couleurs.infoTint)).toBeGreaterThan(1);
-    expect(couleurs.ocre).not.toBe(couleurs.or);
+  it('sépare franchement les quatre fonds', () => {
+    // Vingt-sept unités au moins sur un canal, entre deux fonds quelconques.
+    // Sans cette épreuve, rien ne rattrape le défaut qui a coûté la refonte :
+    // deux familles qui se ressemblent assez pour n'en faire qu'une.
+    const paires = TUILES.flatMap((a, rang) =>
+      TUILES.slice(rang + 1).map((b) => [a, b] as const),
+    );
+
+    for (const [a, b] of paires) {
+      const [ra, va, ba] = canaux(a.fond);
+      const [rb, vb, bb] = canaux(b.fond);
+      const ecart = Math.max(Math.abs(ra - rb), Math.abs(va - vb), Math.abs(ba - bb));
+      expect(ecart, `${a.nom} contre ${b.nom}`).toBeGreaterThanOrEqual(27);
+    }
+  });
+
+  it('garde les quatre fonds à luminance voisine', () => {
+    const lum = (hex: string) => {
+      const lineaire = (canal: number) => {
+        const c = canal / 255;
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+      };
+      const [r, v, b] = canaux(hex);
+      return 0.2126 * lineaire(r) + 0.7152 * lineaire(v) + 0.0722 * lineaire(b);
+    };
+
+    const luminances = TUILES.map(({ fond }) => lum(fond));
+    expect(Math.max(...luminances) - Math.min(...luminances)).toBeLessThan(0.08);
   });
 
   it('n’est pas un or déguisé', () => {
     // `or` est une couleur de marque, interdite sur les surfaces qui manipulent
-    // l'argent. `ocre` est fonctionnel et beaucoup plus sombre : il ne peut pas
-    // être confondu avec la pièce du logo.
-    expect(contraste(couleurs.ocre, couleurs.surface)).toBeGreaterThan(
+    // l'argent. L'encre de gestion est fonctionnelle et beaucoup plus sombre :
+    // elle ne peut pas être confondue avec la pièce du logo.
+    expect(contraste(couleurs.tuileGestionEncre, couleurs.surface)).toBeGreaterThan(
       contraste(couleurs.or, couleurs.surface),
     );
   });

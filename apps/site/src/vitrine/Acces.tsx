@@ -84,7 +84,7 @@ export function Acces() {
         <h2 className="mb-3 max-w-2xl font-headings text-3xl font-bold text-white sm:text-4xl">
           Ouvre ta tournée
         </h2>
-        <p className="mb-12 max-w-xl font-body text-base text-white/50">
+        <p className="mb-12 max-w-xl font-body text-base text-white/55">
           Ton compte t’attend. Encaisse tes clients, rapproche ta caisse, clôture tes cartes,
           depuis le téléphone que tu as déjà dans la poche.
         </p>
@@ -137,7 +137,7 @@ export function Acces() {
               <h3 className="mb-2 font-headings text-xl font-bold text-white">
                 Ouvrir un compte
               </h3>
-              <p className="mb-4 font-body text-sm leading-relaxed text-white/50">
+              <p className="mb-4 font-body text-sm leading-relaxed text-white/55">
                 Laisse ton nom et ton numéro. GTCS te rappelle, ouvre ton compte, et tu encaisses
                 dès le lendemain.
               </p>

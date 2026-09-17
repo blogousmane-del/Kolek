@@ -44,23 +44,42 @@ L'image fournie est la **maquette de représentation de notre Dashboard Admin** 
 - Contenu réel : **nos données** (collecteurs, clients, cartes, mises) et **le français**, à la place des noms, marques et montants de démonstration.
 - **Aucun or dans les applications** : l'admin et le collecteur collent strictement à la maquette (vert profond, neutres, vert/corail sémantiques, pastels de graphique). Décision actée.
 - **L'or est une couleur de marque, pas une couleur d'interface.** `--color-or` et `--color-or-doux` n'existent que pour le logo, le favicon, l'image Open Graph et la vitrine — les surfaces qui *vendent* Kolek. Les surfaces qui *manipulent l'argent* n'en portent pas une trace. La distinction n'est pas cosmétique : sur un écran d'encaissement, l'or désignerait une valeur, et aucune valeur de ce produit n'est or.
-- **`ocre` n'est pas de l'or, et voici où passe la frontière.** Ajouté le
-  2026-09-09 avec `ardoise` comme famille **fonctionnelle** : `--color-ocre`
-  (`#7D6B35`) est un repère de destination dans `ActionsRapides`, pas un
-  ornement. Ce qui sépare les deux n'est pas la teinte mais l'emploi — l'or
-  *désigne une valeur*, l'ocre *distingue un bouton d'un autre*. La règle
-  au-dessus reste donc entière : aucune surface d'encaissement ne porte d'or.
+- **Les quatre aplats de tuile ne sont pas de l'or, et voici où passe la
+  frontière.** `tuileGestion` (`#F1E4C9`) et son encre (`#6A5218`) sont des
+  jaunes : la question se pose donc pour de bon. Ce qui les sépare de l'or n'est
+  pas la teinte mais l'emploi — l'or *désigne une valeur*, l'aplat *dit à quelle
+  famille une destination appartient*. La règle au-dessus reste entière, aucune
+  surface d'encaissement ne porte d'or, et un test tient l'écart plutôt qu'un
+  commentaire.
 
-  Pourquoi ces deux familles existent plutôt que d'être ramenées aux jetons
-  sémantiques : la palette sémantique décrit des **états** — succès, erreur,
-  information — et l'écran d'accueil du collecteur affiche **huit destinations
-  ensemble**. Tout ramener à cinq états y rendait *Retrait* et *Bilan*
-  identiques, deux boutons voisins dont l'un sort de l'argent. Un jeton par
-  état, une famille par destination : ce sont deux axes, pas une seule échelle.
+  Pourquoi une famille de destination existe à côté de la palette sémantique :
+  celle-ci décrit des **états** — succès, erreur, information — et l'accueil du
+  collecteur affiche **dix destinations ensemble**. Tout y ramener rendait
+  *Retrait* et *Bilan* identiques, deux boutons voisins dont l'un sort de
+  l'argent. Un jeton par état, une famille par destination : ce sont deux axes,
+  pas une seule échelle.
 
-  Ce que ça n'autorise pas : ouvrir une famille fonctionnelle par écran. Deux
-  existent, elles couvrent les neuf boutons, et une troisième demanderait de
-  montrer d'abord que ces deux-là ne suffisent plus.
+  Pourquoi quatre, et pourquoi dédiées. Quatre familles — ce qui touche à
+  l'argent, ce qui touche au client, ce qui regarde en arrière, ce qui range —
+  s'apprennent en une semaine, là où neuf couleurs accrochées aux icônes ne se
+  mémorisaient jamais. Elles ont leurs propres jetons depuis le 2026-09-17,
+  parce qu'emprunter les teintes d'alerte a échoué : `positiveTint` et
+  `secondary` ne diffèrent que de sept unités sur un canal, et sur l'épreuve
+  d'écran les quatre familles s'y lisaient comme **trois**. Les jetons `tuile*`
+  tiennent deux conditions ensemble — au moins vingt-sept unités d'écart sur un
+  canal entre deux fonds quelconques, et une luminance resserrée entre 0,735 et
+  0,784 — pour qu'on les distingue en couleur sans qu'aucune saute au visage, ni
+  ne disparaisse en niveaux de gris.
+
+  Chaque encre tient **4,5:1 sur son propre fond**, et non 3:1 : depuis que
+  l'aplat *est* la tuile, ces couleurs portent le libellé et plus seulement
+  l'icône.
+
+  Ce que ça n'autorise pas : ouvrir une famille par écran. Quatre existent, la
+  famille est déclarée par l'écran et non déduite du dessin de l'icône, et une
+  cinquième demanderait de montrer d'abord que ces quatre-là ne suffisent plus.
+  « Alertes » n'en est pas une : une tuile rouge en permanence est rouge le jour
+  où il y a trois refus comme le jour où il n'y en a aucun.
 
 ---
 

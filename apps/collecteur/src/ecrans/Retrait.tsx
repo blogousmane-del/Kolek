@@ -244,7 +244,7 @@ export function Retrait({
               return (
                 <Carte
                   key={carte.carteId}
-                  className={`p-4 rounded-2xl border border-hairline/80 shadow-xs hover:shadow-sm transition-all ${carte.cycleComplet ? 'border-positive/80 shadow-positive/5 ring-1 ring-positive/20' : ''} ${
+                  className={`p-4 rounded-lg border border-hairline/80 shadow-xs ${carte.cycleComplet ? 'border-positive/80 shadow-positive/5 ring-1 ring-positive/20' : ''} ${
                     premier ? 'anim-cascade' : ''
                   }`}
                   style={rangCascade(rang, premier)}
