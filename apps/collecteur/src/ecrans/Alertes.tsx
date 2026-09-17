@@ -94,7 +94,7 @@ export function Alertes({ onRetour, revision }: { onRetour: () => void; revision
                 {refusees.map((r) => (
                   <Carte
                     key={r.id}
-                    className="p-4 rounded-2xl border border-negative shadow-xs"
+                    className="p-4 rounded-lg border border-negative shadow-xs"
                   >
                     <div className="flex items-start gap-3">
                       <div className="w-9 h-9 rounded-pill flex items-center justify-center shrink-0 bg-negative-tint text-negative">
@@ -156,7 +156,7 @@ export function Alertes({ onRetour, revision }: { onRetour: () => void; revision
               return (
                 <Carte
                   key={alerte.cle}
-                  className={`p-4 rounded-2xl border border-hairline/80 shadow-xs hover:shadow-sm transition-all ${style.bordure} ${premier ? 'anim-cascade' : ''}`}
+                  className={`p-4 rounded-lg border border-hairline/80 shadow-xs hover:shadow-sm transition-all ${style.bordure} ${premier ? 'anim-cascade' : ''}`}
                   style={rangCascade(rang, premier)}
                 >
                   <div className="flex items-start gap-3">

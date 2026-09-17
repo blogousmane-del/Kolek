@@ -72,7 +72,7 @@ export function Encaisser({
   return (
     <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-liste">
       {/* En-tête avec dégradé subtil */}
-      <div className="bg-[image:var(--degrade-hero)] px-marge pt-entete pb-5 lg:rounded-3xl lg:pt-6 shadow-md">
+      <div className="bg-[image:var(--degrade-hero)] px-marge pt-entete pb-5 lg:rounded-xl lg:pt-6 shadow-md">
         <div className="flex items-center justify-between mb-1">
           <button
             type="button"
@@ -107,7 +107,7 @@ export function Encaisser({
       ) : (
         <>
           {/* Client */}
-          <div className="mx-4 mt-4 bg-surface rounded-2xl border border-hairline/80 p-4 flex items-center gap-3.5 shadow-sm">
+          <div className="mx-4 mt-4 bg-surface rounded-lg border border-hairline/80 p-4 flex items-center gap-3.5 shadow-sm">
             <Avatar nom={carte.clientNom} className="w-12 h-12 ring-2 ring-hairline" />
             <div className="flex-1 min-w-0">
               <p className="font-headings font-bold text-lg text-ink truncate leading-tight">
@@ -140,7 +140,7 @@ export function Encaisser({
             <p className="text-xs font-body font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 px-0.5">
               Montant de la mise
             </p>
-            <div className="flex items-baseline justify-between bg-surface border border-hairline/80 rounded-2xl px-5 py-3.5 shadow-xs">
+            <div className="flex items-baseline justify-between bg-surface border border-hairline/80 rounded-xl px-5 py-3.5 shadow-xs">
               <span className="font-headings font-bold text-3xl xs:text-4xl text-ink tabular-nums tracking-tight">
                 {formatMontant(carte.mise)}
               </span>
@@ -165,7 +165,7 @@ export function Encaisser({
           {succes && (
             <div
               role="status"
-              className="anim-reussite mx-4 mb-4 rounded-2xl bg-positive-tint border border-positive/30 p-4 flex items-center gap-3 shadow-md"
+              className="anim-reussite mx-4 mb-4 rounded-lg bg-positive-tint border border-positive/30 p-4 flex items-center gap-3 shadow-md"
             >
               <div className="w-10 h-10 rounded-pill bg-positive text-white flex items-center justify-center shrink-0 shadow-xs">
                 <Icone nom="check-circle" taille={22} />

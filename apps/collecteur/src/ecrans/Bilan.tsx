@@ -38,7 +38,7 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
         enfants={
           donnees && (
             <div className="grid grid-cols-2 gap-3 mt-2">
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 p-3.5 min-w-0 shadow-xs">
+              <div className="bg-white/10 backdrop-blur-md rounded-lg border border-white/15 p-3.5 min-w-0 shadow-xs">
                 <div className="flex items-center gap-1 text-white/70 mb-0.5">
                   <Icone nom="bar-chart-2" taille={13} />
                   <p className="text-xs font-body">Encours client</p>
@@ -48,7 +48,7 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
                 </p>
                 <p className="text-white/55 text-[11px] font-body mt-0.5">FCFA à rendre</p>
               </div>
-              <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 p-3.5 min-w-0 shadow-xs">
+              <div className="bg-white/10 backdrop-blur-md rounded-lg border border-white/15 p-3.5 min-w-0 shadow-xs">
                 <div className="flex items-center gap-1 text-white/70 mb-0.5">
                   <Icone nom="users" taille={13} />
                   <p className="text-xs font-body">Cartes actives</p>
@@ -111,7 +111,7 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
               {donnees?.tranches.map((tranche, rang) => (
                 <Carte
                   key={tranche.libelle}
-                  className={`p-5 rounded-2xl border border-hairline/80 shadow-xs hover:shadow-sm transition-all ${
+                  className={`p-5 rounded-lg border border-hairline/80 shadow-xs hover:shadow-sm transition-all ${
                     premier ? 'anim-cascade' : ''
                   }`}
                   style={rangCascade(rang, premier)}

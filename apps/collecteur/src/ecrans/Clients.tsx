@@ -393,7 +393,7 @@ export function Clients({
   return (
     <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-large">
       {/* En-tête sombre immersif */}
-      <div className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pt-entete pb-7 shadow-lg lg:rounded-3xl lg:pt-6">
+      <div className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pt-entete pb-7 shadow-lg lg:rounded-xl lg:pt-6">
         <Rosace
           petales={18}
           excentricite={0.35}
@@ -422,7 +422,7 @@ export function Clients({
       </div>
 
       {/* Résumé — trois nombres clés */}
-      <div className="mx-4 -mt-5 relative z-20 bg-surface rounded-2xl border border-hairline/80 p-3.5 xs:p-4 flex items-center justify-between shadow-md backdrop-blur-xs">
+      <div className="mx-4 -mt-5 relative z-20 bg-surface rounded-xl border border-hairline/80 p-3.5 xs:p-4 flex items-center justify-between shadow-md backdrop-blur-xs">
         <div className="text-center flex-1 min-w-0">
           <p className="text-[11px] text-muted-foreground font-body font-medium mb-0.5">Clients</p>
           {lignes ? (
@@ -504,7 +504,7 @@ export function Clients({
             autoCorrect="off"
             spellCheck={false}
             enterKeyHint="search"
-            className="w-full min-h-11 pl-10 pr-12 bg-surface border-[1.5px] border-hairline/80 rounded-2xl text-champ font-body text-ink shadow-xs placeholder:text-muted-foreground focus:border-primary transition-colors"
+            className="w-full min-h-11 pl-10 pr-12 bg-surface border-[1.5px] border-hairline/80 rounded-md text-champ font-body text-ink shadow-xs placeholder:text-muted-foreground focus:border-primary transition-colors"
           />
           {recherche && (
             <button
@@ -514,7 +514,7 @@ export function Clients({
               // 44 px, comme `Champ` et `ChampTelephone`. La croix faisait
               // 20 px : au marché, à une main, la manquer efface un caractère
               // au lieu du terme, et il faut recommencer.
-              className="absolute right-1 top-1/2 -translate-y-1/2 min-w-11 min-h-11 flex items-center justify-center rounded-2xl text-muted-foreground hover:text-ink cursor-pointer"
+              className="absolute right-1 top-1/2 -translate-y-1/2 min-w-11 min-h-11 flex items-center justify-center rounded-pill text-muted-foreground hover:text-ink cursor-pointer"
             >
               <Icone nom="x" taille={16} />
             </button>
@@ -752,7 +752,7 @@ function LigneClient({
   }
 
   return (
-    <div className="bg-surface rounded-2xl border border-hairline/80 p-4 shadow-xs hover:shadow-sm transition-all">
+    <div className="bg-surface rounded-lg border border-hairline/80 p-4 shadow-xs hover:shadow-sm transition-all">
       <div className="flex items-center gap-3">
       {/* Un `button` et non la carte entière : « Encaisser » et la bascule des
           avis sont déjà des commandes, et un bouton dans un bouton n'est pas du

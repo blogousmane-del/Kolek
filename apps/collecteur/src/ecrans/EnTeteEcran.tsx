@@ -63,7 +63,7 @@ export function EnTeteEcran({
 }) {
   return (
     <div
-      className={`anim-entree bg-[image:var(--degrade-hero)] px-marge pt-entete pb-6 shadow-md lg:mx-auto lg:w-full lg:rounded-3xl lg:pt-6 ${LARGEURS[largeur]}`}
+      className={`anim-entree bg-[image:var(--degrade-hero)] px-marge pt-entete pb-6 shadow-md lg:mx-auto lg:w-full lg:rounded-xl lg:pt-6 ${LARGEURS[largeur]}`}
     >
       <div className="flex items-center gap-3 mb-4">
         <button
@@ -121,8 +121,8 @@ export function RienAMontrer({ icone, titre, detail }: {
   detail: string;
 }) {
   return (
-    <div className="text-center py-12 px-6 bg-surface rounded-2xl border border-hairline/70 shadow-xs max-w-md mx-auto my-4">
-      <div className="w-14 h-14 rounded-2xl bg-secondary mx-auto mb-3.5 flex items-center justify-center text-primary shadow-xs">
+    <div className="text-center py-12 px-6 bg-surface rounded-lg border border-hairline/70 shadow-xs max-w-md mx-auto my-4">
+      <div className="w-14 h-14 rounded-pill bg-secondary mx-auto mb-3.5 flex items-center justify-center text-primary shadow-xs">
         <Icone nom={icone} taille={24} />
       </div>
       <p className="font-headings font-bold text-lg text-ink mb-1">{titre}</p>

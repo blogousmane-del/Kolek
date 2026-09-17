@@ -91,14 +91,14 @@ export function ActionsRapides({ actions, compact = false, anime = false }: Prop
             style={anime ? ({ '--rang': rang } as CSSProperties) : undefined}
             className={`anim-pression group flex flex-col items-center justify-center ${
               compact ? 'gap-1.5 p-2.5' : 'gap-2 p-3 sm:p-3.5'
-            } rounded-2xl bg-surface border border-hairline/80 shadow-xs hover:shadow-sm hover:border-hairline transition-all cursor-pointer ${
+            } rounded-lg bg-surface border border-hairline/80 shadow-xs hover:shadow-sm hover:border-hairline transition-all cursor-pointer ${
               anime ? 'anim-cascade' : ''
             } ${action.onActiver ? 'cursor-pointer' : 'opacity-60 cursor-default'}`}
           >
             <div
               className={`${
                 compact ? 'w-10 h-10' : 'w-12 h-12'
-              } rounded-2xl ${styleIcone.fond} ${styleIcone.icone} border ${styleIcone.bordure} flex items-center justify-center transition-transform duration-200 group-hover:scale-105`}
+              } rounded-pill ${styleIcone.fond} ${styleIcone.icone} border ${styleIcone.bordure} flex items-center justify-center transition-transform duration-200 group-hover:scale-105`}
             >
               <Icone nom={action.icone} taille={compact ? 18 : 22} />
             </div>

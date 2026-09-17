@@ -131,7 +131,7 @@ export function Accueil({
   return (
     <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-large">
       {/* En-tête sombre immersif */}
-      <div className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pt-entete pb-7 shadow-lg lg:rounded-3xl lg:pt-6">
+      <div className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pt-entete pb-7 shadow-lg lg:rounded-xl lg:pt-6">
         {/* Rosace décorative en filigrane */}
         <Rosace
           petales={18}
@@ -187,7 +187,7 @@ export function Accueil({
       </div>
 
       {/* Résumé du jour — trois indicateurs avec badges d'icônes */}
-      <div className="mx-4 -mt-5 relative z-20 bg-surface rounded-2xl border border-hairline/80 p-3.5 xs:p-4 grid grid-cols-3 gap-2 xs:gap-3 shadow-md backdrop-blur-xs">
+      <div className="mx-4 -mt-5 relative z-20 bg-surface rounded-xl border border-hairline/80 p-3.5 xs:p-4 grid grid-cols-3 gap-2 xs:gap-3 shadow-md backdrop-blur-xs">
         <div className="text-center min-w-0">
           <div className="flex items-center justify-center gap-1 mb-1 text-muted-foreground">
             <Icone nom="users" taille={13} />
