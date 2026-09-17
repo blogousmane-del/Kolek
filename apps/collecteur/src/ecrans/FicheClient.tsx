@@ -133,7 +133,17 @@ export function FicheClient({
     try {
       const lue = await chargerFicheClient(clientId);
       if (lue === null) {
-        setErreur('Fiche introuvable. Elle a peut-être été supprimée.');
+        // `null` a deux causes qu'on ne peut pas distinguer ici : le client a
+        // été supprimé, ou cette tournée n'a jamais été chargée sur ce
+        // téléphone. Hors ligne, la seconde est la seule plausible — dire
+        // « supprimée » à un collecteur qui a le client sous les yeux lui
+        // apprend que l'écran se trompe. Le message juste existait déjà six
+        // lignes plus bas, dans le `catch` ; il sert ici aussi.
+        setErreur(
+          navigator.onLine === false
+            ? 'Fiche indisponible sur ce téléphone. Connecte-toi une fois au réseau pour la charger.'
+            : 'Fiche introuvable. Elle a peut-être été supprimée.',
+        );
         return;
       }
       setFiche(lue);
