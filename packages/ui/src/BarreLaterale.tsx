@@ -186,7 +186,7 @@ function Section({
 }) {
   return (
     <div className={className}>
-      <p className="text-xs font-body font-semibold uppercase tracking-widest text-white/30 px-2 mb-2">
+      <p className="text-xs font-body font-semibold uppercase tracking-widest text-white/55 px-2 mb-2">
         {titre}
       </p>
       {entrees.map((entree) => {
@@ -289,7 +289,7 @@ function SelecteurEspace({
         <span className="text-white/80 text-sm font-body font-medium truncate">
           {courant.libelle}
         </span>
-        <Icone nom="chevrons-up-down" taille={14} className="text-white/50 flex-shrink-0" />
+        <Icone nom="chevrons-up-down" taille={14} className="text-white/55 flex-shrink-0" />
       </button>
 
       {ouvert && (
@@ -442,7 +442,7 @@ export function BarreLaterale({
           onClick={onDeconnexion}
           className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer"
         >
-          <Icone nom="log-out" className="text-white/50" />
+          <Icone nom="log-out" className="text-white/55" />
           <span className="text-base font-body font-medium text-white/60">Déconnexion</span>
         </button>
       </div>

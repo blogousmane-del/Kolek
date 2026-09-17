@@ -69,23 +69,47 @@ export const couleurs = {
   negativeTint: '#F6E4DF',
   info: '#3D6E8E',
   infoTint: '#E6EEF4',
-  // Deux familles fonctionnelles, ajoutées le 2026-09-09 pour `ActionsRapides`.
+  // Les quatre aplats de tuile — Design System §3.1, révisé le 2026-09-17.
   //
-  // L'écran d'accueil du collecteur affiche huit boutons ensemble. Cinq
-  // portaient des hexadécimaux en dur ; les ramener aux jetons sémantiques
-  // existants aurait rendu *Retrait* et *Bilan* identiques — deux boutons
-  // voisins, dont l'un sort de l'argent. La palette sémantique décrit des
-  // **états** (succès, erreur, information) ; elle n'a jamais eu vocation à
-  // distinguer neuf destinations.
+  // ## Ce qu'ils remplacent
   //
-  // `ocre` n'est pas l'or. `or` est une couleur de marque, que le Design
-  // System §1 interdit sur les surfaces qui manipulent l'argent ; `ocre` est
-  // beaucoup plus sombre et sert de repère fonctionnel, jamais d'ornement. Un
-  // test tient cet écart plutôt qu'un commentaire.
-  ardoise: '#475569',
-  ardoiseTint: '#EFF2F9',
-  ocre: '#7D6B35',
-  ocreTint: '#F8F5EC',
+  // `ardoise`/`ardoiseTint` et `ocre`/`ocreTint`, posés le 2026-09-09 pour
+  // `ActionsRapides`. Leur raison d'être tenait : la palette sémantique décrit
+  // des **états** (succès, erreur, information), et n'a jamais eu vocation à
+  // distinguer des **destinations**. C'est leur emploi qui a échoué.
+  //
+  // Les tuiles empruntaient alors les teintes d'alerte comme fonds, et ces
+  // teintes sont conçues pour porter un message par-dessus, pas pour être vues
+  // les unes à côté des autres. Sur l'épreuve d'écran du 2026-09-17, quatre
+  // familles s'y lisaient comme **trois** : `positiveTint` (#E6F3EC) et
+  // `secondary` (#E8F0EA) ne diffèrent que de sept unités sur un canal, et
+  // *Encaisser* était donc de la même couleur que *Souscrire*. Une famille
+  // qu'on ne distingue pas ne classe rien.
+  //
+  // ## Comment ces quatre-là sont choisis
+  //
+  // Quatre teintes, franchement séparées — au moins vingt-sept unités d'écart
+  // sur un canal entre deux fonds quelconques — et à luminance voisine, entre
+  // 0,735 et 0,784. Les deux conditions vont ensemble : l'écart fait qu'on les
+  // distingue en couleur, la luminance proche fait qu'aucune ne saute au visage
+  // ni ne disparaît en niveaux de gris, ce qui est la vue d'un daltonien comme
+  // celle d'un téléphone en plein soleil.
+  //
+  // Chaque encre tient **4,5:1 sur son propre fond**, et non 3:1 : ces couleurs
+  // portent maintenant le libellé de la tuile, pas seulement son icône. C'est ce
+  // qui a changé avec la forme — l'aplat est la tuile, le texte vit dedans.
+  //
+  // `tuileGestionEncre` n'est pas l'or, et le test le tient : `or` est une
+  // couleur de marque que le Design System §1 interdit sur les surfaces qui
+  // manipulent l'argent.
+  tuileArgent: '#CBE5D4',
+  tuileArgentEncre: '#14563A',
+  tuileClient: '#F0DCE4',
+  tuileClientEncre: '#8A3A5E',
+  tuileAnalyse: '#D2E2F4',
+  tuileAnalyseEncre: '#2A5480',
+  tuileGestion: '#F1E4C9',
+  tuileGestionEncre: '#6A5218',
   // Data-viz — une échelle de clarté, et non quatre teintes à la même
   // luminance. Refondue le 2026-09-04.
   //
@@ -281,9 +305,58 @@ export const taillesTexte = {
   '8xl': 'clamp(48px, 15vw, 120px)', // Metric XL
 } as const;
 
+/**
+ * Les deux familles du produit, **changées le 2026-09-17**.
+ *
+ * ## Ce qui part, et pourquoi
+ *
+ * Plus Jakarta Sans et Sora. La paire est lisible, et ce n'est pas ce qu'on lui
+ * reproche : c'est qu'elle est le duo par défaut de tous les générateurs de
+ * maquette depuis 2022. Elle ne dit rien de Kolek, et quiconque en a vu trois
+ * la reconnaît. Une marque qui porte la police de tout le monde n'en porte
+ * aucune.
+ *
+ * ## Ce qui arrive
+ *
+ * **Bricolage Grotesque** pour les titres et les montants. C'est un grotesque
+ * de caractère, avec des chiffres larges et fermés qui tiennent en plein
+ * soleil, là où le « 0 » et le « 8 » de Sora se confondent à distance de bras.
+ *
+ * **Instrument Sans** pour le corps et l'interface. Plus étroite que Jakarta à
+ * taille égale : sur un Galaxy A03 de 360 px, il entre plus de nom de client
+ * par ligne avant la troncature, ce qui est la contrainte quotidienne de la
+ * liste des clients.
+ *
+ * ## Le poids réseau, mesuré et non supposé
+ *
+ * Les deux sont **variables**, et la version `wght` seule est employée :
+ *
+ * | | fichiers latins | octets |
+ * |---|---|---|
+ * | Avant : Jakarta 400/500/600/700 + Sora 700 | 5 | 63 688 |
+ * | Après : Bricolage + Instrument Sans | 2 | 71 436 |
+ *
+ * C'est donc **7,7 ko de plus**, pas de moins, et il faut le dire ainsi : trois
+ * requêtes économisées, une graisse continue de 200 à 800 au lieu de quatre
+ * crans figés, contre douze pour cent de téléchargement en plus au premier
+ * chargement. Sur la 3G d'Abidjan, un sixième de seconde, une seule fois : le
+ * service worker garde les fichiers ensuite.
+ *
+ * Les jeux `opsz` et `wdth` de Bricolage — taille optique et largeur — ne sont
+ * **pas** pris : le fichier tous axes pèse 131 ko à lui seul, soit plus que les
+ * cinq fichiers d'avant réunis. Ce sont de belles possibilités qui ne valent
+ * pas leur prix sur le téléphone où ce produit passe sa vie.
+ *
+ * ## Le suffixe « Variable » n'est pas décoratif
+ *
+ * C'est le nom que Fontsource donne à ses familles variables, et il diffère de
+ * la famille statique du même nom. L'omettre laisserait la déclaration tomber
+ * silencieusement sur le repli système, sans qu'aucun test ne le voie — c'est
+ * exactement la panne que ce dépôt appelle une sonde muette.
+ */
 export const polices = {
-  body: "'Plus Jakarta Sans', 'Inter', system-ui, sans-serif",
-  headings: "'Sora', 'Plus Jakarta Sans', system-ui, sans-serif",
+  body: "'Instrument Sans Variable', system-ui, sans-serif",
+  headings: "'Bricolage Grotesque Variable', 'Instrument Sans Variable', system-ui, sans-serif",
 } as const;
 
 /**

@@ -88,7 +88,7 @@ export function Feuille({
         aria-modal="true"
         aria-label={titre}
         tabIndex={-1}
-        className="anim-feuille relative z-10 w-full sm:max-w-liste max-h-[92dvh] sm:max-h-[85dvh] flex flex-col bg-surface rounded-t-2xl sm:rounded-2xl shadow-lg outline-none overflow-hidden"
+        className="anim-feuille relative z-10 w-full sm:max-w-liste max-h-[92dvh] sm:max-h-[85dvh] flex flex-col bg-surface rounded-t-xl sm:rounded-xl shadow-lg outline-none overflow-hidden"
       >
         {/* La poignée. Purement visuelle — elle ne se saisit pas — mais elle
             dit d'un coup d'œil que l'objet se referme vers le bas. */}

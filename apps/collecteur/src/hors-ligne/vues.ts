@@ -500,7 +500,7 @@ export function refusAffichables(
     carteId === null ? null : nomDuClient(clientDeCarte.get(carteId) ?? null);
   /** « Awa — mise de 1 000 FCFA », ou « Mise de 1 000 FCFA » quand le nom manque. */
   const pour = (nom: string | null, quoi: string) =>
-    nom === null ? quoi.charAt(0).toUpperCase() + quoi.slice(1) : `${nom} — ${quoi}`;
+    nom === null ? quoi.charAt(0).toUpperCase() + quoi.slice(1) : `${nom} : ${quoi}`;
 
   const titre = (cu: Brut | null): string => {
     const charge = champ(cu, 'charge');
@@ -527,7 +527,7 @@ export function refusAffichables(
       const date = texte(charge, 'date');
       const declare = nombre(charge, 'cashDeclare');
       if (date !== null && declare !== null) {
-        return `Caisse du ${date} — ${formatMontant(declare)} FCFA déclarés`;
+        return `Caisse du ${date} : ${formatMontant(declare)} FCFA déclarés`;
       }
     }
     return 'Opération refusée';

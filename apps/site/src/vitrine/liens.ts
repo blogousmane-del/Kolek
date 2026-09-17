@@ -44,4 +44,4 @@ export function inscriptionPour(palier: string): string {
  * — pour qui préfère écrire — mais n'est plus jamais le geste principal.
  */
 export const CONTACT_DEMO =
-  'mailto:gsmtechnoloy@gmail.com?subject=Kolek%20—%20demande%20de%20démo';
+  'mailto:gsmtechnoloy@gmail.com?subject=Kolek%20-%20demande%20de%20démo';

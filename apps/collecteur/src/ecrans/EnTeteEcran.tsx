@@ -29,10 +29,28 @@ export type LargeurEcran = keyof typeof LARGEURS;
  * entré dans « Bilan » n'aurait aucun moyen d'en sortir sans passer par la barre
  * du bas — qui ne montre pas cet écran.
  *
- * À partir de `lg`, le bandeau sombre s'arrondit et se détache des bords :
- * collé aux angles d'un écran de 1 440 px, il se lit comme une barre de
- * navigateur plutôt que comme un en-tête. L'accueil le faisait déjà seul ; la
- * règle remonte ici pour valoir sur les dix écrans.
+ * ## Il est clair depuis le 2026-09-17, et c'était le défaut central
+ *
+ * Il portait le même bandeau vert dégradé que l'accueil, avec la même pastille
+ * de verre et la même ombre. Comme il sert onze écrans, et que l'accueil, la
+ * liste des clients et l'encaissement portaient le même bloc chacun de leur
+ * côté, **quatorze écrans s'ouvraient exactement pareil**. Aucun n'avait
+ * d'identité propre : « Reçus », « Bilan » et « Mot de passe oublié »
+ * commençaient par la même image.
+ *
+ * Un gabarit estampillé quatorze fois se reconnaît avant qu'on ait lu un mot,
+ * et c'est ce qui fait dire d'un produit qu'il a été engendré.
+ *
+ * Le dégradé reste donc à deux endroits, et deux seulement : l'accueil, qui
+ * ouvre la journée, et l'encaissement, qui est le geste qui la paie. Partout
+ * ailleurs l'en-tête est une bande claire, posée sur le même fond que la page
+ * qu'elle titre.
+ *
+ * Ce qui disparaît avec le fond sombre, et qu'on ne remplace pas : l'ombre —
+ * un filet suffit à séparer deux surfaces de même clarté — le flou
+ * d'arrière-plan du bouton de retour, qui coûtait une repeinte à chaque
+ * défilement sur le téléphone d'entrée de gamme, et l'arrondi de bureau, qui
+ * n'a plus d'objet puisque la bande ne se détache plus du fond.
  */
 export function EnTeteEcran({
   titre,
@@ -63,20 +81,22 @@ export function EnTeteEcran({
 }) {
   return (
     <div
-      className={`anim-entree bg-[image:var(--degrade-hero)] px-marge pt-entete pb-6 shadow-md lg:mx-auto lg:w-full lg:rounded-3xl lg:pt-6 ${LARGEURS[largeur]}`}
+      className={`anim-entree bg-canvas border-b border-hairline px-marge pt-entete pb-4 lg:mx-auto lg:w-full lg:pt-6 ${LARGEURS[largeur]}`}
     >
-      <div className="flex items-center gap-3 mb-4">
+      <div className={`flex items-center gap-3 ${enfants ? 'mb-4' : ''}`}>
         <button
           type="button"
           onClick={onRetour}
           aria-label={libelleRetour}
-          className="anim-pression w-10 h-10 rounded-pill bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-md flex items-center justify-center cursor-pointer shrink-0 transition-colors shadow-xs"
+          className="anim-pression w-10 h-10 rounded-pill bg-surface border border-hairline flex items-center justify-center cursor-pointer shrink-0"
         >
-          <Icone nom="arrow-left" className="text-white" taille={18} />
+          <Icone nom="arrow-left" className="text-ink" taille={18} />
         </button>
         <div className="min-w-0">
-          <p className="text-white font-headings font-bold text-xl tracking-tight truncate">{titre}</p>
-          {sousTitre && <p className="text-white/70 text-xs font-body truncate mt-0.5">{sousTitre}</p>}
+          <p className="font-headings font-bold text-xl text-ink tracking-tight truncate">{titre}</p>
+          {sousTitre && (
+            <p className="text-xs font-body text-muted-foreground truncate mt-0.5">{sousTitre}</p>
+          )}
         </div>
       </div>
       {enfants}
@@ -121,8 +141,8 @@ export function RienAMontrer({ icone, titre, detail }: {
   detail: string;
 }) {
   return (
-    <div className="text-center py-12 px-6 bg-surface rounded-2xl border border-hairline/70 shadow-xs max-w-md mx-auto my-4">
-      <div className="w-14 h-14 rounded-2xl bg-secondary mx-auto mb-3.5 flex items-center justify-center text-primary shadow-xs">
+    <div className="text-center py-12 px-6 bg-surface rounded-lg border border-hairline/70 shadow-xs max-w-md mx-auto my-4">
+      <div className="w-14 h-14 rounded-pill bg-secondary mx-auto mb-3.5 flex items-center justify-center text-primary shadow-xs">
         <Icone nom={icone} taille={24} />
       </div>
       <p className="font-headings font-bold text-lg text-ink mb-1">{titre}</p>

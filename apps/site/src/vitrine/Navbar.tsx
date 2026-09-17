@@ -64,9 +64,20 @@ export function Navbar() {
     <>
       {/* `max-w` et `whitespace-nowrap` : sans eux, « Se connecter » passait sur
           deux lignes sous 360 px, doublant la hauteur de la pilule — qui venait
-          alors couvrir le titre de la carte défilant dessous. */}
+          alors couvrir le titre de la carte défilant dessous.
+
+          `w-max` corrige un défaut mesuré le 2026-09-17 sur la production comme
+          sur l’aperçu : « Ouvrir un compte » se cassait sur deux lignes dès le
+          bureau, et désalignait toute la rangée. La cause n’est pas le texte,
+          c’est la largeur disponible. Un élément `fixed` posé à `left: 50%` sans
+          largeur se calcule sur ce qui reste à sa droite, c’est-à-dire la moitié
+          de l’écran — 640 px sur un 1280. La pilule y était donc à l’étroit et
+          comprimait ses éléments, alors qu’elle paraissait centrée, parce que
+          `-translate-x-1/2` la recentre après coup, sans rien rendre à la mise en
+          page. `width: max-content` lui rend sa largeur propre ; le `max-w`
+          au-dessus continue de la borner sur téléphone. */}
       <nav
-        className={`fixed left-1/2 top-3 z-40 flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-1 rounded-pill py-1.5 pl-3 pr-1.5 transition-all duration-500 sm:top-4 sm:py-2 sm:pl-5 sm:pr-2 ${
+        className={`fixed left-1/2 top-3 z-40 flex w-max max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-1 rounded-pill py-1.5 pl-3 pr-1.5 transition-all duration-500 sm:top-4 sm:py-2 sm:pl-5 sm:pr-2 ${
           surLeHero
             ? 'bg-dark-canvas/30 backdrop-blur-sm'
             : 'border border-white/10 bg-dark-canvas/70 shadow-lg backdrop-blur-xl'

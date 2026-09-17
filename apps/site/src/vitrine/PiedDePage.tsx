@@ -36,7 +36,7 @@ export function PiedDePage() {
       <div className="grid gap-10 md:grid-cols-3">
         <div>
           <Logo className="mb-2 h-9 text-white" />
-          <p className="max-w-xs font-body text-sm leading-relaxed text-white/50">
+          <p className="max-w-xs font-body text-sm leading-relaxed text-white/55">
             L’épargne du marché, enfin sécurisée. Un produit GTCS, construit à Abidjan pour les
             banquiers ambulants de Côte d’Ivoire.
           </p>
@@ -47,7 +47,7 @@ export function PiedDePage() {
             {/* En typographie de texte, pas en monospace majuscule espacé : c'est
                 un intitulé de colonne de pied de page, la structure la plus
                 ordinaire qui soit, et rien n'y demandait d'insister. */}
-            <p className="mb-3 font-body text-sm font-semibold text-white/50">{colonne.titre}</p>
+            <p className="mb-3 font-body text-sm font-semibold text-white/55">{colonne.titre}</p>
             <ul className="flex flex-col gap-2">
               {colonne.liens.map((lien) => (
                 <li key={lien.libelle}>

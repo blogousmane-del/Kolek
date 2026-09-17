@@ -216,7 +216,7 @@ export function DetailCollecteur({
         <div className="flex flex-col gap-4">
           <Carte className="p-5">
             <BarreEmpilee
-              titre={`Répartition — ${collecteur.nom}`}
+              titre={`Répartition de ${collecteur.nom}`}
               periode="Depuis l’ouverture"
               total={formatMontant(sommeParts)}
               parts={repartition}

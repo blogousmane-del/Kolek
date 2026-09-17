@@ -1,8 +1,15 @@
-import '@fontsource/plus-jakarta-sans/400.css';
-import '@fontsource/plus-jakarta-sans/500.css';
-import '@fontsource/plus-jakarta-sans/600.css';
-import '@fontsource/plus-jakarta-sans/700.css';
-import '@fontsource/sora/700.css';
+// Les deux familles du produit, en variable et en `wght` seul.
+//
+// Deux fichiers au lieu de cinq, et une graisse continue au lieu de quatre
+// crans. La feuille déclare un `unicode-range` par sous-ensemble : le
+// navigateur ne télécharge le latin étendu et le vietnamien que si la page en
+// affiche un signe, ce qu'elle ne fait jamais ici.
+//
+// Les jeux `opsz` et `wdth` de Bricolage ne sont pas pris : leur fichier pèse
+// 131 ko à lui seul. Le pourquoi du choix est dans `packages/core/src/tokens.ts`,
+// avec les mesures.
+import '@fontsource-variable/bricolage-grotesque/wght.css';
+import '@fontsource-variable/instrument-sans/wght.css';
 // La voix dramatique de la vitrine et la voix des données (monospace). En
 // paquets npm comme les autres : la CSP interdit `font-src` distant, et c'est
 // tant mieux — aucun appel tiers avant le premier octet.

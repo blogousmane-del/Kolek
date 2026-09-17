@@ -33,7 +33,7 @@ const MESSAGES: Record<string, string> = {
   VERIFICATION_IMPOSSIBLE: "Impossible de vérifier les droits d'accès.",
   LECTURE_IMPOSSIBLE: 'La base n’a pas pu rendre les demandes.',
   MISE_A_JOUR_IMPOSSIBLE: 'La demande n’a pas pu être mise à jour.',
-  DEMANDE_INTROUVABLE: 'Cette demande n’existe plus — elle a peut-être été traitée ailleurs.',
+  DEMANDE_INTROUVABLE: 'Cette demande n’existe plus. Elle a peut-être été traitée ailleurs.',
   STATUT_INVALIDE: 'Ce statut n’est pas reconnu.',
   JETON_ABSENT: 'Session expirée. Reconnecte-toi.',
   CONFIGURATION: 'Le serveur est mal configuré.',

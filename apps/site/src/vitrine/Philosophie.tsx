@@ -55,7 +55,7 @@ export function Philosophie() {
       </div>
 
       <div className="relative z-10 mx-auto max-w-4xl">
-        <p className="mb-10 font-body text-lg text-white/50 sm:text-xl">
+        <p className="mb-10 font-body text-lg text-white/55 sm:text-xl">
           <EnMots texte={NEUTRE} />
         </p>
         {/* Même réserve que dans le hero : le `j` de « juste » touchait le bas

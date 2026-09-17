@@ -167,7 +167,7 @@ describe('ce que l’accueil signale de la file (§8.4, §8.7, §8.8)', () => {
     const onNaviguer = vi.fn();
     rendre({ onNaviguer });
 
-    fireEvent.click(await screen.findByRole('button', { name: '2 opérations refusées — à voir' }));
+    fireEvent.click(await screen.findByRole('button', { name: '2 opérations refusées, à voir' }));
 
     expect(onNaviguer).toHaveBeenCalledWith('alertes');
   });

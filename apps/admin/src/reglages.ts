@@ -152,7 +152,7 @@ export function messageDeRefus(message: string): string {
   if (/pwned|leaked|compromised|data breach/i.test(message)) {
     return (
       'Ce mot de passe figure dans des fuites de données publiques. ' +
-      'Le serveur le refuse — choisis-en un autre.'
+      'Le serveur le refuse. Choisis-en un autre.'
     );
   }
   if (/at least|too short|length/i.test(message)) {
@@ -207,7 +207,7 @@ export function lireEnvironnement(): Environnement {
       { nom: 'admin-creer-collecteur', methode: 'POST', role: 'Créer un compte collecteur' },
       { nom: 'admin-modifier-collecteur', methode: 'POST', role: 'Corriger une fiche, suspendre un abonnement' },
       { nom: 'admin-supprimer-collecteur', methode: 'POST', role: 'Retirer un compte sans historique d’argent' },
-      { nom: 'admin-reglages', methode: 'GET', role: 'État de la plateforme — cet écran' },
+      { nom: 'admin-reglages', methode: 'GET', role: 'État de la plateforme (cet écran)' },
       { nom: 'collecteur-cloturer-carte', methode: 'POST', role: 'Clôturer une carte et restituer le solde' },
     ],
   };

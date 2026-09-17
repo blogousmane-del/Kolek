@@ -127,7 +127,7 @@ export function EcranConnexion({
 
       <form
         onSubmit={soumettre}
-        className="relative z-10 w-full max-w-formulaire rounded-2xl border border-white/10 bg-white/[0.04] p-6 shadow-lg backdrop-blur-xl"
+        className="relative z-10 w-full max-w-formulaire rounded-xl border border-white/10 bg-white/[0.04] p-6 shadow-lg backdrop-blur-xl"
       >
         <div className="mb-6 flex items-center gap-3">
           {/* La pièce seule : le texte à côté est le titre de l'écran, pas le
@@ -135,7 +135,7 @@ export function EcranConnexion({
           <Marque className="h-9 w-9 shrink-0" />
           <div>
             <h1 className="font-headings text-xl font-bold leading-tight text-white">{titre}</h1>
-            <p className="font-body text-sm text-white/50">{sousTitre}</p>
+            <p className="font-body text-sm text-white/55">{sousTitre}</p>
           </div>
         </div>
 
@@ -153,7 +153,7 @@ export function EcranConnexion({
 
             <div className="mb-4 flex items-center gap-3">
               <span className="h-px flex-1 bg-white/10" />
-              <span className="font-mono text-[10px] tracking-widest text-white/30">OU</span>
+              <span className="font-mono text-[10px] tracking-widest text-white/55">OU</span>
               <span className="h-px flex-1 bg-white/10" />
             </div>
           </>
@@ -211,7 +211,7 @@ export function EcranConnexion({
         {retourAccueil && (
           <a
             href={retourAccueil}
-            className="mt-5 block text-center font-body text-sm text-white/40 transition-colors hover:text-white/70"
+            className="mt-5 block text-center font-body text-sm text-white/55 transition-colors hover:text-white/70"
           >
             ← Retour à l’accueil
           </a>

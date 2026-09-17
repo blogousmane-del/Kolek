@@ -366,7 +366,7 @@ function Editeur({
               , pour un abonnement de{' '}
               <strong className="tabular-nums">{formatMontant(abonnement)} FCFA</strong>
               {projection > abonnement && (
-                <> — soit {Math.round(projection / abonnement)} fois son prix.</>
+                <>, soit {Math.round(projection / abonnement)} fois son prix.</>
               )}
             </>
           )}

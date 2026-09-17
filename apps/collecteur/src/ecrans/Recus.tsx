@@ -81,7 +81,7 @@ export function Recus({ onRetour, revision }: { onRetour: () => void; revision: 
               return (
                 <Carte
                   key={recu.id}
-                  className={`p-0 rounded-2xl border border-hairline/80 shadow-xs hover:shadow-sm overflow-hidden transition-all ${premier ? 'anim-cascade' : ''}`}
+                  className={`p-0 rounded-lg border border-hairline/80 shadow-xs overflow-hidden ${premier ? 'anim-cascade' : ''}`}
                   style={rangCascade(rang, premier)}
                 >
                   <button

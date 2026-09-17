@@ -992,7 +992,7 @@ function CartesEnCours({
         <div className="bg-positive-tint rounded-md p-3 mt-3 space-y-3">
           <div>
             <p className="font-body text-sm text-ink m-0">
-              Cycle terminé — {MISES_PAR_CYCLE} mises sur {MISES_PAR_CYCLE}.
+              Cycle terminé : {MISES_PAR_CYCLE} mises sur {MISES_PAR_CYCLE}.
             </p>
             <p className="font-body text-xs text-muted-foreground mt-1">
               Tu peux lui rendre ses {solde} FCFA, ou lui activer une carte de plus juste en

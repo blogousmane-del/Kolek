@@ -310,7 +310,7 @@ const MESSAGES_CREATION: Record<string, string> = {
   TELEPHONE_DEJA_PRIS: 'Un autre collecteur porte déjà ce numéro.',
   MOT_DE_PASSE_COURT: 'Le mot de passe doit faire au moins 10 caractères.',
   NOM_REQUIS: 'Le nom du collecteur est obligatoire.',
-  TELEPHONE_REQUIS: 'Le téléphone est obligatoire — il identifie le collecteur.',
+  TELEPHONE_REQUIS: 'Le téléphone est obligatoire : il identifie le collecteur.',
   NOM_TROP_LONG: 'Le nom dépasse 120 caractères.',
   TELEPHONE_TROP_LONG: 'Le téléphone dépasse 64 caractères.',
   ZONE_TROP_LONGUE: 'La zone dépasse 80 caractères.',

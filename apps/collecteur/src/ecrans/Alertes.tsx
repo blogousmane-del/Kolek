@@ -94,14 +94,14 @@ export function Alertes({ onRetour, revision }: { onRetour: () => void; revision
                 {refusees.map((r) => (
                   <Carte
                     key={r.id}
-                    className="p-4 rounded-2xl border border-negative shadow-xs"
+                    className="p-4 rounded-lg border border-negative shadow-xs"
                   >
                     <div className="flex items-start gap-3">
                       <div className="w-9 h-9 rounded-pill flex items-center justify-center shrink-0 bg-negative-tint text-negative">
                         <Icone nom="alert-circle" taille={18} />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">
+                        <p className="text-xs font-body font-semibold text-muted-foreground mb-0.5">
                           Refusée
                         </p>
                         <p className="font-headings font-bold text-base text-ink mb-1">{r.titre}</p>
@@ -156,7 +156,7 @@ export function Alertes({ onRetour, revision }: { onRetour: () => void; revision
               return (
                 <Carte
                   key={alerte.cle}
-                  className={`p-4 rounded-2xl border border-hairline/80 shadow-xs hover:shadow-sm transition-all ${style.bordure} ${premier ? 'anim-cascade' : ''}`}
+                  className={`p-4 rounded-lg border border-hairline/80 shadow-xs ${style.bordure} ${premier ? 'anim-cascade' : ''}`}
                   style={rangCascade(rang, premier)}
                 >
                   <div className="flex items-start gap-3">
@@ -166,7 +166,7 @@ export function Alertes({ onRetour, revision }: { onRetour: () => void; revision
                       <Icone nom={style.icone} taille={18} />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-xs font-body font-semibold uppercase tracking-widest text-muted-foreground mb-0.5">
+                      <p className="text-xs font-body font-semibold text-muted-foreground mb-0.5">
                         {LIBELLE[alerte.gravite]}
                       </p>
                       <p className="font-headings font-bold text-base text-ink mb-1">

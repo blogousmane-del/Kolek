@@ -105,7 +105,7 @@ export function Plus({ onRetour, onDeconnexion, onAbonnement }: {
                     {profil.titulaireId && (
                       <Ligne
                         terme="Équipe"
-                        valeur="Collaborateur — la commission revient à ton titulaire"
+                        valeur="Collaborateur : la commission revient à ton titulaire"
                       />
                     )}
                     {tarif && (
