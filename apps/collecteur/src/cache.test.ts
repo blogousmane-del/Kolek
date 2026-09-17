@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { cleanup, renderHook, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PEREMPTION_MS, ecrireCache, lireCache, tailleCache, viderCache } from './cache';
+import { PEREMPTION_MS, ecrireCache, lireCache, tailleCache, useDonnees, viderCache } from './cache';
 
 /**
  * Le cache de navigation.
@@ -121,5 +122,169 @@ describe('la déconnexion', () => {
     expect(tailleCache()).toBe(0);
     expect(lireCache('bilan')).toBeNull();
     expect(lireCache('recus')).toBeNull();
+  });
+});
+
+/**
+ * `useDonnees` hors ligne.
+ *
+ * Le défaut corrigé : sans valeur gardée, le hook lançait la requête même en
+ * sachant le réseau absent. `postgrest-js` la retente trois fois — sept
+ * secondes — et pendant ce temps `donnees` et `erreur` valent tous deux `null`,
+ * l'état exact dans lequel les écrans affichent leur squelette. L'écran ne
+ * restait pas muet : il **promettait** des données impossibles.
+ *
+ * Mais huit des quatorze appels seulement lisent le réseau — les six autres
+ * lisent IndexedDB par `lectureCourante()` et réussissent hors ligne. Couper la
+ * requête sans discernement casserait ces six-là. `besoinReseau` porte cette
+ * distinction : seuls les appels qui le déclarent sont concernés par le
+ * court-circuit ; absent, il vaut `false` et rien n'est coupé (spec §3.1).
+ *
+ * L'épreuve qui compte, pour un appel réseau, est
+ * `expect(chargeur).not.toHaveBeenCalled()`. On n'affirme pas « c'est plus
+ * rapide » — un délai ne s'éprouve pas — on affirme que la requête n'a pas
+ * lieu. Pour un appel qui ne déclare pas `besoinReseau`, c'est l'inverse qui
+ * compte : la requête doit avoir lieu, hors ligne comme en ligne.
+ */
+describe('useDonnees hors ligne', () => {
+  const MESSAGE = 'Cet écran demande le réseau.';
+
+  const couper = () =>
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+
+  afterEach(() => {
+    cleanup();
+    delete (window.navigator as unknown as { onLine?: boolean }).onLine;
+  });
+
+  it('avec besoinReseau, sans rien de gardé, pose l’erreur sans lancer la requête', async () => {
+    couper();
+    const chargeur = vi.fn().mockResolvedValue({ encaisse: 12_000 });
+
+    const { result } = renderHook(() =>
+      useDonnees('bilan', chargeur, { messageErreur: MESSAGE, besoinReseau: true }),
+    );
+
+    await waitFor(() => expect(result.current.erreur).toBe(MESSAGE));
+    expect(chargeur).not.toHaveBeenCalled();
+    expect(result.current.donnees).toBeNull();
+    expect(result.current.enCours).toBe(false);
+  });
+
+  it('sans besoinReseau, sans rien de gardé, lance quand même la requête (les six lectures de disque)', async () => {
+    // C'est le cas des six chargeurs qui lisent IndexedDB via `lectureCourante()`
+    // et n'ont jamais besoin du réseau : `Accueil`, `commission.ts` (×3), `Plus`,
+    // `Rapprochement`. `besoinReseau` absent doit valoir `false` et ne rien
+    // couper — c'est le sens sûr de l'erreur (spec §3.1).
+    couper();
+    const chargeur = vi.fn().mockResolvedValue({ encaisse: 12_000 });
+
+    const { result } = renderHook(() => useDonnees('bilan', chargeur, { messageErreur: MESSAGE }));
+
+    await waitFor(() => expect(result.current.donnees).toEqual({ encaisse: 12_000 }));
+    expect(chargeur).toHaveBeenCalledTimes(1);
+    expect(result.current.erreur).toBeNull();
+  });
+
+  it('avec une valeur gardée périmée par le temps, l’affiche, retente en fond, et l’échec ne pose aucune erreur', async () => {
+    // Une valeur fraîche sort plus tôt sur `if (garde.frais) return;`, avant
+    // d'atteindre la garde hors-ligne : elle ne prouve donc rien sur elle.
+    // Une valeur périmée par le temps continue, tente une revalidation — qui
+    // échoue ici — et ce sont ses conséquences qu'on vérifie.
+    const valeur = { encaisse: 12_000 };
+    ecrireCache('bilan', valeur, 0, Date.now() - PEREMPTION_MS - 1);
+    couper();
+    const chargeur = vi.fn().mockRejectedValue(new Error('réseau coupé'));
+
+    const { result } = renderHook(() =>
+      useDonnees('bilan', chargeur, { messageErreur: MESSAGE, besoinReseau: true }),
+    );
+
+    await waitFor(() => expect(chargeur).toHaveBeenCalledTimes(1));
+    expect(result.current.donnees).toEqual(valeur);
+    expect(result.current.erreur).toBeNull();
+  });
+
+  it('avec besoinReseau et le réseau présent, lance bien la requête', async () => {
+    // La contre-épreuve de la première du bloc : même déclaration de
+    // `besoinReseau`, mais en ligne. Sans elle, remplacer la garde de
+    // `cache.ts` par `if (besoinReseau)` — qui couperait huit écrans même en
+    // ligne — laisserait tout le fichier vert.
+    const chargeur = vi.fn().mockResolvedValue({ encaisse: 12_000 });
+
+    const { result } = renderHook(() =>
+      useDonnees('bilan', chargeur, { messageErreur: MESSAGE, besoinReseau: true }),
+    );
+
+    await waitFor(() => expect(result.current.donnees).toEqual({ encaisse: 12_000 }));
+    expect(chargeur).toHaveBeenCalledTimes(1);
+    expect(result.current.erreur).toBeNull();
+  });
+
+  /**
+   * `enCours` après un retour anticipé.
+   *
+   * Deux retours anticipés de l'effet — la valeur fraîche (`cache.ts:184`) et
+   * la garde hors-ligne (`cache.ts:204`) — posent `enCours` à `false` avant de
+   * sortir. Rien ne les éprouvait : les retirer ne fait tomber aucune épreuve
+   * ci-dessus. Sans eux, une requête restée en vol au moment du retour
+   * anticipé laisserait l'écran indiquer un chargement qui n'a plus cours.
+   */
+  it('remet enCours à false quand une révision plus fraîche fait sortir l’effet par une valeur gardée', async () => {
+    let resoudre: (valeur: { encaisse: number }) => void = () => {};
+    const chargeur = vi.fn(
+      () =>
+        new Promise<{ encaisse: number }>((resolve) => {
+          resoudre = resolve;
+        }),
+    );
+
+    const { result, rerender } = renderHook(
+      ({ revision }) => useDonnees('bilan', chargeur, { messageErreur: MESSAGE, revision }),
+      { initialProps: { revision: 0 } },
+    );
+
+    await waitFor(() => expect(chargeur).toHaveBeenCalledTimes(1));
+    expect(result.current.enCours).toBe(true);
+
+    // Un encaissement réussi ailleurs pendant que cette requête est en vol :
+    // une valeur fraîche apparaît à la révision suivante.
+    ecrireCache('bilan', { encaisse: 20_000 }, 1);
+    rerender({ revision: 1 });
+
+    expect(result.current.donnees).toEqual({ encaisse: 20_000 });
+    expect(result.current.enCours).toBe(false);
+    expect(chargeur).toHaveBeenCalledTimes(1);
+
+    resoudre({ encaisse: 12_000 });
+  });
+
+  it('remet enCours à false quand une coupure réseau fait sortir l’effet par la garde, après un changement de révision', async () => {
+    let resoudre: (valeur: { encaisse: number }) => void = () => {};
+    const chargeur = vi.fn(
+      () =>
+        new Promise<{ encaisse: number }>((resolve) => {
+          resoudre = resolve;
+        }),
+    );
+
+    const { result, rerender } = renderHook(
+      ({ revision }) => useDonnees('bilan', chargeur, { messageErreur: MESSAGE, besoinReseau: true, revision }),
+      { initialProps: { revision: 0 } },
+    );
+
+    await waitFor(() => expect(chargeur).toHaveBeenCalledTimes(1));
+    expect(result.current.enCours).toBe(true);
+
+    // Le réseau tombe pendant que cette première requête est en vol, et la
+    // coquille relit sur une révision qui n'a rien de gardé.
+    couper();
+    rerender({ revision: 1 });
+
+    expect(result.current.erreur).toBe(MESSAGE);
+    expect(result.current.enCours).toBe(false);
+    expect(chargeur).toHaveBeenCalledTimes(1);
+
+    resoudre({ encaisse: 12_000 });
   });
 });

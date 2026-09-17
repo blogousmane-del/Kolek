@@ -131,6 +131,21 @@ export interface Lecture<T> {
 }
 
 /**
+ * Le réseau est-il **certainement** absent ?
+ *
+ * `navigator.onLine` ne prouve jamais qu'Internet répond — c'est ce que dit
+ * `packages/ui/src/Bandeaux.tsx` (lignes 70-75), et c'est vrai. Mais son erreur
+ * n'est que dans un sens : il ment quand il dit « en ligne », jamais quand il
+ * dit « hors ligne », où l'interface réseau est baissée. Cette fonction ne lit
+ * donc que le `false`, la seule information fiable qu'il donne.
+ *
+ * `typeof navigator` est gardé pour le rendu hors navigateur.
+ */
+function horsLigne(): boolean {
+  return typeof navigator !== 'undefined' && navigator.onLine === false;
+}
+
+/**
  * Lit une donnée d'écran, avec cache.
  *
  * `chargeur` est délibérément **hors** des dépendances de l'effet : les écrans
@@ -141,9 +156,9 @@ export interface Lecture<T> {
 export function useDonnees<T>(
   cle: string,
   chargeur: () => Promise<T>,
-  options: { revision?: number; messageErreur: string },
+  options: { revision?: number; messageErreur: string; besoinReseau?: boolean },
 ): Lecture<T> {
-  const { revision = 0, messageErreur } = options;
+  const { revision = 0, messageErreur, besoinReseau = false } = options;
 
   const chargeurRef = useRef(chargeur);
   chargeurRef.current = chargeur;
@@ -165,9 +180,33 @@ export function useDonnees<T>(
       // `rafraichir` a déjà retiré l'entrée avant d'incrémenter `tour` : si
       // une valeur est là et qu'elle est fraîche, c'est bien qu'aucune
       // relecture n'a été demandée.
-      if (garde.frais) return;
+      if (garde.frais) {
+        setEnCours(false);
+        return;
+      }
     } else {
       setDonnees(null);
+      // Rien à montrer, le chargeur a besoin du réseau, et le réseau est
+      // certainement absent : la requête échouera au bout de trois relances de
+      // postgrest-js — sept secondes pendant lesquelles `donnees` et `erreur`
+      // valent tous deux `null`, l'état où les écrans affichent leur
+      // squelette. L'écran promettrait des données qu'il sait impossibles.
+      // Poser l'erreur tout de suite est la seule chose vraie qu'on puisse
+      // dire, et les écrans s'y accordent sans être modifiés.
+      //
+      // Une valeur gardée fraîche ne passe jamais ici : elle sort plus haut,
+      // au `if (garde.frais)`, avant même d'atteindre ce bloc. Une valeur
+      // gardée périmée par le temps ne passe pas ici non plus : elle reste
+      // affichée, et c'est elle — et seulement elle — que la revalidation de
+      // fond, plus bas, va tenter de rafraîchir, sans jamais consulter cette
+      // garde. Une valeur gardée périmée par la révision, elle, fait rendre
+      // `null` à `lireCache` — elle est donc bien absente du point de vue de
+      // `garde`, et passe ici comme n'importe quelle absence.
+      if (besoinReseau && horsLigne()) {
+        setErreur(messageErreur);
+        setEnCours(false);
+        return;
+      }
     }
 
     setEnCours(true);

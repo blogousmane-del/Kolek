@@ -24,6 +24,7 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
   const { donnees, erreur } = useDonnees('bilan', chargerBilan, {
     revision,
     messageErreur: 'Cet écran demande le réseau.',
+    besoinReseau: true,
   });
   // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit.
   const premier = usePremierRendu();

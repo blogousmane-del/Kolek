@@ -205,7 +205,7 @@ function DetailCarte({
     // `revision` jette l'entrée gardée dès que la fiche a été relue. Sans
     // elle, la péremption de 45 secondes suffirait à montrer une liste d'où
     // manque la mise que le collecteur vient d'encaisser.
-    { revision, messageErreur: 'Cet écran demande le réseau.' },
+    { revision, messageErreur: 'Cet écran demande le réseau.', besoinReseau: true },
   );
 
   return (
