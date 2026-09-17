@@ -5,7 +5,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Issue } from './envoyer';
-import { carte, client, operationClientCarte, operationMise, tournee } from './fabriques';
+import { carte, client, operationCaisse, operationClientCarte, operationMise, tournee } from './fabriques';
 import type { Operation } from './modele';
 import {
   CLE_INSTANTANE,
@@ -73,6 +73,33 @@ async function baseAvec(...operations: Operation[]): Promise<BaseLocale> {
 /** Un envoi scénarisé : une issue par appel, dans l'ordre, puis « acceptée ». */
 function envoiScenarise(...issues: Issue[]) {
   return vi.fn(async (_client: SupabaseClient, _op: Operation) => issues.shift() ?? { issue: 'acceptee' as const });
+}
+
+/**
+ * Un client qui répond vraiment, au lieu d'une issue injectée.
+ *
+ * Toutes les autres épreuves de ce fichier passent `envoyer` en dépendance :
+ * elles éprouvent la passe, et ne verraient jamais un classement changer.
+ * Celle-ci laisse `passe` prendre le vrai `envoyer`, donc le vrai `classer` —
+ * c'est le seul montage qui éprouve la chaîne de bout en bout.
+ *
+ * Seul `insert` est nécessaire : un 201 est accepté sans relecture, et un
+ * refus de caisse relit `'absente'` sans toucher au réseau.
+ */
+type ReponseFactice = { error: { code: string; message: string } | null; status: number; data?: unknown };
+
+function clientQuiRepond(insertions: Record<string, ReponseFactice[]>) {
+  const { client: avecAuth } = authFactice();
+  const client = {
+    auth: avecAuth.auth,
+    from(table: string) {
+      return {
+        insert: (): Promise<ReponseFactice> =>
+          Promise.resolve(insertions[table]?.shift() ?? { error: null, status: 201, data: null }),
+      };
+    },
+  };
+  return client as unknown as SupabaseClient;
 }
 
 describe('une file vide', () => {
@@ -411,5 +438,40 @@ describe('une opération de version 1, écrite par une version antérieure (§9.
 
     expect((await passe({ client: authFactice().client, base, collecteurId: 'col-1', maintenant: () => T, envoyer })).etat).toBe('vide');
     expect(envoyer.mock.calls[0]![1]).toMatchObject({ id: 'ancienne', charge: { montant: 1000 } });
+  });
+});
+
+/**
+ * Le témoin du chantier.
+ *
+ * Avant le correctif, `22003` tombait en `inconnu`, qui arrête la passe :
+ * `{ etat: 'attente', reveil: T + 30 000, traitees: 0 }`, et **les deux**
+ * opérations restaient en file. La mise derrière la caisse attendait le
+ * premier des quatre reculs — 30, 60, 120 puis 300 secondes — avant que la
+ * caisse soit enfin consignée à la cinquième tentative.
+ */
+describe('une déclaration hors borne ne retient plus la file', () => {
+  const HORS_BORNE: ReponseFactice = {
+    error: { code: '22003', message: 'value "99999999999" is out of range for type integer' },
+    status: 400,
+  };
+
+  it('consigne la caisse et envoie la mise derrière elle, dans la même passe', async () => {
+    const base = await baseAvec(
+      operationCaisse(1, { id: 'd1', date: '2026-09-13', cashDeclare: 99_999_999_999 }),
+      operationMise(2, { carteId: 'k1' }),
+    );
+
+    const bilan = await passe({
+      client: clientQuiRepond({ caisses_jour: [HORS_BORNE] }),
+      base,
+      collecteurId: 'col-1',
+      maintenant: () => T,
+      consigner: vi.fn(async () => ({ issue: 'acceptee' as const })),
+    });
+
+    // 1 la caisse refusée, 1 sa consignation, 1 la mise : la file est vide.
+    expect(bilan).toEqual({ etat: 'vide', reveil: null, traitees: 3 });
+    expect(await lireOperations(base)).toHaveLength(0);
   });
 });

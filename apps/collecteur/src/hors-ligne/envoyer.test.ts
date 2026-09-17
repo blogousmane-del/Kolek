@@ -21,6 +21,11 @@ const metier = (code: string): Reponse => ({ error: { code: 'P0001', message: co
 /** `mises_avant_insert` lève `DOUBLON` sous `23505`, que PostgREST rend en 409. */
 const DOUBLON: Reponse = { error: { code: '23505', message: 'DOUBLON' }, status: 409 };
 const lu = (data: unknown): Reponse => ({ error: null, status: 200, data });
+/** Mesuré contre la pile locale le 2026-09-17 : PostgREST rend le 22003 tel quel. */
+const HORS_BORNE: Reponse = {
+  error: { code: '22003', message: 'value "99999999999" is out of range for type integer' },
+  status: 400,
+};
 
 /**
  * Un client supabase de poche : chaque table rend, dans l'ordre, les réponses
@@ -279,6 +284,18 @@ describe('une déclaration de caisse (§6.4)', () => {
   it('reste passagère quand la mise à jour n’aboutit pas', async () => {
     const { client } = clientFactice({ insert: { caisses_jour: [doublon('caisses_jour_pkey')] }, update: [RESEAU] });
     expect(await envoyer(client, op, rien)).toEqual({ issue: 'passager' });
+  });
+
+  it('refuse une déclaration hors borne du premier coup, sans relire ni retenter', async () => {
+    const { client, appels } = clientFactice({ insert: { caisses_jour: [HORS_BORNE] } });
+
+    expect(await envoyer(client, op, rien)).toEqual({
+      issue: 'refusee',
+      motif: 'MONTANT_TROP_GRAND',
+    });
+    // Un seul geste : `envoyerCaisse` donne `async () => 'absente'` pour
+    // relecture, donc aucun aller-retour de plus.
+    expect(appels).toHaveLength(1);
   });
 });
 
