@@ -281,9 +281,58 @@ export const taillesTexte = {
   '8xl': 'clamp(48px, 15vw, 120px)', // Metric XL
 } as const;
 
+/**
+ * Les deux familles du produit, **changées le 2026-09-17**.
+ *
+ * ## Ce qui part, et pourquoi
+ *
+ * Plus Jakarta Sans et Sora. La paire est lisible, et ce n'est pas ce qu'on lui
+ * reproche : c'est qu'elle est le duo par défaut de tous les générateurs de
+ * maquette depuis 2022. Elle ne dit rien de Kolek, et quiconque en a vu trois
+ * la reconnaît. Une marque qui porte la police de tout le monde n'en porte
+ * aucune.
+ *
+ * ## Ce qui arrive
+ *
+ * **Bricolage Grotesque** pour les titres et les montants. C'est un grotesque
+ * de caractère, avec des chiffres larges et fermés qui tiennent en plein
+ * soleil, là où le « 0 » et le « 8 » de Sora se confondent à distance de bras.
+ *
+ * **Instrument Sans** pour le corps et l'interface. Plus étroite que Jakarta à
+ * taille égale : sur un Galaxy A03 de 360 px, il entre plus de nom de client
+ * par ligne avant la troncature, ce qui est la contrainte quotidienne de la
+ * liste des clients.
+ *
+ * ## Le poids réseau, mesuré et non supposé
+ *
+ * Les deux sont **variables**, et la version `wght` seule est employée :
+ *
+ * | | fichiers latins | octets |
+ * |---|---|---|
+ * | Avant : Jakarta 400/500/600/700 + Sora 700 | 5 | 63 688 |
+ * | Après : Bricolage + Instrument Sans | 2 | 71 436 |
+ *
+ * C'est donc **7,7 ko de plus**, pas de moins, et il faut le dire ainsi : trois
+ * requêtes économisées, une graisse continue de 200 à 800 au lieu de quatre
+ * crans figés, contre douze pour cent de téléchargement en plus au premier
+ * chargement. Sur la 3G d'Abidjan, un sixième de seconde, une seule fois : le
+ * service worker garde les fichiers ensuite.
+ *
+ * Les jeux `opsz` et `wdth` de Bricolage — taille optique et largeur — ne sont
+ * **pas** pris : le fichier tous axes pèse 131 ko à lui seul, soit plus que les
+ * cinq fichiers d'avant réunis. Ce sont de belles possibilités qui ne valent
+ * pas leur prix sur le téléphone où ce produit passe sa vie.
+ *
+ * ## Le suffixe « Variable » n'est pas décoratif
+ *
+ * C'est le nom que Fontsource donne à ses familles variables, et il diffère de
+ * la famille statique du même nom. L'omettre laisserait la déclaration tomber
+ * silencieusement sur le repli système, sans qu'aucun test ne le voie — c'est
+ * exactement la panne que ce dépôt appelle une sonde muette.
+ */
 export const polices = {
-  body: "'Plus Jakarta Sans', 'Inter', system-ui, sans-serif",
-  headings: "'Sora', 'Plus Jakarta Sans', system-ui, sans-serif",
+  body: "'Instrument Sans Variable', system-ui, sans-serif",
+  headings: "'Bricolage Grotesque Variable', 'Instrument Sans Variable', system-ui, sans-serif",
 } as const;
 
 /**

@@ -29,7 +29,7 @@ describe('l’attendu du jour', () => {
 
     render(<Rapprochement collecteurId="col-1" revision={0} onRetour={vi.fn()} />);
 
-    expect(await screen.findByText('Cash attendu — calculé par le serveur')).toBeTruthy();
+    expect(await screen.findByText('Cash attendu (calculé par le serveur)')).toBeTruthy();
   });
 
   it('se dit provisoire quand le téléphone compte ce que le serveur n’a pas reçu', async () => {
@@ -37,7 +37,7 @@ describe('l’attendu du jour', () => {
 
     render(<Rapprochement collecteurId="col-1" revision={0} onRetour={vi.fn()} />);
 
-    expect(await screen.findByText('Cash attendu — provisoire, le serveur recalculera')).toBeTruthy();
+    expect(await screen.findByText('Cash attendu (provisoire, le serveur recalculera)')).toBeTruthy();
   });
 });
 

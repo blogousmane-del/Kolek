@@ -467,19 +467,19 @@ describe('les refus, lisibles sans réseau (§8.4)', () => {
     expect(refusAffichables(refus, [], t)).toEqual([
       {
         id: 'op-2',
-        titre: `Awa — carte de ${formatMontant(2000)} FCFA`,
+        titre: `Awa : carte de ${formatMontant(2000)} FCFA`,
         detail: 'L’abonnement n’était plus actif.',
         quand: '2026-09-12T08:00:00.000Z',
       },
       {
         id: 'op-3',
-        titre: `Caisse du 2026-09-12 — ${formatMontant(5000)} FCFA déclarés`,
+        titre: `Caisse du 2026-09-12 : ${formatMontant(5000)} FCFA déclarés`,
         detail: 'Le serveur avait déjà une ligne à cette place.',
         quand: '2026-09-11T08:00:00.000Z',
       },
       {
         id: 'op-1',
-        titre: `Awa — mise de ${formatMontant(1000)} FCFA`,
+        titre: `Awa : mise de ${formatMontant(1000)} FCFA`,
         detail: 'La carte avait été clôturée.',
         quand: '2026-09-10T08:00:00.000Z',
       },
@@ -527,13 +527,13 @@ describe('les refus, lisibles sans réseau (§8.4)', () => {
     expect(refusAffichables([refusDe(inscription, 'ABONNEMENT_INACTIF')], [mise], tournee())).toEqual([
       {
         id: 'op-1',
-        titre: `Bintou — inscription et carte de ${formatMontant(500)} FCFA`,
+        titre: `Bintou : inscription et carte de ${formatMontant(500)} FCFA`,
         detail: 'L’abonnement n’était plus actif.',
         quand: INSTANT,
       },
       {
         id: 'op-2',
-        titre: `Bintou — mise de ${formatMontant(500)} FCFA`,
+        titre: `Bintou : mise de ${formatMontant(500)} FCFA`,
         detail: 'L’opération dont elle dépendait a été refusée.',
         quand: INSTANT,
       },

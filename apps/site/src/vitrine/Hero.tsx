@@ -10,7 +10,7 @@ import { Telephone } from './Telephone';
  * Un billet de banque en pleine nuit : fond dégradé vert coffre, rosace
  * guillochée en or à droite — là où un billet met son filigrane — et le titre
  * poussé au tiers inférieur gauche. Le contraste typographique fait le
- * travail : « L'épargne du marché rencontre » en Sora, « la précision. » en
+ * travail : « L'épargne du marché rencontre » en police de titre, « la précision. » en
  * Bodoni Moda italique, or.
  *
  * C'est le seul titre de tout le produit qui mélange deux familles, et le

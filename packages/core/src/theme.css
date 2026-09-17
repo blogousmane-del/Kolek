@@ -56,8 +56,8 @@
   --text-6xl: clamp(36px, 10vw, 64px);
   --text-7xl: clamp(40px, 12vw, 88px);
   --text-8xl: clamp(48px, 15vw, 120px);
-  --font-body: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
-  --font-headings: 'Sora', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-body: 'Instrument Sans Variable', system-ui, sans-serif;
+  --font-headings: 'Bricolage Grotesque Variable', 'Instrument Sans Variable', system-ui, sans-serif;
   --container-formulaire: 360px;
   --container-carte: 520px;
   --container-liste: 640px;

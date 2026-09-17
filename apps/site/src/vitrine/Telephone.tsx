@@ -51,7 +51,7 @@ export function Telephone({ className }: { className?: string }) {
       <div className="relative mx-auto w-[320px] max-w-full rounded-[2.75rem] border border-white/15 bg-dark-canvas p-2.5 shadow-[0_30px_80px_-20px_rgba(210,178,76,0.25)]">
         <div className="overflow-hidden rounded-[2.25rem] bg-canvas" aria-hidden>
           {/* La barre haute du collecteur, à l'identique : fond `sidebar`, titre
-              en Sora, retour à gauche. */}
+              en police de titre, retour à gauche. */}
           <div className="flex items-center gap-3 bg-sidebar px-4 pb-4 pt-5">
             <span className="flex h-8 w-8 items-center justify-center rounded-pill bg-white/10 text-white/70">
               <svg viewBox="0 0 24 24" className="h-4 w-4">

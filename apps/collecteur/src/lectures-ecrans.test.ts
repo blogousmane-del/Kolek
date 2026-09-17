@@ -178,7 +178,7 @@ describe('les alertes d’un collecteur au-delà de mille lignes', () => {
     const alertes = await chargerAlertes();
 
     // Coupée, la mise d'hier disparaît : la carte retombe sur sa date
-    // d'ouverture, et l'écran dit « Hier — 30 jours sans mise ».
+    // d'ouverture, et l'écran dit « Hier : 30 jours sans mise ».
     expect(alertes.find((a) => a.cle === 'dormante-k2')).toBeUndefined();
   });
 
@@ -189,7 +189,7 @@ describe('les alertes d’un collecteur au-delà de mille lignes', () => {
     const alertes = await chargerAlertes();
 
     expect(alertes.find((a) => a.cle === 'complete-k1000')?.titre).toBe(
-      'Dernière — cycle terminé',
+      'Dernière : cycle terminé',
     );
   });
 });
