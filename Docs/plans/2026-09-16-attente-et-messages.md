@@ -404,11 +404,221 @@ git commit -m "docs(plans): ce que les trois notes floues de J2b donnaient vraim
 
 ---
 
-## Tâche 4 : les correctifs constatés à la tâche 3
+## Tâche 4 : le bandeau d'envoi montre enfin ce qui reste
 
-**À écrire à la fin de la tâche 3**, et pas avant : son contenu dépend de ce qui aura été reproduit. Écrire ici des étapes maintenant reviendrait à deviner le défaut, ce que ce chantier se refuse explicitement à faire.
+Écrite après la tâche 3, et seulement pour ce qu'elle a reproduit. Des trois notes, **une seule** a donné un défaut : le bandeau. Les deux autres sont reparties dans `Docs/plans/2026-09-13-j2b-hors-ligne.md`.
 
-Si les trois notes se révèlent non reproductibles, cette tâche disparaît et le chantier s'arrête à la tâche 5.
+**Ce qui a été vu, le 2026-09-17**, sur la pile locale et l'application réelle (Chrome sans interface, compte de démonstration, quatre encaissements posés hors ligne puis retour en ligne avec 1 500 ms de latence par requête) :
+
+```
+--- hors ligne ---
+Mariam : Hors ligne · 1 mise en attente d’envoi
+Salif  : Hors ligne · 2 mises en attente d’envoi
+Aïcha  : Hors ligne · 3 mises en attente d’envoi
+Drissa : Hors ligne · 4 mises en attente d’envoi
+--- retour en ligne, latence 1500 ms par requete ---
+t+0.1s  : Envoi en cours · 4 restantes
+t+11.2s : (aucun bandeau)
+```
+
+Onze secondes à « 4 restantes », puis plus rien. Jamais 3, jamais 2, jamais 1. Hors ligne, en revanche, le compte monte à chaque geste — parce que chaque geste passe par `apresGeste()`, qui appelle `signalerChangement()`.
+
+**La cause, au code :** `signalerChangement()` n'est appelé, pendant un envoi, qu'au rappel de fin de passe (`moteur.ts:135`, `if (bilan.traitees > 0 || rafraichie)`), alors que `passe` (`synchroniseur.ts:161`) boucle en `for (;;)` sur toute la file et incrémente `traitees` à **cinq** endroits sans rien annoncer. Les écrans ne relisent qu'à ce signal : `Coquille.tsx:154`, `ecouterChangements(() => setRevision((r) => r + 1))`.
+
+**Pourquoi ça compte pour un collecteur.** Le bandeau est la seule chose qui lui dit si son argent est parti. Figé, il ne distingue pas « ça avance » de « ça a calé ». Sur un réseau de marché, une passe de vingt mises tient plusieurs minutes : il lit « 20 restantes » tout du long, et peut fermer l'application en croyant que rien ne part.
+
+**Fichiers :**
+- Modifier : `apps/collecteur/src/hors-ligne/synchroniseur.ts` (`Dependances`, et les cinq `traitees += …`)
+- Modifier : `apps/collecteur/src/hors-ligne/moteur.ts` (l'appel à `passe`, ligne 104)
+- Éprouver : `apps/collecteur/src/hors-ligne/synchroniseur.test.ts`
+
+**Interfaces :**
+- Consomme : rien des tâches 1 et 2. La tâche est indépendante des deux.
+- Produit : un champ facultatif `surProgres?: () => void` dans `Dependances`. Facultatif, donc les vingt et quelques appels à `passe` des épreuves existantes l'omettent sans changer.
+
+- [ ] **Étape 1 : écrire les deux épreuves qui tombent**
+
+Dans `apps/collecteur/src/hors-ligne/synchroniseur.test.ts`, à la fin du `describe('l’ordre (§6.6)')` — c'est là que vivent déjà les passes à plusieurs opérations :
+
+```ts
+  it('annonce chaque opération sortie de la file, et non la passe entière', async () => {
+    const base = await baseAvec(
+      operationMise(1, { carteId: 'k1' }),
+      operationMise(2, { carteId: 'k1' }),
+      operationMise(3, { carteId: 'k1' }),
+    );
+    const surProgres = vi.fn();
+    // Ce que `surProgres` avait déjà annoncé au moment de chaque envoi. C'est
+    // la seule chose qui distingue « pendant la passe » de « à la fin ».
+    const annoncesAvantChaqueEnvoi: number[] = [];
+    const envoyer = vi.fn(async () => {
+      annoncesAvantChaqueEnvoi.push(surProgres.mock.calls.length);
+      return { issue: 'acceptee' as const };
+    });
+
+    const bilan = await passe({
+      client: authFactice().client,
+      base,
+      collecteurId: 'col-1',
+      maintenant: () => T,
+      envoyer,
+      surProgres,
+    });
+
+    expect(bilan.traitees).toBe(3);
+    expect(surProgres).toHaveBeenCalledTimes(3);
+    expect(annoncesAvantChaqueEnvoi).toEqual([0, 1, 2]);
+  });
+
+  it('n’annonce rien quand rien ne sort de la file', async () => {
+    const base = await baseAvec(operationMise(1, { carteId: 'k1' }), operationMise(2, { carteId: 'k1' }));
+    const surProgres = vi.fn();
+
+    const bilan = await passe({
+      client: authFactice().client,
+      base,
+      collecteurId: 'col-1',
+      maintenant: () => T,
+      envoyer: envoiScenarise({ issue: 'passager' }),
+      surProgres,
+    });
+
+    expect(bilan.etat).toBe('hors_ligne');
+    expect(surProgres).not.toHaveBeenCalled();
+  });
+```
+
+La seconde épreuve n'est pas un doublon : elle tient la main du correctif. Un `surProgres()` posé en tête de boucle, ou après le `switch` sans discernement, la ferait tomber — et c'est précisément l'erreur qui rendrait le bandeau bavard sur un réseau coupé.
+
+`annoncesAvantChaqueEnvoi` est le témoin du « pendant » : déplacer l'annonce à la fin de `passe` rendrait `[0, 0, 0]` tout en gardant `toHaveBeenCalledTimes(3)` vert.
+
+- [ ] **Étape 2 : les faire tomber**
+
+```bash
+npm test -w @kolek/collecteur -- --run src/hors-ligne/synchroniseur.test.ts
+```
+
+Attendu : **deux échecs**. La première sur `expected "spy" to be called 3 times, but got 0 times` — `surProgres` n'existe pas encore, l'objet le porte sans que `passe` le lise. La seconde **passe déjà** (rien n'annonce rien, donc « pas appelé » est vrai) : elle est là pour la suite, pas pour le rouge. Le noter tel quel dans le rapport ; une épreuve qui ne tombe pas ne prouve rien, et celle-ci ne prétend rien prouver aujourd'hui.
+
+- [ ] **Étape 3 : le correctif**
+
+Dans `synchroniseur.ts`, la dépendance :
+
+```ts
+export interface Dependances {
+  client: SupabaseClient;
+  base: BaseLocale;
+  collecteurId: string;
+  maintenant?: () => number;
+  /** Injectables pour les épreuves ; sinon les vrais. */
+  envoyer?: typeof envoyer;
+  consigner?: typeof consigner;
+  /**
+   * Appelé à chaque opération sortie de la file, pendant la passe et non à sa
+   * fin : c'est ce qui fait décroître « Envoi en cours · N restantes ». Une
+   * passe de vingt mises tient plusieurs minutes sur un réseau de marché, et un
+   * compte figé ne distingue pas « ça avance » de « ça a calé ».
+   */
+  surProgres?: () => void;
+}
+```
+
+Puis, dans `passe`, juste après `let traitees = 0;` :
+
+```ts
+  /**
+   * Une opération a quitté la file, ou changé d'état : le compte bouge, et les
+   * écrans doivent le relire. Un seul endroit pour les deux gestes — sinon un
+   * sixième `traitees +=` arriverait un jour sans son annonce.
+   */
+  function avancer(de = 1): void {
+    traitees += de;
+    deps.surProgres?.();
+  }
+```
+
+Et les **cinq** incréments deviennent des appels :
+
+| Ligne | Avant | Après |
+| --- | --- | --- |
+| 206 | `traitees += 1 + (await retirerEnRefus(deps.base, aConsigner, maintenant()));` | `avancer(1 + (await retirerEnRefus(deps.base, aConsigner, maintenant())));` |
+| 256 | `traitees += 1;` (parent refusé) | `avancer();` |
+| 271 | `traitees += 1;` (acceptée) | `avancer();` |
+| 284 | `traitees += 1;` (refusée) | `avancer();` |
+| 307 | `traitees += 1;` (inconnue, au-delà de `TENTATIVES_MAX`) | `avancer();` |
+
+Rien d'autre ne change dans ce fichier : les `return bilan(…)` des échecs passagers, de session et d'attente ne touchent pas `traitees`, donc n'annoncent rien — ce que la seconde épreuve tient.
+
+Dans `moteur.ts`, le seul câblage :
+
+```ts
+      passe: () =>
+        sousVerrou(
+          verrou,
+          async () =>
+            passe({
+              client,
+              base: await ouvrirBase(collecteurId),
+              collecteurId,
+              // Le bandeau décroît pendant la passe. Le rappel de fin (plus bas)
+              // reste : il porte aussi le rechargement de tournée.
+              surProgres: signalerChangement,
+            }),
+          // Un autre onglet envoie : on repassera dans trente secondes.
+          () => ({ etat: 'attente' as const, reveil: Date.now() + 30_000, traitees: 0 }),
+        ),
+```
+
+Le rappel de fin de passe (`moteur.ts:135`) **ne change pas**. Il annonce aussi le rechargement de tournée (`rafraichie`), que `surProgres` ne couvre pas ; le retirer priverait les écrans de la relecture après rafraîchissement.
+
+- [ ] **Étape 4 : les faire passer**
+
+```bash
+npm test -w @kolek/collecteur -- --run src/hors-ligne/synchroniseur.test.ts src/hors-ligne/moteur.test.ts
+```
+
+Attendu : tout vert, et les deux nouvelles avec.
+
+- [ ] **Étape 5 : toutes les épreuves du collecteur**
+
+```bash
+npm test -w @kolek/collecteur
+```
+
+Attendu : le compte de la tâche 2 (662) plus 2.
+
+- [ ] **Étape 6 : contrôle de type et linteur**
+
+```bash
+npx tsc -b apps/collecteur
+npm run verifier:lint
+```
+
+Attendu : exit 0 des deux. Le contrôle de type compte ici plus qu'ailleurs : `surProgres` est un champ neuf sur une interface qu'une vingtaine d'appels partagent.
+
+- [ ] **Étape 7 : commit**
+
+```bash
+git add apps/collecteur/src/hors-ligne/synchroniseur.ts apps/collecteur/src/hors-ligne/moteur.ts apps/collecteur/src/hors-ligne/synchroniseur.test.ts
+git commit -m "fix(envoi): le bandeau decroit pendant la passe, au lieu de tomber d'un coup" -m "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+```
+
+---
+
+### Ce que la tâche 3 a écarté, et pourquoi
+
+**L'avis rouge « Session perdue » — pas reproduit, et pas reproductible.** L'état vient d'un seul endroit, `FicheClient.tsx:763`, atteint quand `contexte.current.collecteurId` est absent. Or il ne l'est jamais : `App.tsx:205` monte `Coquille` avec un `collecteurId: string`, `Coquille.tsx:326` le passe à `Clients` et `Clients.tsx:669` à `FicheClient`, et `Coquille.tsx:452` ne rend le contenu que si `moteurDe === collecteurId`. Le `string | null` des props est une prudence de signature, pas un état joignable. La note décrivait donc du code mort.
+
+Ce qui est vrai, et qui reste : les deux **autres** échecs d'encaissement (`ENREGISTREMENT_INCERTAIN`, et le message d'un refus) partagent le même socle `{ operationId: null, envoyee: true }`, donc le même sort — `purger()` sort tôt (`if (!en || en.envoyee || en.operationId === null) return`), et l'effet d'effacement demande `estRattrapee(reelles, attente)`, c'est-à-dire `reelles > attente.base`, qui n'arrivera jamais puisque rien n'a été écrit. Seuls « Réessayer », la disparition de la carte ou le démontage de la fiche les enlèvent. **Ce n'est pas un défaut** : ces deux-là n'ont rien écrit, le collecteur doit décider, et le bandeau porte « Réessayer ». C'était le reproche de la note — « une reconnexion ne l'efface pas » — qui visait le seul cas où il aurait tenu, et ce cas n'existe pas.
+
+**L'alerte du premier lancement — rien d'anormal.** Vu le 2026-09-17, profil neuf, `navigator.storage.persisted()` à `false` : l'accueil affiche « Ce téléphone peut effacer les données de Kolek s'il manque de place… », il ne le réaffiche pas quand on quitte l'accueil et qu'on y revient, et l'écran `Profil` le porte en permanence. C'est mot pour mot la spec J2b §8.7.
+
+Un seul écart, mineur, consigné sans tâche : `stockageDejaSignale` est une variable de module (`Accueil.tsx:35`), donc une **seconde connexion sans rechargement de page** — deux collecteurs qui se relaient sur le même téléphone — ne revoit pas l'avis. Vérifié : première connexion « AVIS », déconnexion, reconnexion dans la même page « PAS D AVIS ». L'avertissement reste accessible sur `Profil`, et la spec dit « une fois par lancement » sans trancher ce que vaut un relais. À reprendre si J2b le remonte, pas à corriger sur une lecture.
+
+### Deux choses vues en montant le regard, sans rapport avec les notes
+
+1. **Le premier rechargement de tournée après connexion n'aboutit pas, en développement.** `StrictMode` monte le moteur deux fois ; le `navigator.locks.request(…, { ifAvailable: true })` de `sousVerrou` (`moteur.ts:92`) refuse le second, et le `demander({ rafraichir: true })` initial rend `impossible`. L'écran dit « Ta tournée n'est pas encore sur ce téléphone » pendant une trentaine de secondes, jusqu'à la reprise à trente secondes. Un `dispatchEvent(new Event('online'))` la fait venir tout de suite. **Artefact du mode développement** — React ne redouble pas les effets dans une construction de production — mais il faut le savoir pour tout regard futur : sans cela, on croit l'application cassée.
+2. **Le compte de démonstration** vit dans `.superpowers/sdd/fixture-demo.mjs` (`awa@kolek.test`, quatre clients, quatre cartes) et le pilote Chrome dans `.superpowers/sdd/attente/regard.mjs`. Aucun des deux n'est suivi par git.
 
 ---
 

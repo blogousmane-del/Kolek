@@ -13344,15 +13344,15 @@ Présentés à l'exploitant le 2026-09-15, après la mise en ligne (`831036f`). 
 Relevés en relecture ou au regard, jugés sans perte d'argent ni de données. À la revue finale, l'exploitant n'a retenu avant fusion que la trace du rafraîchissement (écart 48) ; le reste attend le chantier suivant :
 
 - « Prévenir » de la liste des clients n'est pas gardé par la file (`Clients.tsx`).
-- L'alerte au premier lancement (`Accueil.tsx`).
+- L'alerte au premier lancement (`Accueil.tsx`) — **pas reproduit le 2026-09-17**, à préciser : profil neuf, `persisted()` à `false`, l'avis s'affiche une fois puis se tait quand on revient sur l'accueil, et `Profil` le porte en permanence — conforme à §8.7. Seul écart consigné, sans tâche : `stockageDejaSignale` est une variable de module, donc un relais de collecteur sans rechargement de page ne le revoit pas (Docs/plans/2026-09-16-attente-et-messages.md).
 - Une écriture dans la file juste après un effacement subi de la tournée (`file.ts`, `moteur.ts`).
 - Un enfant encore en sursis quand son parent est refusé (`PARENT_REFUSE`, `FicheClient.tsx`).
-- Le bandeau « Envoi en cours » ne montre aucun progrès.
+- Le bandeau « Envoi en cours » ne montre aucun progrès — **reproduit le 2026-09-17** : « Envoi en cours · 4 restantes » figé onze secondes, puis disparition d'un coup. Corrigé par la tâche 4 de Docs/plans/2026-09-16-attente-et-messages.md.
 - Le commentaire du 42501 sous `anon` (`synchroniseur.ts`).
 - Deux onglets ouverts sur le même compte.
 - La borne `integer` de `cash_declare` (`gestes.ts`).
 - Les angles morts de l'épreuve de durabilité (raccourcis `idb`, sous-dossiers, `.tsx`).
 - La fiche d'un client sur une tournée jamais chargée dit « Fiche introuvable » au lieu de « pas encore sur ce téléphone ».
-- L'avis rouge de déconnexion reste affiché.
+- L'avis rouge de déconnexion reste affiché — **pas reproduit le 2026-09-17**, à préciser : l'état ne vient que de `FicheClient.tsx:763`, atteint si `collecteurId` est absent, ce que le montage de `Coquille` interdit. Les deux autres échecs d'encaissement restent bien affichés jusqu'à « Réessayer » — ils n'ont rien écrit, c'est voulu.
 - Hors ligne, file vide, l'écran Retrait reste vide ~7 s (trois relances de postgrest-js).
 - Le commentaire d'`Abonnement.tsx` (« seul geste qui exige le réseau ») est faux.
