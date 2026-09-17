@@ -779,7 +779,12 @@ function LigneClient({
         {carte && (
           <div className="w-full h-1.5 bg-muted rounded-pill mt-2 overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-accent to-chart-mint rounded-pill transition-all"
+              /* Aplat, et non dégradé : la barre fait six pixels de haut, où
+                 un dégradé horizontal ne se perçoit pas — de la peinture sans
+                 message, avec un jeton de graphique employé hors de son rôle.
+                 Et `transition-[width]` plutôt que `transition-all` : seule
+                 la largeur bouge, et seulement au rechargement des données. */
+              className="h-full bg-accent rounded-pill transition-[width]"
               style={{ width: `${avancement}%` }}
             />
           </div>

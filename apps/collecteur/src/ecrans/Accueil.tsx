@@ -192,7 +192,10 @@ export function Accueil({
 
         <div className="relative z-10 flex items-center gap-2 text-white/60 text-xs font-body">
           <span className="inline-flex items-center gap-1">
-            <Icone nom="check-circle" taille={14} className="text-chart-mint" />
+            {/* Sans teinte : l'icône prend la couleur de sa ligne. Elle portait
+                `chart-mint`, un jeton d'échelle de données employé en
+                ornement. */}
+            <Icone nom="check-circle" taille={14} />
             {tableau ? `${tableau.cartesActives} carte${tableau.cartesActives > 1 ? 's' : ''} active${tableau.cartesActives > 1 ? 's' : ''}` : 'Chargement…'}
           </span>
         </div>

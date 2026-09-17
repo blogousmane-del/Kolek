@@ -110,6 +110,27 @@ export const couleurs = {
   tuileAnalyseEncre: '#2A5480',
   tuileGestion: '#F1E4C9',
   tuileGestionEncre: '#6A5218',
+  // Le marqueur d'état actif des deux navigations, posé le 2026-09-17.
+  //
+  // Il existe pour **décrocher** cet emploi de `chartMint`, qui le portait
+  // jusqu'ici. Le commentaire du bloc data-viz plus bas le disait sans
+  // détour : « `chartMint` a un second métier — l'état actif de la barre
+  // latérale ». C'était assumé, et c'est le couplage qui coûte : la place de
+  // `chartMint` à l'extrémité claire de l'échelle était tenue par la
+  // navigation autant que par les graphiques, donc refondre l'échelle
+  // demandait de repeindre la navigation, et l'inverse aussi.
+  //
+  // Le premier passage de l'audit avait déjà rompu la symétrie en retirant
+  // `chart-mint` du bouton d'encaissement, au motif que les jetons `chart-*`
+  // encodent des séries de données. La règle valait ; elle n'avait été
+  // appliquée qu'à un endroit. Ici elle l'est partout, et l'échelle data-viz
+  // n'a plus qu'un métier.
+  //
+  // 8,89:1 sur `sidebar` — bien au-delà des 3:1 d'un objet graphique, et
+  // au-delà des 4,5:1 du texte, parce qu'il teinte aussi l'intitulé actif.
+  // Soixante-sept unités d'écart sur un canal avec `chartMint` : c'est une
+  // couleur à soi, et non le même vert sous un autre nom.
+  marqueurActif: '#8ED9B0',
   // Data-viz — une échelle de clarté, et non quatre teintes à la même
   // luminance. Refondue le 2026-09-04.
   //
@@ -125,8 +146,11 @@ export const couleurs = {
   // en `sidebar`. Aucune ne peut donc descendre sous 4,5:1 contre `#0E2E1F`, et
   // `chartSlate`, le plus sombre, y tient à 4,57:1.
   //
-  // `chartMint` a un second métier — l'état actif de la barre latérale et le
-  // vert de réussite sur fond sombre — d'où sa place à l'extrémité claire.
+  // `chartMint` portait un second métier jusqu'au 2026-09-17 — l'état actif
+  // de la barre latérale — et c'est `marqueurActif` qui le porte désormais.
+  // Ce qui reste ici est le vert de réussite sur fond sombre, qui appartient
+  // bien à l'échelle : il dit une valeur, pas un état d'interface. Sa place à
+  // l'extrémité claire, elle, ne bouge pas.
   chartMint: '#D1E8D4',
   chartTeal: '#9ACDBE',
   chartBlue: '#82ACCC',
