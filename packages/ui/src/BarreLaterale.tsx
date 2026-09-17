@@ -203,13 +203,16 @@ function Section({
             title={entree.disponible ? undefined : 'Écran à venir'}
             onClick={() => onNaviguer(entree.cle)}
             className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md mb-0.5 ${
-              estActif ? 'bg-white/10 border-l-2 border-chart-mint' : ''
+              estActif ? 'bg-white/10 border-l-2 border-marqueur-actif' : ''
             } ${entree.disponible ? 'cursor-pointer' : 'cursor-default'}`}
           >
             <Icone
               nom={entree.icone}
               className={
-                estActif ? 'text-chart-mint' : entree.disponible ? 'text-white/50' : 'text-white/25'
+                // Couleurs d'icône, donc objets graphiques : 3:1 suffit
+                // (WCAG 1.4.11), et l'entrée indisponible est exemptée par la
+                // 1.4.3. La garde lit cette ligne-ci, elle doit donc le dire.
+                estActif ? 'text-marqueur-actif' : entree.disponible ? 'text-white/50' : 'text-white/25'
               }
             />
             <span

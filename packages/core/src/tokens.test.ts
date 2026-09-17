@@ -194,6 +194,46 @@ describe('taille de champ', () => {
  * visage et qu'aucun ne disparaisse en niveaux de gris — la vue d'un daltonien
  * comme celle d'un téléphone en plein soleil.
  */
+/**
+ * Le marqueur d'état actif des navigations.
+ *
+ * Ces épreuves tiennent ce qui fait que ce jeton mérite d'exister à côté de
+ * `chartMint`, dont il reprend l'emploi : s'il en était indiscernable, ce
+ * serait un renommage, et le couplage qu'on vient de défaire reviendrait par
+ * la ressemblance.
+ */
+describe("le marqueur d'état actif", () => {
+  it('tient 4,5:1 sur la barre latérale', () => {
+    // 4,5 et non 3 : le jeton teinte l'icône **et** l'intitulé de l'entrée
+    // active. C'est donc le seuil du texte qui s'applique.
+    expect(contraste(couleurs.marqueurActif, couleurs.sidebar)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("ne se confond pas avec le vert de l'échelle data-viz", () => {
+    const canaux = (hex: string): [number, number, number] => [
+      Number.parseInt(hex.slice(1, 3), 16),
+      Number.parseInt(hex.slice(3, 5), 16),
+      Number.parseInt(hex.slice(5, 7), 16),
+    ];
+
+    const [rm, vm, bm] = canaux(couleurs.marqueurActif);
+    const [rc, vc, bc] = canaux(couleurs.chartMint);
+    const ecart = Math.max(Math.abs(rm - rc), Math.abs(vm - vc), Math.abs(bm - bc));
+
+    expect(ecart).toBeGreaterThanOrEqual(27);
+  });
+
+  it("n'est pas un or déguisé", () => {
+    // La barre latérale est une surface d'application, et le Design System §1
+    // y interdit l'or. Le marqueur est un vert : sa composante bleue le tient
+    // loin d'un jaune, où elle s'effondre.
+    const bleu = Number.parseInt(couleurs.marqueurActif.slice(5, 7), 16);
+    const bleuOr = Number.parseInt(couleurs.or.slice(5, 7), 16);
+
+    expect(bleu).toBeGreaterThan(bleuOr);
+  });
+});
+
 describe('les quatre aplats de tuile', () => {
   interface Tuile {
     nom: string;

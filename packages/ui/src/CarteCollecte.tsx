@@ -58,7 +58,17 @@ export function CarteCollecte({
   const pourcentage = Math.round((jourCourant / totalJours) * 100);
 
   return (
-    <div className="@container rounded-xl overflow-hidden relative shadow-lg min-h-50 @max-[240px]:min-h-40 bg-[image:var(--degrade-carte)] border border-white/30 backdrop-blur-xs">
+    <div
+      /*
+        Pas de `backdrop-filter` ici. Il y en avait un jusqu'au 2026-09-17, et
+        il ne floutait rien : la carte porte son propre fond `degradeCarte`,
+        qui est opaque, donc le filtre traitait une zone que la carte recouvre
+        entièrement. Ce qu'il coûtait, en revanche, était réel — une couche de
+        composition par carte, et il y a une carte par client dans une liste
+        qui défile. Mesuré sur six cartes : six filtres sans aucun effet.
+      */
+      className="@container rounded-xl overflow-hidden relative shadow-lg min-h-50 @max-[240px]:min-h-40 bg-[image:var(--degrade-carte)] border border-white/30"
+    >
       {/* Cercles et reflets décoratifs */}
       <div className="pointer-events-none absolute top-0 right-0 w-48 h-48 rounded-pill opacity-25 translate-x-[20%] -translate-y-[30%] bg-[radial-gradient(circle,#ffffff_0%,transparent_70%)]" />
       <div className="pointer-events-none absolute bottom-0 left-0 w-36 h-36 rounded-pill opacity-20 -translate-x-[20%] translate-y-[30%] bg-[radial-gradient(circle,var(--color-primary)_0%,transparent_70%)]" />
@@ -102,7 +112,17 @@ export function CarteCollecte({
               }`}
             >
               {numero === jourCourant && (
-                <div className="w-1.5 h-1.5 rounded-pill bg-chart-mint animate-pulse" />
+                <div
+                  /*
+                    Ni `animate-pulse` ni `chart-mint`, depuis le 2026-09-17.
+                    L'animation ne s'arrêtait jamais et il y en avait une par
+                    carte, dans une liste qui défile, sur le téléphone d'entrée
+                    de gamme qui est l'appareil de référence — pour répéter en
+                    bougeant ce que la case dit déjà par son fond `sidebar` et
+                    son anneau blanc.
+                  */
+                  className="w-1.5 h-1.5 rounded-pill bg-primary-foreground"
+                />
               )}
             </div>
           ))}
@@ -111,7 +131,13 @@ export function CarteCollecte({
         {/* Pied */}
         <div className="flex items-end justify-between pt-1 @max-[240px]:flex-col @max-[240px]:items-start @max-[240px]:gap-1.5">
           <div>
-            <p className="text-xs font-body font-medium text-ink/70 mb-0.5 @max-[240px]:text-[10px]">
+            {/* Encre pleine, et non `/70` : à 70 % sur `degradeCarte`, ce
+                libellé donnait 3,63:1 sur la borne violette et 3,81 sur la
+                bleue, qui occupent la plus grande part de la carte. Les
+                trois autres libellés atténués vivent sur un panneau blanc
+                translucide et passent entre 5,10 et 6,74 : celui-ci était
+                le seul à nu sur le dégradé. */}
+            <p className="text-xs font-body font-medium text-ink mb-0.5 @max-[240px]:text-[10px]">
               Solde restituable
             </p>
             <p className="font-headings font-bold text-2xl text-ink tabular-nums leading-none @max-[240px]:text-lg">

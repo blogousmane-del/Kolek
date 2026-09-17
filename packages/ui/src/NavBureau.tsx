@@ -102,12 +102,12 @@ function Groupe({
             type="button"
             onClick={() => onNaviguer(entree.cle)}
             className={`mb-0.5 flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-left ${
-              estActif ? 'border-l-2 border-chart-mint bg-white/10' : ''
+              estActif ? 'border-l-2 border-marqueur-actif bg-white/10' : ''
             }`}
           >
             <Icone
               nom={entree.icone}
-              className={estActif ? 'text-chart-mint' : 'text-white/55'}
+              className={estActif ? 'text-marqueur-actif' : 'text-white/55'}
             />
             <span
               className={`whitespace-nowrap font-body text-base font-medium ${
