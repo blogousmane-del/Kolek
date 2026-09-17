@@ -69,7 +69,10 @@ const CRANS_VITRINE = ['2xl', '3xl'];
  * `@max-[240px]:` — parce que le dépôt en porte de toutes ces formes et qu'un
  * rayon caché derrière une variante reste un rayon.
  */
-const MOTIF = /(?:[\w@[\]().%-]+:)*rounded(?:-[trblse]{1,2})?-(2xl|3xl)\b/g;
+const MOTIF = new RegExp(
+  `(?:[\\w@[\\]().%-]+:)*rounded(?:-[trblse]{1,2})?-(${CRANS_VITRINE.join('|')})\\b`,
+  'g',
+);
 
 function fichiers(dossier) {
   let entrees;

@@ -7,7 +7,6 @@ import {
   Carte,
   Icone,
   Pagination,
-  Rosace,
   SqueletteKPI,
   SqueletteLigne,
   useEnLigne,
@@ -392,37 +391,43 @@ export function Clients({
 
   return (
     <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-large">
-      {/* En-tête sombre immersif */}
-      <div className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pt-entete pb-7 shadow-lg lg:rounded-xl lg:pt-6">
-        <Rosace
-          petales={18}
-          excentricite={0.35}
-          animee
-          className="pointer-events-none absolute -right-[15%] -top-[20%] w-[65vmin] text-or/10 lg:w-96"
-        />
+      {/*
+        En-tête clair depuis le 2026-09-17.
 
-        <div className="relative z-10 flex items-center justify-between mb-2">
-          <div>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-white/10 text-white/70 text-xs font-body font-medium mb-1 backdrop-blur-xs">
-              <span className="w-1.5 h-1.5 rounded-pill bg-chart-mint" />
-              Portefeuille
-            </span>
-            <p className="text-white font-headings font-bold text-2xl tracking-tight">Mes clients</p>
-          </div>
+        Cet écran portait une copie exacte du bandeau de l'accueil : même
+        dégradé, même rosace, même pastille de verre. Deux écrans voisins que le
+        collecteur enchaîne trente fois par jour s'ouvraient donc sur la même
+        image, et la liste des clients n'avait aucune identité propre.
+
+        Le dégradé sombre reste à l'accueil, qui ouvre la journée, et à
+        l'encaissement, qui la paie. Ici, c'est une surface de travail : elle se
+        pose sur le même fond que la liste qu'elle titre.
+
+        La pastille « Portefeuille » est retirée avec lui. Son point vert était
+        vert tous les jours et par tous les temps : il ne disait rien, il
+        décorait. Le titre de l'écran le disait déjà mieux.
+      */}
+      <div className="bg-canvas border-b border-hairline px-marge pt-entete pb-4 lg:pt-6">
+        <div className="flex items-center justify-between gap-3">
+          <p className="font-headings font-bold text-2xl text-ink tracking-tight">Mes clients</p>
           <button
             type="button"
             onClick={onDeconnexion}
             aria-label="Se déconnecter"
-            className="anim-pression w-10 h-10 rounded-pill bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-md flex items-center justify-center cursor-pointer transition-colors shadow-xs"
+            className="anim-pression w-10 h-10 rounded-pill bg-surface border border-hairline flex items-center justify-center cursor-pointer shrink-0"
           >
-            <Icone nom="log-out" className="text-white" taille={18} />
+            <Icone nom="log-out" className="text-ink" taille={18} />
           </button>
         </div>
-        <BandeauHorsLigne enLigne={enLigne} compte={file} className="mt-3 relative z-10" />
+        <BandeauHorsLigne enLigne={enLigne} compte={file} className="mt-3" />
       </div>
 
-      {/* Résumé — trois nombres clés */}
-      <div className="mx-4 -mt-5 relative z-20 bg-surface rounded-xl border border-hairline/80 p-3.5 xs:p-4 flex items-center justify-between shadow-md backdrop-blur-xs">
+      {/* Résumé : trois nombres clés.
+
+          Il ne chevauche plus rien — il n'y a plus de bloc sombre sous lequel
+          glisser — donc ni marge négative, ni ombre portée, ni flou
+          d'arrière-plan posé sur une surface opaque, qui ne floutait rien. */}
+      <div className="mx-4 mt-4 bg-surface rounded-lg border border-hairline p-3.5 xs:p-4 flex items-center justify-between">
         <div className="text-center flex-1 min-w-0">
           <p className="text-[11px] text-muted-foreground font-body font-medium mb-0.5">Clients</p>
           {lignes ? (
@@ -752,7 +757,7 @@ function LigneClient({
   }
 
   return (
-    <div className="bg-surface rounded-lg border border-hairline/80 p-4 shadow-xs hover:shadow-sm transition-all">
+    <div className="bg-surface rounded-lg border border-hairline/80 p-4 shadow-xs">
       <div className="flex items-center gap-3">
       {/* Un `button` et non la carte entière : « Encaisser » et la bascule des
           avis sont déjà des commandes, et un bouton dans un bouton n'est pas du

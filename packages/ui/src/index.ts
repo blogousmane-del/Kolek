@@ -1,5 +1,5 @@
 export { ActionsCarte, type ActionCarte } from './ActionsCarte';
-export { ActionsRapides, type ActionRapide } from './ActionsRapides';
+export { ActionsRapides, type ActionRapide, type FamilleAction } from './ActionsRapides';
 export { Avatar, fondPour, initiales } from './Avatar';
 export { BadgeStatut, type Statut } from './BadgeStatut';
 export { BandeauHorsLigne, messageFile, useEnLigne, type CompteFile } from './Bandeaux';

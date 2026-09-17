@@ -78,7 +78,7 @@ export function Encaisser({
             type="button"
             onClick={() => onNaviguer('clients')}
             aria-label="Revenir aux clients"
-            className="anim-pression w-10 h-10 rounded-pill bg-white/10 hover:bg-white/20 border border-white/15 backdrop-blur-md flex items-center justify-center cursor-pointer transition-colors shadow-xs"
+            className="anim-pression w-10 h-10 rounded-pill bg-white/10 border border-white/15 flex items-center justify-center cursor-pointer"
           >
             <Icone nom="arrow-left" className="text-white" taille={18} />
           </button>
@@ -117,7 +117,6 @@ export function Encaisser({
                 <span className="text-xs font-body font-medium text-muted-foreground">
                   Jour {carte.misesEncaissees}/{MISES_PAR_CYCLE}
                 </span>
-                <span className="w-1 h-1 rounded-pill bg-muted-foreground/40" />
                 <span className="text-xs font-body font-semibold text-accent">
                   Cycle 1
                 </span>
@@ -137,7 +136,7 @@ export function Encaisser({
 
           {/* Montant — imposé par la carte */}
           <div className="mx-4 mt-4">
-            <p className="text-xs font-body font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 px-0.5">
+            <p className="text-xs font-body font-semibold text-muted-foreground mb-1.5 px-0.5">
               Montant de la mise
             </p>
             <div className="flex items-baseline justify-between bg-surface border border-hairline/80 rounded-xl px-5 py-3.5 shadow-xs">
@@ -187,9 +186,30 @@ export function Encaisser({
                 collecteurId === null ||
                 carte.misesEncaissees >= MISES_PAR_CYCLE
               }
-              className="anim-pression w-full rounded-md bg-gradient-to-r from-primary to-accent hover:from-accent hover:to-primary text-white font-headings font-bold text-base xs:text-lg py-4 flex items-center justify-center gap-2.5 cursor-pointer shadow-action disabled:opacity-50 disabled:cursor-default disabled:hover:from-primary disabled:hover:to-accent border border-white/20 transition-all"
+              /*
+                Aplat, depuis le 2026-09-17.
+
+                Il portait un dégradé horizontal qui permutait ses deux bornes
+                au survol. Sur le téléphone où ce bouton est pressé trente fois
+                par jour, le survol n'arrive jamais ; sur le bureau, il donnait
+                un clignotement de couleur qui n'apprenait rien. C'est le geste
+                qui fait vivre Kolek, et il portait le tic visuel le plus daté
+                du produit.
+
+                Ce qui le distingue de tous les autres boutons reste, et il est
+                mieux choisi : `shadow-action`, la seule ombre teintée de vert
+                du Design System §3.5, réservée à cette surface-là. La bordure
+                blanche translucide part avec le dégradé — elle dessinait un
+                liseré sur du vert, sans rien séparer.
+
+                L'icône n'est plus en `chart-mint` : les jetons `chart-*`
+                encodent des séries de données, et les emprunter pour un
+                ornement brouille la lecture des graphiques qui s'en servent
+                vraiment. Elle prend l'encre du bouton.
+              */
+              className="anim-pression w-full rounded-md bg-primary text-primary-foreground font-headings font-bold text-base xs:text-lg py-4 flex items-center justify-center gap-2.5 cursor-pointer shadow-action disabled:opacity-50 disabled:cursor-default"
             >
-              <Icone nom="check-circle" taille={22} className="text-chart-mint" />
+              <Icone nom="check-circle" taille={22} />
               <span>
                 {envoi
                   ? 'Enregistrement…'

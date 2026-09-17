@@ -37,26 +37,30 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
         onRetour={onRetour}
         enfants={
           donnees && (
+            /* Deux tuiles claires depuis le 2026-09-17 : l'en-tête n'est plus
+               sombre, donc le verre translucide n'avait plus rien à laisser
+               transparaître, et son `backdrop-filter` faisait repeindre la zone
+               à chaque défilement pour un effet devenu invisible. */
             <div className="grid grid-cols-2 gap-3 mt-2">
-              <div className="bg-white/10 backdrop-blur-md rounded-lg border border-white/15 p-3.5 min-w-0 shadow-xs">
-                <div className="flex items-center gap-1 text-white/70 mb-0.5">
+              <div className="bg-surface rounded-lg border border-hairline p-3.5 min-w-0">
+                <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
                   <Icone nom="bar-chart-2" taille={13} />
                   <p className="text-xs font-body">Encours client</p>
                 </div>
-                <p className="anim-montant text-white font-headings font-bold text-lg xs:text-xl tabular-nums tracking-tight">
+                <p className="anim-montant font-headings font-bold text-lg xs:text-xl text-ink tabular-nums tracking-tight">
                   {formatMontant(donnees.encoursTotal)}
                 </p>
-                <p className="text-white/55 text-[11px] font-body mt-0.5">FCFA à rendre</p>
+                <p className="text-[11px] font-body text-muted-foreground mt-0.5">FCFA à rendre</p>
               </div>
-              <div className="bg-white/10 backdrop-blur-md rounded-lg border border-white/15 p-3.5 min-w-0 shadow-xs">
-                <div className="flex items-center gap-1 text-white/70 mb-0.5">
+              <div className="bg-surface rounded-lg border border-hairline p-3.5 min-w-0">
+                <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
                   <Icone nom="users" taille={13} />
                   <p className="text-xs font-body">Cartes actives</p>
                 </div>
-                <p className="text-white font-headings font-bold text-xl tabular-nums tracking-tight">
+                <p className="font-headings font-bold text-xl text-ink tabular-nums tracking-tight">
                   {donnees.cartesActives}
                 </p>
-                <p className="text-white/55 text-[11px] font-body mt-0.5">
+                <p className="text-[11px] font-body text-muted-foreground mt-0.5">
                   {donnees.clients} client{donnees.clients > 1 ? 's' : ''}
                 </p>
               </div>
@@ -111,7 +115,7 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
               {donnees?.tranches.map((tranche, rang) => (
                 <Carte
                   key={tranche.libelle}
-                  className={`p-5 rounded-lg border border-hairline/80 shadow-xs hover:shadow-sm transition-all ${
+                  className={`p-5 rounded-lg border border-hairline/80 shadow-xs ${
                     premier ? 'anim-cascade' : ''
                   }`}
                   style={rangCascade(rang, premier)}
@@ -124,7 +128,7 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
                   </div>
 
                   <div className="flex items-baseline justify-between gap-2 mb-1.5">
-                    <span className="font-body text-xs text-muted-foreground shrink-0 uppercase tracking-wider">
+                    <span className="font-body text-xs text-muted-foreground shrink-0">
                       Encaissé
                     </span>
                     <span className="font-headings font-bold text-xl text-ink tabular-nums text-right min-w-0">
