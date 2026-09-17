@@ -966,13 +966,6 @@ describe('fiche absente du téléphone', () => {
     expect(screen.queryByText(/Vérifie le réseau/)).toBeNull();
   });
 
-  /**
-   * `chargerFicheClient` rend `null` pour deux raisons qu'on ne distingue pas
-   * ici : le client a été supprimé, ou cette tournée n'a jamais été chargée sur
-   * ce téléphone. Hors ligne, seule la seconde est plausible — et dire
-   * « supprimée » à un collecteur qui a le client sous les yeux lui apprend que
-   * l'écran se trompe.
-   */
   it('hors ligne, une fiche absente dit qu’elle n’est pas chargée, pas qu’elle est supprimée', async () => {
     Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
     chargerFicheClient.mockResolvedValue(null);

@@ -39,6 +39,13 @@ export interface Dependances {
   /** Injectables pour les épreuves ; sinon les vrais. */
   envoyer?: typeof envoyer;
   consigner?: typeof consigner;
+  /**
+   * Appelé à chaque opération sortie de la file, pendant la passe et non à sa
+   * fin : c’est ce qui fait décroître « Envoi en cours · N restantes ». Une
+   * passe de vingt mises tient plusieurs minutes sur un réseau de marché, et
+   * un compte figé ne distingue pas « ça avance » de « ça a calé ».
+   */
+  surProgres?: () => void;
 }
 
 export interface BilanPasse {
@@ -153,6 +160,15 @@ export async function passe(deps: Dependances): Promise<BilanPasse> {
   const envoyerOp = deps.envoyer ?? envoyer;
   const consignerOp = deps.consigner ?? consigner;
   let traitees = 0;
+  /**
+   * Une opération a quitté la file, ou changé d’état : le compte bouge, et les
+   * écrans doivent le relire. Un seul endroit pour les deux gestes — sinon un
+   * sixième incrément arriverait un jour sans son annonce.
+   */
+  function avancer(de = 1): void {
+    traitees += de;
+    deps.surProgres?.();
+  }
   const bilan = (etat: BilanPasse['etat'], reveil: number | null = null): BilanPasse => ({
     etat,
     reveil,
@@ -203,7 +219,7 @@ export async function passe(deps: Dependances): Promise<BilanPasse> {
       const issue = await consignerOp(deps.client, aConsigner);
       if (issue.issue === 'acceptee') {
         // Le parent, et ses enfants marqués « parent refusé » avec lui.
-        traitees += 1 + (await retirerEnRefus(deps.base, aConsigner, maintenant()));
+        avancer(1 + (await retirerEnRefus(deps.base, aConsigner, maintenant())));
         continue;
       }
       if (issue.issue === 'passager') return bilan('hors_ligne');
@@ -253,7 +269,7 @@ export async function passe(deps: Dependances): Promise<BilanPasse> {
         tentatives: 0,
         prochainEssai: null,
       });
-      traitees += 1;
+      avancer();
       continue;
     }
 
@@ -268,7 +284,7 @@ export async function passe(deps: Dependances): Promise<BilanPasse> {
     switch (issue.issue) {
       case 'acceptee':
         await retirerAcceptee(deps.base, op);
-        traitees += 1;
+        avancer();
         continue;
       case 'refusee': {
         // Même garde qu'à la consignation (§4.5).
@@ -281,7 +297,7 @@ export async function passe(deps: Dependances): Promise<BilanPasse> {
           tentatives: 0,
           prochainEssai: null,
         });
-        traitees += 1;
+        avancer();
         continue;
       }
       case 'passager':
@@ -304,7 +320,7 @@ export async function passe(deps: Dependances): Promise<BilanPasse> {
             motif: 'INCONNU',
             prochainEssai: null,
           });
-          traitees += 1;
+          avancer();
           continue;
         }
         const prochain = maintenant() + delaiApres(tentatives);

@@ -101,7 +101,16 @@ export function demarrerMoteur(client: SupabaseClient, collecteurId: string): ()
       passe: () =>
         sousVerrou(
           verrou,
-          async () => passe({ client, base: await ouvrirBase(collecteurId), collecteurId }),
+          async () =>
+            passe({
+              client,
+              base: await ouvrirBase(collecteurId),
+              collecteurId,
+              // Le bandeau décroît pendant la passe, et non d’un coup à la fin.
+              // Le rappel de fin, plus bas, reste : il porte aussi le
+              // rechargement de tournée, que celui-ci ne couvre pas.
+              surProgres: signalerChangement,
+            }),
           // Un autre onglet envoie : on repassera dans trente secondes.
           () => ({ etat: 'attente' as const, reveil: Date.now() + 30_000, traitees: 0 }),
         ),
