@@ -193,7 +193,7 @@ export function Encaisser({
               <span>
                 {envoi
                   ? 'Enregistrement…'
-                  : `Confirmer la mise — ${formatMontant(carte.mise)} FCFA`}
+                  : `Confirmer la mise de ${formatMontant(carte.mise)} FCFA`}
               </span>
             </button>
             {carte.misesEncaissees >= MISES_PAR_CYCLE && (

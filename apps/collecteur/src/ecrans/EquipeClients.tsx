@@ -55,7 +55,7 @@ export function EquipeClients({
     <div className="flex-1 flex flex-col">
       <EnTeteEcran
         titre={collaborateur.nom}
-        sousTitre="Sa tournée — tu encaisses à sa place"
+        sousTitre="Sa tournée : tu encaisses à sa place"
         onRetour={onRetour}
       />
 

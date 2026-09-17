@@ -46,7 +46,7 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
                 <p className="anim-montant text-white font-headings font-bold text-lg xs:text-xl tabular-nums tracking-tight">
                   {formatMontant(donnees.encoursTotal)}
                 </p>
-                <p className="text-white/50 text-[11px] font-body mt-0.5">FCFA à rendre</p>
+                <p className="text-white/55 text-[11px] font-body mt-0.5">FCFA à rendre</p>
               </div>
               <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 p-3.5 min-w-0 shadow-xs">
                 <div className="flex items-center gap-1 text-white/70 mb-0.5">
@@ -56,7 +56,7 @@ export function Bilan({ onRetour, revision }: { onRetour: () => void; revision: 
                 <p className="text-white font-headings font-bold text-xl tabular-nums tracking-tight">
                   {donnees.cartesActives}
                 </p>
-                <p className="text-white/50 text-[11px] font-body mt-0.5">
+                <p className="text-white/55 text-[11px] font-body mt-0.5">
                   {donnees.clients} client{donnees.clients > 1 ? 's' : ''}
                 </p>
               </div>

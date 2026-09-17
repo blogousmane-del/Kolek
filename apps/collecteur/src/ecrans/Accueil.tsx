@@ -253,7 +253,7 @@ export function Accueil({
               onClick={() => onNaviguer('alertes')}
               className="anim-pression w-full cursor-pointer rounded-md border border-negative bg-surface p-3 text-left text-sm font-body font-medium text-negative"
             >
-              {`${refusees} opération${refusees > 1 ? 's' : ''} refusée${refusees > 1 ? 's' : ''} — à voir`}
+              {`${refusees} opération${refusees > 1 ? 's' : ''} refusée${refusees > 1 ? 's' : ''}, à voir`}
             </button>
           )}
           {avisStockage && (

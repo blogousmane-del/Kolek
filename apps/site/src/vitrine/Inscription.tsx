@@ -162,7 +162,7 @@ export function Inscription() {
             avant le libellé, que `gap-2` dessinait déjà. */}
         <a
           href="/"
-          className="mb-8 inline-flex items-center gap-2 font-body text-sm text-white/50 transition-colors hover:text-white"
+          className="mb-8 inline-flex items-center gap-2 font-body text-sm text-white/55 transition-colors hover:text-white"
         >
           <Icone nom="arrow-left" taille={15} />
           Retour à l’accueil

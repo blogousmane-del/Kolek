@@ -94,14 +94,14 @@ export function Rapprochement({ collecteurId, revision, onRetour }: {
                     relu. Le dire évite qu'un écart d'attente se lise comme un
                     manquant. */}
                 {donnees.provisoire
-                  ? 'Cash attendu — provisoire, le serveur recalculera'
-                  : 'Cash attendu — calculé par le serveur'}
+                  ? 'Cash attendu (provisoire, le serveur recalculera)'
+                  : 'Cash attendu (calculé par le serveur)'}
               </p>
               <p className="text-white font-headings font-bold text-3xl tabular-nums">
                 {formatMontant(donnees.cashAttendu)}{' '}
                 <span className="text-base font-body font-medium text-white/60">FCFA</span>
               </p>
-              <p className="text-white/50 text-xs font-body mt-1">
+              <p className="text-white/55 text-xs font-body mt-1">
                 Somme de tes mises du {donnees.date}
               </p>
             </div>

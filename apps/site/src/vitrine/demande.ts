@@ -66,7 +66,7 @@ const MESSAGES: Record<string, string> = {
   NOM_TROP_LONG: 'Ce nom est trop long.',
   TELEPHONE_TROP_COURT: 'Ce numéro semble incomplet.',
   TELEPHONE_TROP_LONG: 'Ce numéro est trop long.',
-  EMAIL_MANQUANT: 'Indique ton adresse e-mail — c’est par là que ton accès arrivera.',
+  EMAIL_MANQUANT: 'Indique ton adresse e-mail. C’est par là que ton accès arrivera.',
   EMAIL_INVALIDE: 'Cette adresse n’a pas la bonne forme. Vérifie l’arobase et le domaine.',
   EMAIL_TROP_LONG: 'Cette adresse est trop longue.',
   ZONE_TROP_LONGUE: 'Le nom de la zone est trop long.',

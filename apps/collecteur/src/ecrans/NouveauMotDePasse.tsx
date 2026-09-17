@@ -123,7 +123,7 @@ export function NouveauMotDePasse() {
 
         {session === true && !pose && (
           <>
-            <p className="mb-6 font-body text-sm text-white/50">
+            <p className="mb-6 font-body text-sm text-white/55">
               Au moins 10 caractères. Évite un mot de passe déjà utilisé ailleurs.
             </p>
 

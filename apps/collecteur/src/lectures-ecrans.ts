@@ -314,7 +314,7 @@ export async function chargerAlertes(): Promise<Alerte[]> {
       alertes.push({
         cle: `complete-${carte.id}`,
         gravite: 'action',
-        titre: `${nom} — cycle terminé`,
+        titre: `${nom} : cycle terminé`,
         // « La carte doit être clôturée » : c'était vrai tant qu'un client ne
         // pouvait tenir qu'une carte à la fois — il fallait fermer l'ancienne
         // pour en ouvrir une neuve, donc rendre l'argent. La contrainte est
@@ -331,7 +331,7 @@ export async function chargerAlertes(): Promise<Alerte[]> {
       alertes.push({
         cle: `derniere-${carte.id}`,
         gravite: 'attention',
-        titre: `${nom} — dernière mise`,
+        titre: `${nom} : dernière mise`,
         detail: `Encore une mise de ${formatMontant(carte.mise)} FCFA et le cycle est complet.`,
       });
     }
@@ -346,7 +346,7 @@ export async function chargerAlertes(): Promise<Alerte[]> {
       alertes.push({
         cle: `dormante-${carte.id}`,
         gravite: 'attention',
-        titre: `${nom} — ${jours} jours sans mise`,
+        titre: `${nom} : ${jours} jours sans mise`,
         detail: derniereMise.has(carte.id)
           ? `Carte à ${carte.mises_encaissees}/${MISES_PAR_CYCLE}. Dernière mise il y a ${jours} jours.`
           : `Carte à ${carte.mises_encaissees}/${MISES_PAR_CYCLE}, ouverte il y a ${jours} jours et sans mise récente.`,

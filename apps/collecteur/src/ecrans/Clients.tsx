@@ -373,7 +373,7 @@ export function Clients({
         ? `${correspondants} client${pluriel(correspondants)} trouvé${pluriel(correspondants)}`
         : visibles.length === 0
           ? `${correspondants} client${pluriel(correspondants)} trouvé${pluriel(correspondants)}, masqué${pluriel(correspondants)} par le filtre « ${filtre} »`
-          : `${visibles.length} sur ${correspondants} — ${masques} masqué${pluriel(masques)} par le filtre « ${filtre} »`;
+          : `${visibles.length} sur ${correspondants}, dont ${masques} masqué${pluriel(masques)} par le filtre « ${filtre} »`;
 
   // Une ligne par client depuis le 2026-08-26, donc `lignes.length` compte bien
   // des personnes. Les carnets, eux, se comptent en les additionnant : c'est la

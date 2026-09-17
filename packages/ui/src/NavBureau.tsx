@@ -91,7 +91,7 @@ function Groupe({
 }) {
   return (
     <div className="mb-5 px-3">
-      <p className="mb-2 px-2 font-body text-xs font-semibold uppercase tracking-widest text-white/30">
+      <p className="mb-2 px-2 font-body text-xs font-semibold uppercase tracking-widest text-white/55">
         {titre}
       </p>
       {entrees.map((entree) => {
@@ -107,7 +107,7 @@ function Groupe({
           >
             <Icone
               nom={entree.icone}
-              className={estActif ? 'text-chart-mint' : 'text-white/50'}
+              className={estActif ? 'text-chart-mint' : 'text-white/55'}
             />
             <span
               className={`whitespace-nowrap font-body text-base font-medium ${
@@ -153,7 +153,7 @@ export function NavBureau({ actif, onNaviguer, onDeconnexion, nom }: Props) {
 
       <div className="border-t border-white/8 px-3 py-4">
         {nom && (
-          <p className="mb-2 truncate px-3 font-body text-sm text-white/40" title={nom}>
+          <p className="mb-2 truncate px-3 font-body text-sm text-white/55" title={nom}>
             {nom}
           </p>
         )}
@@ -162,7 +162,7 @@ export function NavBureau({ actif, onNaviguer, onDeconnexion, nom }: Props) {
           onClick={onDeconnexion}
           className="flex w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-left"
         >
-          <Icone nom="log-out" className="text-white/50" />
+          <Icone nom="log-out" className="text-white/55" />
           <span className="font-body text-base font-medium text-white/60">Déconnexion</span>
         </button>
       </div>

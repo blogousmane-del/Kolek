@@ -66,7 +66,7 @@ export function Tarification() {
               <p className={`mb-1 font-headings text-4xl font-bold tabular-nums ${vedette ? 'text-or' : 'text-ink'}`}>
                 {palier.prix === 0 ? 'Gratuit' : formatMontant(palier.prix)}
                 {palier.prix > 0 && (
-                  <span className={`ml-1 font-body text-sm font-medium ${vedette ? 'text-white/50' : 'text-muted-foreground'}`}>
+                  <span className={`ml-1 font-body text-sm font-medium ${vedette ? 'text-white/55' : 'text-muted-foreground'}`}>
                     FCFA/{palier.periode}
                   </span>
                 )}

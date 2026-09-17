@@ -207,7 +207,7 @@ function Places({
   if (restantes <= 0) {
     return (
       <p className="font-body text-sm text-muted-foreground text-center py-2">
-        Équipe complète — {COLLABORATEURS_MAX} collaborateurs sur {COLLABORATEURS_MAX}.
+        Équipe complète : {COLLABORATEURS_MAX} collaborateurs sur {COLLABORATEURS_MAX}.
       </p>
     );
   }
