@@ -149,6 +149,7 @@ export function Clients({
   onDeconnexion,
   onEcriture,
   onRetrait,
+  onRecus,
 }: {
   collecteurId: string | null;
   revision: number;
@@ -166,6 +167,9 @@ export function Clients({
       carte : le renvoyer sur la liste de tous ses clients l'obligerait à la
       retrouver à la main, avant un geste qui ne se défait pas. */
   onRetrait: (client: ClientCible) => void;
+  /** Ouvre « Reçus » sur ce client, la recherche déjà remplie de son nom.
+      Depuis le 2026-09-17, tout son passé vit là-bas. */
+  onRecus: (clientNom: string) => void;
 }) {
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);
   /** Le client dont la fiche flottante est ouverte. `null` = aucune. */
@@ -675,6 +679,7 @@ export function Clients({
         revision={revision}
         onFermer={() => setFiche(null)}
         onEcriture={onEcriture}
+        onRecus={onRecus}
         onRetrait={(nom) => {
           // La fiche se referme, mais le client la suit : l'écran de retrait
           // s'ouvre sur ses cartes à lui, pas sur celles de tous. Le nom vient

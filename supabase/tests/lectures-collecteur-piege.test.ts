@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { admin, creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
-import { ATTENDU_PIEGE, MISE_PIEGE, jourUtc, poserJeuPiege, poserRattrapage, poserRefus, type JeuPiege } from './jeu-piege';
+import { ATTENDU_PIEGE, MISE_PIEGE, MISES_AU_SERVEUR, jourUtc, poserJeuPiege, poserRattrapage, poserRefus, type JeuPiege } from './jeu-piege';
 
 /**
  * Les lectures en ligne du collecteur, sur le jeu piégé, avec la session d'un
@@ -21,7 +21,7 @@ vi.mock('../../apps/collecteur/src/supabase', () => ({
   },
 }));
 
-const { chargerAlertes, chargerBilan, chargerHistoriqueCarte, chargerRecus } = await import(
+const { chargerAlertes, chargerBilan, chargerHistoriqueCarte, chargerJournal } = await import(
   '../../apps/collecteur/src/lectures-ecrans'
 );
 
@@ -57,14 +57,37 @@ describe('le bilan', () => {
   });
 });
 
-describe('les reçus', () => {
+describe('le journal', () => {
   it('rend les trente-et-un versements, dont le rattrapage', async () => {
-    const recus = await chargerRecus();
+    const journal = await chargerJournal();
+    const versements = journal.filter((e) => e.nature !== 'cloture');
 
-    expect(recus).toHaveLength(ATTENDU_PIEGE.versements);
-    expect(recus.reduce((somme, r) => somme + r.montant, 0)).toBe(ATTENDU_PIEGE.encaisse);
-    expect(recus.filter((r) => r.nature === 'rattrapage')).toEqual([
-      expect.objectContaining({ id: jeu.rattrapageId, montant: MISE_PIEGE, estCommission: false }),
+    expect(versements).toHaveLength(ATTENDU_PIEGE.versements);
+    expect(versements.reduce((somme, e) => somme + e.montant, 0)).toBe(ATTENDU_PIEGE.encaisse);
+    // La nature porte maintenant ce que `estCommission` disait : un rattrapage
+    // marqué commission serait rangé en « commission » et sortirait d'ici.
+    expect(versements.filter((e) => e.nature === 'rattrapage')).toEqual([
+      expect.objectContaining({ id: jeu.rattrapageId, montant: MISE_PIEGE }),
+    ]);
+  });
+
+  /**
+   * La carte close sur la même frise que les versements.
+   *
+   * Elle vient d'une autre table que les mouvements, et son montant n'est pas
+   * un versement : c'est le compteur × la mise, soit tout ce que la carte a
+   * reçu. Le rattrapage, lui, ne fait pas avancer le compteur — il répare un
+   * jour, il n'ajoute pas une case au carnet.
+   */
+  it('y joint la carte close, chiffrée au total encaissé', async () => {
+    const journal = await chargerJournal();
+
+    expect(journal.filter((e) => e.nature === 'cloture')).toEqual([
+      expect.objectContaining({
+        carteId: jeu.carteId,
+        montant: MISES_AU_SERVEUR * MISE_PIEGE,
+        cycle: expect.objectContaining({ misesEncaissees: MISES_AU_SERVEUR }),
+      }),
     ]);
   });
 });

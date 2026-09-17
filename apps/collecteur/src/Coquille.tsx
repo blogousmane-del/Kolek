@@ -98,6 +98,9 @@ export function Coquille({
       C'est le bouton « Souscrire » de l'accueil qui la pose. */
   const [souscrire, setSouscrire] = useState(false);
   const [carteChoisie, setCarteChoisie] = useState<CarteChoisie | null>(null);
+  /** Le nom qui remplit la recherche de « Reçus » quand on y arrive depuis
+      une fiche client. Vidé par `naviguer`, comme la carte choisie. */
+  const [rechercheRecus, setRechercheRecus] = useState('');
   /** Le client sur lequel l'écran de retrait s'ouvre réduit. `null` = toutes les
       cartes. Porté ici et non dans l'écran : c'est la navigation qui le décide,
       et un état local se perdrait au premier aller-retour. */
@@ -252,6 +255,10 @@ export function Coquille({
    */
   function naviguer(cle: Page) {
     setClientPourRetrait(null);
+    // La recherche des reçus s'oublie ici pour la même raison que la carte
+    // choisie : sans ça, l'onglet « Reçus » rouvrirait le journal filtré sur
+    // le client d'avant, et le collecteur croirait n'avoir encaissé que lui.
+    setRechercheRecus('');
     // La carte choisie s'oublie ici, et non après l'encaissement.
     //
     // Elle s'oubliait au succès, ce qui interdisait à l'écran de montrer sa
@@ -268,6 +275,19 @@ export function Coquille({
     // la barre du bas rouvrirait celle du client précédent.
     setCarteChoisie(null);
     setPage(cle);
+  }
+
+  /**
+   * Ouvre « Reçus » sur un client.
+   *
+   * Le nom, et non l'identifiant : l'écran filtre par une recherche en
+   * toutes lettres, que le collecteur peut ensuite élargir ou effacer sans
+   * se retrouver coincé dans un filtre qu'il ne voit pas. Une recherche
+   * pré-remplie se défait ; un filtre caché, non.
+   */
+  function allerAuxRecus(clientNom: string) {
+    naviguer('recus');
+    setRechercheRecus(clientNom);
   }
 
   function allerAuRetrait(client: ClientCible) {
@@ -332,6 +352,7 @@ export function Coquille({
           onDeconnexion={deconnecter}
           onEcriture={() => setRevision((r) => r + 1)}
           onRetrait={allerAuRetrait}
+          onRecus={allerAuxRecus}
         />
       )}
       {page === 'encaisser' && (
@@ -391,7 +412,13 @@ export function Coquille({
           onEcriture={() => setRevision((r) => r + 1)}
         />
       )}
-      {page === 'recus' && <Recus revision={revision} onRetour={() => naviguer('accueil')} />}
+      {page === 'recus' && (
+        <Recus
+          revision={revision}
+          rechercheInitiale={rechercheRecus}
+          onRetour={() => naviguer('accueil')}
+        />
+      )}
       {page === 'alertes' && <Alertes revision={revision} onRetour={() => naviguer('accueil')} />}
       {page === 'avis' && <Avis revision={revision} onRetour={() => naviguer('accueil')} />}
       {(page === 'plus' || page === 'profil') && (

@@ -9,11 +9,9 @@ import {
   EnteteSection,
   Icone,
   LienBloc,
-  LigneTransaction,
   Rosace,
   Squelette,
   SqueletteKPI,
-  SqueletteLigne,
   useEnLigne,
   type ActionRapide,
 } from '@kolek/ui';
@@ -386,40 +384,15 @@ export function Accueil({
         )}
       </div>
 
-      <div className="mx-4 mt-5 lg:mx-0">
-        <EnteteSection
-          titre="Dernières mises"
-          className="mb-2"
-          action={<LienBloc libelle="Tout voir" onActiver={() => onNaviguer('clients')} />}
-        />
-        <Carte className="overflow-hidden">
-          {!tableau ? (
-            <div className="divide-y divide-hairline">
-              <SqueletteLigne />
-              <SqueletteLigne />
-              <SqueletteLigne />
-            </div>
-          ) : tableau.dernieres.length === 0 ? (
-            <p className="px-4 py-5 text-base font-body text-muted-foreground m-0">
-              Aucune mise encaissée pour l’instant.
-            </p>
-          ) : (
-            tableau.dernieres.map((ligne, i) => (
-              <LigneTransaction
-                key={`${ligne.quand}-${i}`}
-                nom={ligne.nom}
-                meta={`${new Date(ligne.quand).toLocaleDateString('fr-FR', {
-                  day: 'numeric',
-                  month: 'short',
-                })} · ${ligne.estCommission ? 'Commission' : 'Mise'}`}
-                montant={`+${formatMontant(ligne.montant)}`}
-                type={ligne.estCommission ? 'neutre' : 'positive'}
-                derniere={i === tableau.dernieres.length - 1}
-              />
-            ))
-          )}
-        </Carte>
-      </div>
+      {/* « Dernières mises » vivait ici jusqu'au 2026-09-17.
+      
+          Cinq lignes d'historique sur l'écran qu'on ouvre pour agir, et un
+          « Tout voir » qui menait à la liste des clients — c'est-à-dire pas
+          à l'historique. Tout le passé est maintenant dans « Reçus », sur une
+          seule frise, avec ses filtres ; la tuile « Reçus » plus bas y mène.
+      
+          Ce que l'accueil garde : la carte du jour, le résumé, et les
+          actions. Ce qu'on fait, et non ce qu'on a fait. */}
 
       </div>
 
