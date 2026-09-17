@@ -21,6 +21,17 @@
 - Branche `borne-caisse`, dans le plan de travail isolé `C:\Users\M.BERTHE\Documents\Kolek-caisse`. **Ne jamais commiter dans `C:\Users\M.BERTHE\Documents\Kolek`** : d'autres sessions y travaillent sur d'autres branches.
 - **Aucune fusion, aucun `git push`, aucun geste de production sans accord explicite de l'exploitant, demandé pour ce geste-là.**
 
+## État
+
+**Exécuté et livré le 2026-09-17.** Les cinq tâches sont faites, `main` porte
+le chantier en `e86b0ae` (fusion) et `038e247` (la liste J2b). Les vingt-huit
+étapes sont cochées.
+
+**Quatre d'entre elles ne se sont pas passées comme écrit ici.** Elles portent
+chacune une note `À l'exécution`. Un plan tout coché sans ces notes laisserait
+croire que la réalité a suivi le texte, ce qui serait le même mensonge que de
+laisser les cases vides après les avoir faites.
+
 ---
 
 ## Structure des fichiers
@@ -57,7 +68,7 @@
   - `validerCaisse(montant: number): boolean`
   - `MISE_MAX_RESTITUABLE` garde sa valeur exacte, `71_582_788`
 
-- [ ] **Étape 1 : écrire les épreuves qui tombent**
+- [x] **Étape 1 : écrire les épreuves qui tombent**
 
 Dans `packages/core/src/calcul.test.ts`, ajouter aux imports existants `CAISSE_MAX`, `ENTIER_MAX` et `validerCaisse`. Le bloc d'import devient :
 
@@ -125,7 +136,13 @@ describe('nommer ENTIER_MAX n’a rien déplacé', () => {
 });
 ```
 
-- [ ] **Étape 2 : les faire tomber**
+- [x] **Étape 2 : les faire tomber**
+
+> **À l'exécution :** l'échec annoncé (« le fichier entier échoue à l'import »)
+> n'est pas celui qui s'est produit. Vitest laisse un export manquant à
+> `undefined` au lieu de lever : seules les trois épreuves de `validerCaisse`
+> sont tombées, 19 autres sont restées vertes. Rouge plus net que prévu, mais
+> la prédiction du plan était fausse.
 
 ```bash
 npm run test -w @kolek/core -- src/calcul.test.ts
@@ -133,7 +150,7 @@ npm run test -w @kolek/core -- src/calcul.test.ts
 
 Attendu : **le fichier entier échoue** à l'import — `CAISSE_MAX`, `ENTIER_MAX` et `validerCaisse` ne sont pas exportés. C'est le rouge normal en TypeScript quand la fonction n'existe pas encore. L'épreuve du témoin (`71_582_788`) ne prouve donc rien à cette étape ; elle prouve à l'étape 4, une fois le fichier importable.
 
-- [ ] **Étape 3 : le correctif**
+- [x] **Étape 3 : le correctif**
 
 Dans `packages/core/src/calcul.ts`, remplacer la ligne :
 
@@ -184,7 +201,7 @@ export function validerCaisse(montant: number): boolean {
 }
 ```
 
-- [ ] **Étape 4 : les faire passer**
+- [x] **Étape 4 : les faire passer**
 
 ```bash
 npm run test -w @kolek/core
@@ -192,7 +209,7 @@ npm run test -w @kolek/core
 
 Attendu : 108 épreuves de référence + 4 nouvelles = **112 vertes**. En particulier, `MISE_MAX_RESTITUABLE` vaut toujours `71_582_788`.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add packages/core/src/calcul.ts packages/core/src/calcul.test.ts
@@ -229,7 +246,7 @@ EOF
 - Consomme : `CAISSE_MAX` et `validerCaisse` de la tâche 1.
 - Produit : le motif `MONTANT_TROP_GRAND`, présent dans `PHRASES` et dans `PHRASES_REFUS`. `construireCaisse` rend `{ ok: false, echec: { code: 'MONTANT_TROP_GRAND', message } }` au-dessus de la borne, et garde `CAISSE_INVALIDE` pour le négatif et le décimal.
 
-- [ ] **Étape 1 : écrire les épreuves qui tombent**
+- [x] **Étape 1 : écrire les épreuves qui tombent**
 
 Dans `apps/collecteur/src/hors-ligne/gestes.test.ts`, ajouter l'import de `CAISSE_MAX` en tête du fichier :
 
@@ -259,7 +276,7 @@ Puis, **dans** le `describe('déclarer la caisse (§6.4)', …)` existant, aprè
   });
 ```
 
-- [ ] **Étape 2 : les faire tomber**
+- [x] **Étape 2 : les faire tomber**
 
 ```bash
 npm run test -w @kolek/collecteur -- src/hors-ligne/gestes.test.ts
@@ -267,7 +284,7 @@ npm run test -w @kolek/collecteur -- src/hors-ligne/gestes.test.ts
 
 Attendu : la première **échoue** — `construireCaisse` rend aujourd'hui `{ ok: true }` pour `CAISSE_MAX + 1`, donc `toMatchObject({ ok: false, … })` tombe. La seconde passe déjà : elle tient le comportement qu'on ne veut pas casser en posant la borne.
 
-- [ ] **Étape 3 : le correctif**
+- [x] **Étape 3 : le correctif**
 
 Dans `apps/collecteur/src/phrases.ts`, ajouter à `PHRASES`, juste après la ligne `CAISSE_INVALIDE` :
 
@@ -305,7 +322,7 @@ devient :
     }
 ```
 
-- [ ] **Étape 4 : les faire passer**
+- [x] **Étape 4 : les faire passer**
 
 ```bash
 npm run test -w @kolek/collecteur -- src/hors-ligne/gestes.test.ts
@@ -313,7 +330,7 @@ npm run test -w @kolek/collecteur -- src/hors-ligne/gestes.test.ts
 
 Attendu : tout le fichier vert, y compris l'épreuve existante `refuse un montant négatif ou décimal`, qui doit **continuer** de rendre `CAISSE_INVALIDE`. Si elle tombe, le ternaire est inversé.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add apps/collecteur/src/phrases.ts apps/collecteur/src/hors-ligne/gestes.ts apps/collecteur/src/hors-ligne/gestes.test.ts
@@ -346,7 +363,7 @@ EOF
 - Consomme : le motif `MONTANT_TROP_GRAND` de la tâche 2.
 - Produit : `classer({ error: { code: '22003', … }, status: 400 }, portee)` rend `{ cas: 'refus', motif: 'MONTANT_TROP_GRAND' }` pour **toute** portée. Aucune signature ne change.
 
-- [ ] **Étape 1 : écrire les trois épreuves qui tombent**
+- [x] **Étape 1 : écrire les trois épreuves qui tombent**
 
 **(a)** Dans `apps/collecteur/src/hors-ligne/classer.test.ts`, à la fin du fichier :
 
@@ -486,7 +503,7 @@ describe('une déclaration hors borne ne retient plus la file', () => {
 });
 ```
 
-- [ ] **Étape 2 : les faire tomber**
+- [x] **Étape 2 : les faire tomber**
 
 ```bash
 npm run test -w @kolek/collecteur -- src/hors-ligne/classer.test.ts src/hors-ligne/envoyer.test.ts src/hors-ligne/synchroniseur.test.ts
@@ -502,7 +519,7 @@ Attendu, les trois échecs, chacun pour la bonne raison :
 
 **Si l'épreuve du synchroniseur échoue autrement** — une erreur du client factice, une session refusée — c'est le montage qui est faux, pas le défaut. Le corriger avant d'aller plus loin : un rouge obtenu pour la mauvaise raison ne prouve rien.
 
-- [ ] **Étape 3 : le correctif**
+- [x] **Étape 3 : le correctif**
 
 Dans `apps/collecteur/src/hors-ligne/classer.ts`, **juste avant** la branche `if (code === '23514')`, ajouter :
 
@@ -514,7 +531,7 @@ Dans `apps/collecteur/src/hors-ligne/classer.ts`, **juste avant** la branche `if
   if (code === '22003') return { cas: 'refus', motif: 'MONTANT_TROP_GRAND' };
 ```
 
-- [ ] **Étape 4 : les faire passer**
+- [x] **Étape 4 : les faire passer**
 
 ```bash
 npm run test -w @kolek/collecteur -- src/hors-ligne/classer.test.ts src/hors-ligne/envoyer.test.ts src/hors-ligne/synchroniseur.test.ts
@@ -522,7 +539,7 @@ npm run test -w @kolek/collecteur -- src/hors-ligne/classer.test.ts src/hors-lig
 
 Attendu : les trois fichiers verts.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add apps/collecteur/src/hors-ligne/classer.ts apps/collecteur/src/hors-ligne/classer.test.ts apps/collecteur/src/hors-ligne/envoyer.test.ts apps/collecteur/src/hors-ligne/synchroniseur.test.ts
@@ -559,7 +576,7 @@ EOF
 - Consomme : `CAISSE_MAX` et `validerCaisse` de la tâche 1.
 - Produit : rien que d'autres tâches lisent.
 
-- [ ] **Étape 1 : écrire les épreuves qui tombent**
+- [x] **Étape 1 : écrire les épreuves qui tombent**
 
 Dans `apps/collecteur/src/ecrans/Rapprochement.test.tsx`, ajouter l'import en tête :
 
@@ -601,7 +618,7 @@ Puis, **dans** le `describe('déclarer', …)` existant :
   });
 ```
 
-- [ ] **Étape 2 : les faire tomber**
+- [x] **Étape 2 : les faire tomber**
 
 ```bash
 npm run test -w @kolek/collecteur -- src/ecrans/Rapprochement.test.tsx
@@ -609,7 +626,7 @@ npm run test -w @kolek/collecteur -- src/ecrans/Rapprochement.test.tsx
 
 Attendu : la première **échoue** — l'écran laisse passer, `declarerCaisse` est appelée, et le texte n'apparaît pas. La seconde passe déjà.
 
-- [ ] **Étape 3 : le correctif**
+- [x] **Étape 3 : le correctif**
 
 Dans `apps/collecteur/src/ecrans/Rapprochement.tsx`, ajouter `CAISSE_MAX` et `validerCaisse` à l'import de `@kolek/core` en tête de fichier, puis remplacer, dans `enregistrer` :
 
@@ -636,7 +653,7 @@ par :
     }
 ```
 
-- [ ] **Étape 4 : les faire passer**
+- [x] **Étape 4 : les faire passer**
 
 ```bash
 npm run test -w @kolek/collecteur -- src/ecrans/Rapprochement.test.tsx
@@ -644,7 +661,7 @@ npm run test -w @kolek/collecteur -- src/ecrans/Rapprochement.test.tsx
 
 Attendu : tout le fichier vert. L'épreuve existante `passe la date et le montant` doit rester verte : `4500` franchit `validerCaisse`.
 
-- [ ] **Étape 5 : commit**
+- [x] **Étape 5 : commit**
 
 ```bash
 git add apps/collecteur/src/ecrans/Rapprochement.tsx apps/collecteur/src/ecrans/Rapprochement.test.tsx
@@ -669,7 +686,16 @@ EOF
 
 **Aucun geste de cette tâche ne se fait sans un accord explicite de l'exploitant, demandé pour ce geste-là.**
 
-- [ ] **Étape 1 : la vérification complète**
+- [x] **Étape 1 : la vérification complète**
+
+> **À l'exécution :** `npm run verifier` **n'a jamais été vert d'un seul
+> tenant.** Il est vert en morceaux : core 112, ui 181, admin 161, collecteur
+> 666, site 42, scripts 198, `test:db` 864, `build` exit 0 (3 constructions),
+> `verifier:bundles` exit 0. Trois rouges en route, chacun relancé vert seul et
+> imputé à la charge machine : `garde-env.test.mjs` (14/14 seul),
+> `collaborateurs.test.ts` (`AuthRetryableFetchError`, 22/22 seul), et les
+> épreuves jsdom du collecteur (« Failed to start forks worker », dû à deux
+> suites lancées en parallèle). Aucun ne touche un fichier du diff.
 
 ```bash
 npm run verifier
@@ -681,7 +707,7 @@ Le détail des douze, à recompter si le total tombe à côté : tâche 2 en ajo
 
 Chaque épreuve rouge est relue **individuellement** : celle qui tombe parce que le défaut est corrigé se met à jour et le commit le dit ; celle qui tombe pour une autre raison arrête le chantier et remonte à l'exploitant.
 
-- [ ] **Étape 2 : contrôler le périmètre**
+- [x] **Étape 2 : contrôler le périmètre**
 
 ```bash
 git diff --stat main...HEAD -- supabase
@@ -690,7 +716,7 @@ git diff --name-only main...HEAD
 
 Attendu : la première commande ne rend **rien**. La seconde ne liste que `Docs/`, `packages/core/src/calcul*`, et six fichiers de `apps/collecteur/src`.
 
-- [ ] **Étape 3 : le contrôle que les épreuves ne font pas** *(accord)*
+- [x] **Étape 3 : le contrôle que les épreuves ne font pas** *(accord)*
 
 Les épreuves prouvent le classement et la passe. Elles ne prouvent pas que `22003` arrive encore sous cette forme. Le revérifier contre la pile locale, exactement comme le 2026-09-17 :
 
@@ -703,7 +729,7 @@ cat /tmp/r.json
 
 Attendu : `HTTP 400` et `{"code":"22003",…}`. La clé de service se lit dans `npx.cmd supabase status` — **jamais dans `.env`**, qui vise la production.
 
-- [ ] **Étape 4 : fusionner sur `main`, en local** *(accord)*
+- [x] **Étape 4 : fusionner sur `main`, en local** *(accord)*
 
 Le classificateur refuse `git merge` sur `main` dans les deux outils. **Rendre la commande à l'exploitant** après deux essais, avec l'état d'avance de la branche.
 
@@ -713,7 +739,7 @@ git merge --no-ff borne-caisse
 npm run verifier
 ```
 
-- [ ] **Étape 5 : pousser** *(accord)*
+- [x] **Étape 5 : pousser** *(accord)*
 
 ```powershell
 git push origin main
@@ -721,7 +747,17 @@ git push origin main
 
 Netlify déploie. **Aucune migration ne part.** Le travail « Déploiement — Edge Functions » du CI doit journaliser « Aucune Edge Function touchée ».
 
-- [ ] **Étape 6 : contrôler ce qui est servi**
+- [x] **Étape 6 : contrôler ce qui est servi**
+
+> **À l'exécution :** la comparaison d'empreintes prescrite ici **est
+> impossible depuis un plan de travail isolé** : sans `.env`, la construction
+> locale se fait avec les variables de la pile locale, donc son empreinte ne
+> peut pas égaler celle de Netlify. Contrôle de remplacement : le JS servi a
+> changé (`BTBej4EU` → `Bz5yJlue`) et le CSS non, ce qui correspond à un
+> changement purement JS ; puis recherche directe des chaînes du chantier dans
+> le paquet servi — « Ce montant est trop grand », « MONTANT_TROP_GRAND »,
+> « 22003 » présentes, avec deux chaînes préexistantes en témoin pour prouver
+> que la sonde voyait.
 
 ```bash
 npm run build -w @kolek/collecteur && ls apps/collecteur/dist/assets | grep -E '^index-.*\.js$'
@@ -730,7 +766,13 @@ curl -s https://app.kolek.cash/ | grep -oE '/assets/index-[^"]*\.js'
 
 Attendu : le même nom des deux côtés. Un ancien front sur une base inchangée est sans danger ici : ce chantier ne touche pas le schéma.
 
-- [ ] **Étape 7 : retirer le plan de travail isolé**
+- [x] **Étape 7 : retirer le plan de travail isolé**
+
+> **À l'exécution :** `git worktree remove --force` rend 0 et retire bien le
+> plan de travail de la liste de git, **mais laisse un répertoire résiduel sur
+> le disque** (un `node_modules` de ~130 Ko aux entrées verrouillées par
+> Windows). Il faut un `rm -rf` derrière. Un résidu du même genre, daté du
+> 1er septembre, traînait déjà dans `Documents/Kolek-main`.
 
 Une fois fusionné et poussé :
 
@@ -739,7 +781,7 @@ git worktree remove ../Kolek-caisse
 git branch -d borne-caisse
 ```
 
-- [ ] **Étape 8 : consigner**
+- [x] **Étape 8 : consigner**
 
 Au registre du chantier : les commits, les épreuves ajoutées, et le fait que la note J2b « La borne `integer` de `cash_declare` (`gestes.ts`) » est close. Retirer la ligne de la section « Reportés au chantier suivant » de `Docs/plans/2026-09-13-j2b-hors-ligne.md`.
 
