@@ -31,21 +31,23 @@ export function PageLegale({
   children?: ReactNode;
 }) {
   return (
-    <main className="mx-auto min-h-dvh max-w-3xl bg-canvas px-5 py-12 sm:px-8">
-      <a
-        href="/"
-        className="font-body text-sm text-primary underline underline-offset-2"
-      >
-        ← Retour à l’accueil
-      </a>
-      <h1 className="mt-6 font-headings text-3xl font-bold text-ink sm:text-4xl">{titre}</h1>
-      <p className="mt-2 font-body text-sm text-muted-foreground">
-        Dernière mise à jour : {miseAJour}
-      </p>
-      <div className="mt-8 flex flex-col gap-6 font-body text-base leading-relaxed text-ink">
-        {children}
-      </div>
-    </main>
+    <div className="min-h-dvh bg-canvas">
+      <main className="mx-auto max-w-3xl px-5 py-12 sm:px-8">
+        <a
+          href="/"
+          className="font-body text-sm text-primary underline underline-offset-2"
+        >
+          ← Retour à l’accueil
+        </a>
+        <h1 className="mt-6 font-headings text-3xl font-bold text-ink sm:text-4xl">{titre}</h1>
+        <p className="mt-2 font-body text-sm text-muted-foreground">
+          Dernière mise à jour : {miseAJour}
+        </p>
+        <div className="mt-8 flex flex-col gap-6 font-body text-base leading-relaxed text-ink">
+          {children}
+        </div>
+      </main>
+    </div>
   );
 }
 
