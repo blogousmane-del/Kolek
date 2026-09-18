@@ -14,18 +14,22 @@ Pour l’essai, gratuit, un compte est ouvert par l’exploitant après un écha
 Sur une formule payante (Standard, Pro ou Illimité), l’acceptation des présentes conditions puis le règlement de l’abonnement valent ouverture : le compte naît du paiement confirmé, par un traitement automatique, sans intervention humaine.
 3. Les formules et leurs prix
 Kolek propose 4 formules. Les prix sont mensuels, en FCFA, sans commission sur les mises encaissées.
-Essai : Gratuit pendant 30 jours.20 clients
+Essai : Gratuit pendant 30 jours.
+20 clients
 Encaissement hors ligne
 Rapports basiques
-Standard : 2 500 FCFA par mois.50 clients
+Standard : 2 500 FCFA par mois.
+50 clients
 Encaissement hors ligne
 Rapports avancés
 Support prioritaire
-Pro : 5 000 FCFA par mois.150 clients
+Pro : 5 000 FCFA par mois.
+150 clients
 Encaissement hors ligne
 Rapports avancés
 Support prioritaire
-Illimité : 10 000 FCFA par mois.Clients illimités
+Illimité : 10 000 FCFA par mois.
+Clients illimités
 Encaissement hors ligne
 Rapports avancés
 Support prioritaire
@@ -36,9 +40,7 @@ L’abonnement est mensuel et se reconduit tacitement chaque mois, sauf résilia
 5. Suspension pour impayé
 À défaut de paiement à l’échéance, l’abonnement est suspendu. La suspension ferme l’inscription de nouveaux clients, l’ouverture de nouvelles cartes et l’ajout de collaborateurs. Elle ne ferme pas l’encaissement : le collecteur continue de percevoir les mises des cartes déjà ouvertes, et la file des encaissements pris hors ligne sur ces mêmes cartes continue de se synchroniser. Un encaissement pris hors ligne sur une carte ouverte pendant la suspension ne peut pas, lui, être enregistré : l’ouverture de la carte étant refusée, l’encaissement qui en dépend l’est aussi. Les données déjà enregistrées sont conservées.
 6. Résiliation
-Le collecteur peut résilier à tout moment, en écrivant à contact@kolek.cash
-. L’exploitant peut résilier en cas de manquement grave aux présentes conditions. Le sort des données à la résiliation est décrit dans la politique de confidentialité
-.
+Le collecteur peut résilier à tout moment, en écrivant à contact@kolek.cash. L’exploitant peut résilier en cas de manquement grave aux présentes conditions. Le sort des données à la résiliation est décrit dans la politique de confidentialité.
 7. Disponibilité
 L’exploitant met en œuvre les moyens raisonnables pour assurer la disponibilité de Kolek, sans garantir un taux de disponibilité chiffré. Des interruptions pour maintenance ou cas de force majeure peuvent survenir.
 8. Obligations du collecteur
@@ -81,8 +83,7 @@ Le journal d’audit sert à la sécurité et à la traçabilité des actions.
 Les avis par SMS servent à informer un client du collecteur d’un encaissement.
 Les paiements d’abonnement servent à activer, renouveler et suivre l’abonnement du collecteur.
 4. Sur quel fondement
-Le fondement est le consentement, au sens de la loi n° 2013-450 : « manifestation de volonté expresse, non équivoque, libre, spécifique et informée ». Le collecteur le donne à l’ouverture de son compte. Pour les clients du collecteur, les conditions générales
-imposent au collecteur de les informer avant toute inscription, et de ne pas inscrire celui qui refuse d’y figurer : une obligation d’information et d’opposition, non de recueil d’un consentement exprès.
+Le fondement est le consentement, au sens de la loi n° 2013-450 : « manifestation de volonté expresse, non équivoque, libre, spécifique et informée ». Le collecteur le donne à l’ouverture de son compte. Pour les clients du collecteur, les conditions générales imposent au collecteur de les informer avant toute inscription, et de ne pas inscrire celui qui refuse d’y figurer : une obligation d’information et d’opposition, non de recueil d’un consentement exprès.
 Ce consentement fonde la collecte des données, pas tout ce qui suit : la conservation des mises repose sur l’obligation comptable OHADA, celle des paiements d’abonnement sur l’obligation comptable et fiscale, le compte collecteur sur l’exécution du contrat, le journal d’audit sur la sécurité, et les avis SMS sur l’exécution du service — chaque fondement est détaillé ligne par ligne dans le tableau de la section 5.
 Il faut le dire franchement : la trace de ce consentement n’est pas conservée aujourd’hui. C’est un chantier ouvert, pas un fait acquis.
 5. Combien de temps ces données sont conservées
@@ -133,8 +134,7 @@ Rectification : faire corriger une donnée inexacte.
 Opposition : s’opposer à un traitement.
 Refus de figurer au fichier : avant son inscription par le collecteur, refuser d’y figurer.
 Effacement par anonymisation : la fiche du client et ses cartes ne portent plus ni nom ni numéro de téléphone : ils sont remplacés par une mention neutre, et les montants restent, parce que la loi comptable impose de les conserver. Le journal d’audit, lui, est immuable : il garde la trace des saisies et des corrections antérieures, nom et numéro d’origine compris, lisible par l’exploitant seul.
-Pour exercer l’un de ces droits, écrire à contact@kolek.cash
-. Une réponse est apportée sous 7 jours ouvrés.
+Pour exercer l’un de ces droits, écrire à contact@kolek.cash. Une réponse est apportée sous 7 jours ouvrés.
 Il faut le dire franchement : aucun écran ne permet aujourd’hui d’exercer ces droits soi-même. Chaque demande est traitée à la main, par courriel.
 10. La sécurité
 Chiffrement des données en transit.
@@ -146,5 +146,4 @@ L’autorité compétente est l’ARTCI. À la date de publication de cette page
 12. Modification de cette politique
 L’exploitant peut modifier la présente politique. La version en vigueur est celle publiée sur cette page ; la date de mise à jour, en tête de page, fait foi.
 Pour aller plus loin
-Conditions générales
-· Mentions légales
+Conditions générales · Mentions légales

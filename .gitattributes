@@ -1,0 +1,7 @@
+# Docs/legal/*.txt porte, dans son propre nom, l’empreinte de son
+# contenu (voir scripts/generer-cgu.mjs). Sans cette ligne,
+# core.autocrlf=true convertit les fins de ligne à la sortie d’un
+# clone Windows, et le texte livré n’empreint plus à la valeur que
+# porte le nom du fichier ni à celle enregistrée avec chaque
+# acceptation — en silence.
+Docs/legal/*.txt text eol=lf

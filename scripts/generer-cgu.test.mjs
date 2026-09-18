@@ -1,6 +1,16 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { contenuConstante, empreinteDe, enTexte } from './generer-cgu.mjs';
+import {
+  composer,
+  contenuConstante,
+  empreinteDe,
+  enTexte,
+  instantaneValide,
+} from './generer-cgu.mjs';
 
 describe('enTexte', () => {
   it('coupe aux fermantes de bloc et retire les balises', () => {
@@ -26,6 +36,19 @@ describe('enTexte', () => {
 
   it('supprime les lignes vides', () => {
     expect(enTexte('<div></div><p>Seule</p><div>  </div>')).toBe('Seule');
+  });
+
+  it('coupe une fin de ligne à chaque <br>', () => {
+    // Trou de couverture prouvé par mutation : sans cette règle, `<br>` est
+    // simplement retiré par la passe générale et deux lignes se collent.
+    expect(enTexte('<p>Un<br>Deux</p>')).toBe('Un\nDeux');
+  });
+
+  it('décode les quatre entités, pas seulement leur ordre', () => {
+    // L’épreuve d’ordre (ci-dessus) pince l’ordre des remplacements, pas
+    // leur existence : un dépouillement qui laisserait les entités
+    // littérales passerait quand même cette épreuve-là.
+    expect(enTexte('<p>&lt;&gt;&quot;&#x27;</p>')).toBe('<>"\'');
   });
 });
 
@@ -53,5 +76,62 @@ describe('contenuConstante', () => {
     // comme `/conditions` y mènerait à une page qui n’existe pas.
     expect(texte).toMatch(/URL_CONDITIONS = 'https:\/\/kolek\.cash\/conditions'/);
     expect(texte).toMatch(/URL_CONFIDENTIALITE = 'https:\/\/kolek\.cash\/confidentialite'/);
+  });
+});
+
+describe('instantaneValide', () => {
+  // Sur un répertoire temporaire créé et détruit ici, jamais sur
+  // Docs/legal/ : la garde qu’on éprouve ne doit pas dépendre de ce que
+  // contient le dépôt au moment où l’épreuve tourne.
+  function dossierTemporaire() {
+    return mkdtempSync(join(tmpdir(), 'kolek-instantane-'));
+  }
+
+  it('refuse un instantané dont le contenu ne correspond pas à son nom', () => {
+    const dossier = dossierTemporaire();
+    try {
+      const empreinte = empreinteDe('le vrai texte des conditions');
+      writeFileSync(
+        join(dossier, `conditions-2026-01-01-${empreinte}.txt`),
+        'un texte quelconque, sans rapport avec le nom du fichier',
+        'utf8',
+      );
+      // Trou de couverture prouvé par mutation : un contrôle qui ne
+      // regarde que le suffixe du nom laisserait passer ce fichier.
+      expect(instantaneValide(empreinte, dossier)).toBe(false);
+    } finally {
+      rmSync(dossier, { recursive: true, force: true });
+    }
+  });
+
+  it('accepte un instantané dont le contenu retombe sur son nom', () => {
+    const dossier = dossierTemporaire();
+    try {
+      const texte = 'le vrai texte des conditions';
+      const empreinte = empreinteDe(texte);
+      writeFileSync(join(dossier, `conditions-2026-01-01-${empreinte}.txt`), texte, 'utf8');
+      expect(instantaneValide(empreinte, dossier)).toBe(true);
+    } finally {
+      rmSync(dossier, { recursive: true, force: true });
+    }
+  });
+
+  it('refuse quand le répertoire n’existe pas', () => {
+    expect(instantaneValide('0123456789abcdef', join(tmpdir(), 'kolek-inexistant-xyz'))).toBe(
+      false,
+    );
+  });
+});
+
+describe('composer', () => {
+  it('joint les deux pages, Conditions en premier, séparées par une ligne vide', () => {
+    // Trou de couverture prouvé par mutation : le générateur peut cesser
+    // de joindre la politique de confidentialité sans qu’aucune épreuve ne
+    // rougisse tant que cette fonction n’est pas éprouvée séparément.
+    expect(composer('<p>Un</p>', '<p>Deux</p>')).toBe('Un\n\nDeux');
+  });
+
+  it('dépouille chaque page avant de les joindre', () => {
+    expect(composer('<p>Un<br>Bis</p>', '<div>Deux</div>')).toBe('Un\nBis\n\nDeux');
   });
 });

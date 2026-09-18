@@ -9,9 +9,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
  * Trois générateurs de ce dépôt suivent ce motif — `generer-theme.mjs`,
  * `generer-marque.mjs`, `generer-paliers-edge.mjs` — et celui-ci s'en écarte
  * sur un point : il doit charger du JSX, que Node refuse
- * (« Unknown file extension ".tsx" »). Vite le transforme, et c'est la même
- * transformation que celle qui produit le site livré : l'empreinte porte donc
- * sur ce que la personne lit, pas sur le résultat d'une seconde chaîne.
+ * (« Unknown file extension ".tsx" »). Vite le transforme en JavaScript que
+ * Node peut exécuter. `configFile: false` (voir plus bas) écarte
+ * `@vitejs/plugin-react` et Tailwind, qui ne tournent donc pas ici,
+ * contrairement au site livré — vérifié : cette configuration ne porte ni
+ * `define` ni `alias` qui changeraient le texte que produit
+ * `renderToStaticMarkup`, donc aucune conséquence mesurable aujourd'hui. Une
+ * configuration future qui ajouterait l'un des deux devrait refaire cette
+ * vérification.
  *
  * L'empreinte porte sur le **texte rendu**, jamais sur les octets des fichiers
  * source : un commentaire ou une classe CSS changeraient les seconds sans que
@@ -31,22 +36,41 @@ export const CIBLE_COLLECTEUR = join(RACINE, 'apps/collecteur/src/version-condit
 export const CIBLE_EDGE = join(RACINE, 'supabase/functions/_shared/version-conditions.ts');
 export const DOSSIER_INSTANTANES = join(RACINE, 'Docs/legal');
 
-/** Les fermantes qui valent une fin de ligne. Sans elles, deux paragraphes
-    voisins se colleraient en une phrase que personne n'a écrite. */
-const FERMANTES_DE_BLOC =
-  /<\/(?:p|li|h[1-6]|div|section|table|tr|td|th|ul|ol|main|header|footer|a)>/gi;
+/** Les balises de bloc : une fin de ligne avant chaque ouvrante et après
+    chaque fermante. Sans elles, deux paragraphes voisins se colleraient en
+    une phrase que personne n'a écrite. `a` n'en fait pas partie : c'est une
+    balise en ligne, et la couper produirait des lignes commençant par un
+    point en plein milieu de phrase. */
+const BALISES_DE_BLOC =
+  /<\/?(?:p|li|h[1-6]|div|section|table|tr|td|th|ul|ol|main|header|footer)(?:\s[^>]*)?>/gi;
 
 /**
  * Le HTML rendu, dépouillé en texte.
  *
- * Cette fonction **est** l'empreinte : deux dépouillements différents donnent
- * deux empreintes différentes pour le même texte lu. Son ordre est donc fixé,
- * et `&amp;` se décode en dernier — le décoder en premier transformerait le
- * texte littéral « &lt; » en un « < » que personne n'a écrit.
+ * Cette fonction **est** l'empreinte : deux dépouillements différents
+ * donnent deux empreintes différentes pour le même texte lu. La règle, dans
+ * l'ordre :
+ *
+ * 1. une fin de ligne avant chaque balise ouvrante de bloc et après chaque
+ *    balise fermante de bloc, pour `p`, `li`, `h1` à `h6`, `div`, `section`,
+ *    `table`, `tr`, `td`, `th`, `ul`, `ol`, `main`, `header`, `footer` — `a`
+ *    n'en fait pas partie, c'est une balise en ligne — et une fin de ligne à
+ *    chaque `<br>` ;
+ * 2. toutes les balises restantes retirées ;
+ * 3. les entités décodées : `&lt;`, `&gt;`, `&quot;`, `&#x27;`, puis `&amp;`
+ *    en dernier — le décoder en premier transformerait le texte littéral
+ *    « &lt; » en un « < » que personne n'a écrit ;
+ * 4. sur chaque ligne, les suites d'espaces ordinaires et de tabulations
+ *    réduites à une espace, puis les bords ébarbés des seuls blancs
+ *    ordinaires — `String.prototype.trim()` compte aussi l'insécable
+ *    U+00A0 comme un blanc, ce qu'on ne veut pas ;
+ * 5. les lignes vides supprimées, le reste joint par une fin de ligne ;
+ * 6. les espaces insécables U+00A0 traversent intactes, y compris en bord de
+ *    ligne : elles ne sont pas de la mise en forme.
  */
 export function enTexte(html) {
   return html
-    .replace(FERMANTES_DE_BLOC, '\n')
+    .replace(BALISES_DE_BLOC, '\n')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&lt;/g, '<')
@@ -55,9 +79,7 @@ export function enTexte(html) {
     .replace(/&#x27;/g, "'")
     .replace(/&amp;/g, '&')
     .split('\n')
-    // Les espaces insécables U+00A0 traversent : elles ne sont pas de la mise
-    // en forme, et `[ \t]` ne les décrit pas.
-    .map((ligne) => ligne.replace(/[ \t]+/g, ' ').trim())
+    .map((ligne) => ligne.replace(/[ \t]+/g, ' ').replace(/^[ \t]+|[ \t]+$/g, ''))
     .filter((ligne) => ligne.length > 0)
     .join('\n');
 }
@@ -102,7 +124,16 @@ export function contenuConstante(empreinte, avecUrls) {
   return texte;
 }
 
-/** Rend les deux pages et les dépouille. Le serveur Vite naît et meurt ici. */
+/** Dépouille et joint les deux pages, `Conditions` d'abord. Fonction pure,
+    sans Vite : le rendu de `Confidentialite.tsx` était un trou de
+    couverture que les huit épreuves d'origine laissaient passer sans
+    rougir. Cette fonction s'éprouve seule, à la vitesse d'une épreuve
+    normale ; `texteRendu` l'appelle avec le HTML que Vite a produit. */
+export function composer(htmlConditions, htmlConfidentialite) {
+  return enTexte(htmlConditions) + '\n\n' + enTexte(htmlConfidentialite);
+}
+
+/** Rend les deux pages. Le serveur Vite naît et meurt ici. */
 export async function texteRendu() {
   const { createServer } = await import('vite');
   const { renderToStaticMarkup } = await import('react-dom/server');
@@ -120,10 +151,9 @@ export async function texteRendu() {
     const pageConfidentialite = await serveur.ssrLoadModule(
       '/src/vitrine/legal/Confidentialite.tsx',
     );
-    return (
-      enTexte(renderToStaticMarkup(createElement(pageConditions.Conditions))) +
-      '\n\n' +
-      enTexte(renderToStaticMarkup(createElement(pageConfidentialite.Confidentialite)))
+    return composer(
+      renderToStaticMarkup(createElement(pageConditions.Conditions)),
+      renderToStaticMarkup(createElement(pageConfidentialite.Confidentialite)),
     );
   } finally {
     await serveur.close();
@@ -135,6 +165,30 @@ export async function texteRendu() {
     sur tout dépôt fraîchement cloné. Même idiome que `generer-paliers-edge.mjs`. */
 function normaliser(texte) {
   return texte.replace(/\r\n/g, '\n');
+}
+
+/** Le contrôle de contenu de l'instantané, isolé pour être éprouvé sur un
+    répertoire temporaire plutôt que sur Docs/legal/. Un contrôle qui ne
+    regarde que le suffixe du nom laisse passer un fichier vidé de son texte
+    légal et renommé pour porter la bonne empreinte : la pièce qu'on
+    produirait à l'audience ne correspondrait alors plus à rien. Ici, le
+    fichier trouvé est lu, dépouillé des différences de fin de ligne, et sa
+    propre empreinte doit retomber sur celle attendue. */
+export function instantaneValide(empreinte, dossier = DOSSIER_INSTANTANES) {
+  let noms;
+  try {
+    noms = readdirSync(dossier);
+  } catch {
+    return false;
+  }
+  const nom = noms.find((n) => n.endsWith(`-${empreinte}.txt`));
+  if (!nom) return false;
+  try {
+    const contenu = readFileSync(join(dossier, nom), 'utf8');
+    return empreinteDe(normaliser(contenu)) === empreinte;
+  } catch {
+    return false;
+  }
 }
 
 export async function estAJour() {
@@ -151,14 +205,11 @@ export async function estAJour() {
       return false;
     }
   }
-  // L'instantané doit exister pour cette empreinte, sinon la constante désigne
-  // un document qu'on ne peut pas produire — la situation qu'on cherche à
-  // quitter.
-  try {
-    return readdirSync(DOSSIER_INSTANTANES).some((nom) => nom.endsWith(`-${empreinte}.txt`));
-  } catch {
-    return false;
-  }
+  // L'instantané doit exister pour cette empreinte, et son contenu doit
+  // retomber sur cette même empreinte une fois dépouillé — sinon la
+  // constante désigne un document qu'on ne peut pas produire, la situation
+  // qu'on cherche à quitter.
+  return instantaneValide(empreinte);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

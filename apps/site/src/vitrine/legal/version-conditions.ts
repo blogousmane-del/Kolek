@@ -8,4 +8,4 @@
 // l'application du collecteur, les Edge Functions — et npm run verifier:cgu
 // échoue si l'une diverge.
 
-export const VERSION_CONDITIONS = '2f8fc714bfccffa1';
+export const VERSION_CONDITIONS = '54df67d1b9d053f3';
