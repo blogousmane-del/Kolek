@@ -50,8 +50,50 @@
   status = 301
   force = true
 
+# Le vrai 404 — tâche 6 de l'audit du 2026-09-04, point A.3.
+#
+# Avant cette ligne, `/*` réécrivait toute adresse vers `/index.html` en
+# **200** : une adresse inventée rendait la page d'accueil sous un statut
+# « tout va bien ». Une mention légale mal orthographiée dans un lien partagé
+# se serait donc rendue introuvable... en semblant exister.
+#
+# Sans joker, Netlify sert `apps/site/public/404.html` — copié tel quel dans
+# `dist/404.html` par Vite — avec le statut 404, pour toute adresse qui ne
+# correspond ni à un fichier réel (`/`, `/assets/*`, `/robots.txt`, …) ni à
+# l'une des règles ci-dessous. Rien à faire pour la racine ou pour les
+# ressources : Netlify les sert directement, avant même d'essayer une règle.
+#
+# Ces quatre chemins sont la seule autre liste des routes que connaît
+# `App.tsx:24-29`. Une route ajoutée là-bas sans sa règle ici marche en
+# développement — Vite sert tout — et rend 404 en production, sans qu'aucune
+# épreuve du site ne le remarque : rien, dans `npm test`, ne visite ce
+# fichier. `scripts/verifier-routes.mjs` (`npm run verifier:routes`) lit les
+# deux fichiers et échoue si l'une des deux listes contient une route que
+# l'autre ignore, ou si ce joker reparaît.
+#
+# La barre oblique finale n'a pas besoin de sa propre règle : Netlify
+# normalise les adresses avant de tester les règles de réécriture internes
+# (`status = 200`, sur ce même site) et fait donc correspondre `/conditions`
+# et `/conditions/` à la même règle — documenté sous « Trailing slash » dans
+# les options de redirection Netlify. Seule une réécriture en *proxy* vers un
+# autre site échapperait à cette normalisation ; ce n'est pas le cas ici.
 [[redirects]]
-  from = "/*"
+  from = "/inscription"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/mentions-legales"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/conditions"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/confidentialite"
   to = "/index.html"
   status = 200
 

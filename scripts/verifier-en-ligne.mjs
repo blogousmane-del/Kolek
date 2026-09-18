@@ -335,6 +335,13 @@ export const CIBLES = [
     // poser sur les deux applications reviendrait à exiger un sitemap de pages
     // qu'on interdit aux moteurs.
     seo: true,
+    // Depuis la tâche 6 de l'audit du 2026-09-04 (point A.3) : ce site ne
+    // réécrit plus tout vers /index.html. netlify.toml énumère les routes
+    // connues — voir sa longue note « Le vrai 404 » — et le reste rend un
+    // vrai 404, apps/site/public/404.html, servi avec le statut 404. Les
+    // deux applications réécrivent encore tout : leur point d'entrée unique
+    // ne connaît pas de « page inconnue », donc rien n'y change.
+    route404: true,
   },
 ];
 
@@ -500,9 +507,16 @@ async function verifier(cible) {
     }
   }
 
-  // Réécriture d'application à page unique : une route inconnue rend l'index.
+  // Réécriture d'application à page unique : une route inconnue rend l'index
+  // — sauf le site public, qui rend un vrai 404 depuis la tâche 6 du
+  // 2026-09-04. `route404` le dit par cible ; le corps reste du HTML dans les
+  // deux cas (l'index pour les deux applications, `404.html` pour le site).
   const inconnue = await fetch(`${cible.url}/route-qui-nexiste-pas`);
-  constat(inconnue.status === 200, `route inconnue renvoie ${inconnue.status}, attendu 200`);
+  const statutAttendu = cible.route404 ? 404 : 200;
+  constat(
+    inconnue.status === statutAttendu,
+    `route inconnue renvoie ${inconnue.status}, attendu ${statutAttendu}`,
+  );
   constat(
     (inconnue.headers.get('content-type') ?? '').includes('text/html'),
     `route inconnue sert ${inconnue.headers.get('content-type')}`,

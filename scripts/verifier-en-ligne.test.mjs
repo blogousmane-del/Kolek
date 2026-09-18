@@ -66,6 +66,15 @@ describe('les attentes déclarées par cible', () => {
     ]);
   });
 
+  it('seul le site public rend un vrai 404 sur une route inconnue', () => {
+    // Depuis la tâche 6 du 2026-09-04 : netlify.toml du site n'a plus de
+    // joker /*, et une route inconnue y rend 404.html en 404. Les deux
+    // applications réécrivent encore tout en 200 — leur netlify.toml n'a pas
+    // changé. Un site qui perdrait ce champ referait passer un vrai 404 pour
+    // un manquement, et un contrôle qui crie à tort finit par être ignoré.
+    expect(CIBLES.filter((c) => c.route404).map((c) => c.nom)).toEqual(['site']);
+  });
+
   it('déclare pour chaque cible l’adresse Netlify qu’elle remplace', () => {
     // Sans ce champ, le contrôle de redirection se sauterait en silence — et un
     // contrôle qui s'efface tout seul ne vaut rien.

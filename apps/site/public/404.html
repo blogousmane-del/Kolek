@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Page introuvable · Kolek</title>
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!--
+      404 statique, sans JavaScript : la tâche 6 de l'audit du 2026-09-04
+      (point A.3) remplace le joker `/*` de netlify.toml par les routes
+      nommées de App.tsx. Sans lui, cette page resterait invisible :
+      Netlify sert `404.html` avec le statut 404 dès qu'aucune règle et
+      aucun fichier ne correspondent à l'adresse demandée.
+
+      La CSP du site autorise le style en ligne mais pas le script en
+      ligne (`script-src 'self'`) : cette page n'en porte aucun, à
+      dessein.
+    -->
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        display: flex;
+        min-height: 100vh;
+        margin: 0;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        padding: 24px;
+        background: #06140e;
+        color: #f4f5f2;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        text-align: center;
+      }
+
+      .code {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #d2b24c;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      p {
+        margin: 0;
+        max-width: 340px;
+        font-size: 15px;
+        line-height: 1.5;
+        color: rgba(244, 245, 242, 0.7);
+      }
+
+      a {
+        margin-top: 4px;
+        padding: 10px 20px;
+        border-radius: 999px;
+        background: #d2b24c;
+        color: #06140e;
+        font-size: 14px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      a:focus-visible {
+        outline: 2px solid #f4f5f2;
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <img src="/favicon.svg" width="40" height="40" alt="" />
+    <p class="code">404</p>
+    <h1>Cette page n’existe pas</h1>
+    <p>L’adresse demandée ne correspond à rien de connu. Retournez à l’accueil pour retrouver Kolek.</p>
+    <a href="/">Retour à l’accueil</a>
+  </body>
+</html>
