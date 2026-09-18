@@ -75,9 +75,9 @@ export function Confidentialite() {
             collecteur.
           </li>
           <li>
-            <strong>Paiements d’abonnement</strong> : identifiant de vente Chariow, montant,
-            devise, pourcentage de remise, échéances et date de règlement — transmis par Chariow
-            lors du paiement.
+            <strong>Paiements d’abonnement</strong> : identifiant de vente, montant, devise et
+            date de règlement, transmis par Chariow lors du paiement ; pourcentage de remise et
+            échéances, posés par l’exploitant.
           </li>
         </ul>
       </section>
@@ -116,9 +116,9 @@ export function Confidentialite() {
         <p className="mt-2">
           Ce consentement fonde la collecte des données, pas tout ce qui suit : la conservation
           des mises repose sur l’obligation comptable OHADA, celle des paiements d’abonnement sur
-          l’obligation comptable et fiscale, le compte collecteur sur l’exécution du contrat, et
-          les avis SMS sur l’exécution du service — chaque fondement est détaillé ligne par ligne
-          dans le tableau de la section 5.
+          l’obligation comptable et fiscale, le compte collecteur sur l’exécution du contrat, le
+          journal d’audit sur la sécurité, et les avis SMS sur l’exécution du service — chaque
+          fondement est détaillé ligne par ligne dans le tableau de la section 5.
         </p>
         <p className="mt-2">
           Il faut le dire franchement : la trace de ce consentement n’est pas conservée
@@ -148,7 +148,8 @@ export function Confidentialite() {
                 <td className="py-2 pr-3">Compte collecteur (nom, téléphone, zone)</td>
                 <td className="py-2 pr-3">Exécution du contrat</td>
                 <td className="py-2">
-                  Durée de la relation, puis anonymisation sur demande — pas automatiquement
+                  Durée de la relation, puis anonymisation sur demande — pas automatiquement, sauf
+                  suppression du compte n’ayant jamais manié d’argent
                 </td>
               </tr>
               <tr>
@@ -176,13 +177,17 @@ export function Confidentialite() {
                 <td className="py-2 pr-3">
                   Consentement du demandeur, donné en remplissant le formulaire
                 </td>
-                <td className="py-2">Sans purge automatique, effacement sur demande</td>
+                <td className="py-2">
+                  Sans purge automatique, effacement sur demande, sauf si un paiement s’y
+                  rattache : elle est alors retenue dix ans, comme lui
+                </td>
               </tr>
               <tr>
                 <td className="py-2 pr-3">Journal d’audit</td>
                 <td className="py-2 pr-3">Sécurité</td>
                 <td className="py-2">
-                  Immuable par construction : jamais modifié ni effacé, y compris par l’exploitant
+                  Immuable par construction : le schéma refuse toute modification et tout
+                  effacement, même sous clé de service ; aucune purge n’est prévue.
                 </td>
               </tr>
               <tr>
@@ -273,9 +278,12 @@ export function Confidentialite() {
             collecteur, refuser d’y figurer.
           </li>
           <li>
-            <strong>Effacement par anonymisation</strong> — le nom et le numéro de téléphone sont
-            remplacés par une mention neutre ; les montants restent, sans rien qui désigne la
-            personne, parce que la loi comptable impose de les conserver.
+            <strong>Effacement par anonymisation</strong> — la fiche du client et ses cartes ne
+            portent plus ni nom ni numéro de téléphone : ils sont remplacés par une mention
+            neutre, et les montants restent, parce que la loi comptable impose de les conserver.
+            Le journal d’audit, lui, est immuable : il garde la trace des saisies et des
+            corrections antérieures, nom et numéro d’origine compris, lisible par l’exploitant
+            seul.
           </li>
         </ul>
         <p className="mt-2">

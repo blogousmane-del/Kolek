@@ -52,4 +52,13 @@ describe('politique de confidentialité', () => {
     // voir tomber si quelqu'un ajoute un jour un champ photo à cette page.
     expect(container.textContent).not.toMatch(/photo/i);
   });
+
+  it('dit que le journal d’audit garde la trace du client malgré une anonymisation', () => {
+    const { container } = render(<Confidentialite />);
+    // C'est la garantie la plus exposée de la page : l'anonymisation efface le
+    // nom et le téléphone de la fiche, mais journaliser() copie la ligne
+    // entière dans audit_log à chaque écriture, et ce journal n'est jamais
+    // purgé. Le lecteur doit pouvoir le savoir sans lire le schéma.
+    expect(container.textContent).toMatch(/journal d.audit[^.]*garde la trace/i);
+  });
 });
