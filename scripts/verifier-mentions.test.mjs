@@ -60,6 +60,30 @@ function executer(cwd) {
   return spawnSync(process.execPath, [SCRIPT], { cwd, encoding: 'utf8' });
 }
 
+/**
+ * Un fichier au format réel de `identite.ts` : une interface `Identite` qui
+ * dit quels champs ont le droit d'être un trou (`| Trou`), puis l'objet
+ * `IDENTITE` qui les assigne. `declarationActiviteValeur` est le texte brut
+ * de la valeur — `'null'` pour un trou, une chaîne entre quotes pour un champ
+ * rempli — exactement ce que la garde doit lire pour nommer ou non ce champ.
+ */
+function texteIdentiteSujet({ declarationActiviteValeur }) {
+  return [
+    'export interface Identite {',
+    '  exploitant: string;',
+    '  adressePrecise: string | Trou;',
+    '  declarationActivite: string | Trou;',
+    '}',
+    '',
+    'export const IDENTITE: Readonly<Identite> = Object.freeze({',
+    "  exploitant: 'BERTHE OUSMANE',",
+    "  adressePrecise: 'Place Blé Zokou',",
+    `  declarationActivite: ${declarationActiviteValeur},`,
+    '});',
+    '',
+  ].join('\n');
+}
+
 describe('garde de source des mentions', () => {
   it('refuse un texte qui porte l’ancienne adresse personnelle, dans une page légale', () => {
     const resultat = executer(
@@ -84,37 +108,110 @@ describe('garde de source des mentions', () => {
     expect(resultat.stderr).toMatch(/numéro ARTCI/);
   });
 
-  it('accepte un dépôt sans faute, marqueur compris', () => {
+  it('accepte un dépôt sans faute, tous les champs d’identité renseignés', () => {
     const resultat = executer(
-      depotAvec('apps/site/src/vitrine/legal/sujet.tsx', "export const x = 'À COMPLÉTER';\n"),
+      depotAvec(
+        'apps/site/src/vitrine/legal/identite.ts',
+        texteIdentiteSujet({ declarationActiviteValeur: "'Déposée le 2 janvier 2026'" }),
+      ),
     );
 
     expect(resultat.status).toBe(0);
     expect(resultat.stdout).toMatch(/ne citent ni adresse personnelle ni numéro ARTCI/);
+    expect(resultat.stdout).toMatch(/Tous les champs d'identité .* sont renseignés/);
   });
 
-  it('compte et nomme un trou « À COMPLÉTER », sans faire échouer le script', () => {
+  it('nomme le champ d’identité encore vide, pas seulement son compte', () => {
     const resultat = executer(
       depotAvec(
-        'apps/site/src/vitrine/legal/sujet.tsx',
-        "export const x = 'À COMPLÉTER : numéro de téléphone';\n",
+        'apps/site/src/vitrine/legal/identite.ts',
+        texteIdentiteSujet({ declarationActiviteValeur: 'null' }),
       ),
     );
 
     expect(resultat.status).toBe(0);
-    expect(resultat.stdout).toMatch(/sujet\.tsx\s*:\s*1/);
+    expect(resultat.stdout).toMatch(/declarationActivite/);
   });
 
-  it('compte deux trous dans le même fichier', () => {
-    const resultat = executer(
+  it('change de sortie quand un champ auparavant vide est renseigné — la propriété que l’ancien compte n’avait pas', () => {
+    const resultatVide = executer(
       depotAvec(
-        'apps/site/src/vitrine/legal/sujet.tsx',
-        "export const x = 'À COMPLÉTER'; export const y = 'À COMPLÉTER';\n",
+        'apps/site/src/vitrine/legal/identite.ts',
+        texteIdentiteSujet({ declarationActiviteValeur: 'null' }),
+      ),
+    );
+    const resultatRempli = executer(
+      depotAvec(
+        'apps/site/src/vitrine/legal/identite.ts',
+        texteIdentiteSujet({ declarationActiviteValeur: "'Déposée le 2 janvier 2026'" }),
       ),
     );
 
+    expect(resultatVide.status).toBe(0);
+    expect(resultatRempli.status).toBe(0);
+    expect(resultatVide.stdout).toMatch(/declarationActivite/);
+    expect(resultatRempli.stdout).not.toMatch(/declarationActivite/);
+    expect(resultatVide.stdout).not.toBe(resultatRempli.stdout);
+  });
+
+  it('échoue si l’extraction ne trouve aucun champ dans IDENTITE, au lieu de dire silencieusement « aucun trou »', () => {
+    const resultat = executer(
+      depotAvec(
+        'apps/site/src/vitrine/legal/identite.ts',
+        'export const IDENTITE: Readonly<Identite> = Object.freeze({\n});\n',
+      ),
+    );
+
+    expect(resultat.status).toBe(1);
+    expect(resultat.stderr).toMatch(/cassée/);
+  });
+
+  it('signale une occurrence littérale du marqueur écrite en dur ailleurs que dans identite.ts, sans faire échouer le script', () => {
+    const dossierRepo = depotAvec(
+      'apps/site/src/vitrine/legal/identite.ts',
+      texteIdentiteSujet({ declarationActiviteValeur: "'Déposée le 2 janvier 2026'" }),
+    );
+    ecrire(
+      'apps/site/src/vitrine/legal/page-en-dur.tsx',
+      "export const X = () => 'À COMPLÉTER : numéro de téléphone';\n",
+    );
+
+    const resultat = executer(dossierRepo);
+
     expect(resultat.status).toBe(0);
-    expect(resultat.stdout).toMatch(/sujet\.tsx\s*:\s*2/);
+    expect(resultat.stdout).toMatch(/page-en-dur\.tsx\s*:\s*1/);
+  });
+
+  it('compte deux occurrences littérales dans le même fichier', () => {
+    const dossierRepo = depotAvec(
+      'apps/site/src/vitrine/legal/identite.ts',
+      texteIdentiteSujet({ declarationActiviteValeur: "'Déposée le 2 janvier 2026'" }),
+    );
+    ecrire(
+      'apps/site/src/vitrine/legal/page-en-dur.tsx',
+      "export const X = () => 'À COMPLÉTER'; export const Y = () => 'À COMPLÉTER';\n",
+    );
+
+    const resultat = executer(dossierRepo);
+
+    expect(resultat.status).toBe(0);
+    expect(resultat.stdout).toMatch(/page-en-dur\.tsx\s*:\s*2/);
+  });
+
+  it('n’imprime ni la définition du marqueur ni une assertion de test comme occurrence littérale', () => {
+    const dossierRepo = depotAvec(
+      'apps/site/src/vitrine/legal/identite.ts',
+      `${texteIdentiteSujet({ declarationActiviteValeur: "'Déposée le 2 janvier 2026'" })}\nexport const MARQUEUR_TROU = 'À COMPLÉTER';\n`,
+    );
+    ecrire(
+      'apps/site/src/vitrine/legal/sujet.test.tsx',
+      'expect(screen.getAllByText(/À COMPLÉTER/).length).toBeGreaterThan(0);\n',
+    );
+
+    const resultat = executer(dossierRepo);
+
+    expect(resultat.status).toBe(0);
+    expect(resultat.stdout).toMatch(/Aucune occurrence littérale isolée/);
   });
 
   it('échoue si un motif ne trouve aucun fichier, et nomme lequel', () => {
