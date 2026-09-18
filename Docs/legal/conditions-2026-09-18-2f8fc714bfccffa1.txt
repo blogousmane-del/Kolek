@@ -1,0 +1,150 @@
+← Retour à l’accueil
+Conditions générales
+Dernière mise à jour : 2026-09-18
+1. Objet et définitions
+Les présentes conditions générales régissent l’usage de Kolek, un outil de tenue de collecte édité par BERTHE OUSMANE (ci-après « l’exploitant »), personne physique exerçant sous l’enseigne GSM TECHNOLOGIE CYBER SHOP, et le collecteur titulaire d’un compte.
+Collecteur : la personne, titulaire d’un compte Kolek ouvert par l’exploitant, qui tient sa collecte auprès de ses propres clients.
+Client du collecteur : la personne inscrite par le collecteur, qui lui verse ses mises. Elle ne détient pas de compte Kolek et n’est pas partie aux présentes conditions.
+Tournée : l’ensemble des cartes que le collecteur gère au jour le jour, y compris hors connexion.
+Mise : le versement effectué par un client du collecteur à une échéance donnée, enregistré par le collecteur dans Kolek.
+Carte : le support sur lequel Kolek suit les mises d’un client, de son ouverture jusqu’à sa clôture.
+2. Accès au service
+L’accès à Kolek n’est pas libre : il n’existe aucune inscription en libre-service. Deux chemins mènent à l’ouverture d’un compte, selon la formule choisie.
+Pour l’essai, gratuit, un compte est ouvert par l’exploitant après un échange avec le collecteur, une fois le formulaire d’ouverture rempli.
+Sur une formule payante (Standard, Pro ou Illimité), l’acceptation des présentes conditions puis le règlement de l’abonnement valent ouverture : le compte naît du paiement confirmé, par un traitement automatique, sans intervention humaine.
+3. Les formules et leurs prix
+Kolek propose 4 formules. Les prix sont mensuels, en FCFA, sans commission sur les mises encaissées.
+Essai : Gratuit pendant 30 jours.20 clients
+Encaissement hors ligne
+Rapports basiques
+Standard : 2 500 FCFA par mois.50 clients
+Encaissement hors ligne
+Rapports avancés
+Support prioritaire
+Pro : 5 000 FCFA par mois.150 clients
+Encaissement hors ligne
+Rapports avancés
+Support prioritaire
+Illimité : 10 000 FCFA par mois.Clients illimités
+Encaissement hors ligne
+Rapports avancés
+Support prioritaire
+3 collaborateurs
+Accompagnement personnalisé
+4. Durée, reconduction, paiement
+L’abonnement est mensuel et se reconduit tacitement chaque mois, sauf résiliation (section 6). Le paiement s’effectue par Chariow ; la date d’échéance figure sur le compte du collecteur.
+5. Suspension pour impayé
+À défaut de paiement à l’échéance, l’abonnement est suspendu. La suspension ferme l’inscription de nouveaux clients, l’ouverture de nouvelles cartes et l’ajout de collaborateurs. Elle ne ferme pas l’encaissement : le collecteur continue de percevoir les mises des cartes déjà ouvertes, et la file des encaissements pris hors ligne sur ces mêmes cartes continue de se synchroniser. Un encaissement pris hors ligne sur une carte ouverte pendant la suspension ne peut pas, lui, être enregistré : l’ouverture de la carte étant refusée, l’encaissement qui en dépend l’est aussi. Les données déjà enregistrées sont conservées.
+6. Résiliation
+Le collecteur peut résilier à tout moment, en écrivant à contact@kolek.cash
+. L’exploitant peut résilier en cas de manquement grave aux présentes conditions. Le sort des données à la résiliation est décrit dans la politique de confidentialité
+.
+7. Disponibilité
+L’exploitant met en œuvre les moyens raisonnables pour assurer la disponibilité de Kolek, sans garantir un taux de disponibilité chiffré. Des interruptions pour maintenance ou cas de force majeure peuvent survenir.
+8. Obligations du collecteur
+L’exploitant enregistre le nom, le numéro de téléphone, le marché et l’activité des clients du collecteur — des personnes qui n’ont pas de compte Kolek et n’ont rien signé. Le collecteur s’engage à :
+informer chaque client, avant de l’inscrire, de l’identité de l’exploitant, des finalités du traitement, des catégories de données enregistrées, des destinataires, de la durée de conservation, de son droit d’accès et de rectification, du transfert de ses données hors de la CEDEAO, et de la possibilité de refuser de figurer au fichier ;
+ne pas inscrire un client qui refuse d’y figurer ;
+n’inscrire que ce qui sert la collecte ;
+répondre de l’usage qu’il fait de l’envoi d’avis par SMS à ses clients.
+répondre des collaborateurs qu’il rattache à son compte, et leur transmettre les obligations des présentes : le collaborateur ne règle aucun abonnement, n’accepte donc pas ces conditions pour son propre compte, et engage le titulaire par ce qu’il inscrit.
+9. Propriété intellectuelle
+Le nom Kolek, le logo, l’interface et le code appartiennent à l’exploitant, BERTHE OUSMANE. Le collecteur reçoit un simple droit d’usage du service pour la durée de son abonnement, sans aucune cession.
+10. Responsabilité
+L’exploitant n’est pas dépositaire des fonds collectés. Il ne garantit pas les sommes que le collecteur encaisse auprès de ses clients, et n’intervient à aucun moment dans leur détention. Sa responsabilité se limite à la mise à disposition de l’outil.
+11. Droit applicable et juridiction
+Les présentes conditions sont soumises au droit ivoirien. Tout litige relatif à leur formation, leur exécution ou leur interprétation relève de la compétence des juridictions ivoiriennes.
+12. Modification des conditions
+L’exploitant peut modifier les présentes conditions. La version en vigueur est celle publiée sur cette page ; la date de mise à jour, en tête de page, fait foi.
+
+← Retour à l’accueil
+Politique de confidentialité
+Dernière mise à jour : 2026-09-18
+1. Qui est responsable du traitement
+BERTHE OUSMANE, personne physique exerçant sous l’enseigne GSM TECHNOLOGIE CYBER SHOP, est seul responsable du traitement décrit par la présente politique, y compris pour les données des clients du collecteur — des personnes qui n’ont pas de compte Kolek et n’ont rien signé directement avec l’exploitant. Compte contribuable : 4212842W. Contact : contact@kolek.cash.
+Adresse : Saïoua, Place Blé Zokou, Côte d’Ivoire.
+2. Ce qui est collecté, et d’où ça vient
+L’exploitant traite les catégories de données suivantes :
+Compte collecteur : nom, numéro de téléphone, zone, courriel — saisis par le collecteur lui-même à l’ouverture de son compte.
+Clients du collecteur : nom, numéro de téléphone, marché, activité — saisis par le collecteur, jamais directement par la personne concernée.
+Données de collecte : cartes, mises, retraits, caisses du jour.
+Demandes d’ouverture : les informations fournies dans le formulaire, avant la création d’un compte.
+Journal d’audit : les actions effectuées dans Kolek, horodatées.
+Avis envoyés par SMS : les messages adressés aux clients du collecteur.
+Paiements d’abonnement : identifiant de vente, montant, devise et date de règlement, transmis par Chariow lors du paiement ; pourcentage de remise et échéances, posés par l’exploitant.
+3. Pourquoi ces données sont traitées
+Le compte collecteur sert à ouvrir et administrer l’accès du collecteur à Kolek.
+Les données des clients du collecteur servent à tenir leur carte de collecte.
+Les données de collecte servent à enregistrer et suivre les mises, au fil de la tournée.
+Les demandes d’ouverture servent à instruire l’ouverture d’un compte collecteur.
+Le journal d’audit sert à la sécurité et à la traçabilité des actions.
+Les avis par SMS servent à informer un client du collecteur d’un encaissement.
+Les paiements d’abonnement servent à activer, renouveler et suivre l’abonnement du collecteur.
+4. Sur quel fondement
+Le fondement est le consentement, au sens de la loi n° 2013-450 : « manifestation de volonté expresse, non équivoque, libre, spécifique et informée ». Le collecteur le donne à l’ouverture de son compte. Pour les clients du collecteur, les conditions générales
+imposent au collecteur de les informer avant toute inscription, et de ne pas inscrire celui qui refuse d’y figurer : une obligation d’information et d’opposition, non de recueil d’un consentement exprès.
+Ce consentement fonde la collecte des données, pas tout ce qui suit : la conservation des mises repose sur l’obligation comptable OHADA, celle des paiements d’abonnement sur l’obligation comptable et fiscale, le compte collecteur sur l’exécution du contrat, le journal d’audit sur la sécurité, et les avis SMS sur l’exécution du service — chaque fondement est détaillé ligne par ligne dans le tableau de la section 5.
+Il faut le dire franchement : la trace de ce consentement n’est pas conservée aujourd’hui. C’est un chantier ouvert, pas un fait acquis.
+5. Combien de temps ces données sont conservées
+Donnée
+Base
+Durée
+Compte collecteur (nom, téléphone, zone)
+Exécution du contrat
+Durée de la relation, puis anonymisation sur demande — pas automatiquement, sauf suppression du compte n’ayant jamais manié d’argent. Le journal d’audit, lui, garde nom et numéro d’origine malgré l’anonymisation : il est immuable et jamais purgé.
+Clients du collecteur (nom, téléphone, marché, activité)
+Consentement recueilli par le collecteur
+Tant que le compte du collecteur existe, puis anonymisation sur demande — pas automatiquement
+Mises, cartes, retraits, caisses du jour
+Obligation comptable OHADA
+10 ans, accès restreint
+Paiements d’abonnement
+Obligation comptable et fiscale
+10 ans
+Demandes d’ouverture non converties
+Consentement du demandeur, donné en remplissant le formulaire
+Sans purge automatique, effacement sur demande, sauf si un paiement s’y rattache : elle est alors retenue dix ans, comme lui. Le journal d’audit, lui, garde nom et numéro d’origine malgré l’effacement : il est immuable et jamais purgé ; l’empreinte du mot de passe, elle, n’y entre jamais.
+Journal d’audit
+Sécurité
+Immuable par construction : les déclencheurs refusent toute modification et toute suppression ligne à ligne ; aucune purge n’est prévue.
+Avis clients envoyés (SMS)
+Exécution du service
+Sans purge automatique, effacement sur demande
+6. Qui accède à ces données
+Le collecteur, pour sa propre tournée — la sécurité au niveau des lignes (RLS) l’empêche de voir celle d’un autre collecteur.
+Le titulaire d’un compte, pour les tournées des collaborateurs qu’il a rattachés (trois au plus) ; un collaborateur n’accède qu’à sa propre tournée.
+L’exploitant, pour l’administration du service et le support.
+7. Les destinataires et les sous-traitants
+L’exploitant s’appuie sur les sous-traitants suivants, nommés un par un :
+Supabase : hébergement de la base de données, de l’authentification et des fonctions, à Paris.
+Netlify : hébergement du site et des applications.
+Twilio : envoi des avis par SMS.
+Resend : envoi des courriels.
+Chariow : traitement du paiement des abonnements.
+Google : connexion facultative au compte.
+8. Le transfert hors CEDEAO
+La loi n° 2013-450 définit un pays tiers comme tout État non membre de la CEDEAO. La base de données de Kolek est hébergée à Paris, en France — un pays tiers au sens de la loi. Supabase, Netlify, Twilio, Resend, Chariow et Google traitent tous des données hors CEDEAO.
+Ce transfert n’est ni exceptionnel ni ponctuel : il est quotidien et structurel, et cette politique l’assume plutôt que de le taire.
+9. Les droits, et comment les exercer
+Toute personne dont l’exploitant traite les données dispose des droits suivants :
+Information : savoir ce qui est traité, et pourquoi.
+Accès : obtenir communication de ses données.
+Rectification : faire corriger une donnée inexacte.
+Opposition : s’opposer à un traitement.
+Refus de figurer au fichier : avant son inscription par le collecteur, refuser d’y figurer.
+Effacement par anonymisation : la fiche du client et ses cartes ne portent plus ni nom ni numéro de téléphone : ils sont remplacés par une mention neutre, et les montants restent, parce que la loi comptable impose de les conserver. Le journal d’audit, lui, est immuable : il garde la trace des saisies et des corrections antérieures, nom et numéro d’origine compris, lisible par l’exploitant seul.
+Pour exercer l’un de ces droits, écrire à contact@kolek.cash
+. Une réponse est apportée sous 7 jours ouvrés.
+Il faut le dire franchement : aucun écran ne permet aujourd’hui d’exercer ces droits soi-même. Chaque demande est traitée à la main, par courriel.
+10. La sécurité
+Chiffrement des données en transit.
+Cloisonnement des accès par sécurité au niveau des lignes (RLS) : un collecteur ne voit que sa propre tournée.
+La clé de service n’est jamais exposée au navigateur.
+Un journal d’audit trace les actions effectuées dans Kolek.
+11. L’autorité de protection des données
+L’autorité compétente est l’ARTCI. À la date de publication de cette page, aucune autorisation n’a encore été délivrée par l’ARTCI pour les traitements décrits ici.
+12. Modification de cette politique
+L’exploitant peut modifier la présente politique. La version en vigueur est celle publiée sur cette page ; la date de mise à jour, en tête de page, fait foi.
+Pour aller plus loin
+Conditions générales
+· Mentions légales

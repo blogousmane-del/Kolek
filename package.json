@@ -38,9 +38,11 @@
     "verifier:theme": "node scripts/generer-theme.mjs --verifier",
     "generer:marque": "node scripts/generer-marque.mjs",
     "verifier:marque": "node scripts/generer-marque.mjs --verifier",
-    "verifier": "npm run db:reset && npm run verifier:theme && npm run verifier:marque && npm run verifier:paliers && npm run verifier:champs && npm run verifier:rayons && npm run verifier:contraste && npm run verifier:tirets && npm run verifier:exemples-env && npm run verifier:manifeste && npm run verifier:portillons && npm run verifier:mentions && npm run verifier:routes && npm run verifier:lint && npm run typecheck --workspaces --if-present && npm test && npm run test:scripts && npm run test:db && npm run build && npm run verifier:bundles",
+    "verifier": "npm run db:reset && npm run verifier:theme && npm run verifier:marque && npm run verifier:paliers && npm run verifier:cgu && npm run verifier:champs && npm run verifier:rayons && npm run verifier:contraste && npm run verifier:tirets && npm run verifier:exemples-env && npm run verifier:manifeste && npm run verifier:portillons && npm run verifier:mentions && npm run verifier:routes && npm run verifier:lint && npm run typecheck --workspaces --if-present && npm test && npm run test:scripts && npm run test:db && npm run build && npm run verifier:bundles",
     "generer:paliers": "node scripts/generer-paliers-edge.mjs",
-    "verifier:paliers": "node scripts/generer-paliers-edge.mjs --verifier"
+    "verifier:paliers": "node scripts/generer-paliers-edge.mjs --verifier",
+    "generer:cgu": "node scripts/generer-cgu.mjs",
+    "verifier:cgu": "node scripts/generer-cgu.mjs --verifier"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

@@ -167,6 +167,16 @@ jobs:
       - name: App.tsx et netlify.toml dispatchent les mêmes routes
         run: npm run verifier:routes
 
+      # La preuve qu'on enregistre avec chaque acceptation est une empreinte du
+      # texte rendu. Si quelqu'un corrige une virgule des conditions sans
+      # relancer le générateur, la constante désigne un instantané qui n'est
+      # plus le texte affiché : on enregistrerait une acceptation pour un
+      # document qu'on ne peut pas produire. Rien ne casse — le site se
+      # construit, la page s'affiche, le formulaire répond — et c'est
+      # précisément pourquoi seule une étape de CI l'attrape.
+      - name: La version des conditions correspond au texte
+        run: npm run verifier:cgu
+
       # `oxlint` était installé dans les trois applications et câblé à un script
       # `lint` depuis le début. Personne ne le lançait — ni cette vérification,
       # ni `npm run verifier`. Il signalait pourtant, depuis des jours, que
