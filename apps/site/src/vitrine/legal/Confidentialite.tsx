@@ -224,19 +224,19 @@ export function Confidentialite() {
             et des fonctions, à Paris.
           </li>
           <li>
-            <strong>Netlify</strong> — hébergement du site et des applications.
+            <strong>Netlify</strong> : hébergement du site et des applications.
           </li>
           <li>
-            <strong>Twilio</strong> — envoi des avis par SMS.
+            <strong>Twilio</strong> : envoi des avis par SMS.
           </li>
           <li>
-            <strong>Resend</strong> — envoi des courriels.
+            <strong>Resend</strong> : envoi des courriels.
           </li>
           <li>
-            <strong>Chariow</strong> — traitement du paiement des abonnements.
+            <strong>Chariow</strong> : traitement du paiement des abonnements.
           </li>
           <li>
-            <strong>Google</strong> — connexion facultative au compte.
+            <strong>Google</strong> : connexion facultative au compte.
           </li>
         </ul>
       </section>
@@ -262,16 +262,16 @@ export function Confidentialite() {
         </p>
         <ul className="mt-2 flex flex-col gap-1 pl-5 list-disc">
           <li>
-            <strong>Information</strong> — savoir ce qui est traité, et pourquoi.
+            <strong>Information</strong> : savoir ce qui est traité, et pourquoi.
           </li>
           <li>
-            <strong>Accès</strong> — obtenir communication de ses données.
+            <strong>Accès</strong> : obtenir communication de ses données.
           </li>
           <li>
-            <strong>Rectification</strong> — faire corriger une donnée inexacte.
+            <strong>Rectification</strong> : faire corriger une donnée inexacte.
           </li>
           <li>
-            <strong>Opposition</strong> — s’opposer à un traitement.
+            <strong>Opposition</strong> : s’opposer à un traitement.
           </li>
           <li>
             <strong>Refus de figurer au fichier</strong> — avant son inscription par le

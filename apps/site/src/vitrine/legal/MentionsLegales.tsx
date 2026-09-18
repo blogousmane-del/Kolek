@@ -31,7 +31,7 @@ export function MentionsLegales() {
         <p className="mt-2">Compte contribuable : {IDENTITE.compteContribuable}.</p>
         <p className="mt-2">
           Téléphone :{' '}
-          <Champ valeur={IDENTITE.telephone} nom="téléphone" /> — Contact : {IDENTITE.contact}.
+          <Champ valeur={IDENTITE.telephone} nom="téléphone" />. Contact : {IDENTITE.contact}.
         </p>
       </section>
 

@@ -81,7 +81,7 @@ export function Champ({ valeur, nom }: { valeur: string | number | null; nom: st
   if (valeur === null) {
     return (
       <mark className="rounded-pill bg-negative-tint px-2 py-0.5 font-body text-sm font-semibold text-negative">
-        {MARQUEUR_TROU} — {nom}
+        {MARQUEUR_TROU} : {nom}
       </mark>
     );
   }
