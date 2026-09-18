@@ -96,9 +96,10 @@ describe('mentions légales', () => {
 
   it('marque visiblement ce qui n’est pas encore renseigné', () => {
     render(<MentionsLegales />);
-    // L'adresse précise et le téléphone valent `null` tant que l'exploitant
-    // ne les a pas donnés. Un trou muet passerait en production sans qu'on
-    // le voie ; un trou marqué arrête l'œil.
+    // Depuis le 2026-09-18, seuls `declarationActivite` et
+    // `delaiReponseJoursOuvres` valent `null`. La page des mentions rend le
+    // premier ; un trou muet passerait en production sans qu’on le voie,
+    // un trou marqué arrête l’œil.
     expect(screen.getAllByText(/À COMPLÉTER/).length).toBeGreaterThan(0);
   });
 
