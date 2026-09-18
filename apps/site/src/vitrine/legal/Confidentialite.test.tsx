@@ -49,8 +49,16 @@ describe('politique de confidentialité', () => {
     expect(screen.getAllByText(/contact@kolek\.cash/).length).toBeGreaterThan(0);
     expect(container.textContent).toMatch(/aucun écran/);
     // Aucune photographie n'est collectée aujourd'hui — garantie qu'on veut
-    // voir tomber si quelqu'un ajoute un jour un champ photo à cette page.
-    expect(container.textContent).not.toMatch(/photo/i);
+    // voir tomber si la page se met un jour à décrire une collecte de photo.
+    // L'assertion précédente interdisait le mot « photo » sur toute la page,
+    // ce qui interdit du même coup de le dire honnêtement : « aucune photo »
+    // ne passerait pas plus qu'une vraie collecte. On resserre sur ce qu'on
+    // veut vraiment garder — toute phrase qui mentionne « photo » doit nier
+    // la collecte, jamais l'affirmer.
+    const phrasesAvecPhoto = (container.textContent ?? '').match(/[^.]*photo[^.]*\./gi) ?? [];
+    for (const phrase of phrasesAvecPhoto) {
+      expect(phrase).toMatch(/aucun|pas de|n['’]est pas|jamais/i);
+    }
     // Et l'exercice des droits ne part jamais sur WhatsApp. Le pied de page
     // l'offre comme canal commercial depuis la tâche 8 ; une demande d'accès
     // ou d'effacement, elle, doit laisser une trace écrite et datée, qu'une

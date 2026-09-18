@@ -106,12 +106,13 @@ export function Confidentialite() {
         <p className="mt-2">
           Le fondement est le consentement, au sens de la loi n° 2013-450 : « manifestation de
           volonté expresse, non équivoque, libre, spécifique et informée ». Le collecteur le donne
-          à l’ouverture de son compte. Pour les clients du collecteur, ce consentement est
-          recueilli par le collecteur lui-même — les{' '}
+          à l’ouverture de son compte. Pour les clients du collecteur, les{' '}
           <a href={CONDITIONS} className="text-primary underline underline-offset-2">
             conditions générales
           </a>{' '}
-          l’y obligent, avant toute inscription.
+          imposent au collecteur de les informer avant toute inscription, et de ne pas inscrire
+          celui qui refuse d’y figurer : une obligation d’information et d’opposition, non de
+          recueil d’un consentement exprès.
         </p>
         <p className="mt-2">
           Ce consentement fonde la collecte des données, pas tout ce qui suit : la conservation
@@ -149,7 +150,9 @@ export function Confidentialite() {
                 <td className="py-2 pr-3">Exécution du contrat</td>
                 <td className="py-2">
                   Durée de la relation, puis anonymisation sur demande — pas automatiquement, sauf
-                  suppression du compte n’ayant jamais manié d’argent
+                  suppression du compte n’ayant jamais manié d’argent. Le journal d’audit, lui,
+                  garde nom et numéro d’origine malgré l’anonymisation : il est immuable et
+                  jamais purgé.
                 </td>
               </tr>
               <tr>
@@ -179,15 +182,17 @@ export function Confidentialite() {
                 </td>
                 <td className="py-2">
                   Sans purge automatique, effacement sur demande, sauf si un paiement s’y
-                  rattache : elle est alors retenue dix ans, comme lui
+                  rattache : elle est alors retenue dix ans, comme lui. Le journal d’audit, lui,
+                  garde nom et numéro d’origine malgré l’effacement : il est immuable et jamais
+                  purgé ; l’empreinte du mot de passe, elle, n’y entre jamais.
                 </td>
               </tr>
               <tr>
                 <td className="py-2 pr-3">Journal d’audit</td>
                 <td className="py-2 pr-3">Sécurité</td>
                 <td className="py-2">
-                  Immuable par construction : le schéma refuse toute modification et tout
-                  effacement, même sous clé de service ; aucune purge n’est prévue.
+                  Immuable par construction : les déclencheurs refusent toute modification et
+                  toute suppression ligne à ligne ; aucune purge n’est prévue.
                 </td>
               </tr>
               <tr>
@@ -297,7 +302,7 @@ export function Confidentialite() {
           . Une réponse est apportée sous{' '}
           <Champ
             valeur={IDENTITE.delaiReponseJoursOuvres}
-            nom="délai de réponse en jours ouvrés"
+            nom="délai de réponse"
           />{' '}
           jours ouvrés.
         </p>
