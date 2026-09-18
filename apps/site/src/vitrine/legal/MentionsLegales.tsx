@@ -54,8 +54,9 @@ export function MentionsLegales() {
       <section>
         <TitreSection>Nature du service</TitreSection>
         <p className="mt-2">
-          Kolek est un outil de tenue de collecte. « GTCS n’est pas un établissement financier,
-          ne reçoit aucun dépôt, et aucun flux d’épargne ne transite par la plateforme. »
+          Kolek est un outil de tenue de collecte. L’exploitant n’est pas un établissement
+          financier, ne reçoit aucun dépôt, et aucun flux d’épargne ne transite par la
+          plateforme.
         </p>
       </section>
 
