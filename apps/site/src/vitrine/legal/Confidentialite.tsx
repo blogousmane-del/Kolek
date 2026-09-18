@@ -220,7 +220,7 @@ export function Confidentialite() {
         <p className="mt-2">L’exploitant s’appuie sur les sous-traitants suivants, nommés un par un :</p>
         <ul className="mt-2 flex flex-col gap-1 pl-5 list-disc">
           <li>
-            <strong>Supabase</strong> — hébergement de la base de données, de l’authentification
+            <strong>Supabase</strong> : hébergement de la base de données, de l’authentification
             et des fonctions, à Paris.
           </li>
           <li>
@@ -274,11 +274,11 @@ export function Confidentialite() {
             <strong>Opposition</strong> : s’opposer à un traitement.
           </li>
           <li>
-            <strong>Refus de figurer au fichier</strong> — avant son inscription par le
+            <strong>Refus de figurer au fichier</strong> : avant son inscription par le
             collecteur, refuser d’y figurer.
           </li>
           <li>
-            <strong>Effacement par anonymisation</strong> — la fiche du client et ses cartes ne
+            <strong>Effacement par anonymisation</strong> : la fiche du client et ses cartes ne
             portent plus ni nom ni numéro de téléphone : ils sont remplacés par une mention
             neutre, et les montants restent, parce que la loi comptable impose de les conserver.
             Le journal d’audit, lui, est immuable : il garde la trace des saisies et des

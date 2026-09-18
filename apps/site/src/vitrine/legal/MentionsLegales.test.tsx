@@ -48,6 +48,6 @@ describe('mentions légales', () => {
 
   it('n’invente aucun numéro ARTCI', () => {
     const { container } = render(<MentionsLegales />);
-    expect(container.textContent).not.toMatch(/ARTCI\s*n[°o]/i);
+    expect(container.textContent).not.toMatch(/ARTCI\s*:?\s*(?:num[ée]ro|n[°o])/i);
   });
 });

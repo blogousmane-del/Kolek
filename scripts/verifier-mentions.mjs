@@ -12,21 +12,32 @@
  */
 import { globSync, readFileSync } from 'node:fs';
 
-// Deux motifs plutot qu'une expansion d'accolades : `fs.globSync` ne la
-// garantit pas, et un motif qui ne correspond a rien rend une liste vide —
-// donc une garde qui passe sans rien avoir lu. Le compte est verifie plus bas.
-const sources = [
-  ...globSync('apps/**/*.ts'),
-  ...globSync('apps/**/*.tsx'),
-  ...globSync('packages/**/*.ts'),
-  ...globSync('packages/**/*.tsx'),
-].filter((p) => !p.includes('node_modules') && !p.includes('dist'));
+// Un segment de chemin entier, pas une sous-chaîne : `distribution.ts`
+// resterait lu, seul un vrai dossier `node_modules/` ou `dist/` est écarté.
+// `exclude` évite en plus à `globSync` de descendre dans les `node_modules`
+// de chaque espace de travail avant qu'on les rejette.
+const EXCLUSIONS = ['**/node_modules/**', '**/dist/**'];
 
-// Temoin : une garde qui ne lit aucun fichier passerait toujours.
-if (sources.length < 100) {
-  console.error(`Seulement ${sources.length} sources lues : le motif est casse.`);
-  process.exit(1);
+// Quatre motifs plutôt qu'une expansion d'accolades : `fs.globSync` ne la
+// garantit pas. Chacun a SON témoin, pas une somme : un plancher sur le total
+// laisserait les deux motifs `.ts` couvrir pour des `.tsx` cassés — exactement
+// ce qui s'est produit ici, alors que les trois pages légales que cette garde
+// protège sont toutes des `.tsx`.
+const MOTIFS = {
+  'apps/**/*.ts': globSync('apps/**/*.ts', { exclude: EXCLUSIONS }),
+  'apps/**/*.tsx': globSync('apps/**/*.tsx', { exclude: EXCLUSIONS }),
+  'packages/**/*.ts': globSync('packages/**/*.ts', { exclude: EXCLUSIONS }),
+  'packages/**/*.tsx': globSync('packages/**/*.tsx', { exclude: EXCLUSIONS }),
+};
+
+for (const [motif, resultat] of Object.entries(MOTIFS)) {
+  if (resultat.length === 0) {
+    console.error(`Le motif ${motif} n'a trouvé aucun fichier : il est cassé.`);
+    process.exit(1);
+  }
 }
+
+const sources = Object.values(MOTIFS).flat();
 
 const fautes = [];
 for (const fichier of sources) {
@@ -34,7 +45,7 @@ for (const fichier of sources) {
   if (/gsmtechnoloy@gmail\.com/.test(texte)) {
     fautes.push(`${fichier} : adresse personnelle, remplacer par contact@kolek.cash`);
   }
-  if (/ARTCI\s*n[°o]\s*\d/i.test(texte)) {
+  if (/ARTCI\s*:?\s*(?:num[ée]ro|n[°o])\s*\d/i.test(texte)) {
     fautes.push(`${fichier} : cite un numéro ARTCI, or aucune autorisation n'existe`);
   }
 }
