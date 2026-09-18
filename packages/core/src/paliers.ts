@@ -98,7 +98,7 @@ export const PALIERS: readonly DescriptionPalier[] = [
       { libelle: 'Exports CSV', incluse: false },
       { libelle: 'Support prioritaire', incluse: false },
       { libelle: '3 collaborateurs', incluse: false },
-      { libelle: 'Manager dédié', incluse: false },
+      { libelle: 'Accompagnement personnalisé', incluse: false },
     ],
   },
   {
@@ -120,7 +120,7 @@ export const PALIERS: readonly DescriptionPalier[] = [
       { libelle: 'Exports CSV', incluse: false },
       { libelle: 'Support prioritaire', incluse: true },
       { libelle: '3 collaborateurs', incluse: false },
-      { libelle: 'Manager dédié', incluse: false },
+      { libelle: 'Accompagnement personnalisé', incluse: false },
     ],
   },
   {
@@ -142,7 +142,7 @@ export const PALIERS: readonly DescriptionPalier[] = [
       { libelle: 'Exports CSV', incluse: false },
       { libelle: 'Support prioritaire', incluse: true },
       { libelle: '3 collaborateurs', incluse: false },
-      { libelle: 'Manager dédié', incluse: false },
+      { libelle: 'Accompagnement personnalisé', incluse: false },
     ],
   },
   {
@@ -162,9 +162,9 @@ export const PALIERS: readonly DescriptionPalier[] = [
       { libelle: 'Encaissement hors ligne', incluse: true },
       { libelle: 'Rapports avancés', incluse: true },
       { libelle: 'Exports CSV', incluse: false },
-      { libelle: 'Support dédié 24/7', incluse: true },
+      { libelle: 'Support prioritaire', incluse: true },
       { libelle: '3 collaborateurs', incluse: true },
-      { libelle: 'Manager dédié', incluse: true },
+      { libelle: 'Accompagnement personnalisé', incluse: true },
     ],
   },
 ];
