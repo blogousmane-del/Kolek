@@ -93,6 +93,30 @@ describe('garde de source des mentions', () => {
     expect(resultat.stdout).toMatch(/ne citent ni adresse personnelle ni numéro ARTCI/);
   });
 
+  it('compte et nomme un trou « À COMPLÉTER », sans faire échouer le script', () => {
+    const resultat = executer(
+      depotAvec(
+        'apps/site/src/vitrine/legal/sujet.tsx',
+        "export const x = 'À COMPLÉTER : numéro de téléphone';\n",
+      ),
+    );
+
+    expect(resultat.status).toBe(0);
+    expect(resultat.stdout).toMatch(/sujet\.tsx\s*:\s*1/);
+  });
+
+  it('compte deux trous dans le même fichier', () => {
+    const resultat = executer(
+      depotAvec(
+        'apps/site/src/vitrine/legal/sujet.tsx',
+        "export const x = 'À COMPLÉTER'; export const y = 'À COMPLÉTER';\n",
+      ),
+    );
+
+    expect(resultat.status).toBe(0);
+    expect(resultat.stdout).toMatch(/sujet\.tsx\s*:\s*2/);
+  });
+
   it('échoue si un motif ne trouve aucun fichier, et nomme lequel', () => {
     dossier = mkdtempSync(join(tmpdir(), 'verifier-mentions-'));
     // Cinq fichiers, tous sous `apps/` : les motifs `apps/**\/*.ts` et
