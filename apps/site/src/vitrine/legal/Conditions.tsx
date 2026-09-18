@@ -1,4 +1,4 @@
-import { PALIERS } from '@kolek/core';
+import { PALIERS, formatMontant } from '@kolek/core';
 
 import { CONFIDENTIALITE } from '../liens';
 import { PageLegale, TitreSection } from './PageLegale';
@@ -13,6 +13,13 @@ import { IDENTITE } from './identite';
  * ne tient pas. La page ne liste que les fonctions dont `incluse` vaut
  * `true`, quelles qu'elles soient : c'est la règle, et elle ne dépend
  * d'aucun palier ni d'aucune date.
+ *
+ * Le prix se rend par `formatMontant` (`packages/core/src/format.ts`),
+ * jamais `palier.prix` brut : la page de tarifs et l'écran d'administration
+ * affichent déjà « 2 500 FCFA » avec ce même séparateur. Un contrat qui
+ * écrirait « 2500 FCFA » ne changerait rien au montant dû, mais un écart de
+ * présentation entre la page de vente et le contrat est un détail qu'un
+ * adversaire relève.
  *
  * La section « Obligations du collecteur » porte le risque de l'article 28
  * de la loi n° 2013-450 : aucun écran ne permet aujourd'hui à un client du
@@ -77,7 +84,7 @@ export function Conditions() {
               <strong>{palier.nom}</strong> :{' '}
               {palier.prix === 0
                 ? `Gratuit pendant ${palier.periode}.`
-                : `${palier.prix} FCFA par mois.`}
+                : `${formatMontant(palier.prix)} FCFA par mois.`}
               <ul className="mt-1 flex flex-col gap-0.5 pl-5 list-disc">
                 {palier.fonctions
                   .filter((fonction) => fonction.incluse)
@@ -144,9 +151,9 @@ export function Conditions() {
       <section>
         <TitreSection>8. Obligations du collecteur</TitreSection>
         <p className="mt-2">
-          Kolek enregistre le nom, le numéro de téléphone, le marché et l’activité des clients du
-          collecteur — des personnes qui n’ont pas de compte Kolek et n’ont rien signé. Le
-          collecteur s’engage à :
+          L’exploitant enregistre le nom, le numéro de téléphone, le marché et l’activité des
+          clients du collecteur — des personnes qui n’ont pas de compte Kolek et n’ont rien
+          signé. Le collecteur s’engage à :
         </p>
         <ul className="mt-2 flex flex-col gap-1 pl-5 list-disc">
           <li>

@@ -1,7 +1,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { PALIERS } from '@kolek/core';
+import { PALIERS, formatMontant } from '@kolek/core';
 
 import { Conditions } from './Conditions';
 
@@ -21,7 +21,16 @@ describe('conditions générales', () => {
   it('affiche les prix réels de chaque palier, sans en inventer', () => {
     render(<Conditions />);
     for (const palier of PALIERS) {
-      const attendu = palier.prix === 0 ? /gratuit/i : new RegExp(String(palier.prix));
+      // `formatMontant` sépare les milliers par une espace insécable
+      // (U+00A0), mais le normaliseur par défaut de Testing Library réduit
+      // toute suite d'espaces — insécable comprise — à une espace ordinaire
+      // avant de comparer : une expression construite avec l'insécable brute
+      // ne correspondrait donc jamais au texte rendu. On la remplace ici par
+      // son point de code, jamais en la tapant.
+      const attendu =
+        palier.prix === 0
+          ? /gratuit/i
+          : new RegExp(formatMontant(palier.prix).replace(/ /g, ' '));
       expect(screen.getAllByText(attendu).length).toBeGreaterThan(0);
     }
   });
