@@ -46,7 +46,7 @@ export const IDENTITE: Readonly<Identite> = Object.freeze({
   telephone: '+225 07 88 81 81 18',
   whatsapp: '2250788818118',
   contact: 'contact@kolek.cash',
-  delaiReponseJoursOuvres: null,
+  delaiReponseJoursOuvres: 7,
 });
 
 /** Le texte que porte un champ non renseigné. Repris par la garde de source. */
