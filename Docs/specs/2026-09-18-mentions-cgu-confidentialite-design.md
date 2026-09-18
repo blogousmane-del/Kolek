@@ -190,13 +190,48 @@ Chaque page est une page ordinaire de la vitrine, lisible sans JavaScript actif 
 - **La suppression de `clients.photo_url`** — migration dédiée, avec contrôle préalable en production.
 - **L’immatriculation** — hors de ce que le dépôt peut faire, et la protection la plus forte du lot.
 
-## 9. Ce qui manque encore, et qui interdit la publication
+## 9. L’identité de l’exploitant
 
-Aucune page ne part en ligne tant que ces trous ne sont pas comblés. Ils seront marqués dans le texte de façon à ce qu’une publication accidentelle soit visible à l’œil nu.
+Fourni par l’exploitant le 2026-09-18 :
 
-1. Nom complet de la personne physique exploitant sous l’enseigne GTCS.
-2. Adresse — domicile ou adresse d’exploitation.
-3. Numéro de compte contribuable, s’il en existe un (exigé par l’article 9).
-4. Numéro de téléphone professionnel à publier, s’il diffère de celui de la vitrine.
-5. Confirmation que `contact@kolek.cash` existe et est relevée.
-6. Délai de réponse que l’exploitant s’engage à tenir sur les demandes de droits.
+| Élément | Valeur |
+| --- | --- |
+| Enseigne | **GSM TECHNOLOGIE CYBER SHOP** — dont « GTCS » est le sigle employé partout dans le produit |
+| Adresse | **Saïoua**, Côte d’Ivoire |
+| Numéro de compte contribuable | **4212842W** |
+| Contact | **contact@kolek.cash** |
+
+Le numéro de compte contribuable est celui qu’exige l’article 9 pour le dossier
+adressé à l’autorité. Il est désormais disponible.
+
+**Une hypothèse à reprendre.** L’exploitant a d’abord décrit l’activité comme
+« entreprise individuelle non immatriculée ». Un compte contribuable signifie
+pourtant que l’activité est **déclarée à la DGI**, donc formalisée fiscalement.
+Les deux ne sont pas contradictoires — une entreprise individuelle peut être
+connue du fisc sans être inscrite au RCCM — mais la rédaction change selon le
+cas, et la question doit être tranchée sur pièces avant publication :
+
+- **s’il existe un numéro RCCM**, les mentions légales le portent, et
+  l’exploitant est désigné par la dénomination inscrite ;
+- **s’il n’en existe pas**, les mentions désignent la personne physique
+  exploitant sous l’enseigne GSM TECHNOLOGIE CYBER SHOP, et l’enseigne seule
+  ne suffit pas.
+
+## 10. Ce qui manque encore, et qui interdit la publication
+
+Aucune page ne part en ligne tant que ces trous ne sont pas comblés. Ils seront
+marqués dans le texte de façon à ce qu’une publication accidentelle soit
+visible à l’œil nu.
+
+1. **Nom complet de la personne physique** exploitant sous l’enseigne — le nom
+   d’une enseigne ne désigne personne en droit.
+2. **Numéro RCCM**, s’il existe (voir §9), ou la confirmation qu’il n’en existe
+   pas.
+3. **Adresse plus précise que la seule commune** : quartier, lot, ou boîte
+   postale. « Saïoua » seul ne permet ni de notifier ni d’assigner, et une
+   adresse qu’on ne peut pas atteindre est une mention incomplète.
+4. **Numéro de téléphone professionnel** à publier.
+5. **Confirmation que `contact@kolek.cash` existe et est relevée** — les MX du
+   domaine sont configurés, la boîte n’a pas pu être vérifiée depuis le dépôt.
+6. **Délai de réponse** que l’exploitant s’engage à tenir sur les demandes
+   d’exercice des droits. La politique l’annoncera, et il devient opposable.
