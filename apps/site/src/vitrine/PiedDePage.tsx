@@ -1,6 +1,13 @@
 import { Logo } from '@kolek/ui';
 
-import { APP_COLLECTEUR, CONTACT_DEMO, INSCRIPTION } from './liens';
+import {
+  APP_COLLECTEUR,
+  CONDITIONS,
+  CONFIDENTIALITE,
+  CONTACT_DEMO,
+  INSCRIPTION,
+  MENTIONS_LEGALES,
+} from './liens';
 
 /**
  * Le pied de page.
@@ -28,12 +35,20 @@ const COLONNES = [
       { href: CONTACT_DEMO, libelle: 'Écrire à GTCS' },
     ],
   },
+  {
+    titre: 'Légal',
+    liens: [
+      { href: MENTIONS_LEGALES, libelle: 'Mentions légales' },
+      { href: CONDITIONS, libelle: 'Conditions générales' },
+      { href: CONFIDENTIALITE, libelle: 'Confidentialité' },
+    ],
+  },
 ] as const;
 
 export function PiedDePage() {
   return (
     <footer className="rounded-t-[2rem] bg-dark-canvas sm:rounded-t-[4rem] px-5 pb-10 pt-16 sm:px-12 lg:px-20">
-      <div className="grid gap-10 md:grid-cols-3">
+      <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
         <div>
           <Logo className="mb-2 h-9 text-white" />
           <p className="max-w-xs font-body text-sm leading-relaxed text-white/55">

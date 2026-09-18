@@ -26,6 +26,7 @@
     "verifier:dns": "node scripts/verifier-dns.mjs",
     "verifier:exemples-env": "node scripts/verifier-exemples-env.mjs",
     "verifier:manifeste": "node scripts/verifier-manifeste.mjs",
+    "verifier:mentions": "node scripts/verifier-mentions.mjs",
     "verifier:en-ligne": "node scripts/verifier-en-ligne.mjs",
     "verifier:migrations": "node scripts/verifier-migrations.mjs",
     "verifier:portillons": "node scripts/verifier-portillons.mjs",
@@ -36,7 +37,7 @@
     "verifier:theme": "node scripts/generer-theme.mjs --verifier",
     "generer:marque": "node scripts/generer-marque.mjs",
     "verifier:marque": "node scripts/generer-marque.mjs --verifier",
-    "verifier": "npm run db:reset && npm run verifier:theme && npm run verifier:marque && npm run verifier:paliers && npm run verifier:champs && npm run verifier:rayons && npm run verifier:contraste && npm run verifier:tirets && npm run verifier:exemples-env && npm run verifier:manifeste && npm run verifier:portillons && npm run verifier:lint && npm run typecheck --workspaces --if-present && npm test && npm run test:scripts && npm run test:db && npm run build && npm run verifier:bundles",
+    "verifier": "npm run db:reset && npm run verifier:theme && npm run verifier:marque && npm run verifier:paliers && npm run verifier:champs && npm run verifier:rayons && npm run verifier:contraste && npm run verifier:tirets && npm run verifier:exemples-env && npm run verifier:manifeste && npm run verifier:portillons && npm run verifier:mentions && npm run verifier:lint && npm run typecheck --workspaces --if-present && npm test && npm run test:scripts && npm run test:db && npm run build && npm run verifier:bundles",
     "generer:paliers": "node scripts/generer-paliers-edge.mjs",
     "verifier:paliers": "node scripts/generer-paliers-edge.mjs --verifier"
   },
