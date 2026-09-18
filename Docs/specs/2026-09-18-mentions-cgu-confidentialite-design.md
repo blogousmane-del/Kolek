@@ -99,7 +99,7 @@ Sanctions pécuniaires administratives plafonnées à **10 000 000 FCFA**, port�
 | Question | Décision | Conséquence |
 |---|---|---|
 | Statut ARTCI | **Rien n’est fait** | Aucun numéro n’est invoqué dans les pages. Le dossier d’autorisation est un livrable séparé. |
-| Forme juridique | **Entreprise individuelle non immatriculée** | Les textes nomment la **personne physique** exploitant sous l’enseigne GTCS. Révision courte après immatriculation. |
+| Forme juridique | **Entreprenant**, dispensé d’immatriculation au RCCM (§9.1) | Les textes nomment la **personne physique** exploitant sous l’enseigne. Le patrimoine personnel répond. |
 | Responsable du traitement | **L’exploitant, seul** | Conforme au code : il détermine finalités et moyens. Le collecteur est un utilisateur, tenu par les CGU d’informer ses clients. |
 | Conservation | **Par catégorie, avec plancher comptable** | Tableau au §5.3. |
 | `clients.photo_url` | **À supprimer** | Migration séparée, après contrôle en production. Retire la question biométrique du dossier. |
@@ -190,7 +190,7 @@ Chaque page est une page ordinaire de la vitrine, lisible sans JavaScript actif 
 - **La suppression de `clients.photo_url`** — migration dédiée, avec contrôle préalable en production.
 - **L’immatriculation** — hors de ce que le dépôt peut faire, et la protection la plus forte du lot.
 
-## 9. L’identité de l’exploitant
+## 9. L’identité de l’exploitant, et son statut
 
 Fourni par l’exploitant le 2026-09-18 :
 
@@ -199,23 +199,37 @@ Fourni par l’exploitant le 2026-09-18 :
 | Enseigne | **GSM TECHNOLOGIE CYBER SHOP** — dont « GTCS » est le sigle employé partout dans le produit |
 | Adresse | **Saïoua**, Côte d’Ivoire |
 | Numéro de compte contribuable | **4212842W** |
+| Statut | **Entreprenant** — impôt déclaré, **pas d’immatriculation au RCCM** |
 | Contact | **contact@kolek.cash** |
 
-Le numéro de compte contribuable est celui qu’exige l’article 9 pour le dossier
-adressé à l’autorité. Il est désormais disponible.
+### 9.1 L’absence de RCCM est régulière, et une note antérieure se trompait
 
-**Une hypothèse à reprendre.** L’exploitant a d’abord décrit l’activité comme
-« entreprise individuelle non immatriculée ». Un compte contribuable signifie
-pourtant que l’activité est **déclarée à la DGI**, donc formalisée fiscalement.
-Les deux ne sont pas contradictoires — une entreprise individuelle peut être
-connue du fisc sans être inscrite au RCCM — mais la rédaction change selon le
-cas, et la question doit être tranchée sur pièces avant publication :
+Une première version de cette analyse affirmait que vendre un abonnement
+mensuel imposait l’immatriculation au RCCM. **C’est faux pour le statut
+d’entreprenant.** L’acte uniforme OHADA portant droit commercial général
+dispense l’entreprenant de l’immatriculation et lui substitue une simple
+**déclaration d’activité**, déposée sans frais au greffe de la juridiction
+compétente. L’exploitant n’est donc pas en irrégularité.
 
-- **s’il existe un numéro RCCM**, les mentions légales le portent, et
-  l’exploitant est désigné par la dénomination inscrite ;
-- **s’il n’en existe pas**, les mentions désignent la personne physique
-  exploitant sous l’enseigne GSM TECHNOLOGIE CYBER SHOP, et l’enseigne seule
-  ne suffit pas.
+Trois conséquences pour ce chantier :
+
+1. **Le compte contribuable ne doit pas être annulé.** C’est exactement le
+   numéro de déclaration fiscale qu’exige l’article 9 ; sans lui, le dossier
+   ARTCI ne peut pas être déposé complet. L’exploitant a envisagé de le faire
+   supprimer pour éviter un problème : ce serait en créer un autre, d’une
+   nature bien plus lourde.
+2. **Les mentions légales publieront le numéro de déclaration d’activité**
+   dès qu’il existera, à côté du compte contribuable. C’est ce qui rend
+   l’enseigne opposable.
+3. **Un seuil est à surveiller.** L’entreprenant bascule obligatoirement vers
+   le statut de commerçant, avec immatriculation au RCCM, si le chiffre
+   d’affaires dépasse **10 millions FCFA** pour une entreprise de services
+   pendant **deux années consécutives**. Aux paliers actuels, l’ordre de
+   grandeur est de 83 collecteurs à 10 000 FCFA par mois, ou 330 à 2 500.
+
+Ce qui reste vrai, et qui n’est pas une faute mais le prix du statut léger :
+faute de personne morale, **le patrimoine personnel de l’exploitant répond**.
+Les textes nomment donc la personne physique exploitant sous l’enseigne.
 
 ## 10. Ce qui manque encore, et qui interdit la publication
 
@@ -224,14 +238,15 @@ marqués dans le texte de façon à ce qu’une publication accidentelle soit
 visible à l’œil nu.
 
 1. **Nom complet de la personne physique** exploitant sous l’enseigne — le nom
-   d’une enseigne ne désigne personne en droit.
-2. **Numéro RCCM**, s’il existe (voir §9), ou la confirmation qu’il n’en existe
-   pas.
-3. **Adresse plus précise que la seule commune** : quartier, lot, ou boîte
-   postale. « Saïoua » seul ne permet ni de notifier ni d’assigner, et une
-   adresse qu’on ne peut pas atteindre est une mention incomplète.
+   d’une enseigne ne désigne personne en droit. **Seul trou réellement
+   bloquant : sans lui, aucun des trois textes ne peut être rédigé.**
+2. **Adresse plus précise que la seule commune** : quartier, lot, ou boîte
+   postale. « Saïoua » seul ne permet ni de notifier ni d’assigner.
+3. **Numéro de déclaration d’activité** au greffe, s’il existe déjà — sinon la
+   démarche est gratuite et les mentions le porteront ensuite.
 4. **Numéro de téléphone professionnel** à publier.
 5. **Confirmation que `contact@kolek.cash` existe et est relevée** — les MX du
    domaine sont configurés, la boîte n’a pas pu être vérifiée depuis le dépôt.
 6. **Délai de réponse** que l’exploitant s’engage à tenir sur les demandes
    d’exercice des droits. La politique l’annoncera, et il devient opposable.
+   Sept jours ouvrés est tenable ; quarante-huit heures ne le serait pas.
