@@ -45,7 +45,11 @@ describe('politique de confidentialité', () => {
   });
 
   it('dit franchement qu’aucun écran n’existe pour exercer ses droits', () => {
-    render(<Confidentialite />);
+    const { container } = render(<Confidentialite />);
     expect(screen.getAllByText(/contact@kolek\.cash/).length).toBeGreaterThan(0);
+    expect(container.textContent).toMatch(/aucun écran/);
+    // Aucune photographie n'est collectée aujourd'hui — garantie qu'on veut
+    // voir tomber si quelqu'un ajoute un jour un champ photo à cette page.
+    expect(container.textContent).not.toMatch(/photo/i);
   });
 });

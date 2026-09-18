@@ -1,3 +1,4 @@
+import { CONDITIONS, MENTIONS_LEGALES } from '../liens';
 import { Champ, PageLegale, TitreSection } from './PageLegale';
 import { IDENTITE } from './identite';
 
@@ -41,11 +42,15 @@ export function Confidentialite() {
           n’ont pas de compte Kolek et n’ont rien signé directement avec l’exploitant. Compte
           contribuable : {IDENTITE.compteContribuable}. Contact : {IDENTITE.contact}.
         </p>
+        <p className="mt-2">
+          Adresse : {IDENTITE.commune},{' '}
+          <Champ valeur={IDENTITE.adressePrecise} nom="adresse précise" />, {IDENTITE.pays}.
+        </p>
       </section>
 
       <section>
         <TitreSection>2. Ce qui est collecté, et d’où ça vient</TitreSection>
-        <p className="mt-2">Kolek traite les catégories de données suivantes :</p>
+        <p className="mt-2">L’exploitant traite les catégories de données suivantes :</p>
         <ul className="mt-2 flex flex-col gap-1 pl-5 list-disc">
           <li>
             <strong>Compte collecteur</strong> : nom, numéro de téléphone, zone, courriel — saisis
@@ -69,6 +74,11 @@ export function Confidentialite() {
             <strong>Avis envoyés par SMS</strong> : les messages adressés aux clients du
             collecteur.
           </li>
+          <li>
+            <strong>Paiements d’abonnement</strong> : identifiant de vente Chariow, montant,
+            devise, pourcentage de remise, échéances et date de règlement — transmis par Chariow
+            lors du paiement.
+          </li>
         </ul>
       </section>
 
@@ -84,6 +94,10 @@ export function Confidentialite() {
           <li>Les demandes d’ouverture servent à instruire l’ouverture d’un compte collecteur.</li>
           <li>Le journal d’audit sert à la sécurité et à la traçabilité des actions.</li>
           <li>Les avis par SMS servent à informer un client du collecteur d’un encaissement.</li>
+          <li>
+            Les paiements d’abonnement servent à activer, renouveler et suivre l’abonnement du
+            collecteur.
+          </li>
         </ul>
       </section>
 
@@ -93,8 +107,18 @@ export function Confidentialite() {
           Le fondement est le consentement, au sens de la loi n° 2013-450 : « manifestation de
           volonté expresse, non équivoque, libre, spécifique et informée ». Le collecteur le donne
           à l’ouverture de son compte. Pour les clients du collecteur, ce consentement est
-          recueilli par le collecteur lui-même — les conditions générales l’y obligent, avant
-          toute inscription.
+          recueilli par le collecteur lui-même — les{' '}
+          <a href={CONDITIONS} className="text-primary underline underline-offset-2">
+            conditions générales
+          </a>{' '}
+          l’y obligent, avant toute inscription.
+        </p>
+        <p className="mt-2">
+          Ce consentement fonde la collecte des données, pas tout ce qui suit : la conservation
+          des mises repose sur l’obligation comptable OHADA, celle des paiements d’abonnement sur
+          l’obligation comptable et fiscale, le compte collecteur sur l’exécution du contrat, et
+          les avis SMS sur l’exécution du service — chaque fondement est détaillé ligne par ligne
+          dans le tableau de la section 5.
         </p>
         <p className="mt-2">
           Il faut le dire franchement : la trace de ce consentement n’est pas conservée
@@ -108,9 +132,15 @@ export function Confidentialite() {
           <table className="w-full border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-hairline">
-                <th className="py-2 pr-3 font-headings">Donnée</th>
-                <th className="py-2 pr-3 font-headings">Base</th>
-                <th className="py-2 font-headings">Durée</th>
+                <th scope="col" className="py-2 pr-3 font-headings">
+                  Donnée
+                </th>
+                <th scope="col" className="py-2 pr-3 font-headings">
+                  Base
+                </th>
+                <th scope="col" className="py-2 font-headings">
+                  Durée
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline">
@@ -167,14 +197,17 @@ export function Confidentialite() {
             Le collecteur, pour sa propre tournée — la sécurité au niveau des lignes (RLS)
             l’empêche de voir celle d’un autre collecteur.
           </li>
-          <li>Ses collaborateurs, dans la limite des droits que le collecteur leur accorde.</li>
+          <li>
+            Le titulaire d’un compte, pour les tournées des collaborateurs qu’il a rattachés
+            (trois au plus) ; un collaborateur n’accède qu’à sa propre tournée.
+          </li>
           <li>L’exploitant, pour l’administration du service et le support.</li>
         </ul>
       </section>
 
       <section>
         <TitreSection>7. Les destinataires et les sous-traitants</TitreSection>
-        <p className="mt-2">Kolek s’appuie sur les sous-traitants suivants, nommés un par un :</p>
+        <p className="mt-2">L’exploitant s’appuie sur les sous-traitants suivants, nommés un par un :</p>
         <ul className="mt-2 flex flex-col gap-1 pl-5 list-disc">
           <li>
             <strong>Supabase</strong> — hébergement de la base de données, de l’authentification
@@ -215,7 +248,7 @@ export function Confidentialite() {
       <section>
         <TitreSection>9. Les droits, et comment les exercer</TitreSection>
         <p className="mt-2">
-          Toute personne dont Kolek traite les données dispose des droits suivants :
+          Toute personne dont l’exploitant traite les données dispose des droits suivants :
         </p>
         <ul className="mt-2 flex flex-col gap-1 pl-5 list-disc">
           <li>
@@ -229,6 +262,10 @@ export function Confidentialite() {
           </li>
           <li>
             <strong>Opposition</strong> — s’opposer à un traitement.
+          </li>
+          <li>
+            <strong>Refus de figurer au fichier</strong> — avant son inscription par le
+            collecteur, refuser d’y figurer.
           </li>
           <li>
             <strong>Effacement par anonymisation</strong> — le nom et le numéro de téléphone sont
@@ -284,6 +321,19 @@ export function Confidentialite() {
         <p className="mt-2">
           L’exploitant peut modifier la présente politique. La version en vigueur est celle
           publiée sur cette page ; la date de mise à jour, en tête de page, fait foi.
+        </p>
+      </section>
+
+      <section>
+        <TitreSection>Pour aller plus loin</TitreSection>
+        <p className="mt-2">
+          <a href={CONDITIONS} className="text-primary underline underline-offset-2">
+            Conditions générales
+          </a>{' '}
+          ·{' '}
+          <a href={MENTIONS_LEGALES} className="text-primary underline underline-offset-2">
+            Mentions légales
+          </a>
         </p>
       </section>
     </PageLegale>
