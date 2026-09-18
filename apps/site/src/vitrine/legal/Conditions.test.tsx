@@ -53,18 +53,18 @@ describe('conditions générales', () => {
     expect(container.textContent).not.toMatch(/9[0-9],?[0-9]*\s*%/);
   });
 
-  it("met le titulaire en repondant des collaborateurs qu'il rattache", () => {
+  it("met le titulaire en répondant des collaborateurs qu’il rattache", () => {
     const { container } = render(<Conditions />);
-    // §3.4 de la spec : un collaborateur ne règle jamais d'abonnement, donc il
-    // ne rencontre aucun des trois chemins où l'acceptation est recueillie.
+    // §3.4 de la spec : un collaborateur ne règle jamais d’abonnement, donc il
+    // ne rencontre aucun des trois chemins où l’acceptation est recueillie.
     // Le trou se ferme par le contrat plutôt que par un écran de plus — et
-    // c'est sur lui que pèse en fait l'obligation d'information de l'article 28,
-    // puisque c'est lui qui inscrit les clients.
-    expect(container.textContent).toMatch(/répondre des collaborateurs qu'il rattache/);
+    // c’est sur lui que pèse en fait l’obligation d’information de l’article 28,
+    // puisque c’est lui qui inscrit les clients.
+    expect(container.textContent).toMatch(/répondre des collaborateurs qu’il rattache/);
     expect(container.textContent).toMatch(/leur transmettre les obligations des présentes/);
   });
 
-    it('ne publie, pour chaque palier, aucune fonction que ce palier n’inclut pas', () => {
+  it("ne publie, pour chaque palier, aucune fonction que ce palier n'inclut pas", () => {
     render(<Conditions />);
     // Le filtre `fonctions.filter((f) => f.incluse)` de Conditions.tsx garde
     // les CGU alignées sur ce que le produit livre réellement : une fonction
