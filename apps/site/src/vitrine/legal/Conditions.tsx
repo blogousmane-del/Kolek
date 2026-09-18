@@ -66,9 +66,17 @@ export function Conditions() {
       <section>
         <TitreSection>2. Accès au service</TitreSection>
         <p className="mt-2">
-          L’accès à Kolek n’est pas libre : il n’existe aucune inscription en libre-service. Un
-          compte est ouvert par l’exploitant après un premier échange avec le collecteur, une
-          fois le formulaire d’ouverture rempli.
+          L’accès à Kolek n’est pas libre : il n’existe aucune inscription en libre-service. Deux
+          chemins mènent à l’ouverture d’un compte, selon la formule choisie.
+        </p>
+        <p className="mt-2">
+          Pour l’essai, gratuit, un compte est ouvert par l’exploitant après un échange avec le
+          collecteur, une fois le formulaire d’ouverture rempli.
+        </p>
+        <p className="mt-2">
+          Sur une formule payante (Standard, Pro ou Illimité), l’acceptation des présentes
+          conditions puis le règlement de l’abonnement valent ouverture : le compte naît du
+          paiement confirmé, par un traitement automatique, sans intervention humaine.
         </p>
       </section>
 
