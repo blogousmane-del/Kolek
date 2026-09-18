@@ -39,9 +39,19 @@ export function inscriptionPour(palier: string): string {
   return `${INSCRIPTION}?palier=${encodeURIComponent(palier)}`;
 }
 
+/** Les trois textes juridiques. Servis par la vitrine, hors de l'index. */
+export const MENTIONS_LEGALES = '/mentions-legales';
+export const CONDITIONS = '/conditions';
+export const CONFIDENTIALITE = '/confidentialite';
+
 /**
- * L'adresse de GTCS. Elle reste offerte en dernier recours, sous le formulaire
- * — pour qui préfère écrire — mais n'est plus jamais le geste principal.
+ * L'adresse de l'exploitant. Elle reste offerte en dernier recours, sous le
+ * formulaire — pour qui préfère écrire — mais n'est plus jamais le geste
+ * principal.
+ *
+ * Au domaine depuis le 2026-09-18 : l'adresse d'un service commercial qui
+ * figure dans des mentions légales et sert à exercer un droit d'accès ne peut
+ * pas être un compte personnel chez un fournisseur grand public.
  */
 export const CONTACT_DEMO =
-  'mailto:gsmtechnoloy@gmail.com?subject=Kolek%20-%20demande%20de%20démo';
+  'mailto:contact@kolek.cash?subject=Kolek%20-%20demande%20de%20démo';

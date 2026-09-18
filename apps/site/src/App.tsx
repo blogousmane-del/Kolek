@@ -1,5 +1,9 @@
 import { Inscription } from './vitrine/Inscription';
 import { Vitrine } from './vitrine/Vitrine';
+import { Confidentialite } from './vitrine/legal/Confidentialite';
+import { Conditions } from './vitrine/legal/Conditions';
+import { MentionsLegales } from './vitrine/legal/MentionsLegales';
+import { CONDITIONS, CONFIDENTIALITE, MENTIONS_LEGALES } from './vitrine/liens';
 
 /**
  * Le routage du site public.
@@ -20,5 +24,8 @@ export default function App() {
   const chemin = window.location.pathname.replace(/\/+$/, '');
 
   if (chemin === '/inscription') return <Inscription />;
+  if (chemin === MENTIONS_LEGALES) return <MentionsLegales />;
+  if (chemin === CONDITIONS) return <Conditions />;
+  if (chemin === CONFIDENTIALITE) return <Confidentialite />;
   return <Vitrine />;
 }
