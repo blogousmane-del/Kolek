@@ -51,6 +51,23 @@ export const LIENS_TS = 'apps/site/src/vitrine/liens.ts';
 export const NETLIFY_TOML = 'apps/site/netlify.toml';
 
 /**
+ * Blanchit les commentaires d'`App.tsx`, sans décaler les lignes.
+ *
+ * Le commentaire de tête du fichier écrit : « Le chemin est lu une fois, au
+ * chargement. » — une phrase de prose qui mentionne `chemin` au même titre
+ * qu'un vrai dispatch. Sans ce nettoyage, elle entrerait dans `inconnues` et
+ * ferait échouer la garde sur un fichier qui n'a pourtant pas changé.
+ *
+ * Chaque caractère retiré est remplacé par une espace plutôt que supprimé :
+ * les numéros de ligne restent justes pour les messages d'erreur.
+ */
+function sansCommentaires(texte) {
+  return texte
+    .replace(/\/\*[\s\S]*?\*\//g, (bloc) => bloc.replace(/[^\r\n]/g, ' '))
+    .replace(/\/\/[^\r\n]*/g, (ligne) => ' '.repeat(ligne.length));
+}
+
+/**
  * Les routes que `App.tsx` fait mener à une page, dans l'ordre du fichier,
  * et ce qui n'a pas pu être résolu.
  *
@@ -62,23 +79,40 @@ export const NETLIFY_TOML = 'apps/site/netlify.toml';
  * `liens.ts` va dans `inconnues` plutôt que d'être tu : un routage qu'on ne
  * sait pas lire est un routage qu'on ne peut pas garder synchronisé, et le
  * signaler vaut mieux que de conclure sur un ensemble incomplet sans le dire.
+ *
+ * Le motif ne reconnaît qu'une seule forme de dispatch : `if (chemin === X)
+ * return`. Un `switch (chemin)`, un `if (chemin === X) {` sur bloc, ou un
+ * `chemin.startsWith(...)` seraient sinon ignorés sans bruit — la garde
+ * conclurait « mêmes routes » pendant qu'une page neuve rend 404 en
+ * production. Toute autre ligne qui mentionne `chemin`, hors de sa
+ * déclaration, part donc elle aussi dans `inconnues` plutôt que d'être
+ * tue : le reproche qui nomme une route inconnue (voir plus bas) fait le
+ * reste.
  */
 export function routesDeAppTsx(texte, constantes) {
   const routes = [];
   const inconnues = [];
-  for (const m of texte.matchAll(/if\s*\(chemin === (.+?)\)\s*return/g)) {
-    const expr = m[1].trim();
-    const litteral = /^'([^']*)'$/.exec(expr);
-    if (litteral) {
-      routes.push(litteral[1]);
+
+  for (const ligne of sansCommentaires(texte).split(/\r?\n/)) {
+    if (/\bconst chemin\b/.test(ligne)) continue;
+
+    const dispatch = /if\s*\(chemin === (.+?)\)\s*return\b/.exec(ligne);
+    if (dispatch) {
+      const expr = dispatch[1].trim();
+      const litteral = /^'([^']*)'$/.exec(expr);
+      if (litteral) {
+        routes.push(litteral[1]);
+      } else if (Object.prototype.hasOwnProperty.call(constantes, expr)) {
+        routes.push(constantes[expr]);
+      } else {
+        inconnues.push(expr);
+      }
       continue;
     }
-    if (Object.prototype.hasOwnProperty.call(constantes, expr)) {
-      routes.push(constantes[expr]);
-      continue;
-    }
-    inconnues.push(expr);
+
+    if (/\bchemin\b/.test(ligne)) inconnues.push(ligne.trim());
   }
+
   return { routes, inconnues };
 }
 

@@ -136,6 +136,37 @@ jobs:
       - name: Les Edge Functions vérifient leur appelant
         run: npm run verifier:portillons
 
+      # Onze cadratins de prose dans les trois pages légales de cette branche
+      # sont passés à travers trois tours de relecture sans qu'aucun automate
+      # ne les voie — ni le CI, qui ne se déclenche pas sur une branche sans
+      # pull request, ni personne qui aurait pensé à lancer `verifier:tirets`
+      # à la main. Ils n'ont été trouvés qu'une fois `test:scripts` lancé
+      # localement, par curiosité, bien après les relectures. Mesuré : 11
+      # cadratins, dans `Confidentialite.tsx` et `MentionsLegales.tsx`.
+      - name: Aucun cadratin de prose dans l'interface
+        run: npm run verifier:tirets
+
+      # L'adresse personnelle de l'exploitant est réapparue plusieurs fois
+      # dans l'historique de ce dépôt — un copier-coller d'un ancien
+      # `liens.ts`, une branche partie avant la correction — et un numéro
+      # ARTCI inventé serait la même faute dans un texte juridique plutôt que
+      # dans un lien `mailto:`. Ni l'un ni l'autre ne casse quoi que ce soit :
+      # le site continue de se construire et de s'afficher, la faute ne se
+      # voit que dans le texte publié.
+      - name: Aucune adresse personnelle ni faux numéro ARTCI
+        run: npm run verifier:mentions
+
+      # Le cas nommé par la tâche 6 : une route ajoutée à App.tsx sans sa
+      # règle dans netlify.toml passait `npm test`, `test:scripts` et
+      # `build` — CI vert — pour rendre 404 en production sur une mention
+      # légale. `verifier-routes.mjs` existait déjà pour l'arrêter, mais
+      # seulement contre des dépôts jetables : rien n'exécutait la
+      # comparaison contre les deux vrais fichiers avant la fusion. Cette
+      # étape, et le témoin ajouté à `verifier-routes.test.mjs` qui joue la
+      # même comparaison dans `test:scripts`, ferment ce trou des deux côtés.
+      - name: App.tsx et netlify.toml dispatchent les mêmes routes
+        run: npm run verifier:routes
+
       # `oxlint` était installé dans les trois applications et câblé à un script
       # `lint` depuis le début. Personne ne le lançait — ni cette vérification,
       # ni `npm run verifier`. Il signalait pourtant, depuis des jours, que

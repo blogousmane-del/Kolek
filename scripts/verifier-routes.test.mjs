@@ -16,13 +16,13 @@ import {
 } from './verifier-routes.mjs';
 
 /**
- * La garde de \`verifier-routes.mjs\`.
+ * La garde de `verifier-routes.mjs`.
  *
  * Deux familles d'épreuves. La première appelle les fonctions exportées
  * directement — c'est le seul moyen de viser précisément une extraction
  * cassée (le motif d'App.tsx, celui de netlify.toml, la résolution d'une
  * constante). La seconde fait tourner le script en sous-processus sur un
- * faux dépôt jetable, comme \`verifier-mentions.test.mjs\` le fait déjà :
+ * faux dépôt jetable, comme `verifier-mentions.test.mjs` le fait déjà :
  * c'est le contrat réel, code de sortie et texte imprimé compris, et rien
  * d'autre ne le vérifie — le script n'est jamais importé pour son effet de
  * bord.
@@ -286,5 +286,25 @@ describe('en sous-processus, sur un faux dépôt', () => {
     const resultat = executer(depotAvec({ netlifyToml }));
     expect(resultat.status).toBe(1);
     expect(resultat.stderr).toMatch(/Aucune règle/);
+  });
+});
+
+// --- Le vrai dépôt, pas une fixture ------------------------------------------
+
+/**
+ * Le témoin que la relecture de la tâche 6 réclamait : jusqu'ici, aucune
+ * épreuve n'exécutait ce script contre le vrai `App.tsx` et le vrai
+ * `netlify.toml` — seulement contre des dépôts jetables, ci-dessus. Une route
+ * ajoutée à l'un sans sa règle dans l'autre passait donc `npm test`,
+ * `test:scripts` et `build`, CI vert, et rendait 404 en production. Cette
+ * épreuve fait tourner le vrai script avec `cwd` = racine du dépôt : elle
+ * entre dans `test:scripts`, déjà dans le CI, sans rien câbler de plus.
+ */
+describe('sur le vrai dépôt', () => {
+  it('réussit — code 0 — quand le vrai App.tsx et le vrai netlify.toml se répondent', () => {
+    const racine = fileURLToPath(new URL('..', import.meta.url));
+    const resultat = executer(racine);
+    expect(resultat.status).toBe(0);
+    expect(resultat.stdout).toMatch(/dispatchent exactement les mêmes routes/);
   });
 });

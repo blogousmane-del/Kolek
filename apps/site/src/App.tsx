@@ -8,7 +8,7 @@ import { CONDITIONS, CONFIDENTIALITE, MENTIONS_LEGALES } from './vitrine/liens';
 /**
  * Le routage du site public.
  *
- * Deux destinations, donc pas de bibliothèque de routage : `react-router`
+ * Cinq destinations, donc pas de bibliothèque de routage : `react-router`
  * pèserait une quinzaine de kilo-octets pour remplacer les six lignes
  * ci-dessous, sur une page dont le poids est déjà un constat d'audit ouvert.
  *
@@ -17,8 +17,8 @@ import { CONDITIONS, CONFIDENTIALITE, MENTIONS_LEGALES } from './vitrine/liens';
  * ici : on ne passe du formulaire à la vitrine qu'une fois, et le rechargement
  * remet la page à zéro, ce qui est exactement ce qu'on veut après un envoi.
  *
- * La redirection `/* → /index.html` du `netlify.toml` est ce qui rend
- * `/inscription` servable : sans elle, Netlify chercherait un fichier de ce nom.
+ * La règle nommée `/inscription` du `netlify.toml` (`:80-83`) est ce qui rend
+ * cette page servable : sans elle, Netlify chercherait un fichier de ce nom.
  */
 export default function App() {
   const chemin = window.location.pathname.replace(/\/+$/, '');

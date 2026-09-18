@@ -41,9 +41,11 @@
 # `force = true` est indispensable : sans lui, la règle s'efface devant un
 # fichier réellement présent à ce chemin, et la racine en est un.
 #
-# **Cette règle précède la réécriture SPA**, et l'ordre fait la décision :
-# Netlify applique la première correspondance. Placée après, elle ne serait
-# jamais atteinte — `/*` avale tout.
+# **Cette règle précède les quatre routes nommées ci-dessous**, et l'ordre
+# fait la décision : Netlify applique la première correspondance. Une règle
+# comme `/inscription` n'est bornée à aucun hôte — elle correspondrait tout
+# autant à `kolek-site.netlify.app/inscription` — et la placer avant ferait
+# manquer la redirection vers le nouveau domaine pour ces quatre chemins.
 [[redirects]]
   from = "https://kolek-site.netlify.app/*"
   to = "https://kolek.cash/:splat"

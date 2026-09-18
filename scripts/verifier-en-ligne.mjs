@@ -13,6 +13,7 @@
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { chercherFuitesTexte } from './verifier-bundles.mjs';
+import { NETLIFY_TOML, blocsRedirects, routesDeNetlify } from './verifier-routes.mjs';
 
 const PROJET = 'yfnwmokxkznejotgpfgf';
 
@@ -342,6 +343,11 @@ export const CIBLES = [
     // deux applications réécrivent encore tout : leur point d'entrée unique
     // ne connaît pas de « page inconnue », donc rien n'y change.
     route404: true,
+    // Et le seul, donc, dont les routes nommées doivent être éprouvées une à
+    // une : route404 ne ferme qu'un côté du contrôle (l'inconnu rend 404),
+    // pas l'autre (le connu rend 200). Or c'est ce second côté qui coûte —
+    // une mention légale qui répond « introuvable » est pire que son absence.
+    routesNommees: true,
   },
 ];
 
@@ -521,6 +527,21 @@ async function verifier(cible) {
     (inconnue.headers.get('content-type') ?? '').includes('text/html'),
     `route inconnue sert ${inconnue.headers.get('content-type')}`,
   );
+
+  // L'autre côté du contrôle : les routes que netlify.toml nomme doivent
+  // répondre 200, pas seulement l'inconnue rendre 404. Lues depuis
+  // netlify.toml par les mêmes fonctions que verifier-routes.mjs — une
+  // cinquième liste de routes recopiée à la main serait l'ironie qu'un
+  // correctif pensé pour empêcher deux listes de diverger ne peut pas se
+  // permettre.
+  if (cible.routesNommees) {
+    const netlifyToml = await readFile(NETLIFY_TOML, 'utf8');
+    const routes = routesDeNetlify(blocsRedirects(netlifyToml));
+    for (const route of routes) {
+      const reponse = await fetch(`${cible.url}${route}`);
+      constat(reponse.status === 200, `${route} renvoie ${reponse.status}, attendu 200`);
+    }
+  }
 
   // L'indexation, pour le seul site qui la cherche.
   //
