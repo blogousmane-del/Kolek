@@ -196,6 +196,7 @@ Fourni par l’exploitant le 2026-09-18 :
 
 | Élément | Valeur |
 | --- | --- |
+| Exploitant | **BERTHE OUSMANE**, personne physique — c’est lui que les trois textes nomment |
 | Enseigne | **GSM TECHNOLOGIE CYBER SHOP** — dont « GTCS » est le sigle employé partout dans le produit |
 | Adresse | **Saïoua**, Côte d’Ivoire |
 | Numéro de compte contribuable | **4212842W** |
@@ -237,16 +238,13 @@ Aucune page ne part en ligne tant que ces trous ne sont pas comblés. Ils seront
 marqués dans le texte de façon à ce qu’une publication accidentelle soit
 visible à l’œil nu.
 
-1. **Nom complet de la personne physique** exploitant sous l’enseigne — le nom
-   d’une enseigne ne désigne personne en droit. **Seul trou réellement
-   bloquant : sans lui, aucun des trois textes ne peut être rédigé.**
-2. **Adresse plus précise que la seule commune** : quartier, lot, ou boîte
+1. **Adresse plus précise que la seule commune** : quartier, lot, ou boîte
    postale. « Saïoua » seul ne permet ni de notifier ni d’assigner.
-3. **Numéro de déclaration d’activité** au greffe, s’il existe déjà — sinon la
+2. **Numéro de déclaration d’activité** au greffe, s’il existe déjà — sinon la
    démarche est gratuite et les mentions le porteront ensuite.
-4. **Numéro de téléphone professionnel** à publier.
-5. **Confirmation que `contact@kolek.cash` existe et est relevée** — les MX du
+3. **Numéro de téléphone professionnel** à publier.
+4. **Confirmation que `contact@kolek.cash` existe et est relevée** — les MX du
    domaine sont configurés, la boîte n’a pas pu être vérifiée depuis le dépôt.
-6. **Délai de réponse** que l’exploitant s’engage à tenir sur les demandes
+5. **Délai de réponse** que l’exploitant s’engage à tenir sur les demandes
    d’exercice des droits. La politique l’annoncera, et il devient opposable.
    Sept jours ouvrés est tenable ; quarante-huit heures ne le serait pas.
