@@ -103,7 +103,7 @@ Sanctions pécuniaires administratives plafonnées à **10 000 000 FCFA**, port�
 | Responsable du traitement | **L’exploitant, seul** | Conforme au code : il détermine finalités et moyens. Le collecteur est un utilisateur, tenu par les CGU d’informer ses clients. |
 | Conservation | **Par catégorie, avec plancher comptable** | Tableau au §5.3. |
 | `clients.photo_url` | **À supprimer** | Migration séparée, après contrôle en production. Retire la question biométrique du dossier. |
-| Contact | **`contact@kolek.cash`** | Adresse unique : mentions légales, exercice des droits, notifications contractuelles. |
+| Contact | **contact@kolek.cash** pour l’exercice des droits · **WhatsApp** pour le contact commercial |
 
 **Point à confirmer avant toute mise en ligne :** le domaine `kolek.cash` porte bien des enregistrements MX (`mx1.hostinger.com` priorité 5, `mx2.hostinger.com` priorité 10), mais l’existence et la relève de la boîte `contact@kolek.cash` n’ont pas pu être vérifiées depuis le dépôt. La politique annonce un délai de réponse ; ce délai démarre une horloge opposable. **La boîte doit exister et être relevée avant publication.**
 
@@ -198,10 +198,12 @@ Fourni par l’exploitant le 2026-09-18 :
 | --- | --- |
 | Exploitant | **BERTHE OUSMANE**, personne physique — c’est lui que les trois textes nomment |
 | Enseigne | **GSM TECHNOLOGIE CYBER SHOP** — dont « GTCS » est le sigle employé partout dans le produit |
-| Adresse | **Saïoua**, Côte d’Ivoire |
+| Adresse | **Place Blé Zokou, Saïoua**, Côte d’Ivoire |
+| Téléphone | **+225 07 88 81 81 18** — également WhatsApp |
 | Numéro de compte contribuable | **4212842W** |
 | Statut | **Entreprenant** — impôt déclaré, **pas d’immatriculation au RCCM** |
-| Contact | **contact@kolek.cash** |
+| Contact | **contact@kolek.cash** — exercice des droits, trace écrite |
+| WhatsApp | **+225 07 88 81 81 18** — contact commercial des prospects et des collecteurs |
 
 ### 9.1 L’absence de RCCM est régulière, et une note antérieure se trompait
 
@@ -238,13 +240,10 @@ Aucune page ne part en ligne tant que ces trous ne sont pas comblés. Ils seront
 marqués dans le texte de façon à ce qu’une publication accidentelle soit
 visible à l’œil nu.
 
-1. **Adresse plus précise que la seule commune** : quartier, lot, ou boîte
-   postale. « Saïoua » seul ne permet ni de notifier ni d’assigner.
-2. **Numéro de déclaration d’activité** au greffe, s’il existe déjà — sinon la
+1. **Numéro de déclaration d’activité** au greffe, s’il existe déjà — sinon la
    démarche est gratuite et les mentions le porteront ensuite.
-3. **Numéro de téléphone professionnel** à publier.
-4. **Confirmation que `contact@kolek.cash` existe et est relevée** — les MX du
+2. **Confirmation que `contact@kolek.cash` existe et est relevée** — les MX du
    domaine sont configurés, la boîte n’a pas pu être vérifiée depuis le dépôt.
-5. **Délai de réponse** que l’exploitant s’engage à tenir sur les demandes
+3. **Délai de réponse** que l’exploitant s’engage à tenir sur les demandes
    d’exercice des droits. La politique l’annoncera, et il devient opposable.
    Sept jours ouvrés est tenable ; quarante-huit heures ne le serait pas.

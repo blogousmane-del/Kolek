@@ -11,12 +11,12 @@
 ## Contraintes globales
 
 - **Spec :** `Docs/specs/2026-09-18-mentions-cgu-confidentialite-design.md`. Toute question de contenu s'y tranche.
-- **Exploitant :** BERTHE OUSMANE, personne physique, enseigne GSM TECHNOLOGIE CYBER SHOP, Saïoua (Côte d'Ivoire), compte contribuable **4212842W**, statut **entreprenant** — dispensé d'immatriculation au RCCM.
-- **Contact unique :** `contact@kolek.cash`. Le `mailto:gsmtechnoloy@gmail.com` disparaît du dépôt.
+- **Exploitant :** BERTHE OUSMANE, personne physique, enseigne GSM TECHNOLOGIE CYBER SHOP, **Place Blé Zokou, Saïoua** (Côte d’Ivoire), téléphone **+225 07 88 81 81 18** (aussi WhatsApp), compte contribuable **4212842W**, statut **entreprenant** — dispensé d’immatriculation au RCCM.
+- **Deux canaux, et ils ne servent pas à la même chose :** `contact@kolek.cash` pour l’exercice des droits — une demande d’accès ou d’effacement doit laisser une trace écrite et datée — et **WhatsApp** pour le contact commercial. Le `mailto:gsmtechnoloy@gmail.com` disparaît du dépôt.
 - **Aucun numéro ARTCI n'est cité** : il n'en existe pas. Une page qui en inventerait un serait une fausse mention.
 - **Pas d'« intérêt légitime »** : la notion n'existe pas en droit ivoirien (loi n° 2013-450, le terme n'apparaît qu'à l'article 27, sur les objectifs statutaires). Le fondement est le **consentement**.
 - **L'effacement se dit « anonymisation »**, jamais « suppression totale » : aucune politique `for delete` n'existe dans la base, et les mises sont des pièces comptables à conserver dix ans.
-- **Cinq trous connus** — adresse précise, numéro de déclaration d'activité, téléphone professionnel, confirmation de la boîte `contact@kolek.cash`, délai de réponse. Ils se rendent en marqueur, ils ne s'inventent pas.
+- **Trois trous restants** — numéro de déclaration d’activité, confirmation que la boîte `contact@kolek.cash` est relevée, délai de réponse. Ils se rendent en marqueur, ils ne s’inventent pas. Adresse et téléphone sont comblés depuis le 2026-09-18.
 - **Aucune migration, aucune Edge Function.** `supabase/` n'est pas touché.
 - **Rouge d'abord.** Une épreuve qui ne tombe pas avant le correctif ne prouve rien.
 - **Les 42 épreuves du site doivent rester vertes.**
@@ -148,6 +148,8 @@ export interface Identite {
   /** Déposée sans frais au greffe ; l'entreprenant en est dispensé de RCCM. */
   declarationActivite: string | Trou;
   telephone: string | Trou;
+  /** Le meme numero, en chiffres nus, pour wa.me. Jamais d’espace ni de +. */
+  whatsapp: string | Trou;
   contact: string;
   /** Annoncé dans la politique, donc opposable : ne pas promettre 48 h. */
   delaiReponseJoursOuvres: number | Trou;
@@ -157,11 +159,12 @@ export const IDENTITE: Readonly<Identite> = Object.freeze({
   exploitant: 'BERTHE OUSMANE',
   enseigne: 'GSM TECHNOLOGIE CYBER SHOP',
   commune: 'Saïoua',
-  adressePrecise: null,
+  adressePrecise: 'Place Blé Zokou',
   pays: 'Côte d’Ivoire',
   compteContribuable: '4212842W',
   declarationActivite: null,
-  telephone: null,
+  telephone: '+225 07 88 81 81 18',
+  whatsapp: '2250788818118',
   contact: 'contact@kolek.cash',
   delaiReponseJoursOuvres: null,
 });
@@ -809,6 +812,98 @@ Pousser la branche, ouvrir une pull request vers `main`. Le travail `Base` de la
 - [ ] **Étape 6 : consigner**
 
 Au registre du chantier : les commits, les épreuves ajoutées, les trous encore ouverts, et la date à laquelle un avocat aura relu.
+
+---
+
+## Tâche 8 : joindre GTCS par WhatsApp
+
+Au marché, WhatsApp est le canal réel — davantage que le courriel. Un prospect
+qui veut poser une question avant de payer ne doit pas avoir à ouvrir une boîte
+aux lettres.
+
+**Ce que cette tâche ne fait pas :** déplacer l’exercice des droits sur
+WhatsApp. Une demande d’accès ou d’effacement se fait par écrit, à une adresse
+qui date et conserve. La politique de confidentialité continue de ne nommer que
+`contact@kolek.cash` pour cela.
+
+**Fichiers :**
+- Modifier : `apps/site/src/vitrine/liens.ts`
+- Modifier : `apps/site/src/vitrine/PiedDePage.tsx`
+- Modifier : `apps/site/src/vitrine/PiedDePage.test.tsx`
+- Modifier : `apps/site/src/vitrine/Inscription.tsx`
+
+- [ ] **Étape 1 : écrire les épreuves qui tombent**
+
+```tsx
+// à ajouter dans apps/site/src/vitrine/PiedDePage.test.tsx
+it('offre WhatsApp, avec un numéro en chiffres nus', () => {
+  render(<PiedDePage />);
+  const lien = screen.getByRole('link', { name: /WhatsApp/i });
+  // wa.me n'accepte ni espace, ni +, ni indicatif entre parenthèses : un
+  // numéro formaté pour l'œil humain y ouvre une conversation vide.
+  expect(lien.getAttribute('href')).toBe('https://wa.me/2250788818118');
+  expect(lien.getAttribute('target')).toBe('_blank');
+  expect(lien.getAttribute('rel')).toContain('noreferrer');
+});
+
+it('ne renvoie pas l’exercice des droits vers WhatsApp', () => {
+  const { container } = render(<PiedDePage />);
+  // Le lien des droits reste le courriel : une conversation qu’on efface ne
+  // prouve ni la demande, ni sa date.
+  expect(container.innerHTML).toMatch(/contact@kolek\.cash/);
+});
+```
+
+- [ ] **Étape 2 : les faire tomber**
+
+Run : `npm test -w @kolek/site -- --run src/vitrine/PiedDePage.test.tsx`
+Attendu : ÉCHEC — aucun lien WhatsApp.
+
+- [ ] **Étape 3 : le lien**
+
+Dans `liens.ts` :
+
+```ts
+/**
+ * La conversation WhatsApp de GTCS.
+ *
+ * Le numéro est en chiffres nus, sans `+`, sans espace et sans indicatif
+ * entre parenthèses : `wa.me` n’accepte que cette forme, et un numéro
+ * formaté pour l’œil humain y ouvre une conversation vide — un lien mort qui
+ * n’a pas l’air mort, le pire des deux.
+ *
+ * Le même numéro se lit sous sa forme humaine dans les mentions légales, où
+ * c’est un fait d’identité et non un lien.
+ */
+export const WHATSAPP = 'https://wa.me/2250788818118';
+```
+
+Dans `PiedDePage.tsx`, colonne « Accès », **avant** « Écrire à GTCS » — le
+canal le plus employé se lit en premier :
+
+```ts
+      { href: WHATSAPP, libelle: 'WhatsApp' },
+```
+
+Les liens sortants du pied de page portent `target="_blank"` et
+`rel="noreferrer"`. Si le composant ne le fait pas déjà pour tous les liens, ne
+**pas** l’ajouter globalement : les ancres internes (`#tarifs`) ouvriraient un
+onglet. Distinguer sur `href.startsWith('http')`.
+
+Dans `Inscription.tsx`, sous le formulaire, à côté de l’adresse de courriel
+déjà offerte : un second lien « Écrire sur WhatsApp ».
+
+- [ ] **Étape 4 : les faire passer**
+
+Run : `npm test -w @kolek/site`
+Attendu : toutes vertes, dont les deux nouvelles.
+
+- [ ] **Étape 5 : commit**
+
+```bash
+git add apps/site/src/vitrine/liens.ts apps/site/src/vitrine/PiedDePage.tsx apps/site/src/vitrine/PiedDePage.test.tsx apps/site/src/vitrine/Inscription.tsx
+git commit -m "feat(site): joindre GTCS par WhatsApp, sans y deplacer l exercice des droits" -m "Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+```
 
 ---
 
