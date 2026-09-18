@@ -51,6 +51,12 @@ describe('politique de confidentialité', () => {
     // Aucune photographie n'est collectée aujourd'hui — garantie qu'on veut
     // voir tomber si quelqu'un ajoute un jour un champ photo à cette page.
     expect(container.textContent).not.toMatch(/photo/i);
+    // Et l'exercice des droits ne part jamais sur WhatsApp. Le pied de page
+    // l'offre comme canal commercial depuis la tâche 8 ; une demande d'accès
+    // ou d'effacement, elle, doit laisser une trace écrite et datée, qu'une
+    // conversation qu'on efface ne donne pas. L'épreuve du pied de page ne
+    // pouvait pas garder cela : elle ne rend pas cette page.
+    expect(container.innerHTML).not.toMatch(/wa\.me|WhatsApp/i);
   });
 
   it('dit que le journal d’audit garde la trace du client malgré une anonymisation', () => {
