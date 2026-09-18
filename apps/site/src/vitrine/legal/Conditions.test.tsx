@@ -56,6 +56,12 @@ describe('conditions générales', () => {
       const ligne = screen.getByText(palier.nom, { selector: 'strong' }).closest('li');
       if (!ligne) throw new Error(`Ligne introuvable pour le palier ${palier.cle}`);
       const scope = within(ligne);
+      // Les deux sens. Sans le second, un filtre `() => false` — ou une
+      // sous-liste retirée — passerait vert : une sonde qui ne peut rien
+      // trouver ne prouve rien sur ce qu'elle ne trouve pas.
+      for (const fonction of palier.fonctions.filter((f) => f.incluse)) {
+        expect(scope.getByText(fonction.libelle)).toBeTruthy();
+      }
       for (const fonction of palier.fonctions.filter((f) => !f.incluse)) {
         expect(scope.queryByText(fonction.libelle)).toBeNull();
       }

@@ -105,8 +105,11 @@ export function Conditions() {
           À défaut de paiement à l’échéance, l’abonnement est suspendu. La suspension ferme
           l’inscription de nouveaux clients, l’ouverture de nouvelles cartes et l’ajout de
           collaborateurs. Elle ne ferme pas l’encaissement : le collecteur continue de percevoir
-          les mises des cartes déjà ouvertes, et la file des encaissements pris hors ligne
-          continue de se synchroniser. Les données déjà enregistrées sont conservées.
+          les mises des cartes déjà ouvertes, et la file des encaissements pris hors ligne sur
+          ces mêmes cartes continue de se synchroniser. Un encaissement pris hors ligne sur une
+          carte ouverte pendant la suspension ne peut pas, lui, être enregistré : l’ouverture
+          de la carte étant refusée, l’encaissement qui en dépend l’est aussi. Les données déjà
+          enregistrées sont conservées.
         </p>
       </section>
 
@@ -162,7 +165,7 @@ export function Conditions() {
       <section>
         <TitreSection>9. Propriété intellectuelle</TitreSection>
         <p className="mt-2">
-          Le nom, le logo, l’interface et le code appartiennent à l’exploitant,{' '}
+          Le nom Kolek, le logo, l’interface et le code appartiennent à l’exploitant,{' '}
           {IDENTITE.exploitant}. Le collecteur reçoit un simple droit d’usage du service pour la
           durée de son abonnement, sans aucune cession.
         </p>
