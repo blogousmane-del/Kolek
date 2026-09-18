@@ -41,7 +41,7 @@ export function PageLegale({
         </a>
         <h1 className="mt-6 font-headings text-3xl font-bold text-ink sm:text-4xl">{titre}</h1>
         <p className="mt-2 font-body text-sm text-muted-foreground">
-          Dernière mise à jour : {miseAJour}
+          Dernière mise à jour : {miseAJour}
         </p>
         <div className="mt-8 flex flex-col gap-6 font-body text-base leading-relaxed text-ink">
           {children}

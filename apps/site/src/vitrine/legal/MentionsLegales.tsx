@@ -62,7 +62,7 @@ export function MentionsLegales() {
       <section>
         <TitreSection>Propriété intellectuelle</TitreSection>
         <p className="mt-2">
-          Le nom Kolek, la marque et le code appartiennent à l’exploitant, {IDENTITE.exploitant}.
+          Le nom Kolek, le logo, l’interface et le code appartiennent à l’exploitant, {IDENTITE.exploitant}.
         </p>
       </section>
 
