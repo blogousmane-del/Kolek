@@ -1,5 +1,5 @@
 import { CONDITIONS, CONFIDENTIALITE } from '../liens';
-import { Champ, PageLegale } from './PageLegale';
+import { Champ, PageLegale, TitreSection } from './PageLegale';
 import { IDENTITE } from './identite';
 
 /**
@@ -14,60 +14,60 @@ export function MentionsLegales() {
   return (
     <PageLegale titre="Mentions légales" miseAJour="2026-09-18">
       <section>
-        <h2 className="font-headings text-xl font-bold text-ink">Éditeur</h2>
+        <TitreSection>Éditeur</TitreSection>
         <p className="mt-2">
           Le présent site est édité par <strong>{IDENTITE.exploitant}</strong>, personne
-          physique exerçant sous l’enseigne <strong>{IDENTITE.enseigne}</strong> (« GTCS »),
+          physique exerçant sous l’enseigne <strong>{IDENTITE.enseigne}</strong> (« GTCS »),
           sous le statut d’entreprenant — un régime qui dispense de l’immatriculation au
           registre du commerce et du crédit mobilier (RCCM).
         </p>
         <p className="mt-2">
-          Adresse : {IDENTITE.commune}, <Champ valeur={IDENTITE.adressePrecise} nom="adresse précise" />, {IDENTITE.pays}.
+          Adresse : {IDENTITE.commune}, <Champ valeur={IDENTITE.adressePrecise} nom="adresse précise" />, {IDENTITE.pays}.
         </p>
         <p className="mt-2">
-          Déclaration d’activité :{' '}
+          Déclaration d’activité :{' '}
           <Champ valeur={IDENTITE.declarationActivite} nom="numéro de déclaration d’activité" />.
         </p>
-        <p className="mt-2">Compte contribuable : {IDENTITE.compteContribuable}.</p>
+        <p className="mt-2">Compte contribuable : {IDENTITE.compteContribuable}.</p>
         <p className="mt-2">
-          Téléphone :{' '}
-          <Champ valeur={IDENTITE.telephone} nom="téléphone" /> — Contact : {IDENTITE.contact}.
+          Téléphone :{' '}
+          <Champ valeur={IDENTITE.telephone} nom="téléphone" /> — Contact : {IDENTITE.contact}.
         </p>
       </section>
 
       <section>
-        <h2 className="font-headings text-xl font-bold text-ink">Directeur de la publication</h2>
+        <TitreSection>Directeur de la publication</TitreSection>
         <p className="mt-2">{IDENTITE.exploitant}.</p>
       </section>
 
       <section>
-        <h2 className="font-headings text-xl font-bold text-ink">Hébergement</h2>
+        <TitreSection>Hébergement</TitreSection>
         <p className="mt-2">
-          Base de données, authentification et fonctions : <strong>Supabase</strong>, région
+          Base de données, authentification et fonctions : <strong>Supabase</strong>, région
           eu-west-3 (Paris, France).
         </p>
         <p className="mt-2">
-          Hébergement du site et des applications : <strong>Netlify</strong>.
+          Hébergement du site et des applications : <strong>Netlify</strong>.
         </p>
       </section>
 
       <section>
-        <h2 className="font-headings text-xl font-bold text-ink">Nature du service</h2>
+        <TitreSection>Nature du service</TitreSection>
         <p className="mt-2">
           Kolek est un outil de tenue de collecte. « GTCS n’est pas un établissement financier,
-          ne reçoit aucun dépôt, et aucun flux d’épargne ne transite par la plateforme. »
+          ne reçoit aucun dépôt, et aucun flux d’épargne ne transite par la plateforme. »
         </p>
       </section>
 
       <section>
-        <h2 className="font-headings text-xl font-bold text-ink">Propriété intellectuelle</h2>
+        <TitreSection>Propriété intellectuelle</TitreSection>
         <p className="mt-2">
           Le nom Kolek, la marque et le code appartiennent à l’exploitant, {IDENTITE.exploitant}.
         </p>
       </section>
 
       <section>
-        <h2 className="font-headings text-xl font-bold text-ink">Pour aller plus loin</h2>
+        <TitreSection>Pour aller plus loin</TitreSection>
         <p className="mt-2">
           <a href={CONDITIONS} className="text-primary underline underline-offset-2">
             Conditions générales

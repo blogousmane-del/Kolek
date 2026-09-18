@@ -52,6 +52,18 @@ export function PageLegale({
 }
 
 /**
+ * Le titre d'une section, sur les trois pages légales.
+ *
+ * `className="font-headings text-xl font-bold text-ink"` était recopié sur
+ * chaque `<h2>` de `Conditions.tsx` et de `MentionsLegales.tsx` — douze fois
+ * plus six. Un habillage recopié douze fois se corrige douze fois ; un
+ * habillage exporté se corrige une fois.
+ */
+export function TitreSection({ children }: { children: ReactNode }) {
+  return <h2 className="font-headings text-xl font-bold text-ink">{children}</h2>;
+}
+
+/**
  * Un fait, ou la marque de son absence.
  *
  * Un trou rendu en blanc passerait en production sans qu'on le voie. Rendu en
