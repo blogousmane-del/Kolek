@@ -147,7 +147,9 @@ export function Confidentialite() {
               <tr>
                 <td className="py-2 pr-3">Compte collecteur (nom, téléphone, zone)</td>
                 <td className="py-2 pr-3">Exécution du contrat</td>
-                <td className="py-2">Durée de la relation, puis archivage comptable</td>
+                <td className="py-2">
+                  Durée de la relation, puis anonymisation sur demande — pas automatiquement
+                </td>
               </tr>
               <tr>
                 <td className="py-2 pr-3">
@@ -155,7 +157,8 @@ export function Confidentialite() {
                 </td>
                 <td className="py-2 pr-3">Consentement recueilli par le collecteur</td>
                 <td className="py-2">
-                  Anonymisation à la fermeture du compte du collecteur, ou sur demande
+                  Tant que le compte du collecteur existe, puis anonymisation sur demande — pas
+                  automatiquement
                 </td>
               </tr>
               <tr>
@@ -173,17 +176,19 @@ export function Confidentialite() {
                 <td className="py-2 pr-3">
                   Consentement du demandeur, donné en remplissant le formulaire
                 </td>
-                <td className="py-2">1 an</td>
+                <td className="py-2">Sans purge automatique, effacement sur demande</td>
               </tr>
               <tr>
                 <td className="py-2 pr-3">Journal d’audit</td>
                 <td className="py-2 pr-3">Sécurité</td>
-                <td className="py-2">1 an</td>
+                <td className="py-2">
+                  Immuable par construction : jamais modifié ni effacé, y compris par l’exploitant
+                </td>
               </tr>
               <tr>
                 <td className="py-2 pr-3">Avis clients envoyés (SMS)</td>
                 <td className="py-2 pr-3">Exécution du service</td>
-                <td className="py-2">1 an</td>
+                <td className="py-2">Sans purge automatique, effacement sur demande</td>
               </tr>
             </tbody>
           </table>
