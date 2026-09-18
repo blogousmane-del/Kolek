@@ -72,9 +72,9 @@ jobs:
       VITE_SUPABASE_ANON_KEY: sb_publishable_valeur-de-ci-sans-effet
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # 26 comme les trois `netlify.toml`. Une version différente ici
           # validerait une construction que la production ne fait pas.
@@ -183,16 +183,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '26'
           cache: npm
 
       - run: npm ci
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
 
@@ -245,7 +245,7 @@ jobs:
       PROJET: yfnwmokxkznejotgpfgf
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Historique entier : la plage à comparer est celle de la poussée, et
           # elle peut porter dix-sept commits. `fetch-depth: 2` suffisait à
@@ -307,7 +307,7 @@ jobs:
             echo "pret=oui" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         if: steps.jeton.outputs.pret == 'oui'
         with:
           version: latest
@@ -357,7 +357,7 @@ jobs:
     needs: [depot, base]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
