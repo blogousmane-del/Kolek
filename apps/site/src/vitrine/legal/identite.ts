@@ -42,7 +42,7 @@ export const IDENTITE: Readonly<Identite> = Object.freeze({
   adressePrecise: 'Place Blé Zokou',
   pays: 'Côte d’Ivoire',
   compteContribuable: '4212842W',
-  declarationActivite: null,
+  declarationActivite: 'CI-ISSI-18-A-141',
   telephone: '+225 07 88 81 81 18',
   whatsapp: '2250788818118',
   contact: 'contact@kolek.cash',
