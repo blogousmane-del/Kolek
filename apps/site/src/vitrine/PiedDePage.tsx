@@ -7,6 +7,7 @@ import {
   CONTACT_DEMO,
   INSCRIPTION,
   MENTIONS_LEGALES,
+  WHATSAPP,
 } from './liens';
 
 /**
@@ -32,6 +33,7 @@ const COLONNES = [
     liens: [
       { href: APP_COLLECTEUR, libelle: 'Espace collecteur' },
       { href: INSCRIPTION, libelle: 'Ouvrir un compte' },
+      { href: WHATSAPP, libelle: 'WhatsApp' },
       { href: CONTACT_DEMO, libelle: 'Écrire à GTCS' },
     ],
   },
@@ -64,16 +66,24 @@ export function PiedDePage() {
                 ordinaire qui soit, et rien n'y demandait d'insister. */}
             <p className="mb-3 font-body text-sm font-semibold text-white/55">{colonne.titre}</p>
             <ul className="flex flex-col gap-2">
-              {colonne.liens.map((lien) => (
-                <li key={lien.libelle}>
-                  <a
-                    href={lien.href}
-                    className="font-body text-sm text-white/60 transition-transform duration-300 hover:-translate-y-px hover:text-white"
-                  >
-                    {lien.libelle}
-                  </a>
-                </li>
-              ))}
+              {colonne.liens.map((lien) => {
+                // Un lien sortant part dans un onglet neuf, pour ne pas faire
+                // perdre la page ; une ancre interne comme #tarifs resterait
+                // sur place, et lui ouvrir un onglet serait une régression.
+                const externe = lien.href.startsWith('http');
+                return (
+                  <li key={lien.libelle}>
+                    <a
+                      href={lien.href}
+                      target={externe ? '_blank' : undefined}
+                      rel={externe ? 'noreferrer' : undefined}
+                      className="font-body text-sm text-white/60 transition-transform duration-300 hover:-translate-y-px hover:text-white"
+                    >
+                      {lien.libelle}
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
           </nav>
         ))}

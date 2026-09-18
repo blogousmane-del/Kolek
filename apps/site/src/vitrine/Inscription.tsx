@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { entree, useAnimations } from './animation';
 import { envoyerDemande, palierDepuisAdresse } from './demande';
-import { APP_COLLECTEUR, CONDITIONS, CONFIDENTIALITE, CONTACT_DEMO } from './liens';
+import { APP_COLLECTEUR, CONDITIONS, CONFIDENTIALITE, CONTACT_DEMO, WHATSAPP } from './liens';
 
 /**
  * Le formulaire d'ouverture de compte.
@@ -491,6 +491,18 @@ export function Inscription() {
                 Tu préfères écrire ?{' '}
                 <a href={CONTACT_DEMO} className="text-or/70 underline underline-offset-2">
                   Envoyer un courriel à GTCS
+                </a>{' '}
+                ·{' '}
+                {/* Onglet neuf, comme tout lien sortant : le formulaire à
+                    moitié rempli ne doit pas être perdu pour avoir ouvert
+                    WhatsApp. */}
+                <a
+                  href={WHATSAPP}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-or/70 underline underline-offset-2"
+                >
+                  Écrire sur WhatsApp
                 </a>
               </p>
             </form>

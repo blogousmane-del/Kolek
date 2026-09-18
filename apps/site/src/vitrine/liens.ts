@@ -45,6 +45,19 @@ export const CONDITIONS = '/conditions';
 export const CONFIDENTIALITE = '/confidentialite';
 
 /**
+ * La conversation WhatsApp de GTCS.
+ *
+ * Le numéro est en chiffres nus, sans `+`, sans espace et sans indicatif
+ * entre parenthèses : `wa.me` n'accepte que cette forme, et un numéro
+ * formaté pour l'œil humain y ouvre une conversation vide — un lien mort qui
+ * n'a pas l'air mort, le pire des deux.
+ *
+ * Le même numéro se lit sous sa forme humaine dans les mentions légales, où
+ * c'est un fait d'identité et non un lien.
+ */
+export const WHATSAPP = 'https://wa.me/2250788818118';
+
+/**
  * L'adresse de l'exploitant. Elle reste offerte en dernier recours, sous le
  * formulaire — pour qui préfère écrire — mais n'est plus jamais le geste
  * principal.
