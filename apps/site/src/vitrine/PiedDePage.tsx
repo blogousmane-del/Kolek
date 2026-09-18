@@ -54,7 +54,7 @@ export function PiedDePage() {
         <div>
           <Logo className="mb-2 h-9 text-white" />
           <p className="max-w-xs font-body text-sm leading-relaxed text-white/55">
-            L’épargne du marché, enfin sécurisée. Un produit GTCS, construit à Abidjan pour les
+            L’épargne du marché, enfin sécurisée. Un produit GTCS, pour les
             banquiers ambulants de Côte d’Ivoire.
           </p>
         </div>
