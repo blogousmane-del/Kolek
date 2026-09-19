@@ -11,6 +11,7 @@ import {
   type NatureEvenement,
 } from '../lectures-ecrans';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
+import { nu } from '../recherche';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 import { useEstCollaborateur } from './commission';
 
@@ -158,12 +159,12 @@ export function Recus({
 
     const jours = PERIODES.find((p) => p.cle === periode)?.jours ?? null;
     const depuis = jours === null ? null : Date.now() - jours * 86_400_000;
-    const cherche = recherche.trim().toLocaleLowerCase('fr');
+    const cherche = nu(recherche.trim());
 
     return journal.filter((e) => {
       if (natures.length > 0 && !natures.includes(e.nature)) return false;
       if (depuis !== null && new Date(e.survenuLe).getTime() < depuis) return false;
-      if (cherche && !e.clientNom.toLocaleLowerCase('fr').includes(cherche)) return false;
+      if (cherche && !nu(e.clientNom).includes(cherche)) return false;
       return true;
     });
   }, [journal, natures, periode, recherche]);

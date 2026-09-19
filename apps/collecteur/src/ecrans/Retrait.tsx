@@ -9,6 +9,7 @@ import { useHorsLigne } from '../hors-ligne/useHorsLigne';
 import { enAttenteSurCarte, phraseAttenteCarte } from '../hors-ligne/vues';
 import { chargerCartesCloturables, type CarteCloturable } from '../lectures-ecrans';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
+import { nu } from '../recherche';
 import { useEstCollaborateur } from './commission';
 import { ActiverCarte } from './ActiverCarte';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
@@ -79,6 +80,7 @@ export function Retrait({
       instantané de l'ancienne liste inviterait à la clôturer deux fois. C'est
       le seul écran où le cache doit être franchement invalidé. */
   const [tourLocal, setTourLocal] = useState(0);
+  const [recherche, setRecherche] = useState('');
 
   const {
     donnees: cartes,
@@ -97,7 +99,26 @@ export function Retrait({
   // toutes les cartes ne coûte pas un aller-retour réseau. Rien lu (lecture en
   // cours, ou en échec hors ligne) reste `null` : une liste vide dirait d'un
   // client qui a des cartes que toutes sont clôturées.
-  const visibles = client && cartes ? cartes.filter((c) => c.clientId === client.id) : cartes;
+  const duClient = client && cartes ? cartes.filter((c) => c.clientId === client.id) : cartes;
+
+  /**
+   * Quand le champ de recherche existe.
+   *
+   * Pas sous un filtre client : la liste ne porte déjà qu'une personne, et un
+   * second filtre par-dessus ne retrancherait rien qu'on cherche. Pas non plus
+   * sur zéro ou une carte, où il n'y a rien à trouver — un champ posé au-dessus
+   * d'une liste d'un élément est du décor.
+   *
+   * Et le terme n'est lu que si le champ est là. Sans cette garde, arriver ici
+   * depuis la fiche d'un client, la recherche restée pleine d'un passage
+   * précédent, masquerait ses cartes par un filtre devenu invisible — le pire
+   * défaut possible sur l'écran qui fait sortir l'argent.
+   */
+  const avecRecherche = !client && (cartes?.length ?? 0) > 1;
+  const cherche = avecRecherche ? nu(recherche.trim()) : '';
+
+  const visibles =
+    cherche && duClient ? duClient.filter((c) => nu(c.clientNom).includes(cherche)) : duClient;
 
   /**
    * Pourquoi le retrait d'une carte attend, ou `null` (spec J2b §7).
@@ -170,9 +191,37 @@ export function Retrait({
     <div className="flex-1 flex flex-col">
       <EnTeteEcran
         titre="Retrait"
-        sousTitre="Clôturer une carte et rendre le solde"
+        sousTitre={
+          // Le compte filtré **et** le compte total : une liste qui rétrécit
+          // sans dire de combien laisse croire qu'on a perdu des cartes.
+          cherche && visibles && duClient
+            ? `${visibles.length} sur ${duClient.length} cartes`
+            : 'Clôturer une carte et rendre le solde'
+        }
         onRetour={onRetour}
         largeur="large"
+        enfants={
+          avecRecherche ? (
+            <label className="relative block">
+              <span className="sr-only">Chercher un client</span>
+              <Icone
+                nom="search"
+                taille={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              />
+              {/* Le champ fait 16 px : en dessous, Safari zoome à la mise au
+                  point et l'écran saute sous le doigt. C'est la règle que tient
+                  `verifier-champs.mjs`. */}
+              <input
+                type="search"
+                value={recherche}
+                onChange={(e) => setRecherche(e.target.value)}
+                placeholder="Chercher un client"
+                className="w-full rounded-md border border-hairline bg-surface py-2.5 pl-10 pr-3 font-body text-champ text-ink placeholder:text-muted-foreground"
+              />
+            </label>
+          ) : undefined
+        }
       />
 
       <CorpsEcran
@@ -221,7 +270,21 @@ export function Retrait({
               </div>
             )}
 
-            {visibles?.length === 0 && (
+            {/* « Aucune carte active » sous une recherche qui ne trouve rien
+                ferait croire au collecteur que toutes les cartes sont
+                clôturées, alors qu'il a mal tapé un nom. */}
+            {visibles?.length === 0 && cherche && (
+              <RienAMontrer
+                // `credit-card` et non `coins` : le vide porte sur des cartes,
+                // pas sur de l'argent — c'est le critère que `RienAMontrer`
+                // énonce pour sa liste courte, et il évite de l'élargir.
+                icone="credit-card"
+                titre="Aucune carte à ce nom"
+                detail="Vérifie l’orthographe, ou vide le champ pour revoir toutes les cartes."
+              />
+            )}
+
+            {visibles?.length === 0 && !cherche && (
               <RienAMontrer
                 icone="coins"
                 titre={client ? 'Aucune carte active pour ce client' : 'Aucune carte active'}
