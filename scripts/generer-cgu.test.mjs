@@ -50,6 +50,36 @@ describe('enTexte', () => {
     // littérales passerait quand même cette épreuve-là.
     expect(enTexte('<p>&lt;&gt;&quot;&#x27;</p>')).toBe('<>"\'');
   });
+
+  it('coupe aussi avant une ouvrante de bloc, pas seulement après une fermante', () => {
+    // La pièce produite au tribunal a porté « Gratuit pendant 30 jours.20 clients » :
+    // une `<ul>` ouvrante qui suit du texte en ligne ne produisait aucun saut, et la
+    // passe qui retire les balises l’effaçait en silence. Quatre phrases que personne
+    // n’avait écrites, dans le document même qu’on produirait à l’audience.
+    //
+    // Le cas est une liste imbriquée, et il le faut : du texte suivi d’une `</p>`
+    // serait coupé de toute façon par cette fermante, et l’épreuve passerait au vert
+    // sur une règle qui ne connaît que les fermantes. Mesuré — la première version de
+    // cette épreuve ne gardait rien.
+    expect(enTexte('<li>Prix.<ul><li>20 clients</li></ul></li>')).toBe('Prix.\n20 clients');
+  });
+
+  it('ne coupe pas sur `a`, qui est une balise en ligne', () => {
+    // `a` a figuré dans la liste des balises de bloc : la pièce portait alors trois
+    // lignes commençant par un point, dont une réduite au seul caractère « . », et la
+    // phrase de résiliation perdait sa ponctuation finale.
+    expect(enTexte('<p>Écrire à <a href="#">contact</a>. Suite.</p>')).toBe(
+      'Écrire à contact. Suite.',
+    );
+  });
+
+  it('garde une insécable en bord de ligne, que `trim()` mangerait', () => {
+    // `String.prototype.trim()` compte U+00A0 comme un blanc. Écrit en échappement et
+    // non au caractère : une insécable tapée dans un fichier est indiscernable d’une
+    // espace ordinaire à la relecture, et cette épreuve mesurerait alors exactement le
+    // contraire de ce qu’elle annonce.
+    expect(enTexte('<p>\u00a0X\u00a0</p>')).toBe('\u00a0X\u00a0');
+  });
 });
 
 describe('empreinteDe', () => {
