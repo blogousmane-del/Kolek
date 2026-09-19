@@ -12,6 +12,8 @@
  * l'intérieur du produit**, pas dans la boîte aux lettres de quelqu'un.
  */
 
+import { IDENTITE } from './legal/identite';
+
 /** L'application du collecteur. Site Netlify distinct — la vitrine y renvoie
     par une navigation ordinaire, ce qu'aucune directive CSP n'entrave. */
 export const APP_COLLECTEUR = 'https://app.kolek.cash';
@@ -52,10 +54,22 @@ export const CONFIDENTIALITE = '/confidentialite';
  * formaté pour l'œil humain y ouvre une conversation vide — un lien mort qui
  * n'a pas l'air mort, le pire des deux.
  *
- * Le même numéro se lit sous sa forme humaine dans les mentions légales, où
- * c'est un fait d'identité et non un lien.
+ * **Il se déduit de `IDENTITE`, il ne s'y recopie pas.** Ce fichier a porté
+ * les mêmes chiffres en dur jusqu'au 2026-09-19, à côté d'un `identite.ts`
+ * qui s'ouvre sur « deux copies d'un nom ou d'un numéro finissent par
+ * diverger » — et dont le champ `whatsapp` n'avait, lui, aucun lecteur. Le
+ * fait d'identité était donc le mort, et la copie le vivant. Changer de numéro
+ * aurait laissé le pied de page ouvrir l'ancien, sans qu'aucune garde ne
+ * bronche : `verifier:mentions` contrôle qu'un champ est renseigné, pas qu'il
+ * est lu.
+ *
+ * `null` quand l'exploitant n'a pas fourni de numéro : le champ est un `Trou`,
+ * et `https://wa.me/` sans chiffres ouvre une conversation vide. Les deux
+ * appelants retirent alors le lien plutôt que d'en servir un mort.
  */
-export const WHATSAPP = 'https://wa.me/2250788818118';
+export const WHATSAPP: string | null = IDENTITE.whatsapp
+  ? `https://wa.me/${IDENTITE.whatsapp}`
+  : null;
 
 /**
  * L'adresse de l'exploitant. Elle reste offerte en dernier recours, sous le

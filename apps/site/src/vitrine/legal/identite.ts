@@ -28,7 +28,9 @@ export interface Identite {
   /** Déposée sans frais au greffe ; l'entreprenant en est dispensé de RCCM. */
   declarationActivite: string | Trou;
   telephone: string | Trou;
-  /** Le meme numero, en chiffres nus, pour wa.me. Jamais d’espace ni de +. */
+  /** Le meme numero, en chiffres nus, pour wa.me. Jamais d’espace ni de +.
+      Lu par `liens.ts`, qui en deduit `WHATSAPP` : c'est ici, et nulle part
+      ailleurs, qu'on change le numero. */
   whatsapp: string | Trou;
   contact: string;
   /** Annoncé dans la politique, donc opposable : ne pas promettre 48 h. */

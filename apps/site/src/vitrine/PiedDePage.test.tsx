@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { IDENTITE } from './legal/identite';
 import { PiedDePage } from './PiedDePage';
 
 // `globals` n'est pas activé : sans cet appel, chaque rendu s'ajoute au
@@ -30,7 +31,12 @@ describe('pied de page', () => {
     const lien = screen.getByRole('link', { name: /WhatsApp/i });
     // wa.me n'accepte ni espace, ni +, ni indicatif entre parenthèses : un
     // numéro formaté pour l'œil humain y ouvre une conversation vide.
-    expect(lien.getAttribute('href')).toBe('https://wa.me/2250788818118');
+    //
+    // L'attente se déduit de `IDENTITE` au lieu de recopier les chiffres :
+    // une épreuve qui porte sa propre copie du numéro ne peut pas signaler une
+    // divergence, elle en devient la troisième.
+    expect(lien.getAttribute('href')).toBe(`https://wa.me/${IDENTITE.whatsapp}`);
+    expect(lien.getAttribute('href')).toMatch(/^https:\/\/wa\.me\/\d{10,}$/);
     expect(lien.getAttribute('target')).toBe('_blank');
     expect(lien.getAttribute('rel')).toContain('noreferrer');
   });
