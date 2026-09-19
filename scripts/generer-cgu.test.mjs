@@ -1,10 +1,12 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
 import {
+  CIBLE_SITE,
+  DOSSIER_INSTANTANES,
   composer,
   contenuConstante,
   empreinteDe,
@@ -47,6 +49,23 @@ describe('retirerHorsContrat', () => {
 
   it('laisse intact un document sans marque', () => {
     const intact = '<section><p>Rien à retirer</p></section>';
+    expect(retirerHorsContrat(intact)).toBe(intact);
+  });
+
+  it('ne prend pas un attribut voisin pour la marque', () => {
+    // Faux positif mesuré : `\bdata-hors-contrat\b` s’accroche au préfixe,
+    // parce que `-` est un non-mot et que la frontière de mot y tire. Un
+    // attribut nommé `data-hors-contrat-bis` faisait disparaître son élément.
+    const intact = '<p data-hors-contrat-bis>Contrat</p><p>Suite</p>';
+    expect(retirerHorsContrat(intact)).toBe(intact);
+  });
+
+  it('ne lit la marque que dans un nom d’attribut, jamais dans une valeur', () => {
+    // Faux positif mesuré : `<p title="data-hors-contrat">Contrat</p>` rendait
+    // la chaîne vide. Les pages légales sont de la prose, et la prose finit par
+    // contenir ce qu’on cherche — ici, une section de contrat disparaissait de
+    // la pièce d’audience, recevait une empreinte, et des gens l’acceptaient.
+    const intact = '<p title="data-hors-contrat">Contrat</p>';
     expect(retirerHorsContrat(intact)).toBe(intact);
   });
 
@@ -212,7 +231,7 @@ describe('composer', () => {
     expect(composer('<p>Un<br>Bis</p>', '<div>Deux</div>')).toBe('Un\nBis\n\nDeux');
   });
 
-  it('écarte le hors-contrat des deux pages, pas d’une seule', () => {
+  it('écarte le hors-contrat des deux pages, pas d’une seule (synthétique)', () => {
     // `enTexte` efface les balises, donc la marque avec elles : un retrait
     // appliqué après le dépouillement ne trouverait plus rien et laisserait le
     // mobilier de navigation dans la pièce d'audience.
@@ -222,5 +241,87 @@ describe('composer', () => {
         '<p>Politique</p><section data-hors-contrat>Pour aller plus loin</section>',
       ),
     ).toBe('Contrat\n\nPolitique');
+  });
+});
+
+/**
+ * La pièce d'audience, telle qu'elle est commise.
+ *
+ * Ce bloc existe à cause d'un trou mesuré par mutation : retirer
+ * `data-hors-contrat` de `PageLegale.tsx` laissait 386 épreuves vertes.
+ * Seul `verifier:cgu` rougissait — et son message dit « lance
+ * `npm run generer:cgu` », c'est-à-dire exactement le geste qui remet le
+ * mobilier de navigation dans la pièce, en vert. Une garde dont le remède
+ * détruit la propriété n'en est pas une.
+ *
+ * Ces épreuves-ci portent sur le fichier commis, pas sur du HTML synthétique :
+ * c'est lui qu'on produirait à l'audience. Elles ne demandent pas Vite.
+ */
+describe('la pièce d’audience commise', () => {
+  // La pièce **en vigueur**, désignée par la constante — jamais « le premier
+  // fichier du répertoire ».
+  //
+  // `Docs/legal/` est fait pour accumuler : le §9.5 du carnet de déploiement
+  // dit de garder les anciens instantanés, parce qu'un litige portant sur une
+  // période antérieure à un changement se juge sur le texte d'alors. Un choix
+  // par position tomberait donc sur une pièce périmée dès le deuxième
+  // versement — et les anciennes ont le droit de porter ce que cette épreuve
+  // interdit à la courante. Mesuré : avec deux instantanés au répertoire, la
+  // première version de ce bloc a examiné celui que l'ordre alphabétique lui
+  // donnait.
+  const version = readFileSync(CIBLE_SITE, 'utf8').match(
+    /VERSION_CONDITIONS = '([0-9a-f]{16})'/,
+  )?.[1];
+  const nom = version
+    ? readdirSync(DOSSIER_INSTANTANES).find((f) => f.endsWith(`-${version}.txt`))
+    : undefined;
+  const piece = nom ? readFileSync(join(DOSSIER_INSTANTANES, nom), 'utf8') : '';
+
+  it('existe, et porte bien le contrat — sinon les épreuves suivantes ne mesurent rien', () => {
+    // Le témoin positif. Sans lui, une pièce absente ou vide rendrait vertes
+    // les épreuves d'absence ci-dessous, qui annonceraient le contraire de ce
+    // qu'elles mesurent.
+    expect(version, 'la constante engendrée doit porter une empreinte').toBeTruthy();
+    expect(nom, `aucun instantané pour la version ${version} dans Docs/legal/`).toBeTruthy();
+    expect(piece).toMatch(/Obligations du collecteur/);
+    expect(piece).toMatch(/politique de confidentialité/i);
+  });
+
+  it('ne porte aucun mobilier de navigation', () => {
+    // Le lien de retour de `PageLegale.tsx` et les sections « Pour aller plus
+    // loin ». Leur présence rendrait la version dépendante de libellés de
+    // navigation : renommer un lien forcerait une réacceptation générale pour
+    // un changement sans aucun contenu juridique.
+    expect(piece).not.toMatch(/Retour à l’accueil/);
+    expect(piece).not.toMatch(/Pour aller plus loin/);
+  });
+
+  it('porte l’empreinte de son propre contenu dans son nom', () => {
+    expect(empreinteDe(piece.replace(/\r\n/g, '\n'))).toBe(version);
+  });
+});
+
+/**
+ * Les marques, là où elles doivent être.
+ *
+ * Complément du bloc ci-dessus : celui-ci échoue **en nommant la cause** quand
+ * quelqu'un retire une marque, au lieu de laisser découvrir le symptôme dans la
+ * pièce. Contrôle de source, comme `verifier-champs.mjs` — pas d'épreuve
+ * d'interface, pas de rendu.
+ */
+describe('les marques data-hors-contrat dans les sources', () => {
+  const RACINE_LEGAL = 'apps/site/src/vitrine/legal';
+
+  it('le lien de retour de PageLegale est marqué', () => {
+    const source = readFileSync(join(RACINE_LEGAL, 'PageLegale.tsx'), 'utf8');
+    // Témoin positif : le lien existe bien, et c'est le bon.
+    expect(source).toMatch(/← Retour à l’accueil/);
+    expect(source).toMatch(/href="\/"\s*\r?\n\s*data-hors-contrat/);
+  });
+
+  it('la section « Pour aller plus loin » de Confidentialite est marquée', () => {
+    const source = readFileSync(join(RACINE_LEGAL, 'Confidentialite.tsx'), 'utf8');
+    expect(source).toMatch(/Pour aller plus loin/);
+    expect(source).toMatch(/<section data-hors-contrat>\s*\r?\n\s*<TitreSection>Pour aller plus loin/);
   });
 });

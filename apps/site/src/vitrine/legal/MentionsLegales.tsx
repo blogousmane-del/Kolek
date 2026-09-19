@@ -67,10 +67,7 @@ export function MentionsLegales() {
         </p>
       </section>
 
-      {/* `data-hors-contrat`, comme sur les deux autres pages légales : la
-          marque dit ce que ce bloc est — de la navigation — et non ce que le
-          générateur lit aujourd'hui. Voir `PageLegale.tsx`. */}
-      <section data-hors-contrat>
+      <section>
         <TitreSection>Pour aller plus loin</TitreSection>
         <p className="mt-2">
           <a href={CONDITIONS} className="text-primary underline underline-offset-2">

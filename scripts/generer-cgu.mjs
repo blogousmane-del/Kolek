@@ -45,11 +45,35 @@ const BALISES_DE_BLOC =
   /<\/?(?:p|li|h[1-6]|div|section|table|tr|td|th|ul|ol|main|header|footer)(?:\s[^>]*)?>/gi;
 
 /**
+ * La balise ouvrante porte-t-elle l'attribut, vraiment ?
+ *
+ * Deux faux positifs mesurés sur la première version, qui cherchait
+ * `\bdata-hors-contrat\b` n'importe où dans la balise :
+ *
+ * - `<p data-hors-contrat-bis>` était retiré, parce que `-` est un non-mot et
+ *   que `\b` s'y accroche. D'où `(?![-\w])`, qui exige la fin du nom.
+ * - `<p title="data-hors-contrat">` l'était aussi : la chaîne se lisait dans
+ *   une **valeur**, pas dans un nom d'attribut. D'où le vidage des valeurs
+ *   entre guillemets avant l'examen — les pages légales sont de la prose, et
+ *   la prose finit par contenir ce qu'on cherche.
+ *
+ * Aucun des deux cas n'existe aujourd'hui dans les pages légales. La
+ * conséquence, elle, est la pire de sa catégorie : une section de contrat
+ * disparaît de la pièce, reçoit une empreinte, et des gens l'acceptent.
+ */
+function porteLaMarque(baliseOuvrante) {
+  return /\sdata-hors-contrat(?![-\w])/i.test(baliseOuvrante.replace(/"[^"]*"|'[^']*'/g, '""'));
+}
+
+/**
  * Les sous-arbres marqués `data-hors-contrat`, retirés.
  *
- * Deux blocs des pages légales sont de la navigation et non du contrat : le
- * lien « ← Retour à l'accueil » de `PageLegale.tsx`, et la section « Pour
- * aller plus loin » qui ferme `Confidentialite.tsx` et `MentionsLegales.tsx`.
+ * Deux blocs sont de la navigation et non du contrat, dans les deux pages que
+ * `texteRendu` rend : le lien « ← Retour à l'accueil » de `PageLegale.tsx`, et
+ * la section « Pour aller plus loin » qui ferme `Confidentialite.tsx`. La même
+ * section existe dans `MentionsLegales.tsx`, non marquée : cette page n'entre
+ * pas dans la pièce, et marquer ce qu'aucun code ne lit serait de
+ * l'anticipation. Le jour où elle y entrera, la marque ira avec.
  * Sans ce retrait, ils entraient dans la pièce qu'on produirait à l'audience —
  * qui s'ouvrait sur une affordance de navigation et se fermait sur une liste
  * de liens dont un nommait un document qu'elle ne contient pas.
@@ -64,11 +88,18 @@ const BALISES_DE_BLOC =
  * balise, et le retrait emporterait la moitié du contrat sans rien dire.
  */
 export function retirerHorsContrat(html) {
-  const marque = /<([a-z][a-z0-9]*)\b[^>]*\bdata-hors-contrat\b[^>]*>/i;
+  const ouvrantes = /<([a-z][a-z0-9]*)\b[^>]*>/gi;
 
   let texte = html;
   for (;;) {
-    const debut = marque.exec(texte);
+    ouvrantes.lastIndex = 0;
+    let debut = null;
+    for (let tag = ouvrantes.exec(texte); tag; tag = ouvrantes.exec(texte)) {
+      if (porteLaMarque(tag[0])) {
+        debut = tag;
+        break;
+      }
+    }
     if (!debut) return texte;
 
     const balise = debut[1].toLowerCase();
@@ -102,7 +133,8 @@ export function retirerHorsContrat(html) {
 /**
  * Le HTML rendu, dépouillé en texte.
  *
- * Cette fonction **est** l'empreinte : deux dépouillements différents
+ * Cette fonction est la **seconde moitié** de l'empreinte : `composer` écarte
+ * d'abord le hors-contrat, puis dépouille ici. Deux dépouillements différents
  * donnent deux empreintes différentes pour le même texte lu. La règle, dans
  * l'ordre :
  *
