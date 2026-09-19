@@ -1367,18 +1367,38 @@ principe. Ce déploiement-là se rate en silence, et la §9.2 dit comment.
 
 ### 9.1 L'ordre, et pourquoi il n'est pas celui de la §6.3
 
-La règle générale de la §6.3 tient — **le schéma d'abord, toujours** — mais
-elle décrit un monde où les fonctions se déploient à la main. Depuis
-`.github/workflows/verification.yml`, ce n'est plus le cas :
+La règle générale de la §6.3 tient — **le schéma d'abord, toujours**. Mais elle
+décrit un monde où les fonctions se déploient à la main, et selon l'état des
+secrets du dépôt ce n'est plus forcément le cas. Ce que fait
+`.github/workflows/verification.yml`, exactement :
 
-- travail `fonctions` : `supabase functions deploy` part **tout seul** à chaque
-  poussée qui touche `supabase/functions`, et déploie **toutes** les fonctions ;
-- travail `rappel-migrations` : la migration, elle, ne part pas. Un `::notice`,
-  délibérément pas un échec, parce que `db push` demande le mot de passe de la
-  base.
+- le fichier ne se déclenche sur poussée que pour `main` (`on: push: branches:
+  [main]`). Sur une branche de travail, seul l'événement `pull_request` tourne,
+  et le travail `fonctions` y est sauté ;
+- le travail `fonctions`, donc, ne s'exécute qu'à la fusion. Il déploie alors
+  **toutes** les fonctions, pas seulement celles dont le fichier a changé ;
+- **mais seulement si `SUPABASE_ACCESS_TOKEN` est posé et accepté.** Deux
+  étapes le contrôlent — présence, puis un `supabase projects list` qui tranche
+  la validité. Absent, le travail rend un `::warning` et les fonctions restent
+  à déployer à la main ;
+- le travail `rappel-migrations` : la migration, elle, ne part jamais. Un
+  `::notice`, délibérément pas un échec, parce que `db push` demande le mot de
+  passe de la base.
 
-Donc la fusion déploie les fonctions et déclenche Netlify **dans le même
-geste**. Ce qu'on peut encore ordonner, c'est ce qui vient avant :
+**Vérifier dans quel monde on est avant de fusionner**, parce que la procédure
+en dépend :
+
+```bash
+gh secret list --repo <depot> | grep SUPABASE_ACCESS_TOKEN
+```
+
+- **Jeton posé** — la fusion déploie les fonctions et déclenche Netlify dans le
+  même geste. Plus rien ne s'ordonne après ; tout se joue avant.
+- **Jeton absent** — la §6.3 s'applique telle quelle, à la main, et l'ordre
+  complet reste entre les mains de l'exploitant : schéma, puis fonctions, puis
+  les sites.
+
+Dans les deux cas, ce qui vient avant la fusion est le même :
 
 ```bash
 npx supabase db push                     # 1. AVANT la fusion, à la main
@@ -1387,9 +1407,21 @@ npx supabase migration list --linked     # 2. constater qu'elle est passée
 ```
 
 `20260918100000_acceptations_conditions` crée la table, ses deux index, active
-RLS et révoque `public`, `anon` et `authenticated`. Elle ne touche à aucune
-table existante : aucun verrou à craindre, elle peut passer à n'importe quelle
-heure.
+RLS et révoque `public`, `anon` et `authenticated`. Elle ne modifie aucune table
+existante, mais elle n'est pas sans verrou pour autant : ses deux clés
+étrangères visent `demandes_ouverture` et `auth.users`, et créer une table qui
+en référence une autre prend un `SHARE ROW EXCLUSIVE` sur la table référencée —
+ce qui bloque les écritures le temps de la transaction. `auth.users` est écrite
+à chaque connexion.
+
+C'est bref : la table naît vide, il n'y a rien à balayer, et la transaction ne
+dure que le temps de poser les déclencheurs. Mais elle fait la queue derrière
+les écritures en cours. Une heure creuse reste préférable à midi, sans être la
+précaution que réclamait `20260902120000_encaisse_par` (§6.3), qui verrouillait
+les deux tables où entre l'argent le temps d'un `update` complet.
+
+*Raisonné depuis les règles de verrouillage de PostgreSQL, non mesuré sur la
+production.*
 
 ### 9.2 Le défaut silencieux : la migration en retard
 
@@ -1477,12 +1509,23 @@ npm run verifier:cgu   # doit être vert avant de commiter
 ```
 
 Puis commiter l'instantané neuf **et** garder l'ancien : un litige portant sur
-une période antérieure au changement se juge sur le texte d'alors.
+une période antérieure au changement se juge sur le texte d'alors. `Docs/legal/`
+est fait pour accumuler.
+
+**La seule exception, et elle ne se présente qu'une fois :** un instantané que
+personne n'a jamais pu accepter — texte jamais déployé, table d'acceptations
+encore vide — ne prouve rien et ne se garde pas. C'est ce qui est arrivé à
+`54df67d1b9d053f3`, retiré le 2026-09-19 au profit de `e4adce80ca3bc9b1`. Dès
+la première acceptation enregistrée, la règle ci-dessus reprend sans exception.
 
 Ce qui est marqué `data-hors-contrat` dans le JSX — le lien « ← Retour à
-l'accueil » de `PageLegale.tsx`, les sections « Pour aller plus loin » — est
-écarté du rendu empreint. C'est de la navigation, pas du contrat : le renommer
-ne doit pas forcer une réacceptation générale.
+l'accueil » de `PageLegale.tsx`, la section « Pour aller plus loin » de
+`Confidentialite.tsx` — est écarté du rendu empreint. C'est de la navigation,
+pas du contrat : le renommer ne doit pas forcer une réacceptation générale.
+Deux épreuves de `test:scripts` le tiennent : l'une refuse la navigation dans
+l'instantané en vigueur, l'autre exige les marques dans les sources. Sans
+elles, il suffisait de retirer une marque et de relancer `generer:cgu` pour
+remettre le mobilier dans la pièce, en vert.
 
 ---
 
