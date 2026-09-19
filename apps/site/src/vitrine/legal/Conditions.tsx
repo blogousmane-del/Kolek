@@ -173,7 +173,13 @@ export function Conditions() {
           </li>
           <li>ne pas inscrire un client qui refuse d’y figurer ;</li>
           <li>n’inscrire que ce qui sert la collecte ;</li>
-          <li>répondre de l’usage qu’il fait de l’envoi d’avis par SMS à ses clients.</li>
+          <li>répondre de l’usage qu’il fait de l’envoi d’avis par SMS à ses clients ;</li>
+          <li>
+            répondre des collaborateurs qu’il rattache à son compte, et leur transmettre les
+            obligations des présentes : le collaborateur ne règle aucun abonnement, n’accepte
+            donc pas ces conditions pour son propre compte, et engage le titulaire par ce
+            qu’il inscrit.
+          </li>
         </ul>
       </section>
 

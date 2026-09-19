@@ -24,6 +24,34 @@ seule façon de le savoir est d'y appliquer les migrations et de refaire l'audit
 
 ---
 
+## Dans quel shell taper tout ceci
+
+**Tous les blocs de ce carnet sont du Git Bash.** Le dire une fois évite deux
+pièges que rien n'annonce, et que la ligne de commande n'explique pas.
+
+**Sous PowerShell, `npx` est refusé** — la politique d'exécution de Windows
+bloque `npx.ps1` :
+
+```
+npx : Impossible de charger le fichier C:\Program Files\nodejs\npx.ps1, car
+l'exécution de scripts est désactivée sur ce système.
+```
+
+`npx.cmd` passe outre, parce qu'il ne traverse pas PowerShell. Mais il traverse
+`cmd.exe`, **qui casse tout argument contenant une espace ou des guillemets** —
+le tableau des pièges de la §3, « Sites Netlify », en garde la trace. Donc :
+
+| Ce que tu lances | Où |
+|---|---|
+| Une commande sans guillemets — `login`, `link`, `db push`, `functions deploy`, `migration list` | PowerShell avec `npx.cmd`, ou Git Bash tel quel |
+| Une commande à guillemets — `secrets set`, tout ce qui porte du JSON ou une liste d'origines | **Git Bash**, avec `npx` tel quel |
+
+En clair : recopie les blocs dans Git Bash et ils marchent. Si tu préfères
+PowerShell, ajoute `.cmd` — et repasse sous Git Bash dès qu'il y a un
+guillemet.
+
+---
+
 ## Ce qui demande ton compte
 
 Deux commandes à lancer toi-même. Elles ouvrent ton navigateur et stockent tes
@@ -260,6 +288,26 @@ Trois sites distincts sur le même dépôt, conformément au dossier stratégiqu
 | `kolek-collecteur` | `apps/collecteur` | `apps/collecteur/netlify.toml` | Collecteurs, sur le terrain |
 | `kolek-admin` | `apps/admin` | `apps/admin/netlify.toml` | GTCS et gérants |
 | `kolek-site` | `apps/site` | `apps/site/netlify.toml` | Public — grille tarifaire |
+
+> **Trois projets de plus existent sur le compte, et ils échouent à chaque
+> construction.** Repérés le 2026-09-19 : `calm-begonia-7139bf`,
+> `helpful-kleicha-e77441`, `mellifluous-cuchufli-182dc7` — des noms
+> auto-générés, signe d'une connexion créée sans nom. Ce sont des **doublons**
+> des trois sites ci-dessus : même `packagePath`, même `netlify.toml`,
+> jusqu'à la redirection vers `admin.kolek.cash`.
+>
+> Ils échouent parce que `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` ne
+> sont posées que sur les trois vrais sites, et que la garde de `vite.config.ts`
+> refuse d'émettre un paquet sans elles. **C'est le garde-fou qui fonctionne** —
+> un doublon qui construirait « avec succès » un paquet sans configuration
+> serait le vrai problème.
+>
+> Conséquence : **trois rouges permanents sur toute PR visant `main`**, et donc
+> trois rouges que tout le monde apprend à ignorer. Un rouge qu'on apprend à
+> ignorer est un rouge qui ne servira plus le jour où il aura raison. À
+> supprimer ou à délier du dépôt dans Netlify — surtout pas à configurer :
+> dupliquer la configuration Supabase sur trois sites fantômes multiplie les
+> endroits où une clé peut fuiter, pour zéro bénéfice.
 
 En ligne depuis le 2026-08-18, équipe `blog-ousmane`, publiés à la main depuis
 les artefacts locaux :
@@ -1354,6 +1402,226 @@ colonne `reserve_le` ni l'état `en_cours`, qu'aucune ligne ne porte encore.
 
 ---
 
+## 9. La trace de l'acceptation des conditions (2026-09-19)
+
+Depuis cette livraison, chaque acceptation des conditions générales laisse une
+ligne dans `public.acceptations_conditions` : qui a accepté, quand, et
+**l'empreinte de la version du texte** qu'il avait sous les yeux. Le serveur
+refuse une version qu'il ne connaît pas, sur les trois chemins — formulaire
+payant, formulaire d'essai, renouvellement dans l'application.
+
+C'est ce qui rend les CGU opposables à une personne précise plutôt qu'en
+principe. Ce déploiement-là se rate en silence, et la §9.2 dit comment.
+
+### 9.1 L'ordre, et pourquoi il n'est pas celui de la §6.3
+
+La règle générale de la §6.3 tient — **le schéma d'abord, toujours**. Mais elle
+décrit un monde où les fonctions se déploient à la main, et selon l'état des
+secrets du dépôt ce n'est plus forcément le cas. Ce que fait
+`.github/workflows/verification.yml`, exactement :
+
+- le fichier ne se déclenche sur poussée que pour `main` (`on: push: branches:
+  [main]`). Sur une branche de travail, seul l'événement `pull_request` tourne,
+  et le travail `fonctions` y est sauté ;
+- le travail `fonctions`, donc, ne s'exécute qu'à la fusion. Il déploie alors
+  **toutes** les fonctions, pas seulement celles dont le fichier a changé ;
+- **mais seulement si `SUPABASE_ACCESS_TOKEN` est posé et accepté.** Deux
+  étapes le contrôlent — présence, puis un `supabase projects list` qui tranche
+  la validité. Absent, le travail rend un `::warning` et les fonctions restent
+  à déployer à la main ;
+- le travail `rappel-migrations` : la migration, elle, ne part jamais. Un
+  `::notice`, délibérément pas un échec, parce que `db push` demande le mot de
+  passe de la base.
+
+**Vérifier dans quel monde on est avant de fusionner**, parce que la procédure
+en dépend :
+
+```bash
+gh secret list --repo <depot> | grep SUPABASE_ACCESS_TOKEN
+```
+
+- **Jeton posé** — la fusion déploie les fonctions et déclenche Netlify dans le
+  même geste. Plus rien ne s'ordonne après ; tout se joue avant.
+- **Jeton absent** — la §6.3 s'applique telle quelle, à la main, et l'ordre
+  complet reste entre les mains de l'exploitant : schéma, puis fonctions, puis
+  les sites.
+
+Dans les deux cas, ce qui vient avant la fusion est le même :
+
+```bash
+npx supabase db push                     # 1. AVANT la fusion, à la main
+npx supabase migration list --linked     # 2. constater qu'elle est passée
+                                         # 3. puis seulement, fusionner
+```
+
+`20260918100000_acceptations_conditions` crée la table, ses trois index, active
+RLS et révoque `public`, `anon` et `authenticated`.
+
+Deux de ces index sont des règles, pas des accélérateurs, et il vaut mieux les
+connaître avant de lire un journal : **une demande donne lieu à une acceptation
+et une seule** (`where demande_id is not null`), et **un compte accepte une
+version donnée une fois et une seule** (`where demande_id is null`). Le second
+rend l'écriture idempotente au renouvellement — `abonnement-payer` enregistre
+avant d'appeler la boutique, donc un collecteur dont la vente échoue et qui
+réappuie repasse par là. `enregistrerAcceptation` lit le `23505` comme un
+succès : le fait est déjà enregistré, et la preuve ne s'améliore pas en double.
+
+Conséquence pratique au constat : **une seule ligne par compte et par version
+est le comportement correct**, pas le signe d'une écriture perdue. Elle ne modifie aucune table
+existante, mais elle n'est pas sans verrou pour autant : ses deux clés
+étrangères visent `demandes_ouverture` et `auth.users`, et créer une table qui
+en référence une autre prend un `SHARE ROW EXCLUSIVE` sur la table référencée —
+ce qui bloque les écritures le temps de la transaction. `auth.users` est écrite
+à chaque connexion.
+
+C'est bref : la table naît vide, il n'y a rien à balayer, et la transaction ne
+dure que le temps de poser les déclencheurs. Mais elle fait la queue derrière
+les écritures en cours. Une heure creuse reste préférable à midi, sans être la
+précaution que réclamait `20260902120000_encaisse_par` (§6.3), qui verrouillait
+les deux tables où entre l'argent le temps d'un `update` complet.
+
+*Raisonné depuis les règles de verrouillage de PostgreSQL, non mesuré sur la
+production.*
+
+### 9.2 Le défaut silencieux : la migration en retard
+
+**C'est le seul risque grave de cette livraison, et il ne se voit nulle part.**
+
+`enregistrerAcceptation` n'échoue jamais bruyamment : dans
+`demander-ouverture`, dans `abonnement-payer` et dans `_shared/ouvrir-compte`,
+un échec d'écriture est tracé par `console.error` et la requête continue. Ce
+choix est le bon — refuser une ouverture de compte déjà payée pour une ligne de
+journal serait pire que le mal.
+
+Mais si les fonctions partent avant la migration, la table n'existe pas, chaque
+insertion échoue, et :
+
+- les comptes s'ouvrent normalement ;
+- les paiements passent normalement ;
+- **aucune acceptation n'est enregistrée** ;
+- le CI est vert, les journaux Netlify sont verts, et rien dans le produit ne
+  l'indique.
+
+C'est-à-dire exactement l'état que cette livraison existe pour quitter, atteint
+sans qu'un seul signal le dise. D'où la §9.4 : le premier constat après
+déploiement n'est pas facultatif.
+
+### 9.3 Le défaut bruyant : les fronts en retard
+
+Un ancien paquet n'envoie pas de champ `version`. Le serveur le refuse par
+`VERSION_CONDITIONS_PERIMEE`, et l'ouverture de compte comme le renouvellement
+sont refusés le temps que Netlify publie.
+
+C'est désagréable mais sain, et cela se répare tout seul :
+
+- la vitrine se recharge au premier rafraîchissement ;
+- l'application du collecteur est en `registerType: 'autoUpdate'` avec
+  `skipWaiting` et `clientsClaim` (`apps/collecteur/vite.config.ts`) : le paquet
+  neuf prend la main à la prochaine ouverture en ligne ;
+- le message affiché est écrit pour ce cas précis — « Les conditions générales
+  ont changé. Ferme l'application, rouvre-la, relis-les et réessaie. »
+
+Coût maximal : une tentative de paiement refusée par collecteur. À ne pas
+confondre avec la §9.2, qui ne coûte rien sur le moment et tout au tribunal.
+
+### 9.4 Constater, et le faire vraiment
+
+Un compte ouvert ou un renouvellement réglé après le déploiement doit avoir
+laissé sa ligne :
+
+```sql
+select acceptee_le, version, collecteur_id, demande_id
+  from public.acceptations_conditions
+ order by acceptee_le desc
+ limit 5;
+```
+
+**Zéro ligne ne prouve rien tant que personne n'a accepté depuis la mise en
+ligne.** C'est le piège habituel : la sonde muette. Le seul constat qui vaut est
+positif — une ligne dont on connaît l'auteur, après un geste qu'on a fait
+soi-même.
+
+Et la version qu'elle porte doit être celle du dépôt :
+
+```bash
+npm run verifier:cgu
+```
+
+Si la colonne `version` d'une ligne fraîche ne correspond pas à
+`VERSION_CONDITIONS`, c'est qu'un front périmé est encore servi quelque part —
+voir la §9.3.
+
+### 9.5 Le texte des conditions, et ce qu'il coûte d'y toucher
+
+`Docs/legal/conditions-<date>-<empreinte>.txt` est la pièce qu'on produirait à
+l'audience. Son nom porte l'empreinte de son contenu, et c'est cette empreinte
+qui est enregistrée avec chaque acceptation.
+
+Conséquence à ne pas découvrir un jour de litige : **toute modification du texte
+rendu de `Conditions.tsx` ou de `Confidentialite.tsx` change la version, et
+oblige tout le monde à réaccepter.** Une virgule suffit.
+
+La marche à suivre après une modification :
+
+```bash
+npm run generer:cgu    # nouvelle empreinte, nouvel instantané, trois constantes
+npm run verifier:cgu   # doit être vert avant de commiter
+```
+
+Puis commiter l'instantané neuf **et** garder l'ancien : un litige portant sur
+une période antérieure au changement se juge sur le texte d'alors. `Docs/legal/`
+est fait pour accumuler.
+
+**La seule exception, et elle ne se présente qu'une fois :** un instantané que
+personne n'a jamais pu accepter — texte jamais déployé, table d'acceptations
+encore vide — ne prouve rien et ne se garde pas. C'est ce qui est arrivé à
+`54df67d1b9d053f3`, retiré le 2026-09-19 au profit de `e4adce80ca3bc9b1`. Dès
+la première acceptation enregistrée, la règle ci-dessus reprend sans exception.
+
+Ce qui est marqué `data-hors-contrat` dans le JSX — le lien « ← Retour à
+l'accueil » de `PageLegale.tsx`, la section « Pour aller plus loin » de
+`Confidentialite.tsx` — est écarté du rendu empreint. C'est de la navigation,
+pas du contrat : le renommer ne doit pas forcer une réacceptation générale.
+Deux épreuves de `test:scripts` le tiennent : l'une refuse la navigation dans
+l'instantané en vigueur, l'autre exige les marques dans les sources. Sans
+elles, il suffisait de retirer une marque et de relancer `generer:cgu` pour
+remettre le mobilier dans la pièce, en vert.
+
+---
+
+### 9.6 Les deux fusions, et le squash qui casse la pile
+
+Ce chantier arrive en **deux PR empilées** : #11 porte les trois textes
+juridiques, #13 la trace de leur acceptation, et #13 est basée sur la branche de
+#11. L'ordre et la méthode comptent tous les deux.
+
+**Fusionner #11 par un commit de fusion, jamais par un squash.** Le dépôt
+autorise les trois modes, et c'est le piège : un squash pose sur `main` un
+commit unique qui n'est **pas un ancêtre** de `trace-acceptation`. GitHub
+retargete alors #13 sur `main`, et elle y réapparaît avec la totalité de ses
+commits plus ceux de #11 — en conflit avec des changements déjà présents sous
+une autre forme. Un commit de fusion garde la filiation, et #13 se réduit toute
+seule à ce qui lui appartient. `main` est d'ailleurs déjà tenue ainsi
+(`Merge pull request #7`).
+
+Supprimer la branche de #11 après la fusion : c'est ce qui déclenche le
+retarget automatique de #13 vers `main`.
+
+**Ce que chaque fusion déclenche**, et ce n'est pas symétrique :
+
+| Fusion | Edge Functions touchées | Ce qui part |
+|---|---|---|
+| #11 — textes juridiques | **0** | Netlify publie les trois sites. Le travail `fonctions` conclut « aucune touchée » et saute |
+| #13 — trace de l'acceptation | **7** | Netlify republie, **et le déploiement des fonctions part** — le contrôle de version entre en production |
+
+C'est donc à la fusion de #13, et seulement là, que s'ouvre la fenêtre décrite
+en §9.3 : un ancien paquet encore servi n'envoie pas de `version` et se fait
+refuser. Bruyant, borné, et réparé tout seul au premier rechargement.
+
+Et c'est **avant** cette fusion que `db push` doit être passé — §9.1.
+
+---
+
 ## Ce que le déploiement ne fait pas
 
 Il ne rend pas le produit vendable. Un collecteur qui ouvre l'application y
@@ -1377,4 +1645,5 @@ une opération routinière plutôt qu'un événement redouté en fin de projet.
 ---
 
 *Kolek — procédure de déploiement · 2026-08-16, révisée le 2026-08-17
-(troisième site, dépôt GitHub) et le 2026-09-02 (§6, déployer une évolution).*
+(troisième site, dépôt GitHub), le 2026-09-02 (§6, déployer une évolution) et le
+2026-09-19 (§9, la trace de l’acceptation des conditions).*

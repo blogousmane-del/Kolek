@@ -45,6 +45,12 @@ export interface Demande {
       Refuser un mot de passe après l'encaissement serait le pire moment
       possible, d'où le contrôle ici et non plus tard. */
   motDePasse: string;
+  /** L'empreinte du texte que la personne avait sous les yeux en cochant la
+      case, engendrée par `scripts/generer-cgu.mjs`. Le serveur la compare à la
+      sienne et refuse ce qu'il ne connaît pas : un onglet resté ouvert depuis
+      une version précédente ne doit pas produire une acceptation pour un texte
+      qu'on ne peut plus produire. */
+  version: string;
 }
 
 export type Envoi =
@@ -72,6 +78,8 @@ const MESSAGES: Record<string, string> = {
   ZONE_TROP_LONGUE: 'Le nom de la zone est trop long.',
   MESSAGE_TROP_LONG: 'Ton message dépasse 500 caractères.',
   PALIER_INCONNU: 'Cette offre n’existe pas. Choisis-en une dans la liste.',
+  VERSION_CONDITIONS_PERIMEE:
+    'Les conditions générales ont changé depuis l’ouverture de cette page. Recharge-la, relis-les, et réessaie.',
   MOT_DE_PASSE_REQUIS:
     'Choisis un mot de passe : c’est celui avec lequel tu ouvriras l’application.',
   MOT_DE_PASSE_COURT: 'Choisis un mot de passe d’au moins 10 caractères.',

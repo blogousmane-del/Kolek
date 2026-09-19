@@ -33,8 +33,15 @@ export function PageLegale({
   return (
     <div className="min-h-dvh bg-canvas">
       <main className="mx-auto max-w-3xl px-5 py-12 sm:px-8">
+        {/* `data-hors-contrat` : ce lien est du mobilier de navigation, pas du
+            contrat. Sans cette marque, il entrait dans le texte rendu que
+            `scripts/generer-cgu.mjs` empreinte — la pièce qu'on produirait à
+            l'audience s'ouvrait sur « ← Retour à l'accueil », et renommer ce
+            libellé changeait la version que tout le monde a acceptée, pour un
+            changement sans aucun contenu juridique. */}
         <a
           href="/"
+          data-hors-contrat
           className="font-body text-sm text-primary underline underline-offset-2"
         >
           ← Retour à l’accueil

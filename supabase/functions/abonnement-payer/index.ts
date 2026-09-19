@@ -8,6 +8,8 @@ import {
   creerVenteChariow,
 } from '../_shared/depot-chariow.ts';
 import { reconcilier } from '../_shared/reconciliation.ts';
+import { enregistrerAcceptation } from '../_shared/acceptation.ts';
+import { VERSION_CONDITIONS } from '../_shared/version-conditions.ts';
 
 /**
  * Créer la vente qui renouvellera l'abonnement d'un collecteur.
@@ -127,15 +129,21 @@ Deno.serve(async (requete) => {
     return reponse({ erreur: 'ABONNEMENT_DU_TITULAIRE' }, 403, requete);
   }
 
-  // --- Passé l'identité, la configuration du fournisseur ---
+  // --- Passé l'identité, la clé de service ---
+  //
+  // `cleService` est nécessaire tôt : elle fabrique, plus bas, le client de
+  // service. `CHARIOW_CLE_API` ne sert, elle, qu'au fournisseur de paiement —
+  // son contrôle est descendu à son premier usage, juste avant la
+  // réconciliation, pour qu'un refus qui n'a rien à voir avec Chariow (le
+  // titulaire, une version des conditions périmée) reste atteignable sans clé
+  // de boutique. Ni le poste ni le CI ne la posent.
 
   const cleService = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const cleApi = Deno.env.get('CHARIOW_CLE_API');
   const racine = Deno.env.get('CHARIOW_API_URL') ?? 'https://api.chariow.com/v1';
   const retour = Deno.env.get('URL_RETOUR_COLLECTEUR') ?? 'https://app.kolek.cash';
 
-  if (!cleService || !cleApi) {
-    console.error('Configuration incomplète : CHARIOW_CLE_API est-elle posée ?');
+  if (!cleService) {
+    console.error('Configuration de plateforme incomplète : SUPABASE_SERVICE_ROLE_KEY est-elle posée ?');
     return reponse({ erreur: 'CONFIGURATION' }, 500, requete);
   }
 
@@ -174,6 +182,14 @@ Deno.serve(async (requete) => {
   });
   if (!telephone) return reponse({ erreur: 'TELEPHONE_INVALIDE' }, 400, requete);
 
+  // Le serveur compare à la sienne plutôt que de croire le client. Sans ce
+  // contrôle, on enregistrerait une acceptation pour un texte qu'on ne peut pas
+  // produire — exactement la situation qu'on cherche à quitter.
+  const version = typeof saisie.version === 'string' ? saisie.version.trim() : '';
+  if (version !== VERSION_CONDITIONS) {
+    return reponse({ erreur: 'VERSION_CONDITIONS_PERIMEE' }, 400, requete);
+  }
+
   // La remise interne devient un `discount_code` chez Chariow : c'est le seul
   // moyen que l'API offre de réduire un prix (`Docs/Chariow.md` §3.1). Le code
   // n'est envoyé que s'il est encore valide — `remise_fin` est une date, et un
@@ -200,6 +216,44 @@ Deno.serve(async (requete) => {
   const clientService = createClient(url, cleService, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  // L'acceptation, avec le collecteur connu d'emblée et sans demande : cette
+  // voie n'en a pas. C'est le rattrapage des comptes déjà en place — chacun
+  // accepte à son prochain renouvellement, au moment où il y a de l'argent en
+  // jeu, et personne n'est bloqué en tournée devant un mur de texte.
+  //
+  // Écrite ici, avant la vente, pas après : la personne a coché et appuyé sur
+  // payer, c'est là que le contrat se forme — comme le fait déjà
+  // `demander-ouverture` pour la voie publique, qui écrit l'acceptation avec la
+  // demande, avant que le visiteur ne parte payer. L'acceptation est un fait,
+  // pas une conséquence du paiement : si la vente échoue juste en dessous, la
+  // personne a quand même accepté cette version-là, à cette heure-là, et
+  // n'avoir de preuve que des paiements réussis laisserait sans trace
+  // exactement les cas où un litige naît.
+  //
+  // Un échec d'écriture ne fait pas échouer le paiement : à ce stade, aucune
+  // vente n'a encore été créée chez Chariow, donc rien à défaire. L'échec se
+  // voit dans les traces.
+  const trace = await enregistrerAcceptation(clientService, {
+    collecteurId,
+    version,
+  });
+  if (!trace.ok) {
+    console.error('[Abonnement] acceptation non enregistrée pour', collecteurId, ':', trace.message);
+  }
+
+  // --- La configuration du fournisseur, à son premier usage ---
+  //
+  // Descendue depuis l'entrée de la fonction : c'est ici que `CHARIOW_CLE_API`
+  // sert pour la première fois, à la réconciliation juste en dessous puis à la
+  // vente. La garder plus haut aurait lié à une clé de boutique un refus qui
+  // n'a rien à voir avec Chariow — voir le commentaire au-dessus de
+  // `cleService`.
+  const cleApi = Deno.env.get('CHARIOW_CLE_API');
+  if (!cleApi) {
+    console.error('Configuration incomplète : CHARIOW_CLE_API est-elle posée ?');
+    return reponse({ erreur: 'CONFIGURATION' }, 500, requete);
+  }
 
   // Supersession : les tentatives précédentes sont d'abord réconciliées, puis
   // abandonnées. Réconcilier **avant** de clore est la seule façon de ne pas

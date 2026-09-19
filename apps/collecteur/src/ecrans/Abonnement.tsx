@@ -10,6 +10,7 @@ import {
 import { useState } from 'react';
 
 import { demarrerPaiement } from '../abonnement';
+import { URL_CONDITIONS, URL_CONFIDENTIALITE, VERSION_CONDITIONS } from '../version-conditions';
 import { CorpsEcran, EnTeteEcran } from './EnTeteEcran';
 
 /**
@@ -68,6 +69,8 @@ export function Abonnement({
   );
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
+  // Jamais pré-cochée : un accord donné par défaut n'en est pas un.
+  const [accepte, setAccepte] = useState(false);
 
   async function payer() {
     setErreur(null);
@@ -78,6 +81,7 @@ export function Abonnement({
       telephone: telephone.e164,
       paysTelephone: telephone.pays,
       telephoneLocal: telephone.local,
+      version: VERSION_CONDITIONS,
     });
 
     if (!resultat.ok) {
@@ -92,7 +96,7 @@ export function Abonnement({
     window.location.assign(resultat.checkoutUrl);
   }
 
-  const pretAPayer = enLigne && telephone.valide && !enCours;
+  const pretAPayer = enLigne && telephone.valide && accepte && !enCours;
 
   return (
     <div className="flex-1 flex flex-col">
@@ -149,6 +153,38 @@ export function Abonnement({
               </Carte>
             )}
 
+            <Carte className="p-4">
+              <label className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={accepte}
+                  onChange={(evenement) => setAccepte(evenement.target.checked)}
+                  className="mt-1 size-5 shrink-0 rounded"
+                />
+                <span className="font-body text-sm text-ink">
+                  J’ai lu et j’accepte les{' '}
+                  <a
+                    href={URL_CONDITIONS}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    conditions générales
+                  </a>{' '}
+                  et la{' '}
+                  <a
+                    href={URL_CONFIDENTIALITE}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    politique de confidentialité
+                  </a>
+                  .
+                </span>
+              </label>
+            </Carte>
+
             <Bouton
               pleineLargeur
               disabled={!pretAPayer}
@@ -157,7 +193,9 @@ export function Abonnement({
                   ? 'Le paiement a besoin du réseau.'
                   : !telephone.valide
                     ? 'Saisis un numéro complet.'
-                    : undefined
+                    : !accepte
+                      ? 'Accepte les conditions générales pour continuer.'
+                      : undefined
               }
               onClick={() => void payer()}
             >

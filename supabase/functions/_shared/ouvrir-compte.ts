@@ -124,6 +124,30 @@ export function ouvrirCompteDepuisDemande(clientService: SupabaseClient): Ouvrir
       }
     }
 
+    // L'acceptation a été écrite au formulaire, avec la demande et sans compte —
+    // il n'existait pas encore. C'est ici qu'elle rejoint la personne : c'est le
+    // moment où le contrat se forme, « payer vaut accord ».
+    //
+    // Un échec ne fait pas échouer l'ouverture, pour la même raison que la zone :
+    // le compte existe, le paiement est encaissé, et refuser maintenant
+    // laisserait un client payant sans accès. Mais il se voit dans les traces —
+    // une acceptation qui ne désigne pas de compte reste rattachée à sa demande,
+    // avec le nom et le numéro, donc la preuve n'est pas perdue, seulement moins
+    // directe.
+    const { error: erreurAcceptation } = await clientService
+      .from('acceptations_conditions')
+      .update({ collecteur_id: compte })
+      .eq('demande_id', demandeId)
+      .is('collecteur_id', null);
+    if (erreurAcceptation) {
+      console.error(
+        '[Abonnement] acceptation non reliée au compte',
+        compte,
+        ':',
+        erreurAcceptation.message,
+      );
+    }
+
     return compte;
   };
 }

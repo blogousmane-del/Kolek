@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Inscription } from './Inscription';
 import { envoyerDemande } from './demande';
+import { VERSION_CONDITIONS } from './legal/version-conditions';
 
 // `globals` n'est pas activé : sans cet appel, chaque rendu s'ajoute au
 // précédent et les requêtes trouvent deux champs du même nom.
@@ -240,6 +241,27 @@ describe('ce que le formulaire envoie', () => {
 
     await waitFor(() => expect(envoi).toHaveBeenCalled());
     expect(envoi.mock.calls[0][0].motDePasse).toBe('');
+  });
+
+  it('envoie la version des conditions acceptée', async () => {
+    const envoi = vi.fn().mockResolvedValue({ ok: true });
+    vi.mocked(envoyerDemande).mockImplementation(envoi);
+
+    render(<Inscription />);
+    remplirLeFormulaire();
+    // `cocherLesConditions` et `soumettre` n'existent pas dans ce fichier : leur
+    // travail se fait ici en ligne, comme les épreuves voisines le font déjà.
+    fireEvent.click(screen.getByRole('checkbox', { name: /conditions/i }));
+    fireEvent.submit(screen.getByRole('button', { name: /envoyer ma demande/i }));
+    await waitFor(() => expect(envoi).toHaveBeenCalled());
+
+    // La case garde la soumission depuis la tâche 8 du chantier précédent, mais
+    // rien de cet accord n'atteignait le serveur : ni indicateur, ni date, ni
+    // version. Des conditions opposables en principe, improuvables contre une
+    // personne précise.
+    expect(envoi).toHaveBeenCalledWith(
+      expect.objectContaining({ version: VERSION_CONDITIONS }),
+    );
   });
 });
 

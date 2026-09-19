@@ -6,6 +6,7 @@ import {
   validerDemande,
 } from '../functions/_shared/valider-demande.ts';
 import { LONGUEUR_MOT_DE_PASSE } from '../functions/_shared/valider-collecteur.ts';
+import { VERSION_CONDITIONS } from '../functions/_shared/version-conditions.ts';
 
 /**
  * La validation de la demande d'ouverture.
@@ -30,6 +31,9 @@ const VALIDE = {
   // remette d'identifiants. `pro` est payant, donc cette clé n'est pas un
   // ornement du gabarit — sans elle, la demande est refusée.
   motDePasse: 'kolek-2026-mariam',
+  // Exigée depuis le contrôle de version des conditions générales : sans elle,
+  // toute demande — même par ailleurs complète — est refusée.
+  version: VERSION_CONDITIONS,
 };
 
 describe('la normalisation du téléphone', () => {
@@ -67,7 +71,7 @@ describe('ce qui passe', () => {
     expect(r.demande.palier).toBe('pro');
   });
 
-  it('accepte le strict nécessaire : un nom, un numéro, une adresse', () => {
+  it('accepte le strict nécessaire : un nom, un numéro, une adresse, une version', () => {
     // Le strict nécessaire a changé le 2026-08-27. Il valait « un nom et un
     // numéro » tant que la seule suite d'une demande était un appel ; l'accord
     // ouvre maintenant le compte et envoie une invitation, ce qu'aucun numéro
@@ -76,6 +80,7 @@ describe('ce qui passe', () => {
       nom: 'Adama',
       telephone: '0701020304',
       email: 'adama@example.ci',
+      version: VERSION_CONDITIONS,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -91,6 +96,7 @@ describe('ce qui passe', () => {
       nom: '  Fatou  ',
       telephone: ' 0701020304 ',
       email: ' fatou@example.ci ',
+      version: VERSION_CONDITIONS,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -274,5 +280,28 @@ describe('le mot de passe d’une demande payante', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.motDePasse).toBe(avecEspaces);
+  });
+});
+
+describe('la version des conditions générales', () => {
+  it('refuse une demande sans version des conditions', () => {
+    const verdict = validerDemande({ ...VALIDE, version: undefined });
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.erreur).toBe('VERSION_CONDITIONS_PERIMEE');
+  });
+
+  it('refuse une version que le serveur ne connaît pas', () => {
+    // Un onglet resté ouvert depuis une version précédente. Sans ce contrôle,
+    // on enregistrerait une acceptation pour un texte qu'on ne peut pas
+    // produire — exactement la situation qu'on cherche à quitter.
+    const verdict = validerDemande({ ...VALIDE, version: 'deadbeefdeadbeef' });
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.erreur).toBe('VERSION_CONDITIONS_PERIMEE');
+  });
+
+  it('accepte la version courante et la rend dans le verdict', () => {
+    const verdict = validerDemande({ ...VALIDE, version: VERSION_CONDITIONS });
+    expect(verdict.ok).toBe(true);
+    if (verdict.ok) expect(verdict.version).toBe(VERSION_CONDITIONS);
   });
 });

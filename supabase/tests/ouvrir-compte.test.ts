@@ -20,6 +20,10 @@ import { ouvrirCompteDepuisDemande } from '../functions/_shared/ouvrir-compte';
  * 3. **Les refus de la reprise** — elle retrouve un compte par le numéro, et
  *    c'est exactement là qu'une erreur créditerait un tiers. Deux conditions,
  *    et les deux sont mesurées séparément.
+ * 4. **L'acceptation, reliée au compte qui naît** — c'est le seul chemin où
+ *    le contrat se forme sans qu'un humain intervienne ; une ligne qui reste
+ *    orpheline n'est pas un incident silencieux, elle doit se voir dans le
+ *    journal.
  *
  * Tout est bouchonné : ni réseau, ni base. Ce qui est en jeu ici est une suite
  * de décisions, et une décision se mesure sans infrastructure.
@@ -31,13 +35,29 @@ interface Reglages {
   parTelephone?: { data: unknown; error: { message: string } | null };
   parId?: { data: { user: { email: string } | null } };
   erreurZone?: { message: string };
+  erreurAcceptation?: { message: string };
 }
 
 interface Journal {
   creations: Record<string, unknown>[];
   zones: Record<string, unknown>[];
+  acceptations: { filtres: Record<string, unknown>; correctif: Record<string, unknown> }[];
   telephonesCherches: string[];
   comptesLus: string[];
+}
+
+/**
+ * PostgREST rend, pour `update(...)`, un constructeur chaînable : chaque
+ * filtre (`eq`, `is`, …) le rend lui-même, et c'est l'attente qui déclenche la
+ * requête — jamais l'appel d'un filtre. Un bouchon qui résout dès le premier
+ * `eq()` n'accepte qu'une seule forme de chaîne ; celui-ci accumule ses
+ * filtres par nom de colonne réel et ne se rend qu'à l'attente, exactement
+ * comme PostgREST.
+ */
+interface ConstructeurMiseAJour {
+  eq(colonne: string, valeur: unknown): ConstructeurMiseAJour;
+  is(colonne: string, valeur: unknown): ConstructeurMiseAJour;
+  then(resolve: (valeur: { error: { message: string } | null }) => void): void;
 }
 
 const DEMANDE = {
@@ -61,7 +81,13 @@ const PAIEMENT = {
 };
 
 function clientFactice(reglages: Reglages = {}): { client: never; journal: Journal } {
-  const journal: Journal = { creations: [], zones: [], telephonesCherches: [], comptesLus: [] };
+  const journal: Journal = {
+    creations: [],
+    zones: [],
+    acceptations: [],
+    telephonesCherches: [],
+    comptesLus: [],
+  };
 
   const client = {
     from(table: string) {
@@ -77,12 +103,38 @@ function clientFactice(reglages: Reglages = {}): { client: never; journal: Journ
             },
           }),
         }),
-        update: (correctif: Record<string, unknown>) => ({
-          eq: async (_colonne: string, id: string) => {
-            journal.zones.push({ id, ...correctif });
-            return { error: reglages.erreurZone ?? null };
-          },
-        }),
+        update: (correctif: Record<string, unknown>) => {
+          const filtres: Record<string, unknown> = {};
+          const constructeur: ConstructeurMiseAJour = {
+            eq(colonne, valeur) {
+              filtres[colonne] = valeur;
+              return constructeur;
+            },
+            is(colonne, valeur) {
+              filtres[colonne] = valeur;
+              return constructeur;
+            },
+            then(resolve) {
+              // Distingue les tables : une mise à jour de `collecteurs` va
+              // dans `journal.zones` (forme historique, gardée telle quelle —
+              // les épreuves de « la zone » s'y appuient) ; une mise à jour
+              // de `acceptations_conditions` va dans son propre journal, avec
+              // filtres et correctif séparés, pour ne pas polluer l'un et
+              // pouvoir éprouver l'autre sans base.
+              if (table === 'acceptations_conditions') {
+                journal.acceptations.push({
+                  filtres: { ...filtres },
+                  correctif: { ...correctif },
+                });
+                resolve({ error: reglages.erreurAcceptation ?? null });
+                return;
+              }
+              journal.zones.push({ ...filtres, ...correctif });
+              resolve({ error: reglages.erreurZone ?? null });
+            },
+          };
+          return constructeur;
+        },
       };
     },
     auth: {
@@ -163,6 +215,43 @@ describe('la zone', () => {
     // pour une colonne d'agrément, et le paiement resterait en attente d'un
     // passage qui échouerait pareil.
     const { client } = clientFactice({ erreurZone: { message: 'permission denied' } });
+
+    await expect(ouvrirCompteDepuisDemande(client)(PAIEMENT as never)).resolves.toBe('compte-neuf');
+  });
+});
+
+describe('l’acceptation des conditions', () => {
+  it('relie l’acceptation au compte qui vient de naître', async () => {
+    // C'est le moment où le contrat se forme : l'acceptation, écrite au
+    // formulaire sans compte parce qu'il n'existait pas encore, doit
+    // désigner celui qui vient d'être créé.
+    const { client, journal } = clientFactice();
+
+    const compte = await ouvrirCompteDepuisDemande(client)(PAIEMENT as never);
+
+    expect(journal.acceptations).toEqual([
+      {
+        filtres: { demande_id: 'd1', collecteur_id: null },
+        correctif: { collecteur_id: compte },
+      },
+    ]);
+  });
+
+  it('pose le filtre is sur collecteur_id nul, pour ne pas réécrire une ligne déjà reliée', async () => {
+    // C'est lui qui empêche qu'un rejeu du webhook (Pulse dupliqué, retry
+    // réseau) réécrive une ligne déjà rattachée à un compte.
+    const { client, journal } = clientFactice();
+
+    await ouvrirCompteDepuisDemande(client)(PAIEMENT as never);
+
+    const [entree] = journal.acceptations;
+    expect(entree.filtres.collecteur_id).toBeNull();
+  });
+
+  it('n’empêche pas l’ouverture quand l’acceptation échoue à s’écrire', async () => {
+    // Même raisonnement que la zone : le compte existe, le paiement est
+    // encaissé, et refuser maintenant laisserait un client payant sans accès.
+    const { client } = clientFactice({ erreurAcceptation: { message: 'permission denied' } });
 
     await expect(ouvrirCompteDepuisDemande(client)(PAIEMENT as never)).resolves.toBe('compte-neuf');
   });
