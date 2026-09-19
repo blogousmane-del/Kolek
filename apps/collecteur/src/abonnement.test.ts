@@ -7,6 +7,8 @@ vi.mock('./supabase', () => ({
 const { supabase } = await import('./supabase');
 const { demarrerPaiement, messagePour, verifierPaiements } = await import('./abonnement');
 
+const { VERSION_CONDITIONS } = await import('./version-conditions');
+
 const invoke = supabase.functions.invoke as ReturnType<typeof vi.fn>;
 
 /**
@@ -21,6 +23,10 @@ const SAISIE = {
   telephone: '+225700000000',
   paysTelephone: 'CI',
   telephoneLocal: '0700000000',
+  // Lue depuis la constante engendrée, jamais écrite à la main : c'est la même
+  // valeur que celle du serveur, par construction, et `verifier:cgu` échoue si
+  // les deux divergent.
+  version: VERSION_CONDITIONS,
 };
 
 describe('demarrerPaiement', () => {
@@ -44,6 +50,11 @@ describe('demarrerPaiement', () => {
       'paysTelephone',
       'telephone',
       'telephoneLocal',
+      // L’empreinte du texte accepté, depuis le 2026-09-19. Elle entre dans
+      // cette liste exhaustive plutôt qu’à côté : c’est la liste qui garde la
+      // propriété centrale — rien d’autre ne part d’ici, et surtout aucun
+      // montant.
+      'version',
     ]);
   });
 
