@@ -56,7 +56,15 @@ describe('mentions légales', () => {
     // Fourni par l’exploitant le 2026-09-18, en-tête « Déclaration d’activité »
     // — le régime de l’entreprenant, celui que la page décrit deux lignes plus
     // haut. Lu depuis `IDENTITE`, jamais recopié.
-    expect(container.textContent).toMatch(IDENTITE.declarationActivite);
+    //
+    // Le champ est typé `string | Trou`, donc `string | null` : on le borne avant
+    // de l’employer plutôt que de le forcer. Un `!` aurait fait compiler la même
+    // épreuve en la rendant muette le jour où le numéro repasse à `null` — elle
+    // aurait alors cherché la chaîne « null » dans la page, et l’y aurait peut-être
+    // trouvée. Le constat de nullité est la moitié qui compte.
+    const numero = IDENTITE.declarationActivite;
+    expect(numero, 'le numéro de déclaration d’activité doit être renseigné').not.toBeNull();
+    expect(container.textContent).toMatch(numero as string);
     expect(screen.queryByText(/À COMPLÉTER/)).toBeNull();
   });
 
