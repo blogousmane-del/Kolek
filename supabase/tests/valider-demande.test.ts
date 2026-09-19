@@ -71,7 +71,7 @@ describe('ce qui passe', () => {
     expect(r.demande.palier).toBe('pro');
   });
 
-  it('accepte le strict nécessaire : un nom, un numéro, une adresse', () => {
+  it('accepte le strict nécessaire : un nom, un numéro, une adresse, une version', () => {
     // Le strict nécessaire a changé le 2026-08-27. Il valait « un nom et un
     // numéro » tant que la seule suite d'une demande était un appel ; l'accord
     // ouvre maintenant le compte et envoie une invitation, ce qu'aucun numéro

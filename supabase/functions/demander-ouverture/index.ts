@@ -274,7 +274,12 @@ Deno.serve(async (requete) => {
     version: verdict.version,
   });
   if (!trace.ok) {
-    console.error('[Ouverture] acceptation non enregistrée pour', rangee.id, ':', trace.message);
+    console.error(
+      '[Ouverture] acceptation non enregistrée pour',
+      (rangee as { id: string }).id,
+      ':',
+      trace.message,
+    );
   }
 
   // Une demande d'essai s'arrête là. Rien de la ligne écrite : juste l'accusé.
