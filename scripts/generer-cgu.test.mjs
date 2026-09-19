@@ -10,7 +10,54 @@ import {
   empreinteDe,
   enTexte,
   instantaneValide,
+  retirerHorsContrat,
 } from './generer-cgu.mjs';
+
+describe('retirerHorsContrat', () => {
+  it('retire le sous-arbre marqué, et lui seul', () => {
+    // Le témoin positif est le voisin : une fonction qui rendrait la chaîne
+    // vide passerait la moitié gauche de cette épreuve sans rien faire de bon.
+    expect(retirerHorsContrat('<p>Contrat</p><a data-hors-contrat href="/">Retour</a>')).toBe(
+      '<p>Contrat</p>',
+    );
+  });
+
+  it('compte la profondeur quand la marque porte sur une balise qui se répète', () => {
+    // Trou de couverture prouvé par mutation : une expression paresseuse
+    // s'arrête à la **première** fermante et laisse « </section><p>Après</p> »
+    // amputé de son ouvrante — la moitié du contrat emportée sans un mot.
+    expect(
+      retirerHorsContrat(
+        '<section data-hors-contrat><section>Dedans</section></section><p>Après</p>',
+      ),
+    ).toBe('<p>Après</p>');
+  });
+
+  it('ne compte pas une auto-fermante de même nom comme une ouvrante', () => {
+    expect(retirerHorsContrat('<div data-hors-contrat><div/>X</div><p>Reste</p>')).toBe(
+      '<p>Reste</p>',
+    );
+  });
+
+  it('retire toutes les marques, pas seulement la première', () => {
+    expect(
+      retirerHorsContrat('<a data-hors-contrat>Un</a><p>Gardé</p><section data-hors-contrat>Deux</section>'),
+    ).toBe('<p>Gardé</p>');
+  });
+
+  it('laisse intact un document sans marque', () => {
+    const intact = '<section><p>Rien à retirer</p></section>';
+    expect(retirerHorsContrat(intact)).toBe(intact);
+  });
+
+  it('jette plutôt que d’emporter la fin du document quand la fermante manque', () => {
+    // Un retrait silencieux jusqu'à la fin du fichier produirait une pièce
+    // tronquée, empreinte comprise : il vaut mieux que le générateur s'arrête.
+    expect(() => retirerHorsContrat('<section data-hors-contrat><p>Sans fin</p>')).toThrow(
+      /sans fermante/,
+    );
+  });
+});
 
 describe('enTexte', () => {
   it('coupe aux fermantes de bloc et retire les balises', () => {
@@ -163,5 +210,17 @@ describe('composer', () => {
 
   it('dépouille chaque page avant de les joindre', () => {
     expect(composer('<p>Un<br>Bis</p>', '<div>Deux</div>')).toBe('Un\nBis\n\nDeux');
+  });
+
+  it('écarte le hors-contrat des deux pages, pas d’une seule', () => {
+    // `enTexte` efface les balises, donc la marque avec elles : un retrait
+    // appliqué après le dépouillement ne trouverait plus rien et laisserait le
+    // mobilier de navigation dans la pièce d'audience.
+    expect(
+      composer(
+        '<a data-hors-contrat href="/">Retour</a><p>Contrat</p>',
+        '<p>Politique</p><section data-hors-contrat>Pour aller plus loin</section>',
+      ),
+    ).toBe('Contrat\n\nPolitique');
   });
 });

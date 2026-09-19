@@ -342,7 +342,11 @@ export function Confidentialite() {
         </p>
       </section>
 
-      <section>
+      {/* `data-hors-contrat` : une liste de liens vers les pages voisines, pas
+          un engagement. Elle fermait la pièce d'audience sur « Conditions
+          générales · Mentions légales » — dont un document que la pièce ne
+          contient pas. Voir `PageLegale.tsx`. */}
+      <section data-hors-contrat>
         <TitreSection>Pour aller plus loin</TitreSection>
         <p className="mt-2">
           <a href={CONDITIONS} className="text-primary underline underline-offset-2">

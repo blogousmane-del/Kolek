@@ -45,6 +45,61 @@ const BALISES_DE_BLOC =
   /<\/?(?:p|li|h[1-6]|div|section|table|tr|td|th|ul|ol|main|header|footer)(?:\s[^>]*)?>/gi;
 
 /**
+ * Les sous-arbres marqués `data-hors-contrat`, retirés.
+ *
+ * Deux blocs des pages légales sont de la navigation et non du contrat : le
+ * lien « ← Retour à l'accueil » de `PageLegale.tsx`, et la section « Pour
+ * aller plus loin » qui ferme `Confidentialite.tsx` et `MentionsLegales.tsx`.
+ * Sans ce retrait, ils entraient dans la pièce qu'on produirait à l'audience —
+ * qui s'ouvrait sur une affordance de navigation et se fermait sur une liste
+ * de liens dont un nommait un document qu'elle ne contient pas.
+ *
+ * Le vrai coût était ailleurs : **l'empreinte enregistrée avec chaque
+ * acceptation dépendait de ces libellés.** Renommer « ← Retour à l'accueil »
+ * changeait `VERSION_CONDITIONS` et forçait une réacceptation par tout le
+ * monde, pour un changement sans aucun contenu juridique.
+ *
+ * Le comptage de profondeur n'est pas un ornement : une marque posée sur un
+ * `<section>` qui en contiendrait un autre se refermerait sur la mauvaise
+ * balise, et le retrait emporterait la moitié du contrat sans rien dire.
+ */
+export function retirerHorsContrat(html) {
+  const marque = /<([a-z][a-z0-9]*)\b[^>]*\bdata-hors-contrat\b[^>]*>/i;
+
+  let texte = html;
+  for (;;) {
+    const debut = marque.exec(texte);
+    if (!debut) return texte;
+
+    const balise = debut[1].toLowerCase();
+    // Une ouvrante auto-fermante n'ouvre rien : elle ne compte pas.
+    const bornes = new RegExp(`<${balise}\\b[^>]*?(/?)>|</${balise}\\s*>`, 'gi');
+    bornes.lastIndex = debut.index;
+
+    let profondeur = 0;
+    let fin = -1;
+    for (let borne = bornes.exec(texte); borne; borne = bornes.exec(texte)) {
+      if (borne[0].startsWith('</')) {
+        profondeur -= 1;
+        if (profondeur === 0) {
+          fin = borne.index + borne[0].length;
+          break;
+        }
+      } else if (borne[1] !== '/') {
+        profondeur += 1;
+      }
+    }
+
+    if (fin === -1) {
+      throw new Error(
+        `data-hors-contrat sur <${balise}> sans fermante : le retrait emporterait la fin du document.`,
+      );
+    }
+    texte = texte.slice(0, debut.index) + texte.slice(fin);
+  }
+}
+
+/**
  * Le HTML rendu, dépouillé en texte.
  *
  * Cette fonction **est** l'empreinte : deux dépouillements différents
@@ -124,13 +179,20 @@ export function contenuConstante(empreinte, avecUrls) {
   return texte;
 }
 
-/** Dépouille et joint les deux pages, `Conditions` d'abord. Fonction pure,
-    sans Vite : le rendu de `Confidentialite.tsx` était un trou de
-    couverture que les huit épreuves d'origine laissaient passer sans
+/** Écarte le hors-contrat, dépouille, et joint les deux pages, `Conditions`
+    d'abord. Fonction pure, sans Vite : le rendu de `Confidentialite.tsx` était
+    un trou de couverture que les huit épreuves d'origine laissaient passer sans
     rougir. Cette fonction s'éprouve seule, à la vitesse d'une épreuve
-    normale ; `texteRendu` l'appelle avec le HTML que Vite a produit. */
+    normale ; `texteRendu` l'appelle avec le HTML que Vite a produit.
+
+    Le retrait vient **avant** le dépouillement : `enTexte` efface les balises,
+    donc la marque avec elles. */
 export function composer(htmlConditions, htmlConfidentialite) {
-  return enTexte(htmlConditions) + '\n\n' + enTexte(htmlConfidentialite);
+  return (
+    enTexte(retirerHorsContrat(htmlConditions)) +
+    '\n\n' +
+    enTexte(retirerHorsContrat(htmlConfidentialite))
+  );
 }
 
 /** Rend les deux pages. Le serveur Vite naît et meurt ici. */
@@ -165,6 +227,16 @@ export async function texteRendu() {
     sur tout dépôt fraîchement cloné. Même idiome que `generer-paliers-edge.mjs`. */
 function normaliser(texte) {
   return texte.replace(/\r\n/g, '\n');
+}
+
+/** Les trois constantes sont écrites en CRLF, comme tout le reste du dépôt.
+    Les écrire en LF fonctionnait — `estAJour` normalise les deux côtés — mais
+    faisait basculer trois fichiers suivis à chaque `generer:cgu`, avec un
+    « LF will be replaced by CRLF » de git à chaque fois. L'instantané de
+    `Docs/legal/`, lui, reste en LF : `.gitattributes` l'y épingle, parce que
+    son empreinte est dans son propre nom. */
+function enCrlf(texte) {
+  return normaliser(texte).replace(/\n/g, '\r\n');
 }
 
 /** Le contrôle de contenu de l'instantané, isolé pour être éprouvé sur un
@@ -239,7 +311,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     [CIBLE_EDGE, false],
   ]) {
     mkdirSync(dirname(chemin), { recursive: true });
-    writeFileSync(chemin, contenuConstante(empreinte, avecUrls), 'utf8');
+    writeFileSync(chemin, enCrlf(contenuConstante(empreinte, avecUrls)), 'utf8');
   }
 
   console.log(

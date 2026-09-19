@@ -1,4 +1,3 @@
-← Retour à l’accueil
 Conditions générales
 Dernière mise à jour : 2026-09-18
 1. Objet et définitions
@@ -48,7 +47,7 @@ L’exploitant enregistre le nom, le numéro de téléphone, le marché et l’a
 informer chaque client, avant de l’inscrire, de l’identité de l’exploitant, des finalités du traitement, des catégories de données enregistrées, des destinataires, de la durée de conservation, de son droit d’accès et de rectification, du transfert de ses données hors de la CEDEAO, et de la possibilité de refuser de figurer au fichier ;
 ne pas inscrire un client qui refuse d’y figurer ;
 n’inscrire que ce qui sert la collecte ;
-répondre de l’usage qu’il fait de l’envoi d’avis par SMS à ses clients.
+répondre de l’usage qu’il fait de l’envoi d’avis par SMS à ses clients ;
 répondre des collaborateurs qu’il rattache à son compte, et leur transmettre les obligations des présentes : le collaborateur ne règle aucun abonnement, n’accepte donc pas ces conditions pour son propre compte, et engage le titulaire par ce qu’il inscrit.
 9. Propriété intellectuelle
 Le nom Kolek, le logo, l’interface et le code appartiennent à l’exploitant, BERTHE OUSMANE. Le collecteur reçoit un simple droit d’usage du service pour la durée de son abonnement, sans aucune cession.
@@ -59,7 +58,6 @@ Les présentes conditions sont soumises au droit ivoirien. Tout litige relatif �
 12. Modification des conditions
 L’exploitant peut modifier les présentes conditions. La version en vigueur est celle publiée sur cette page ; la date de mise à jour, en tête de page, fait foi.
 
-← Retour à l’accueil
 Politique de confidentialité
 Dernière mise à jour : 2026-09-18
 1. Qui est responsable du traitement
@@ -145,5 +143,3 @@ Un journal d’audit trace les actions effectuées dans Kolek.
 L’autorité compétente est l’ARTCI. À la date de publication de cette page, aucune autorisation n’a encore été délivrée par l’ARTCI pour les traitements décrits ici.
 12. Modification de cette politique
 L’exploitant peut modifier la présente politique. La version en vigueur est celle publiée sur cette page ; la date de mise à jour, en tête de page, fait foi.
-Pour aller plus loin
-Conditions générales · Mentions légales
