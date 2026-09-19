@@ -1354,6 +1354,138 @@ colonne `reserve_le` ni l'état `en_cours`, qu'aucune ligne ne porte encore.
 
 ---
 
+## 9. La trace de l'acceptation des conditions (2026-09-19)
+
+Depuis cette livraison, chaque acceptation des conditions générales laisse une
+ligne dans `public.acceptations_conditions` : qui a accepté, quand, et
+**l'empreinte de la version du texte** qu'il avait sous les yeux. Le serveur
+refuse une version qu'il ne connaît pas, sur les trois chemins — formulaire
+payant, formulaire d'essai, renouvellement dans l'application.
+
+C'est ce qui rend les CGU opposables à une personne précise plutôt qu'en
+principe. Ce déploiement-là se rate en silence, et la §9.2 dit comment.
+
+### 9.1 L'ordre, et pourquoi il n'est pas celui de la §6.3
+
+La règle générale de la §6.3 tient — **le schéma d'abord, toujours** — mais
+elle décrit un monde où les fonctions se déploient à la main. Depuis
+`.github/workflows/verification.yml`, ce n'est plus le cas :
+
+- travail `fonctions` : `supabase functions deploy` part **tout seul** à chaque
+  poussée qui touche `supabase/functions`, et déploie **toutes** les fonctions ;
+- travail `rappel-migrations` : la migration, elle, ne part pas. Un `::notice`,
+  délibérément pas un échec, parce que `db push` demande le mot de passe de la
+  base.
+
+Donc la fusion déploie les fonctions et déclenche Netlify **dans le même
+geste**. Ce qu'on peut encore ordonner, c'est ce qui vient avant :
+
+```bash
+npx supabase db push                     # 1. AVANT la fusion, à la main
+npx supabase migration list --linked     # 2. constater qu'elle est passée
+                                         # 3. puis seulement, fusionner
+```
+
+`20260918100000_acceptations_conditions` crée la table, ses deux index, active
+RLS et révoque `public`, `anon` et `authenticated`. Elle ne touche à aucune
+table existante : aucun verrou à craindre, elle peut passer à n'importe quelle
+heure.
+
+### 9.2 Le défaut silencieux : la migration en retard
+
+**C'est le seul risque grave de cette livraison, et il ne se voit nulle part.**
+
+`enregistrerAcceptation` n'échoue jamais bruyamment : dans
+`demander-ouverture`, dans `abonnement-payer` et dans `_shared/ouvrir-compte`,
+un échec d'écriture est tracé par `console.error` et la requête continue. Ce
+choix est le bon — refuser une ouverture de compte déjà payée pour une ligne de
+journal serait pire que le mal.
+
+Mais si les fonctions partent avant la migration, la table n'existe pas, chaque
+insertion échoue, et :
+
+- les comptes s'ouvrent normalement ;
+- les paiements passent normalement ;
+- **aucune acceptation n'est enregistrée** ;
+- le CI est vert, les journaux Netlify sont verts, et rien dans le produit ne
+  l'indique.
+
+C'est-à-dire exactement l'état que cette livraison existe pour quitter, atteint
+sans qu'un seul signal le dise. D'où la §9.4 : le premier constat après
+déploiement n'est pas facultatif.
+
+### 9.3 Le défaut bruyant : les fronts en retard
+
+Un ancien paquet n'envoie pas de champ `version`. Le serveur le refuse par
+`VERSION_CONDITIONS_PERIMEE`, et l'ouverture de compte comme le renouvellement
+sont refusés le temps que Netlify publie.
+
+C'est désagréable mais sain, et cela se répare tout seul :
+
+- la vitrine se recharge au premier rafraîchissement ;
+- l'application du collecteur est en `registerType: 'autoUpdate'` avec
+  `skipWaiting` et `clientsClaim` (`apps/collecteur/vite.config.ts`) : le paquet
+  neuf prend la main à la prochaine ouverture en ligne ;
+- le message affiché est écrit pour ce cas précis — « Les conditions générales
+  ont changé. Ferme l'application, rouvre-la, relis-les et réessaie. »
+
+Coût maximal : une tentative de paiement refusée par collecteur. À ne pas
+confondre avec la §9.2, qui ne coûte rien sur le moment et tout au tribunal.
+
+### 9.4 Constater, et le faire vraiment
+
+Un compte ouvert ou un renouvellement réglé après le déploiement doit avoir
+laissé sa ligne :
+
+```sql
+select acceptee_le, version, collecteur_id, demande_id
+  from public.acceptations_conditions
+ order by acceptee_le desc
+ limit 5;
+```
+
+**Zéro ligne ne prouve rien tant que personne n'a accepté depuis la mise en
+ligne.** C'est le piège habituel : la sonde muette. Le seul constat qui vaut est
+positif — une ligne dont on connaît l'auteur, après un geste qu'on a fait
+soi-même.
+
+Et la version qu'elle porte doit être celle du dépôt :
+
+```bash
+npm run verifier:cgu
+```
+
+Si la colonne `version` d'une ligne fraîche ne correspond pas à
+`VERSION_CONDITIONS`, c'est qu'un front périmé est encore servi quelque part —
+voir la §9.3.
+
+### 9.5 Le texte des conditions, et ce qu'il coûte d'y toucher
+
+`Docs/legal/conditions-<date>-<empreinte>.txt` est la pièce qu'on produirait à
+l'audience. Son nom porte l'empreinte de son contenu, et c'est cette empreinte
+qui est enregistrée avec chaque acceptation.
+
+Conséquence à ne pas découvrir un jour de litige : **toute modification du texte
+rendu de `Conditions.tsx` ou de `Confidentialite.tsx` change la version, et
+oblige tout le monde à réaccepter.** Une virgule suffit.
+
+La marche à suivre après une modification :
+
+```bash
+npm run generer:cgu    # nouvelle empreinte, nouvel instantané, trois constantes
+npm run verifier:cgu   # doit être vert avant de commiter
+```
+
+Puis commiter l'instantané neuf **et** garder l'ancien : un litige portant sur
+une période antérieure au changement se juge sur le texte d'alors.
+
+Ce qui est marqué `data-hors-contrat` dans le JSX — le lien « ← Retour à
+l'accueil » de `PageLegale.tsx`, les sections « Pour aller plus loin » — est
+écarté du rendu empreint. C'est de la navigation, pas du contrat : le renommer
+ne doit pas forcer une réacceptation générale.
+
+---
+
 ## Ce que le déploiement ne fait pas
 
 Il ne rend pas le produit vendable. Un collecteur qui ouvre l'application y
@@ -1377,4 +1509,5 @@ une opération routinière plutôt qu'un événement redouté en fin de projet.
 ---
 
 *Kolek — procédure de déploiement · 2026-08-16, révisée le 2026-08-17
-(troisième site, dépôt GitHub) et le 2026-09-02 (§6, déployer une évolution).*
+(troisième site, dépôt GitHub), le 2026-09-02 (§6, déployer une évolution) et le
+2026-09-19 (§9, la trace de l’acceptation des conditions).*
