@@ -24,6 +24,34 @@ seule façon de le savoir est d'y appliquer les migrations et de refaire l'audit
 
 ---
 
+## Dans quel shell taper tout ceci
+
+**Tous les blocs de ce carnet sont du Git Bash.** Le dire une fois évite deux
+pièges que rien n'annonce, et que la ligne de commande n'explique pas.
+
+**Sous PowerShell, `npx` est refusé** — la politique d'exécution de Windows
+bloque `npx.ps1` :
+
+```
+npx : Impossible de charger le fichier C:\Program Files\nodejs\npx.ps1, car
+l'exécution de scripts est désactivée sur ce système.
+```
+
+`npx.cmd` passe outre, parce qu'il ne traverse pas PowerShell. Mais il traverse
+`cmd.exe`, **qui casse tout argument contenant une espace ou des guillemets** —
+le tableau des pièges de la §3, « Sites Netlify », en garde la trace. Donc :
+
+| Ce que tu lances | Où |
+|---|---|
+| Une commande sans guillemets — `login`, `link`, `db push`, `functions deploy`, `migration list` | PowerShell avec `npx.cmd`, ou Git Bash tel quel |
+| Une commande à guillemets — `secrets set`, tout ce qui porte du JSON ou une liste d'origines | **Git Bash**, avec `npx` tel quel |
+
+En clair : recopie les blocs dans Git Bash et ils marchent. Si tu préfères
+PowerShell, ajoute `.cmd` — et repasse sous Git Bash dès qu'il y a un
+guillemet.
+
+---
+
 ## Ce qui demande ton compte
 
 Deux commandes à lancer toi-même. Elles ouvrent ton navigateur et stockent tes
@@ -260,6 +288,26 @@ Trois sites distincts sur le même dépôt, conformément au dossier stratégiqu
 | `kolek-collecteur` | `apps/collecteur` | `apps/collecteur/netlify.toml` | Collecteurs, sur le terrain |
 | `kolek-admin` | `apps/admin` | `apps/admin/netlify.toml` | GTCS et gérants |
 | `kolek-site` | `apps/site` | `apps/site/netlify.toml` | Public — grille tarifaire |
+
+> **Trois projets de plus existent sur le compte, et ils échouent à chaque
+> construction.** Repérés le 2026-09-19 : `calm-begonia-7139bf`,
+> `helpful-kleicha-e77441`, `mellifluous-cuchufli-182dc7` — des noms
+> auto-générés, signe d'une connexion créée sans nom. Ce sont des **doublons**
+> des trois sites ci-dessus : même `packagePath`, même `netlify.toml`,
+> jusqu'à la redirection vers `admin.kolek.cash`.
+>
+> Ils échouent parce que `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` ne
+> sont posées que sur les trois vrais sites, et que la garde de `vite.config.ts`
+> refuse d'émettre un paquet sans elles. **C'est le garde-fou qui fonctionne** —
+> un doublon qui construirait « avec succès » un paquet sans configuration
+> serait le vrai problème.
+>
+> Conséquence : **trois rouges permanents sur toute PR visant `main`**, et donc
+> trois rouges que tout le monde apprend à ignorer. Un rouge qu'on apprend à
+> ignorer est un rouge qui ne servira plus le jour où il aura raison. À
+> supprimer ou à délier du dépôt dans Netlify — surtout pas à configurer :
+> dupliquer la configuration Supabase sur trois sites fantômes multiplie les
+> endroits où une clé peut fuiter, pour zéro bénéfice.
 
 En ligne depuis le 2026-08-18, équipe `blog-ousmane`, publiés à la main depuis
 les artefacts locaux :
@@ -1538,6 +1586,39 @@ Deux épreuves de `test:scripts` le tiennent : l'une refuse la navigation dans
 l'instantané en vigueur, l'autre exige les marques dans les sources. Sans
 elles, il suffisait de retirer une marque et de relancer `generer:cgu` pour
 remettre le mobilier dans la pièce, en vert.
+
+---
+
+### 9.6 Les deux fusions, et le squash qui casse la pile
+
+Ce chantier arrive en **deux PR empilées** : #11 porte les trois textes
+juridiques, #13 la trace de leur acceptation, et #13 est basée sur la branche de
+#11. L'ordre et la méthode comptent tous les deux.
+
+**Fusionner #11 par un commit de fusion, jamais par un squash.** Le dépôt
+autorise les trois modes, et c'est le piège : un squash pose sur `main` un
+commit unique qui n'est **pas un ancêtre** de `trace-acceptation`. GitHub
+retargete alors #13 sur `main`, et elle y réapparaît avec la totalité de ses
+commits plus ceux de #11 — en conflit avec des changements déjà présents sous
+une autre forme. Un commit de fusion garde la filiation, et #13 se réduit toute
+seule à ce qui lui appartient. `main` est d'ailleurs déjà tenue ainsi
+(`Merge pull request #7`).
+
+Supprimer la branche de #11 après la fusion : c'est ce qui déclenche le
+retarget automatique de #13 vers `main`.
+
+**Ce que chaque fusion déclenche**, et ce n'est pas symétrique :
+
+| Fusion | Edge Functions touchées | Ce qui part |
+|---|---|---|
+| #11 — textes juridiques | **0** | Netlify publie les trois sites. Le travail `fonctions` conclut « aucune touchée » et saute |
+| #13 — trace de l'acceptation | **7** | Netlify republie, **et le déploiement des fonctions part** — le contrôle de version entre en production |
+
+C'est donc à la fusion de #13, et seulement là, que s'ouvre la fenêtre décrite
+en §9.3 : un ancien paquet encore servi n'envoie pas de `version` et se fait
+refuser. Bruyant, borné, et réparé tout seul au premier rechargement.
+
+Et c'est **avant** cette fusion que `db push` doit être passé — §9.1.
 
 ---
 
