@@ -180,6 +180,23 @@ describe('les filtres', () => {
     expect(screen.getByText('Moussa Bamba')).toBeTruthy();
   });
 
+  it('trouve un nom accentué tapé sans accent', async () => {
+    journal.mockResolvedValue([mise('m1', 'Awa Traoré', 1), mise('m2', 'Moussa Bamba', 1)]);
+
+    rendre();
+    await screen.findByText('Awa Traoré');
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Chercher un client' }), {
+      target: { value: 'traore' },
+    });
+
+    // Ce champ comparait en minuscules seulement : « Traoré » y était
+    // introuvable dès qu’on tapait sans accent, ce que personne ne fait sur
+    // un clavier de téléphone. Le repli vit maintenant dans `../recherche`.
+    expect(screen.getByText('Awa Traoré')).toBeTruthy();
+    expect(screen.queryByText('Moussa Bamba')).toBeNull();
+  });
+
   it('part avec la recherche déjà remplie quand on vient d’une fiche', async () => {
     journal.mockResolvedValue([
       mise('m1', 'Awa Traoré', 1),
