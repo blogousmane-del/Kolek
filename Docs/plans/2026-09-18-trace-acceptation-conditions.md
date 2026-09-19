@@ -3,7 +3,7 @@
 > **Pour les ouvriers agentiques :** SOUS-COMPÉTENCE REQUISE : utiliser
 > superpowers:subagent-driven-development (recommandé) ou
 > superpowers:executing-plans pour exécuter ce plan tâche par tâche. Les étapes
-> emploient la syntaxe à cases (`- [ ]`) pour le suivi.
+> emploient la syntaxe à cases (`- [x]`) pour le suivi.
 
 **But :** enregistrer qui a accepté les conditions générales, quand, et quelle
 version exacte du texte, pour qu’elles soient opposables à une personne précise.
@@ -101,6 +101,12 @@ l’exploitant qui déploie, et cette section est pour lui.
 | `apps/collecteur/src/abonnement.ts:72-77` | `version` dans `SaisiePaiement` |
 | `apps/collecteur/src/ecrans/Abonnement.tsx` | la case, les deux liens, et la garde avant paiement |
 
+> **Chantier terminé le 2026-09-19.** Les 56 cases sont cochées parce que
+> les huit tâches ont été livrées, relues et corrigées, puis vérifiées par le
+> CI (78 fichiers d'épreuves verts sur la PR #13). L'audit du chantier est
+> dans `Docs/audits/2026-09-19-audit-du-chantier-trace-acceptation.md` — il
+> dit ce qui a été trouvé, et ce qui reste ouvert avant la fusion.
+
 ---
 
 ### Tâche 1 : la phrase qui ferme le trou du collaborateur
@@ -117,7 +123,7 @@ La faire après la tâche 2 rendrait l’instantané périmé le jour de sa nais
 - Produit : rien de programmatique. La tâche 2 dépend du fait que le texte légal
   est figé à partir d’ici.
 
-- [ ] **Étape 1 : écrire l’épreuve qui échoue**
+- [x] **Étape 1 : écrire l’épreuve qui échoue**
 
 Ajoute dans `apps/site/src/vitrine/legal/Conditions.test.tsx`, à l’intérieur du
 `describe` existant :
@@ -135,14 +141,14 @@ Ajoute dans `apps/site/src/vitrine/legal/Conditions.test.tsx`, à l’intérieur
   });
 ```
 
-- [ ] **Étape 2 : la voir rouge**
+- [x] **Étape 2 : la voir rouge**
 
 Lance : `npm test -w @kolek/site -- --run Conditions`
 
 Attendu : ÉCHEC, deux `expect(...).toMatch` non satisfaits. Note le message
 exact.
 
-- [ ] **Étape 3 : poser la phrase**
+- [x] **Étape 3 : poser la phrase**
 
 Dans `apps/site/src/vitrine/legal/Conditions.tsx`, section 8, ajoute un
 quatrième élément à la liste, **après** `répondre de l’usage qu’il fait de
@@ -157,12 +163,12 @@ l’envoi d’avis par SMS à ses clients.` :
           </li>
 ```
 
-- [ ] **Étape 4 : la voir verte**
+- [x] **Étape 4 : la voir verte**
 
 Lance : `npm test -w @kolek/site -- --run Conditions`
 Attendu : PASSE.
 
-- [ ] **Étape 5 : les gardes de forme**
+- [x] **Étape 5 : les gardes de forme**
 
 Lance, et rapporte chaque sortie :
 
@@ -174,7 +180,7 @@ npm run verifier:mentions
 Attendu : les deux passent. Vérifie par Node que `Conditions.tsx` et
 `Conditions.test.tsx` sont en CRLF, `0` LF nu.
 
-- [ ] **Étape 6 : commettre**
+- [x] **Étape 6 : commettre**
 
 ```bash
 git add apps/site/src/vitrine/legal/Conditions.tsx apps/site/src/vitrine/legal/Conditions.test.tsx
@@ -229,7 +235,7 @@ D’où Vite en mode intergiciel, par `ssrLoadModule` : déjà résoluble à la 
 c’est la transformation qui produit le site livré, et elle résout `@kolek/core`
 sans alias à tenir.
 
-- [ ] **Étape 1 : écrire les épreuves qui échouent**
+- [x] **Étape 1 : écrire les épreuves qui échouent**
 
 Crée `scripts/generer-cgu.test.mjs` :
 
@@ -293,14 +299,14 @@ describe('contenuConstante', () => {
 });
 ```
 
-- [ ] **Étape 2 : les voir rouges**
+- [x] **Étape 2 : les voir rouges**
 
 Lance : `npm run test:scripts -- generer-cgu`
 
 Attendu : ÉCHEC à l’import, `Cannot find module` ou
 `Failed to load url ./generer-cgu.mjs`. Note le message exact.
 
-- [ ] **Étape 3 : écrire le générateur**
+- [x] **Étape 3 : écrire le générateur**
 
 Crée `scripts/generer-cgu.mjs` :
 
@@ -504,12 +510,12 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
 }
 ```
 
-- [ ] **Étape 4 : les voir vertes**
+- [x] **Étape 4 : les voir vertes**
 
 Lance : `npm run test:scripts -- generer-cgu`
 Attendu : PASSE, huit épreuves.
 
-- [ ] **Étape 5 : engendrer, et lire le témoin**
+- [x] **Étape 5 : engendrer, et lire le témoin**
 
 Lance : `node scripts/generer-cgu.mjs`
 
@@ -534,7 +540,7 @@ insécables U+00A0 : au moins 60
 Si l’un de ces cinq sort du cadre, la règle de dépouillement a été lue de
 travers — ce n’est pas le texte qui a changé.
 
-- [ ] **Étape 6 : câbler les scripts npm**
+- [x] **Étape 6 : câbler les scripts npm**
 
 Dans `package.json`, à côté de `generer:paliers` et `verifier:paliers` :
 
@@ -547,7 +553,7 @@ Et dans la chaîne `verifier`, insère `&& npm run verifier:cgu` **immédiatemen
 après** `npm run verifier:paliers`. Les trois autres générateurs y figurent ; en
 omettre un laisserait un générateur sur quatre hors du rang.
 
-- [ ] **Étape 7 : voir la garde rouge, puis verte**
+- [x] **Étape 7 : voir la garde rouge, puis verte**
 
 C’est l’épreuve qui compte le plus de ce plan. Fais-la dans cet ordre :
 
@@ -561,7 +567,7 @@ C’est l’épreuve qui compte le plus de ce plan. Fais-la dans cet ordre :
 
 Une garde qu’on n’a pas vue échouer ne garde rien.
 
-- [ ] **Étape 8 : l’étape de CI**
+- [x] **Étape 8 : l’étape de CI**
 
 Dans `.github/workflows/verification.yml`, après l’étape
 `App.tsx et netlify.toml dispatchent les mêmes routes`, ajoute :
@@ -582,7 +588,7 @@ Vérifie que le YAML reste analysable. **`node -e` est piégé ici** : écris un
 script de fichier qui lit `.github/workflows/verification.yml` et compte les
 étapes `- name:`.
 
-- [ ] **Étape 9 : commettre**
+- [x] **Étape 9 : commettre**
 
 ```bash
 git add scripts/generer-cgu.mjs scripts/generer-cgu.test.mjs package.json .github/workflows/verification.yml Docs/legal apps/site/src/vitrine/legal/version-conditions.ts apps/collecteur/src/version-conditions.ts supabase/functions/_shared/version-conditions.ts
@@ -613,7 +619,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 imports sont cohérents, et dis-le dans ton rapport : c’est le travail `Base` de
 la CI qui la rendra verte. Ne cherche pas à contourner.
 
-- [ ] **Étape 1 : écrire l’épreuve qui échoue**
+- [x] **Étape 1 : écrire l’épreuve qui échoue**
 
 Crée `supabase/tests/acceptations-conditions.test.ts` :
 
@@ -712,7 +718,7 @@ Vérifie dans `supabase/tests/harnais.ts` que `admin` et `anon` y sont bien
 exportés sous ces noms ; si l’un porte un autre nom, emploie le vrai — ne
 renomme rien dans le harnais.
 
-- [ ] **Étape 2 : constater qu’elle ne peut pas être verte**
+- [x] **Étape 2 : constater qu’elle ne peut pas être verte**
 
 Lance : `npx.cmd vitest run --config supabase/tests/vitest.config.ts supabase/tests/acceptations-conditions.test.ts`
 
@@ -720,7 +726,7 @@ Attendu : ÉCHEC. Le harnais exige la pile locale, que tu n’as pas le droit de
 démarrer par `db:reset`. **Note l’échec tel qu’il sort**, et dis dans ton rapport
 que la vérification réelle revient au travail `Base` de la CI.
 
-- [ ] **Étape 3 : écrire la migration**
+- [x] **Étape 3 : écrire la migration**
 
 Crée `supabase/migrations/20260918100000_acceptations_conditions.sql` :
 
@@ -788,14 +794,14 @@ revoke all on public.acceptations_conditions from authenticated;
 grant all on public.acceptations_conditions to service_role;
 ```
 
-- [ ] **Étape 4 : vérifier la forme de la migration**
+- [x] **Étape 4 : vérifier la forme de la migration**
 
 Lance : `npm run verifier:migrations`
 Attendu : passe. Rapporte la sortie.
 
 Vérifie par Node : CRLF, `0` LF nu, sur les deux fichiers créés.
 
-- [ ] **Étape 5 : commettre**
+- [x] **Étape 5 : commettre**
 
 ```bash
 git add supabase/migrations/20260918100000_acceptations_conditions.sql supabase/tests/acceptations-conditions.test.ts
@@ -827,7 +833,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
   dans `_shared/acceptation.ts`, que la tâche 7 réutilise.
   Nouveau code d’erreur serveur : `VERSION_CONDITIONS_PERIMEE`.
 
-- [ ] **Étape 1 : écrire l’épreuve qui échoue**
+- [x] **Étape 1 : écrire l’épreuve qui échoue**
 
 Ajoute à `supabase/tests/valider-demande.test.ts` :
 
@@ -865,7 +871,7 @@ d’écrire** : s’il construit ses saisies autrement, suis sa façon plutôt q
 d’introduire une aide qui doublerait un motif existant. S’il n’a rien de tel,
 écris-la, en reprenant exactement les valeurs qu’emploient les épreuves voisines.
 
-- [ ] **Étape 2 : la voir rouge**
+- [x] **Étape 2 : la voir rouge**
 
 Lance : `npx.cmd vitest run --config supabase/tests/vitest.config.ts supabase/tests/valider-demande.test.ts`
 
@@ -873,7 +879,7 @@ Attendu : ÉCHEC, les trois nouvelles épreuves. La première et la deuxième pa
 que `verdict.ok` vaut `true`, la troisième parce que `verdict.version` est
 `undefined`. Note les messages exacts.
 
-- [ ] **Étape 3 : la version entre dans le validateur**
+- [x] **Étape 3 : la version entre dans le validateur**
 
 Dans `supabase/functions/_shared/valider-demande.ts` :
 
@@ -916,7 +922,7 @@ Juste avant le `return { ok: true, ... }` final, ajoute :
 
 Et ajoute `version,` au littéral rendu par le `return { ok: true, ... }`.
 
-- [ ] **Étape 4 : écrire l’écriture de l’acceptation**
+- [x] **Étape 4 : écrire l’écriture de l’acceptation**
 
 Crée `supabase/functions/_shared/acceptation.ts` :
 
@@ -954,7 +960,7 @@ export async function enregistrerAcceptation(
 Vérifie le chemin d’import de `SupabaseClient` employé par les autres fichiers
 de `supabase/functions/_shared/` et **reprends le leur**, à la version près.
 
-- [ ] **Étape 5 : la fonction écrit l’acceptation**
+- [x] **Étape 5 : la fonction écrit l’acceptation**
 
 Dans `supabase/functions/demander-ouverture/index.ts`, ajoute l’import :
 
@@ -985,7 +991,7 @@ Puis, juste après le bloc `if (error) { ... }` qui suit l’insertion dans
   }
 ```
 
-- [ ] **Étape 6 : le message côté navigateur**
+- [x] **Étape 6 : le message côté navigateur**
 
 Dans `apps/site/src/vitrine/demande.ts`, ajoute à la table `MESSAGES` :
 
@@ -997,7 +1003,7 @@ Dans `apps/site/src/vitrine/demande.ts`, ajoute à la table `MESSAGES` :
 Sans cette ligne, le refus s’afficherait comme une panne générique, et personne
 ne saurait qu’il suffit de recharger.
 
-- [ ] **Étape 7 : les voir vertes**
+- [x] **Étape 7 : les voir vertes**
 
 Lance : `npx.cmd vitest run --config supabase/tests/vitest.config.ts supabase/tests/valider-demande.test.ts`
 Attendu : PASSE, les trois nouvelles comprises.
@@ -1006,7 +1012,7 @@ Lance : `npm run verifier:portillons`
 Attendu : passe — le fichier `_shared/acceptation.ts` n’est pas une fonction, il
 ne doit pas apparaître dans la table des portillons.
 
-- [ ] **Étape 8 : commettre**
+- [x] **Étape 8 : commettre**
 
 ```bash
 git add supabase/functions/_shared/acceptation.ts supabase/functions/_shared/valider-demande.ts supabase/functions/demander-ouverture/index.ts supabase/tests/valider-demande.test.ts apps/site/src/vitrine/demande.ts
@@ -1034,7 +1040,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 - Produit : rien de nouveau. Elle rend vraie la phrase du §3.1 de la spec,
   « reliée au compte à sa naissance ».
 
-- [ ] **Étape 1 : écrire l’épreuve qui échoue**
+- [x] **Étape 1 : écrire l’épreuve qui échoue**
 
 Ajoute à `supabase/tests/chariow-webhook.test.ts`, dans le `describe` qui couvre
 l’ouverture du compte :
@@ -1060,14 +1066,14 @@ compte créé. Emploie les siens plutôt que `demandeId` et `compteCree` si les
 siens diffèrent, et place l’épreuve dans le `describe` qui a déjà fait naître un
 compte — n’en fabrique pas un second.
 
-- [ ] **Étape 2 : la voir rouge**
+- [x] **Étape 2 : la voir rouge**
 
 Lance : `npx.cmd vitest run --config supabase/tests/vitest.config.ts supabase/tests/chariow-webhook.test.ts`
 
 Attendu : ÉCHEC — la pile locale est requise pour ce fichier. **Note-le**, et dis
 dans ton rapport que la vérification revient au travail `Base` de la CI.
 
-- [ ] **Étape 3 : poser `collecteur_id`**
+- [x] **Étape 3 : poser `collecteur_id`**
 
 Dans `supabase/functions/_shared/ouvrir-compte.ts`, juste après le bloc qui pose
 la zone (`if (demande.zone) { ... }`) et avant `return compte;` :
@@ -1101,14 +1107,14 @@ la zone (`if (demande.zone) { ... }`) et avant `return compte;` :
 Le `.is('collecteur_id', null)` n’est pas décoratif : le webhook peut rejouer,
 et une deuxième passe ne doit pas réécrire une ligne déjà reliée.
 
-- [ ] **Étape 4 : vérifier ce qui est vérifiable**
+- [x] **Étape 4 : vérifier ce qui est vérifiable**
 
 Lance : `npm run verifier:portillons` et `npm run verifier:lint`
 Attendu : les deux passent. Rapporte les sorties.
 
 Vérifie par Node : CRLF, `0` LF nu, sur les deux fichiers touchés.
 
-- [ ] **Étape 5 : commettre**
+- [x] **Étape 5 : commettre**
 
 ```bash
 git add supabase/functions/_shared/ouvrir-compte.ts supabase/tests/chariow-webhook.test.ts
@@ -1135,7 +1141,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
   `apps/site/src/vitrine/legal/version-conditions.ts` (tâche 2).
 - Produit : le champ `version: string` dans l’interface `Demande`.
 
-- [ ] **Étape 1 : écrire l’épreuve qui échoue**
+- [x] **Étape 1 : écrire l’épreuve qui échoue**
 
 Ajoute à `apps/site/src/vitrine/Inscription.test.tsx` :
 
@@ -1171,13 +1177,13 @@ chantier précédent y a introduit `remplirLeFormulaire()`. Si les deux autres
 n’existent pas, fais leur travail en ligne plutôt que d’inventer des aides
 qu’une seule épreuve emploierait.
 
-- [ ] **Étape 2 : la voir rouge**
+- [x] **Étape 2 : la voir rouge**
 
 Lance : `npm test -w @kolek/site -- --run Inscription`
 Attendu : ÉCHEC, `version` absent de l’objet passé à `envoyerDemande`. Note le
 message exact.
 
-- [ ] **Étape 3 : le champ dans le contrat**
+- [x] **Étape 3 : le champ dans le contrat**
 
 Dans `apps/site/src/vitrine/demande.ts`, ajoute à l’interface `Demande`, après
 `motDePasse: string;` :
@@ -1191,7 +1197,7 @@ Dans `apps/site/src/vitrine/demande.ts`, ajoute à l’interface `Demande`, apr�
   version: string;
 ```
 
-- [ ] **Étape 4 : le formulaire l’envoie**
+- [x] **Étape 4 : le formulaire l’envoie**
 
 Dans `apps/site/src/vitrine/Inscription.tsx`, ajoute l’import :
 
@@ -1209,12 +1215,12 @@ Puis, dans l’objet passé à `envoyerDemande`, après la ligne
       version: VERSION_CONDITIONS,
 ```
 
-- [ ] **Étape 5 : la voir verte**
+- [x] **Étape 5 : la voir verte**
 
 Lance : `npm test -w @kolek/site -- --run Inscription`
 Attendu : PASSE.
 
-- [ ] **Étape 6 : la chaîne complète du site**
+- [x] **Étape 6 : la chaîne complète du site**
 
 Lance, et rapporte chaque sortie :
 
@@ -1226,7 +1232,7 @@ npm run verifier:tirets
 
 Vérifie par Node : CRLF, `0` LF nu, sur les trois fichiers touchés.
 
-- [ ] **Étape 7 : commettre**
+- [x] **Étape 7 : commettre**
 
 ```bash
 git add apps/site/src/vitrine/demande.ts apps/site/src/vitrine/Inscription.tsx apps/site/src/vitrine/Inscription.test.tsx
@@ -1262,7 +1268,7 @@ rendre a sa phrase. » Ajouter le refus côté serveur **sans** sa phrase fera
 échouer ce test. C’est voulu, et c’est le bon ordre : vois-le rouge, puis pose
 la phrase.
 
-- [ ] **Étape 1 : écrire l’épreuve qui échoue**
+- [x] **Étape 1 : écrire l’épreuve qui échoue**
 
 Ajoute à `supabase/tests/abonnement-payer.test.ts` :
 
@@ -1297,7 +1303,7 @@ Ajoute à `supabase/tests/abonnement-payer.test.ts` :
 **Lis le fichier avant d’écrire** : `appeler` et `collecteurId` sont les noms
 supposés de ses aides. Emploie les siens.
 
-- [ ] **Étape 2 : la voir rouge**
+- [x] **Étape 2 : la voir rouge**
 
 Lance : `npx.cmd vitest run --config supabase/tests/vitest.config.ts supabase/tests/abonnement-payer.test.ts`
 
@@ -1309,7 +1315,7 @@ Cette épreuve-là, tu peux la voir : elle vérifie que la table de phrases est
 complète, et elle doit rester **verte** pour l’instant — le code serveur n’existe
 pas encore.
 
-- [ ] **Étape 3 : le refus côté serveur**
+- [x] **Étape 3 : le refus côté serveur**
 
 Dans `supabase/functions/abonnement-payer/index.ts`, ajoute les imports :
 
@@ -1331,7 +1337,7 @@ Puis, juste après le contrôle du téléphone
   }
 ```
 
-- [ ] **Étape 4 : la voir rouge de l’autre côté**
+- [x] **Étape 4 : la voir rouge de l’autre côté**
 
 Lance : `npm test -w @kolek/collecteur -- --run abonnement`
 
@@ -1339,7 +1345,7 @@ Attendu : ÉCHEC maintenant. L’épreuve de complétude lit les sources des deu
 Edge Functions et trouve un code sans phrase. **Note le message exact** — c’est
 la démonstration que ce filet fonctionne.
 
-- [ ] **Étape 5 : la phrase**
+- [x] **Étape 5 : la phrase**
 
 Dans `apps/collecteur/src/abonnement.ts`, ajoute à la table `MESSAGES`, près de
 `PALIER_INCONNU` :
@@ -1352,7 +1358,7 @@ Dans `apps/collecteur/src/abonnement.ts`, ajoute à la table `MESSAGES`, près d
 Le texte dit « ferme et rouvre » plutôt que « recharge la page » : l’application
 du collecteur est une PWA, et personne n’y voit de bouton de rechargement.
 
-- [ ] **Étape 6 : l’écriture de l’acceptation**
+- [x] **Étape 6 : l’écriture de l’acceptation**
 
 Toujours dans `supabase/functions/abonnement-payer/index.ts`, juste après le bloc
 `if (erreurPose) { ... }` qui suit l’insertion dans `paiements_abonnement` :
@@ -1374,7 +1380,7 @@ Toujours dans `supabase/functions/abonnement-payer/index.ts`, juste après le bl
   }
 ```
 
-- [ ] **Étape 7 : les voir vertes**
+- [x] **Étape 7 : les voir vertes**
 
 Lance : `npm test -w @kolek/collecteur -- --run abonnement`
 Attendu : PASSE de nouveau, la table étant complète.
@@ -1382,7 +1388,7 @@ Attendu : PASSE de nouveau, la table étant complète.
 Lance : `npm run verifier:portillons` et `npm run verifier:lint`
 Attendu : les deux passent.
 
-- [ ] **Étape 8 : commettre**
+- [x] **Étape 8 : commettre**
 
 ```bash
 git add supabase/functions/abonnement-payer/index.ts apps/collecteur/src/abonnement.ts supabase/tests/abonnement-payer.test.ts
@@ -1417,7 +1423,7 @@ pourrait montrer une copie périmée pendant que le serveur refuse la version, c
 qui donne un mur sans issue. L’objection « hors ligne » ne tient pas : cet écran
 dit déjà lui-même qu’il est « le seul geste du produit qui exige le réseau ».
 
-- [ ] **Étape 1 : écrire l’épreuve qui échoue**
+- [x] **Étape 1 : écrire l’épreuve qui échoue**
 
 Crée ou complète `apps/collecteur/src/ecrans/Abonnement.test.tsx` :
 
@@ -1481,12 +1487,12 @@ numéro déjà valide : si `pretAPayer` exige `telephone.valide`, remplis le cha
 téléphone comme le font les épreuves voisines de l’application, ou passe par le
 même chemin qu’elles.
 
-- [ ] **Étape 2 : les voir rouges**
+- [x] **Étape 2 : les voir rouges**
 
 Lance : `npm test -w @kolek/collecteur -- --run Abonnement`
 Attendu : ÉCHEC des trois. Note les messages exacts.
 
-- [ ] **Étape 3 : le champ dans le contrat**
+- [x] **Étape 3 : le champ dans le contrat**
 
 Dans `apps/collecteur/src/abonnement.ts`, ajoute à `SaisiePaiement` :
 
@@ -1496,7 +1502,7 @@ Dans `apps/collecteur/src/abonnement.ts`, ajoute à `SaisiePaiement` :
   version: string;
 ```
 
-- [ ] **Étape 4 : la case et les deux liens**
+- [x] **Étape 4 : la case et les deux liens**
 
 Dans `apps/collecteur/src/ecrans/Abonnement.tsx`, ajoute l’import :
 
@@ -1558,12 +1564,12 @@ Et pose la case juste avant le bouton de paiement, dans une `Carte` :
 `target="_blank"` avec `rel="noreferrer"` : la personne est au milieu d’un
 paiement, et la renvoyer hors de l’application lui ferait tout reprendre.
 
-- [ ] **Étape 5 : les voir vertes**
+- [x] **Étape 5 : les voir vertes**
 
 Lance : `npm test -w @kolek/collecteur -- --run Abonnement`
 Attendu : PASSE, les trois.
 
-- [ ] **Étape 6 : la chaîne complète du collecteur**
+- [x] **Étape 6 : la chaîne complète du collecteur**
 
 Lance, et rapporte chaque sortie :
 
@@ -1575,7 +1581,7 @@ npm run verifier:lint
 
 Vérifie par Node : CRLF, `0` LF nu, sur les trois fichiers touchés.
 
-- [ ] **Étape 7 : commettre**
+- [x] **Étape 7 : commettre**
 
 ```bash
 git add apps/collecteur/src/abonnement.ts apps/collecteur/src/ecrans/Abonnement.tsx apps/collecteur/src/ecrans/Abonnement.test.tsx

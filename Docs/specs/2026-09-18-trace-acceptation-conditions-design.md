@@ -1,5 +1,21 @@
 # La trace de l’acceptation des conditions
 
+> **Note du 2026-09-19 — ce document décrit l'état d'*avant* le chantier.**
+>
+> Sa prose est conservée telle quelle : c'est le témoignage d'une décision à
+> une date, et la réécrire pour qu'elle corresponde au livré détruirait ce
+> qu'elle sert à établir. Deux conséquences pour qui la lit aujourd'hui :
+>
+> - **Ses citations de lignes ont glissé**, puisque le chantier a modifié les
+>   fichiers qu'elle cite. `apps/collecteur/src/abonnement.ts:80` tombe
+>   aujourd'hui sur `version: string;` — le champ même dont ce document dit
+>   qu'il n'existe pas. Les numéros valent pour le dépôt au 2026-09-18.
+> - **La conception a bougé en cours de route.** « Deux index » en sont trois
+>   depuis qu'un index partiel rend l'écriture idempotente au renouvellement ;
+>   l'acceptation s'écrit avant la vente et non après ; la garde de
+>   configuration est scindée. Ce qui a été livré, et pourquoi, est dans
+>   `Docs/audits/2026-09-19-audit-du-chantier-trace-acceptation.md`.
+
 > Conception validée par l’exploitant le 2026-09-18. Chantier suivant de
 > `2026-09-18-mentions-cgu-confidentialite-design.md`.
 >

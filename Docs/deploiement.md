@@ -1406,8 +1406,20 @@ npx supabase migration list --linked     # 2. constater qu'elle est passée
                                          # 3. puis seulement, fusionner
 ```
 
-`20260918100000_acceptations_conditions` crée la table, ses deux index, active
-RLS et révoque `public`, `anon` et `authenticated`. Elle ne modifie aucune table
+`20260918100000_acceptations_conditions` crée la table, ses trois index, active
+RLS et révoque `public`, `anon` et `authenticated`.
+
+Deux de ces index sont des règles, pas des accélérateurs, et il vaut mieux les
+connaître avant de lire un journal : **une demande donne lieu à une acceptation
+et une seule** (`where demande_id is not null`), et **un compte accepte une
+version donnée une fois et une seule** (`where demande_id is null`). Le second
+rend l'écriture idempotente au renouvellement — `abonnement-payer` enregistre
+avant d'appeler la boutique, donc un collecteur dont la vente échoue et qui
+réappuie repasse par là. `enregistrerAcceptation` lit le `23505` comme un
+succès : le fait est déjà enregistré, et la preuve ne s'améliore pas en double.
+
+Conséquence pratique au constat : **une seule ligne par compte et par version
+est le comportement correct**, pas le signe d'une écriture perdue. Elle ne modifie aucune table
 existante, mais elle n'est pas sans verrou pour autant : ses deux clés
 étrangères visent `demandes_ouverture` et `auth.users`, et créer une table qui
 en référence une autre prend un `SHARE ROW EXCLUSIVE` sur la table référencée —
