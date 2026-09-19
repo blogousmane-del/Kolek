@@ -26,6 +26,8 @@ const MESSAGES: Record<string, string> = {
   ACCES_RESERVE: 'Session invalide. Reconnecte-toi.',
   COMPTE_SANS_ADRESSE: 'Ton compte n’a pas d’adresse électronique. Contacte GTCS.',
   PALIER_INCONNU: 'Choisis une formule avant de payer.',
+  VERSION_CONDITIONS_PERIMEE:
+    'Les conditions générales ont changé. Ferme l’application, rouvre-la, relis-les et réessaie.',
   PALIER_NON_PAYANT: 'La formule d’essai est gratuite : il n’y a rien à régler.',
   TELEPHONE_INVALIDE: 'Ce numéro n’est pas utilisable. Vérifie le pays et le numéro.',
   SAISIE_REFUSEE: 'Le service de paiement a refusé ces informations. Vérifie ton numéro.',

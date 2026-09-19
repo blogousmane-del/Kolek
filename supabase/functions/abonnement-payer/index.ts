@@ -8,6 +8,8 @@ import {
   creerVenteChariow,
 } from '../_shared/depot-chariow.ts';
 import { reconcilier } from '../_shared/reconciliation.ts';
+import { enregistrerAcceptation } from '../_shared/acceptation.ts';
+import { VERSION_CONDITIONS } from '../_shared/version-conditions.ts';
 
 /**
  * Créer la vente qui renouvellera l'abonnement d'un collecteur.
@@ -174,6 +176,14 @@ Deno.serve(async (requete) => {
   });
   if (!telephone) return reponse({ erreur: 'TELEPHONE_INVALIDE' }, 400, requete);
 
+  // Le serveur compare à la sienne plutôt que de croire le client. Sans ce
+  // contrôle, on enregistrerait une acceptation pour un texte qu'on ne peut pas
+  // produire — exactement la situation qu'on cherche à quitter.
+  const version = typeof saisie.version === 'string' ? saisie.version.trim() : '';
+  if (version !== VERSION_CONDITIONS) {
+    return reponse({ erreur: 'VERSION_CONDITIONS_PERIMEE' }, 400, requete);
+  }
+
   // La remise interne devient un `discount_code` chez Chariow : c'est le seul
   // moyen que l'API offre de réduire un prix (`Docs/Chariow.md` §3.1). Le code
   // n'est envoyé que s'il est encore valide — `remise_fin` est une date, et un
@@ -271,6 +281,21 @@ Deno.serve(async (requete) => {
     // ignorons ne serait crédité par aucun des trois chemins.
     console.error('[Abonnement] enregistrement :', erreurPose.message);
     return reponse({ erreur: 'ENREGISTREMENT_IMPOSSIBLE' }, 500, requete);
+  }
+
+  // L'acceptation, avec le collecteur connu d'emblée et sans demande : cette
+  // voie n'en a pas. C'est le rattrapage des comptes déjà en place — chacun
+  // accepte à son prochain renouvellement, au moment où il y a de l'argent en
+  // jeu, et personne n'est bloqué en tournée devant un mur de texte.
+  //
+  // Un échec ne fait pas échouer le paiement : la vente existe chez Chariow et
+  // le paiement est enregistré. Il se voit dans les traces.
+  const trace = await enregistrerAcceptation(clientService, {
+    collecteurId,
+    version,
+  });
+  if (!trace.ok) {
+    console.error('[Abonnement] acceptation non enregistrée pour', collecteurId, ':', trace.message);
   }
 
   return reponse({ checkoutUrl: issue.checkoutUrl, paiementId: pose.id }, 201, requete);

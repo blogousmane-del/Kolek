@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { admin, creerCollecteur, nettoyer, type CollecteurTest } from './harnais';
+import { VERSION_CONDITIONS } from '../functions/_shared/version-conditions.ts';
 
 /**
  * `abonnement-payer` — le portillon, et le refus qui ne dépend de personne.
@@ -121,5 +122,42 @@ describe('un collaborateur ne s’abonne pas', () => {
 
     expect([401, 403]).not.toContain(reponse.status);
     expect(await reponse.json()).toMatchObject({ erreur: 'CONFIGURATION' });
+  });
+});
+
+describe('la version des conditions, au renouvellement', () => {
+  it('refuse une version des conditions que le serveur ne connaît pas', async () => {
+    const reponse = await appeler(await jetonDe(titulaire), {
+      palier: 'pro',
+      telephone: telephone(),
+      version: 'deadbeefdeadbeef',
+    });
+
+    expect(reponse.status).toBe(400);
+    expect((await reponse.json()).erreur).toBe('VERSION_CONDITIONS_PERIMEE');
+  });
+
+  it('écrit l’acceptation avec le collecteur connu d’emblée', async () => {
+    // §3.3 : cette voie est plus propre que la voie publique — la personne est
+    // authentifiée, donc `collecteur_id` est connu sans passer par une demande.
+    // C'est aussi le rattrapage : chaque collecteur déjà en place accepte à son
+    // prochain renouvellement, au moment où il y a de l'argent en jeu.
+    await appeler(await jetonDe(titulaire), {
+      palier: 'pro',
+      telephone: telephone(),
+      version: VERSION_CONDITIONS,
+    });
+
+    const { data } = await admin
+      .from('acceptations_conditions')
+      .select('collecteur_id, demande_id, version')
+      .eq('collecteur_id', titulaire.id)
+      .order('acceptee_le', { ascending: false })
+      .limit(1)
+      .single();
+
+    expect(data?.collecteur_id).toBe(titulaire.id);
+    expect(data?.demande_id, 'aucune demande sur cette voie').toBeNull();
+    expect(data?.version).toBe(VERSION_CONDITIONS);
   });
 });
