@@ -1599,9 +1599,11 @@ remettre le mobilier dans la pièce, en vert.
 
 ### 9.6 Les deux fusions, et le squash qui casse la pile
 
-Ce chantier arrive en **deux PR empilées** : #11 porte les trois textes
-juridiques, #13 la trace de leur acceptation, et #13 est basée sur la branche de
-#11. L'ordre et la méthode comptent tous les deux.
+Ce chantier est arrivé en **deux PR empilées** : #11 portait les trois textes
+juridiques, #13 la trace de leur acceptation, et #13 était basée sur la branche
+de #11. Les deux ont été fusionnées le 2026-09-19 — #11 en `2bd9509`, #13 en
+`a0c830a`, par commit de fusion les deux fois. L'ordre et la méthode comptaient
+tous les deux, et ce qui suit sert à la prochaine pile.
 
 **Fusionner #11 par un commit de fusion, jamais par un squash.** Le dépôt
 autorise les trois modes, et c'est le piège : un squash pose sur `main` un

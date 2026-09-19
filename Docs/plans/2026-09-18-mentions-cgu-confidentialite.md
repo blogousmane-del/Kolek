@@ -1,5 +1,12 @@
 # Mentions légales, CGU et politique de confidentialité — plan d'exécution
 
+> **Livré.** Fusionné le 2026-09-19 par la PR #11 (commit de fusion
+> `2bd9509`), servi en production sur les trois sites. Les cases ci-dessous
+> n'ont pas été cochées en cours d'exécution : elles ne disent pas l'état du
+> chantier, ce paragraphe si. Le plan jumeau du même jour,
+> `2026-09-18-trace-acceptation-conditions.md`, porte les siennes — la
+> différence est d'habitude de rédaction, pas d'avancement.
+
 > **Pour l'exécutant :** SOUS-SKILL REQUISE — utiliser `superpowers:subagent-driven-development` (recommandé) ou `superpowers:executing-plans` pour exécuter ce plan tâche par tâche. Les étapes se cochent (`- [ ]`).
 
 **But :** servir trois textes juridiques sur la vitrine — mentions légales, conditions générales, politique de confidentialité — les lier depuis le pied de page et le formulaire d'ouverture, exiger une acceptation avant paiement, et rendre un vrai 404 sur l'inconnu.

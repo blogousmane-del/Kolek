@@ -9,6 +9,15 @@ sur #11.
 > invisibles sur GitHub, effacés par un `git clean -fdx`, inconnus des sessions
 > voisines. Ce qui suit est ce qu'un relecteur doit savoir avant de fusionner.
 
+**Suite, ajoutée le 2026-09-19 au soir.** Fusionnée depuis, par commit de
+fusion : #11 en `2bd9509`, #13 en `a0c830a`. La chaîne complète est constatée,
+pas supposée — migration `20260918100000` appliquée sur le projet lié
+(`local` et `remote` renseignés), puis **3 fonctions sur 19** ayant pris une
+version à la vague de 18:58 : `demander-ouverture` (v40), `chariow-webhook`
+(v19), `abonnement-payer` (v17). Le déploiement a d'abord échoué sur un jeton
+Supabase expiré — voir `Docs/deploiement.md` §9.1, qui ne connaissait pas cet
+état.
+
 ---
 
 ## Ce que le chantier livre
@@ -202,5 +211,5 @@ fait soi-même.
 
 ---
 
-*Kolek — audit du chantier `trace-acceptation`, 2026-09-19, avant fusion de la
-PR #13.*
+*Kolek — audit du chantier `trace-acceptation`, 2026-09-19, écrit avant la
+fusion de la PR #13 et complété après.*
