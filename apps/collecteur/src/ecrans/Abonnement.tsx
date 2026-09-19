@@ -193,7 +193,9 @@ export function Abonnement({
                   ? 'Le paiement a besoin du réseau.'
                   : !telephone.valide
                     ? 'Saisis un numéro complet.'
-                    : undefined
+                    : !accepte
+                      ? 'Accepte les conditions générales pour continuer.'
+                      : undefined
               }
               onClick={() => void payer()}
             >
