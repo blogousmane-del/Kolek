@@ -129,15 +129,21 @@ Deno.serve(async (requete) => {
     return reponse({ erreur: 'ABONNEMENT_DU_TITULAIRE' }, 403, requete);
   }
 
-  // --- Passé l'identité, la configuration du fournisseur ---
+  // --- Passé l'identité, la clé de service ---
+  //
+  // `cleService` est nécessaire tôt : elle fabrique, plus bas, le client de
+  // service. `CHARIOW_CLE_API` ne sert, elle, qu'au fournisseur de paiement —
+  // son contrôle est descendu à son premier usage, juste avant la
+  // réconciliation, pour qu'un refus qui n'a rien à voir avec Chariow (le
+  // titulaire, une version des conditions périmée) reste atteignable sans clé
+  // de boutique. Ni le poste ni le CI ne la posent.
 
   const cleService = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const cleApi = Deno.env.get('CHARIOW_CLE_API');
   const racine = Deno.env.get('CHARIOW_API_URL') ?? 'https://api.chariow.com/v1';
   const retour = Deno.env.get('URL_RETOUR_COLLECTEUR') ?? 'https://app.kolek.cash';
 
-  if (!cleService || !cleApi) {
-    console.error('Configuration incomplète : CHARIOW_CLE_API est-elle posée ?');
+  if (!cleService) {
+    console.error('Configuration de plateforme incomplète : SUPABASE_SERVICE_ROLE_KEY est-elle posée ?');
     return reponse({ erreur: 'CONFIGURATION' }, 500, requete);
   }
 
@@ -211,6 +217,44 @@ Deno.serve(async (requete) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  // L'acceptation, avec le collecteur connu d'emblée et sans demande : cette
+  // voie n'en a pas. C'est le rattrapage des comptes déjà en place — chacun
+  // accepte à son prochain renouvellement, au moment où il y a de l'argent en
+  // jeu, et personne n'est bloqué en tournée devant un mur de texte.
+  //
+  // Écrite ici, avant la vente, pas après : la personne a coché et appuyé sur
+  // payer, c'est là que le contrat se forme — comme le fait déjà
+  // `demander-ouverture` pour la voie publique, qui écrit l'acceptation avec la
+  // demande, avant que le visiteur ne parte payer. L'acceptation est un fait,
+  // pas une conséquence du paiement : si la vente échoue juste en dessous, la
+  // personne a quand même accepté cette version-là, à cette heure-là, et
+  // n'avoir de preuve que des paiements réussis laisserait sans trace
+  // exactement les cas où un litige naît.
+  //
+  // Un échec d'écriture ne fait pas échouer le paiement : à ce stade, aucune
+  // vente n'a encore été créée chez Chariow, donc rien à défaire. L'échec se
+  // voit dans les traces.
+  const trace = await enregistrerAcceptation(clientService, {
+    collecteurId,
+    version,
+  });
+  if (!trace.ok) {
+    console.error('[Abonnement] acceptation non enregistrée pour', collecteurId, ':', trace.message);
+  }
+
+  // --- La configuration du fournisseur, à son premier usage ---
+  //
+  // Descendue depuis l'entrée de la fonction : c'est ici que `CHARIOW_CLE_API`
+  // sert pour la première fois, à la réconciliation juste en dessous puis à la
+  // vente. La garder plus haut aurait lié à une clé de boutique un refus qui
+  // n'a rien à voir avec Chariow — voir le commentaire au-dessus de
+  // `cleService`.
+  const cleApi = Deno.env.get('CHARIOW_CLE_API');
+  if (!cleApi) {
+    console.error('Configuration incomplète : CHARIOW_CLE_API est-elle posée ?');
+    return reponse({ erreur: 'CONFIGURATION' }, 500, requete);
+  }
+
   // Supersession : les tentatives précédentes sont d'abord réconciliées, puis
   // abandonnées. Réconcilier **avant** de clore est la seule façon de ne pas
   // abandonner une vente qui vient d'être réglée.
@@ -281,21 +325,6 @@ Deno.serve(async (requete) => {
     // ignorons ne serait crédité par aucun des trois chemins.
     console.error('[Abonnement] enregistrement :', erreurPose.message);
     return reponse({ erreur: 'ENREGISTREMENT_IMPOSSIBLE' }, 500, requete);
-  }
-
-  // L'acceptation, avec le collecteur connu d'emblée et sans demande : cette
-  // voie n'en a pas. C'est le rattrapage des comptes déjà en place — chacun
-  // accepte à son prochain renouvellement, au moment où il y a de l'argent en
-  // jeu, et personne n'est bloqué en tournée devant un mur de texte.
-  //
-  // Un échec ne fait pas échouer le paiement : la vente existe chez Chariow et
-  // le paiement est enregistré. Il se voit dans les traces.
-  const trace = await enregistrerAcceptation(clientService, {
-    collecteurId,
-    version,
-  });
-  if (!trace.ok) {
-    console.error('[Abonnement] acceptation non enregistrée pour', collecteurId, ':', trace.message);
   }
 
   return reponse({ checkoutUrl: issue.checkoutUrl, paiementId: pose.id }, 201, requete);

@@ -13,11 +13,14 @@ import { VERSION_CONDITIONS } from '../functions/_shared/version-conditions.ts';
  *
  * ## Ce que la base locale peut mesurer
  *
- * `CHARIOW_CLE_API` n'existe ni en local ni au CI. Tout ce qui suit la
- * configuration du fournisseur est donc hors d'atteinte : la vente elle-même, la
- * remise, la supersession. Restent le portillon et le refus du collaborateur —
- * et ce dernier n'est mesurable que parce qu'il a été **déplacé avant** la
- * lecture de la configuration.
+ * `CHARIOW_CLE_API` n'existe ni en local ni au CI. Sa garde a été descendue
+ * (relecture de la tâche 7) à son premier usage réel, juste avant la
+ * réconciliation, pour ne plus faire dépendre d'une clé de boutique des refus
+ * qui n'ont rien à voir avec Chariow. Restent donc mesurables : le portillon,
+ * le refus du collaborateur, le refus d'une version des conditions périmée, et
+ * l'écriture de l'acceptation — posée, elle aussi, avant ce qui appelle
+ * réellement Chariow. Hors d'atteinte : la réconciliation, la vente elle-même,
+ * la remise qu'elle applique.
  *
  * Le plan le plaçait après. « Tu es collaborateur, tu n'as rien à payer » est
  * pourtant vrai que la boutique soit configurée ou non ; l'y faire dépendre
@@ -117,11 +120,18 @@ describe('un collaborateur ne s’abonne pas', () => {
   it('laisse passer son titulaire, lui', async () => {
     // Le test qui empêche le précédent de passer pour de mauvaises raisons : un
     // refus posé trop haut refuserait tout le monde, y compris celui qui doit
-    // payer. Ni 401 ni 403 ici — la suite dépend de `CHARIOW_CLE_API`, absente.
+    // payer. Ni 401 ni 403 ici.
+    //
+    // Le repère n'est plus `CONFIGURATION` : depuis que le contrôle de
+    // `CHARIOW_CLE_API` a été descendu à son premier usage (juste avant la
+    // réconciliation), le titulaire va plus loin et atteint le contrôle de
+    // version — cet appel n'envoie pas de `version`, donc le serveur la refuse
+    // comme périmée. C'est encore un repère qui ne dépend pas de
+    // `CHARIOW_CLE_API`, absente ici comme au CI.
     const reponse = await appeler(await jetonDe(titulaire));
 
     expect([401, 403]).not.toContain(reponse.status);
-    expect(await reponse.json()).toMatchObject({ erreur: 'CONFIGURATION' });
+    expect(await reponse.json()).toMatchObject({ erreur: 'VERSION_CONDITIONS_PERIMEE' });
   });
 });
 
