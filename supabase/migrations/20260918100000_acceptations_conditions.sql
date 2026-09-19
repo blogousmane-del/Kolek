@@ -58,6 +58,34 @@ create unique index if not exists acceptations_conditions_demande_unique
   on public.acceptations_conditions (demande_id)
   where demande_id is not null;
 
+-- Le pendant, pour la voie authentifiée : un compte accepte une version donnée
+-- une fois, et une seule. Le « where demande_id is null » borne la règle au
+-- renouvellement — la voie publique a déjà la sienne juste au-dessus.
+--
+-- Deux défauts se ferment ici, et le second est le moins visible :
+--
+-- 1. **L'écriture n'était pas idempotente.** `abonnement-payer` enregistre
+--    l'acceptation avant d'appeler la boutique. Une nouvelle tentative après un
+--    échec en aval — vente refusée, réseau coupé, collecteur qui réappuie —
+--    insérait une ligne de plus pour la même version. Chaque ligne restait
+--    vraie ; l'historique devenait simplement illisible là où il doit servir.
+-- 2. **L'écriture n'était bornée par rien.** `abonnement-payer` n'est pas
+--    soumise à `consommer_debit` — seules les deux routes publiques le sont —
+--    et depuis que l'acceptation est écrite avant la garde de `CHARIOW_CLE_API`,
+--    c'est le premier effet de bord qu'un collecteur authentifié peut
+--    déclencher en boucle.
+--
+-- Rien n'est perdu juridiquement. La question du jour du litige est « cette
+-- personne a-t-elle accepté la version X, et quand » : c'est la **première**
+-- acceptation qui y répond. Les renouvellements suivants sous la même version
+-- n'ajoutent rien, et un changement de version crée bien une ligne nouvelle.
+--
+-- `enregistrerAcceptation` tient sa part : elle lit le `23505` comme un succès,
+-- parce que le fait est déjà enregistré.
+create unique index if not exists acceptations_conditions_collecteur_version_unique
+  on public.acceptations_conditions (collecteur_id, version)
+  where demande_id is null;
+
 -- La question du jour du litige : qu'a accepté cette personne, et quand.
 create index if not exists acceptations_conditions_collecteur_idx
   on public.acceptations_conditions (collecteur_id, acceptee_le desc);

@@ -85,4 +85,45 @@ describe('acceptations_conditions', () => {
       .insert({ version: `intrus-${MARQUE}` });
     expect(ecriture.error, 'anon ne doit pas pouvoir écrire').not.toBeNull();
   });
+
+  it('refuse deux fois la même version pour le même compte, au renouvellement', async () => {
+    // `abonnement-payer` écrit l'acceptation **avant** d'appeler la boutique :
+    // un collecteur dont la vente échoue et qui réappuie repasse par ici. Sans
+    // cet index, chaque tentative ajoutait une ligne pour la même version, et
+    // rien ne bornait une écriture que cette route — non soumise à
+    // `consommer_debit` — laisse déclencher en boucle.
+    const { data: compte } = await admin.from('collecteurs').select('id').limit(1).maybeSingle();
+    expect(compte?.id, 'aucun collecteur en base : la sonde ne mesure rien').toBeTruthy();
+
+    const version = `rejeu-${MARQUE}`;
+    const premiere = await admin
+      .from('acceptations_conditions')
+      .insert({ collecteur_id: compte!.id, version })
+      .select('id')
+      .single();
+    expect(premiere.error, 'la première doit passer').toBeNull();
+    posees.push(premiere.data!.id);
+
+    const rejeu = await admin
+      .from('acceptations_conditions')
+      .insert({ collecteur_id: compte!.id, version });
+    expect(rejeu.error?.code, 'la seconde doit heurter l’index unique').toBe('23505');
+  });
+
+  it('laisse passer une version différente pour le même compte', async () => {
+    // Le témoin de l'épreuve précédente : un index posé sur le seul
+    // `collecteur_id` la passerait aussi, en interdisant du même coup toute
+    // acceptation d'une version suivante — c'est-à-dire en perdant exactement
+    // ce que la table existe pour garder.
+    const { data: compte } = await admin.from('collecteurs').select('id').limit(1).maybeSingle();
+    expect(compte?.id).toBeTruthy();
+
+    const suivante = await admin
+      .from('acceptations_conditions')
+      .insert({ collecteur_id: compte!.id, version: `suite-${MARQUE}` })
+      .select('id')
+      .single();
+    expect(suivante.error, 'une version nouvelle doit toujours pouvoir s’écrire').toBeNull();
+    posees.push(suivante.data!.id);
+  });
 });

@@ -23,6 +23,21 @@ export async function enregistrerAcceptation(
     collecteur_id: acte.collecteurId ?? null,
     version: acte.version,
   });
-  if (error) return { ok: false, message: error.message };
+
+  // `23505` — violation d'unicité — **est** un succès ici, et il faut le dire
+  // plutôt que de le laisser deviner : les deux index uniques de la table
+  // signifient « ce fait est déjà enregistré », une fois par demande sur la
+  // voie publique, une fois par version sur la voie authentifiée. Un
+  // renouvellement rejoué après un échec en aval retombe dessus, et la preuve
+  // ne s'améliore pas en double.
+  //
+  // Le contrôle porte sur `on conflict do nothing` sans y recourir : PostgREST
+  // ne transmet que des colonnes en cible de conflit, jamais le prédicat d'un
+  // index partiel, donc un `upsert` ne saurait pas désigner ces index-là. Lire
+  // le code d'erreur fait le même travail, et dit pourquoi.
+  if (error) {
+    if (error.code === '23505') return { ok: true };
+    return { ok: false, message: error.message };
+  }
   return { ok: true };
 }
