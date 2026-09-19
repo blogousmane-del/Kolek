@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 
+import { VERSION_CONDITIONS } from '../functions/_shared/version-conditions.ts';
 import { admin } from './harnais';
 
 /**
@@ -54,10 +55,38 @@ function demande(suffixe: string) {
     email: `sonde-${MARQUE}-${suffixe}@example.ci`,
     zone: 'Adjamé',
     palier: 'essai',
+    // Exigée depuis que `validerDemande` contrôle la version des conditions.
+    // Lue depuis la constante engendrée, jamais écrite à la main : c'est la
+    // même valeur que celle du serveur, par construction.
+    //
+    // Son absence a rendu **huit** épreuves de ce fichier rouges au CI, et
+    // nulle part ailleurs : le fichier unitaire `valider-demande.test.ts` avait
+    // été mis à jour, celui-ci non, et il ne tourne que sous `test:db` — refusé
+    // au poste. Le contrôle est le dernier de `validerDemande`, d'où les trois
+    // épreuves qui passaient quand même : elles se font refuser plus tôt, sur
+    // l'adresse ou le mot de passe.
+    version: VERSION_CONDITIONS,
   };
 }
 
 afterAll(async () => {
+  // Les acceptations **avant** les demandes : `demande_id` est en
+  // `on delete set null`, donc l'ordre inverse laisserait des lignes que plus
+  // rien ne désigne et qu'on ne saurait plus retrouver.
+  const { data: nees } = await admin
+    .from('demandes_ouverture')
+    .select('id')
+    .like('nom', `Sonde ${MARQUE}%`);
+  if (nees && nees.length > 0) {
+    await admin
+      .from('acceptations_conditions')
+      .delete()
+      .in(
+        'demande_id',
+        nees.map((d) => d.id),
+      );
+  }
+
   await admin.from('demandes_ouverture').delete().like('nom', `Sonde ${MARQUE}%`);
   await admin.from('debit_public').delete().like('empreinte', 'demander-ouverture:10.%');
 });
@@ -97,6 +126,47 @@ describe('le dépôt', () => {
 
     expect(reponse.status).toBe(400);
     expect((await reponse.json()).erreur).toBe('EMAIL_INVALIDE');
+  });
+
+  it('refuse une version des conditions que le serveur ne connaît pas', async () => {
+    // Un onglet resté ouvert depuis une version précédente. Sans ce contrôle,
+    // on enregistrerait une acceptation pour un texte qu'on ne peut pas
+    // produire — exactement la situation qu'on cherche à quitter.
+    //
+    // Cette épreuve existe parce que sa garde n'était mesurée que par le
+    // module pur : le contrôle a cassé huit épreuves de ce fichier sans que
+    // rien, ici, ne le mesure dans l'autre sens. La route elle-même doit en
+    // porter une.
+    const reponse = await deposer({ ...demande('version'), version: 'deadbeefdeadbeef' });
+
+    expect(reponse.status).toBe(400);
+    expect(await reponse.json()).toEqual({
+      erreur: 'VERSION_CONDITIONS_PERIMEE',
+      champ: 'version',
+    });
+  });
+
+  it('écrit l’acceptation avec la demande dont elle est née', async () => {
+    // `collecteur_id` reste nul : le compte n'existe pas encore. Sur un palier
+    // payant, le webhook le posera à sa naissance ; sur un essai, jamais.
+    const reponse = await deposer(demande('acceptation'));
+    expect(reponse.status).toBe(201);
+
+    const { data: ligne } = await admin
+      .from('demandes_ouverture')
+      .select('id')
+      .eq('nom', `Sonde ${MARQUE} acceptation`)
+      .single();
+    expect(ligne?.id, 'la demande doit être écrite, sinon la sonde ne mesure rien').toBeTruthy();
+
+    const { data: acceptation } = await admin
+      .from('acceptations_conditions')
+      .select('version, collecteur_id')
+      .eq('demande_id', ligne!.id)
+      .single();
+
+    expect(acceptation?.version).toBe(VERSION_CONDITIONS);
+    expect(acceptation?.collecteur_id, 'aucun compte à ce stade').toBeNull();
   });
 });
 
