@@ -74,6 +74,9 @@ export interface SaisiePaiement {
   telephone: string;
   paysTelephone: string;
   telephoneLocal: string;
+  /** L'empreinte du texte accepté avant de payer. Le serveur la compare à la
+      sienne et refuse ce qu'il ne connaît pas. */
+  version: string;
 }
 
 export type ResultatPaiement = { ok: true; checkoutUrl: string } | { ok: false; message: string };
