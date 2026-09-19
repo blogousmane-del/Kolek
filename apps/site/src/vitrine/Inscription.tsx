@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { entree, useAnimations } from './animation';
 import { envoyerDemande, palierDepuisAdresse } from './demande';
+import { VERSION_CONDITIONS } from './legal/version-conditions';
 import { APP_COLLECTEUR, CONDITIONS, CONFIDENTIALITE, CONTACT_DEMO, WHATSAPP } from './liens';
 
 /**
@@ -128,6 +129,10 @@ export function Inscription() {
       // Vide pour un essai : le serveur n'en veut pas, et `validerDemande` ne
       // retient rien d'un mot de passe qui n'ouvrira aucun compte.
       motDePasse: payant ? motDePasse : '',
+      // Lue depuis la constante engendrée, jamais écrite à la main : c'est la
+      // même valeur que celle du serveur, par construction, et `verifier:cgu`
+      // échoue si les deux divergent.
+      version: VERSION_CONDITIONS,
     });
 
     if (resultat.ok) {

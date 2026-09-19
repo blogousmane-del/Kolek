@@ -45,6 +45,12 @@ export interface Demande {
       Refuser un mot de passe après l'encaissement serait le pire moment
       possible, d'où le contrôle ici et non plus tard. */
   motDePasse: string;
+  /** L'empreinte du texte que la personne avait sous les yeux en cochant la
+      case, engendrée par `scripts/generer-cgu.mjs`. Le serveur la compare à la
+      sienne et refuse ce qu'il ne connaît pas : un onglet resté ouvert depuis
+      une version précédente ne doit pas produire une acceptation pour un texte
+      qu'on ne peut plus produire. */
+  version: string;
 }
 
 export type Envoi =
