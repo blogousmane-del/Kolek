@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
+import { ouvrirCompteDepuisDemande } from '../functions/_shared/ouvrir-compte';
 import { admin } from './harnais';
 
 /**
@@ -207,5 +208,83 @@ describe('la borne par vente', () => {
     }
 
     expect(await lignesDuCompteur(vente)).toBe(0);
+  });
+});
+
+/**
+ * L'ouverture du compte relie l'acceptation à la personne.
+ *
+ * Ni « la porte du webhook » ni « la borne par vente » ne font naître de
+ * compte : le premier describe n'atteint jamais `reconcilier`, un secret faux
+ * suffit à l'arrêter ; le second envoie des Pulses signés pour des ventes
+ * inconnues, que la fonction referme sans appel réseau. Ce bloc-ci est donc le
+ * premier de ce fichier à créer un compte Auth, pas un second.
+ *
+ * Il n'appelle pas la route HTTP : la réconciliation qui y mène demande
+ * `CHARIOW_CLE_API`, absente ici — voir la note de tête de fichier. Il appelle
+ * directement `ouvrirCompteDepuisDemande`, avec le client `admin`, sur la pile
+ * locale réelle : c'est le même appel que fait le webhook à la naissance du
+ * compte, et c'est ce qui manque à `ouvrir-compte.test.ts`, qui bouchonne tout
+ * — ni réseau, ni base — et ne peut donc pas vérifier que la mise à jour SQL de
+ * la tâche 5 atteint vraiment la table `acceptations_conditions` sous la clé de
+ * service.
+ *
+ * La demande et son acceptation sont posées à la main ci-dessous, avec
+ * `collecteur_id` nul : c'est exactement ce que `demander-ouverture` aurait
+ * déjà écrit au formulaire.
+ */
+
+/** Une empreinte de la bonne forme pour `demandes_ouverture.mot_de_passe_hash` —
+    même valeur que `demande-mot-de-passe.test.ts` : seule la forme compte ici,
+    rien n'est déchiffré. */
+const EMPREINTE_TEST = '$2b$10$abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0';
+
+describe('l’ouverture du compte relie l’acceptation', () => {
+  it('relie l’acceptation au compte à sa naissance', async () => {
+    // §3.1 de la spec : c'est le seul chemin où le contrat se forme sans
+    // intervention humaine, donc le seul où la preuve doit désigner un compte et
+    // pas seulement une demande.
+    const jeton = crypto.randomUUID();
+    const { data: demande, error: erreurDemande } = await admin
+      .from('demandes_ouverture')
+      .insert({
+        nom: `Prospect ${jeton.slice(0, 8)}`,
+        telephone: `+225${jeton.replace(/-/g, '').slice(0, 10)}`,
+        palier: 'standard',
+        email: `prospect-${jeton}@kolek.test`,
+        mot_de_passe_hash: EMPREINTE_TEST,
+      })
+      .select('id')
+      .single();
+    expect(erreurDemande, 'la demande de test doit se poser').toBeNull();
+    const demandeId = (demande as { id: string }).id;
+
+    const { error: erreurPose } = await admin
+      .from('acceptations_conditions')
+      .insert({ demande_id: demandeId, version: `v-${jeton}` });
+    expect(erreurPose, 'l’acceptation de test doit se poser, collecteur_id nul').toBeNull();
+
+    let compteCree: string | null = null;
+    try {
+      // Le même appel que le webhook fait à la naissance du compte : le
+      // paiement réduit à ce que la fonction lit réellement, `demande_id`.
+      compteCree = await ouvrirCompteDepuisDemande(admin)({ demande_id: demandeId } as never);
+      expect(compteCree, 'le compte doit naître pour que la relation ait un sens').toBeTruthy();
+
+      const { data: acceptation } = await admin
+        .from('acceptations_conditions')
+        .select('collecteur_id, version')
+        .eq('demande_id', demandeId)
+        .single();
+
+      expect(acceptation?.collecteur_id, 'collecteur_id doit être posé').toBe(compteCree);
+      expect(acceptation?.version, 'la version doit survivre').toBeTruthy();
+    } finally {
+      // `collecteur_id` référence `auth.users` en cascade : supprimer le compte
+      // supprime aussi la ligne d'acceptation posée ci-dessus. La demande, elle,
+      // ne s'efface pas toute seule.
+      if (compteCree) await admin.auth.admin.deleteUser(compteCree);
+      await admin.from('demandes_ouverture').delete().eq('id', demandeId);
+    }
   });
 });
