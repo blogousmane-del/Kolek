@@ -72,6 +72,8 @@ const MESSAGES: Record<string, string> = {
   ZONE_TROP_LONGUE: 'Le nom de la zone est trop long.',
   MESSAGE_TROP_LONG: 'Ton message dépasse 500 caractères.',
   PALIER_INCONNU: 'Cette offre n’existe pas. Choisis-en une dans la liste.',
+  VERSION_CONDITIONS_PERIMEE:
+    'Les conditions générales ont changé depuis l’ouverture de cette page. Recharge-la, relis-les, et réessaie.',
   MOT_DE_PASSE_REQUIS:
     'Choisis un mot de passe : c’est celui avec lequel tu ouvriras l’application.',
   MOT_DE_PASSE_COURT: 'Choisis un mot de passe d’au moins 10 caractères.',

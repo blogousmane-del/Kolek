@@ -20,6 +20,7 @@
 import { PALIERS_PAYANTS } from './chariow.ts';
 import { EMAIL_MAX, validerEmail } from './valider-email.ts';
 import { LONGUEUR_MOT_DE_PASSE } from './valider-collecteur.ts';
+import { VERSION_CONDITIONS } from './version-conditions.ts';
 
 /** Reprises des contraintes `CHECK` de `public.demandes_ouverture`. */
 export const BORNES = {
@@ -42,6 +43,8 @@ export interface DemandeBrute {
   message?: unknown;
   /** Exigé pour un palier payant seulement. Voir `Resultat`. */
   motDePasse?: unknown;
+  /** L'empreinte du texte que la personne avait sous les yeux. Voir `Resultat`. */
+  version?: unknown;
 }
 
 export interface DemandeValide {
@@ -67,7 +70,7 @@ export interface DemandeValide {
  * personne ne se servira serait un secret gardé pour rien.
  */
 export type Resultat =
-  | { ok: true; demande: DemandeValide; motDePasse: string | null }
+  | { ok: true; demande: DemandeValide; motDePasse: string | null; version: string }
   | { ok: false; erreur: string; champ: string };
 
 function texte(valeur: unknown): string {
@@ -166,6 +169,18 @@ export function validerDemande(brut: DemandeBrute): Resultat {
     };
   }
 
+  // L'empreinte voyage **à côté** de la demande, comme le mot de passe et pour
+  // une raison voisine : `demande` est inséré tel quel dans
+  // `demandes_ouverture`, qui n'a pas de colonne pour elle. L'acceptation est un
+  // événement séparé, écrit dans sa propre table.
+  //
+  // Le serveur compare à la sienne plutôt que de croire le client : une version
+  // envoyée et crue sur parole ne vaut pas mieux qu'aucune version.
+  const version = typeof brut.version === 'string' ? brut.version.trim() : '';
+  if (version !== VERSION_CONDITIONS) {
+    return { ok: false, erreur: 'VERSION_CONDITIONS_PERIMEE', champ: 'version' };
+  }
+
   return {
     ok: true,
     demande: {
@@ -180,5 +195,6 @@ export function validerDemande(brut: DemandeBrute): Resultat {
     // naîtra de cette demande sans l'accord d'un humain, et garder une empreinte
     // dont personne ne se servira serait un secret gardé pour rien.
     motDePasse: payant ? motDePasse : null,
+    version,
   };
 }

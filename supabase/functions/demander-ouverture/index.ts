@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import bcrypt from 'npm:bcryptjs@2.4.3';
 
+import { enregistrerAcceptation } from '../_shared/acceptation.ts';
 import {
   couperNom,
   lireProduits,
@@ -257,6 +258,23 @@ Deno.serve(async (requete) => {
     }
     console.error('Insertion impossible :', error.message);
     return reponse({ erreur: 'ENREGISTREMENT_IMPOSSIBLE' }, 500, requete);
+  }
+
+  // L'acceptation, écrite avec la demande dont elle est née. `collecteur_id`
+  // reste nul : sur un palier payant, le webhook le posera à la naissance du
+  // compte ; sur un essai, il ne sera jamais posé — `admin-creer-collecteur`
+  // ignore la demande, et l'essai n'a pas d'argent en jeu.
+  //
+  // Un échec ici ne fait pas échouer la demande : elle est écrite, la personne
+  // a bien accepté, et refuser maintenant lui ferait tout ressaisir pour une
+  // ligne de journal. Mais il doit se voir dans les traces, parce qu'une
+  // acceptation manquante est une preuve manquante.
+  const trace = await enregistrerAcceptation(client, {
+    demandeId: (rangee as { id: string }).id,
+    version: verdict.version,
+  });
+  if (!trace.ok) {
+    console.error('[Ouverture] acceptation non enregistrée pour', rangee.id, ':', trace.message);
   }
 
   // Une demande d'essai s'arrête là. Rien de la ligne écrite : juste l'accusé.
