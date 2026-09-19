@@ -342,3 +342,99 @@ describe('le retrait attend la file et le réseau (§7)', () => {
     expect(screen.getAllByText('Opérations du téléphone pas encore vérifiées.')).toHaveLength(3);
   });
 });
+
+/**
+ * La recherche par nom, posée le 2026-09-19.
+ *
+ * La liste des cartes à clôturer est la plus longue du produit : elle porte
+ * une ligne par carte ouverte, de tous les clients. Retrouver quelqu'un en la
+ * faisant défiler, debout dans un marché, avant un geste qui ne se défait pas,
+ * c'est le même défaut que celui qui a fait naître le filtre par client — en
+ * plus lent.
+ */
+describe('la recherche par nom', () => {
+  const CARTE_TRAORE = {
+    carteId: 'k4',
+    clientId: 'cli3',
+    clientNom: 'Awa Traoré',
+    mise: 1000,
+    misesEncaissees: 3,
+    restituable: 2000,
+    cycleComplet: false,
+  };
+
+  function champ() {
+    return screen.getByRole('searchbox', { name: 'Chercher un client' });
+  }
+
+  it('ne pose pas de champ quand il n’y a rien à chercher', () => {
+    donnees = [CARTE_PLEINE_HJ];
+
+    rendre();
+
+    // Un champ au-dessus d'une liste d'un seul élément est du décor, et il
+    // pousse la seule carte plus bas sous le pouce.
+    expect(screen.queryByRole('searchbox')).toBeNull();
+  });
+
+  it('pose le champ dès qu’il y a plus d’une carte', () => {
+    rendre();
+
+    expect(champ()).toBeTruthy();
+  });
+
+  it('ne pose pas de champ sous un filtre client', () => {
+    rendre({ client: HJ });
+
+    // La liste ne porte déjà qu'une personne : un second filtre par-dessus ne
+    // retrancherait rien qu'on cherche.
+    expect(screen.queryByRole('searchbox')).toBeNull();
+  });
+
+  it('retrouve un client sans son accent ni sa majuscule', () => {
+    donnees = [CARTE_PLEINE_HJ, CARTE_PLEINE_KA, CARTE_TRAORE];
+
+    rendre();
+    fireEvent.change(champ(), { target: { value: 'traore' } });
+
+    // Personne ne compose un accent sur un clavier de téléphone au marché.
+    expect(screen.getByText('Awa Traoré')).toBeTruthy();
+    expect(screen.queryByText('Hj')).toBeNull();
+    expect(screen.queryByText('Ka')).toBeNull();
+  });
+
+  it('dit combien de cartes la recherche laisse, et sur combien', () => {
+    rendre();
+    fireEvent.change(champ(), { target: { value: 'ka' } });
+
+    // Une liste qui rétrécit sans dire de combien laisse croire qu'on a perdu
+    // des cartes — sur l'écran qui fait sortir l'argent, c'est le doute le
+    // plus cher.
+    expect(screen.getByText('1 sur 3 cartes')).toBeTruthy();
+  });
+
+  it('ne dit pas que les cartes sont clôturées quand c’est le nom qui ne tombe pas', () => {
+    rendre();
+    fireEvent.change(champ(), { target: { value: 'personne' } });
+
+    expect(screen.getByText('Aucune carte à ce nom')).toBeTruthy();
+    // « Aucune carte active » ferait conclure au collecteur que tout a été
+    // clôturé, alors qu'il a mal tapé un nom.
+    expect(screen.queryByText('Aucune carte active')).toBeNull();
+  });
+
+  it('cesse de filtrer dès que le champ disparaît', () => {
+    const { rerender } = rendre();
+    fireEvent.change(champ(), { target: { value: 'ka' } });
+    expect(screen.queryAllByText('Hj')).toHaveLength(0);
+
+    rerender(
+      <Retrait revision={0} collecteurId="col1" onRetour={vi.fn()} onEcriture={vi.fn()} client={HJ} />,
+    );
+
+    // Le terme survit dans l'état, mais plus personne ne peut le voir ni
+    // l'effacer. Sans cette garde, arriver ici depuis la fiche d'un client
+    // masquerait ses cartes par un filtre devenu invisible.
+    expect(screen.getAllByText('Hj')).toHaveLength(2);
+  });
+});
