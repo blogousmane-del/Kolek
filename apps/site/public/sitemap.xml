@@ -1,19 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Une seule adresse, et c'est voulu.
+  Quatre adresses : la vitrine, et les trois textes légaux.
 
-  Le site n'a que deux chemins — voir `apps/site/src/App.tsx`. Le second,
-  `/inscription`, est un formulaire : rien à y chercher, et l'indexer diviserait
-  le signal entre deux pages qui disent la même chose. Il porte d'ailleurs un
-  `X-Robots-Tag: noindex` posé par le `netlify.toml`.
+  `App.tsx` en connaît cinq. La cinquième, `/inscription`, est un formulaire :
+  rien à y chercher, et l’indexer diviserait le signal entre deux pages qui
+  disent la même chose. Il porte d’ailleurs un `X-Robots-Tag: noindex` posé par
+  le `netlify.toml`.
+
+  Les trois pages légales, elles, y ont leur place. Le pied de page y mène
+  depuis partout, donc un robot les trouverait de toute façon — mais ces textes
+  existent pour être opposables, et quelqu’un qui cherche « Kolek mentions
+  légales » doit tomber dessus sans avoir à parcourir le site. Les déclarer ne
+  coûte rien et rend la recherche directe.
 
   Pas de `lastmod` : il faudrait le tenir à jour à chaque déploiement, et un
-  `lastmod` faux est pire qu'absent — Google apprend à ne plus le croire, sur ce
-  site comme sur les autres. Le sitemap sert ici à déclarer l'existence de la
-  page, ce qu'il fait avec une ligne.
+  `lastmod` faux est pire qu’absent — Google apprend à ne plus le croire, sur ce
+  site comme sur les autres. Le sitemap sert ici à déclarer l’existence des
+  pages, ce qu’il fait en une ligne chacune.
+
+  Une route ajoutée à `App.tsx` ne se déclare pas toute seule ici. Le contrôle
+  qui lie les deux listes de routes est `scripts/verifier-routes.mjs`, et il
+  compare `App.tsx` au `netlify.toml` — pas ce fichier, qui relève d’un choix
+  d’indexation et non d’un fait technique.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://kolek.cash/</loc>
+  </url>
+  <url>
+    <loc>https://kolek.cash/mentions-legales</loc>
+  </url>
+  <url>
+    <loc>https://kolek.cash/conditions</loc>
+  </url>
+  <url>
+    <loc>https://kolek.cash/confidentialite</loc>
   </url>
 </urlset>

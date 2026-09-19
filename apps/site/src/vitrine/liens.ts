@@ -39,9 +39,32 @@ export function inscriptionPour(palier: string): string {
   return `${INSCRIPTION}?palier=${encodeURIComponent(palier)}`;
 }
 
+/** Les trois textes juridiques. Servis par la vitrine, hors de l'index. */
+export const MENTIONS_LEGALES = '/mentions-legales';
+export const CONDITIONS = '/conditions';
+export const CONFIDENTIALITE = '/confidentialite';
+
 /**
- * L'adresse de GTCS. Elle reste offerte en dernier recours, sous le formulaire
- * — pour qui préfère écrire — mais n'est plus jamais le geste principal.
+ * La conversation WhatsApp de GTCS.
+ *
+ * Le numéro est en chiffres nus, sans `+`, sans espace et sans indicatif
+ * entre parenthèses : `wa.me` n'accepte que cette forme, et un numéro
+ * formaté pour l'œil humain y ouvre une conversation vide — un lien mort qui
+ * n'a pas l'air mort, le pire des deux.
+ *
+ * Le même numéro se lit sous sa forme humaine dans les mentions légales, où
+ * c'est un fait d'identité et non un lien.
+ */
+export const WHATSAPP = 'https://wa.me/2250788818118';
+
+/**
+ * L'adresse de l'exploitant. Elle reste offerte en dernier recours, sous le
+ * formulaire — pour qui préfère écrire — mais n'est plus jamais le geste
+ * principal.
+ *
+ * Au domaine depuis le 2026-09-18 : l'adresse d'un service commercial qui
+ * figure dans des mentions légales et sert à exercer un droit d'accès ne peut
+ * pas être un compte personnel chez un fournisseur grand public.
  */
 export const CONTACT_DEMO =
-  'mailto:gsmtechnoloy@gmail.com?subject=Kolek%20-%20demande%20de%20démo';
+  'mailto:contact@kolek.cash?subject=Kolek%20-%20demande%20de%20démo';

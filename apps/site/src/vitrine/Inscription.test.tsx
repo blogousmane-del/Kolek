@@ -44,6 +44,16 @@ function choisirPalier(nom: string) {
   fireEvent.click(screen.getByRole('button', { pressed: false, name: new RegExp(nom, 'i') }));
 }
 
+/** Remplit les trois champs obligatoires, pour les épreuves qui ne portent
+    pas sur eux. */
+function remplirLeFormulaire() {
+  fireEvent.change(screen.getByLabelText(/nom complet/i), { target: { value: 'Mariam Koné' } });
+  fireEvent.change(screen.getByLabelText(/ton numéro/i), { target: { value: '07 01 02 03 04' } });
+  fireEvent.change(screen.getByLabelText(/adresse e-mail/i), {
+    target: { value: 'mariam@example.ci' },
+  });
+}
+
 describe('le formulaire d’ouverture', () => {
   it('demande une adresse électronique', () => {
     // Le manque du 2026-08-27 : la demande arrivait sur le serveur sans aucun
@@ -202,6 +212,7 @@ describe('ce que le formulaire envoie', () => {
     fireEvent.change(screen.getByLabelText(/adresse e-mail/i), {
       target: { value: 'mariam@example.ci' },
     });
+    fireEvent.click(screen.getByRole('checkbox', { name: /conditions/i }));
     fireEvent.submit(screen.getByRole('button', { name: /envoyer ma demande/i }));
 
     await waitFor(() => expect(envoi).toHaveBeenCalled());
@@ -224,6 +235,7 @@ describe('ce que le formulaire envoie', () => {
     fireEvent.change(screen.getByLabelText(/adresse e-mail/i), {
       target: { value: 'adama@example.ci' },
     });
+    fireEvent.click(screen.getByRole('checkbox', { name: /conditions/i }));
     fireEvent.submit(screen.getByRole('button', { name: /envoyer ma demande/i }));
 
     await waitFor(() => expect(envoi).toHaveBeenCalled());
@@ -237,6 +249,7 @@ describe('ce que le formulaire fait de la réponse', () => {
     render(<Inscription />);
 
     choisirPalier('Pro');
+    fireEvent.click(screen.getByRole('checkbox', { name: /conditions/i }));
     fireEvent.submit(screen.getByRole('button', { name: /payer et ouvrir mon compte/i }));
 
     await waitFor(() => expect(window.location.assign).toHaveBeenCalledWith('https://pay.test/v_42'));
@@ -249,6 +262,7 @@ describe('ce que le formulaire fait de la réponse', () => {
     envoi.mockResolvedValue({ ok: true });
     render(<Inscription />);
 
+    fireEvent.click(screen.getByRole('checkbox', { name: /conditions/i }));
     fireEvent.submit(screen.getByRole('button', { name: /envoyer ma demande/i }));
 
     expect(await screen.findByText(/demande enregistrée/i)).toBeTruthy();
@@ -260,9 +274,33 @@ describe('ce que le formulaire fait de la réponse', () => {
     render(<Inscription />);
 
     choisirPalier('Pro');
+    fireEvent.click(screen.getByRole('checkbox', { name: /conditions/i }));
     fireEvent.submit(screen.getByRole('button', { name: /payer et ouvrir mon compte/i }));
 
     expect((await screen.findByRole('alert')).textContent).toMatch(/fuite connue/i);
     expect(window.location.assign).not.toHaveBeenCalled();
+  });
+});
+
+describe('l’acceptation avant paiement', () => {
+  it('refuse l’envoi tant que les conditions ne sont pas acceptées', async () => {
+    render(<Inscription />);
+    remplirLeFormulaire(); // l'aide déjà présente dans ce fichier
+    fireEvent.click(screen.getByRole('button', { name: /Payer|Envoyer ma demande/ }));
+    expect(await screen.findByText(/accepter les conditions/i)).toBeTruthy();
+    expect(envoyerDemande).not.toHaveBeenCalled();
+  });
+
+  it('n’est jamais pré-cochée', () => {
+    render(<Inscription />);
+    const case_ = screen.getByRole('checkbox', { name: /conditions/i });
+    expect((case_ as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('mène aux deux textes, sans quitter le formulaire rempli', () => {
+    render(<Inscription />);
+    const lien = screen.getByRole('link', { name: /conditions générales/i });
+    expect(lien.getAttribute('target')).toBe('_blank');
+    expect(lien.getAttribute('href')).toBe('/conditions');
   });
 });

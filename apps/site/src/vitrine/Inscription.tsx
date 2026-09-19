@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 import { entree, useAnimations } from './animation';
 import { envoyerDemande, palierDepuisAdresse } from './demande';
-import { APP_COLLECTEUR, CONTACT_DEMO } from './liens';
+import { APP_COLLECTEUR, CONDITIONS, CONFIDENTIALITE, CONTACT_DEMO, WHATSAPP } from './liens';
 
 /**
  * Le formulaire d'ouverture de compte.
@@ -91,6 +91,8 @@ export function Inscription() {
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoyee, setEnvoyee] = useState(false);
+  // Jamais pré-cochée : un accord donné par défaut n'en est pas un.
+  const [accepte, setAccepte] = useState(false);
 
   const ref = useAnimations<HTMLElement>(() => {
     entree('[data-entree]', { delay: 0.1 });
@@ -103,6 +105,13 @@ export function Inscription() {
   async function soumettre(evenement: React.FormEvent) {
     evenement.preventDefault();
     if (envoi) return;
+
+    // Un contrat non accepté n'engage personne : la garde se pose avant
+    // l'envoi, pas après, pour qu'aucune demande ne parte sans accord.
+    if (!accepte) {
+      setErreur('Tu dois accepter les conditions générales et la politique de confidentialité.');
+      return;
+    }
 
     setEnvoi(true);
     setErreur(null);
@@ -401,6 +410,42 @@ export function Inscription() {
                 </p>
               )}
 
+              {/* Non désactivé tant que la case n'est pas cochée : un bouton
+                  grisé sans explication laisse le visiteur chercher pourquoi.
+                  Il part, et l'erreur qui suit dit quoi faire. Les deux liens
+                  s'ouvrent dans un onglet neuf : un formulaire à moitié
+                  rempli ne doit pas être perdu pour avoir lu ce qu'on
+                  signe. */}
+              <label className="mb-4 flex items-start gap-2.5 font-body text-sm">
+                <input
+                  type="checkbox"
+                  checked={accepte}
+                  onChange={(e) => setAccepte(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                />
+                <span>
+                  J’ai lu et j’accepte les{' '}
+                  <a
+                    href={CONDITIONS}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold underline underline-offset-2"
+                  >
+                    conditions générales
+                  </a>{' '}
+                  et la{' '}
+                  <a
+                    href={CONFIDENTIALITE}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold underline underline-offset-2"
+                  >
+                    politique de confidentialité
+                  </a>
+                  .
+                </span>
+              </label>
+
               <button
                 type="submit"
                 disabled={envoi}
@@ -446,6 +491,18 @@ export function Inscription() {
                 Tu préfères écrire ?{' '}
                 <a href={CONTACT_DEMO} className="text-or/70 underline underline-offset-2">
                   Envoyer un courriel à GTCS
+                </a>{' '}
+                ·{' '}
+                {/* Onglet neuf, comme tout lien sortant : le formulaire à
+                    moitié rempli ne doit pas être perdu pour avoir ouvert
+                    WhatsApp. */}
+                <a
+                  href={WHATSAPP}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-or/70 underline underline-offset-2"
+                >
+                  Écrire sur WhatsApp
                 </a>
               </p>
             </form>

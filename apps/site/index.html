@@ -14,11 +14,24 @@
     <!--
       L'adresse canonique.
 
-      Le site répond sur deux chemins — `/` et `/inscription`, voir `App.tsx` —
-      et `index.html` les sert tous les deux par la réécriture du `netlify.toml`.
-      Sans cette ligne, Google verrait deux pages au même contenu HTML initial et
-      choisirait lui-même laquelle garder. La désigner ici lève le doute ; le
-      formulaire est en outre marqué `noindex` par un en-tête, côté serveur.
+      Le site répond sur cinq chemins — `/`, `/inscription`, `/mentions-legales`,
+      `/conditions` et `/confidentialite`, voir `App.tsx` — et `index.html` les sert
+      tous par la réécriture du `netlify.toml`. Sans cette ligne, Google verrait
+      plusieurs pages au même contenu HTML initial et choisirait lui-même laquelle
+      garder.
+
+      Connu et non corrigé ici : cette balise et `og:url` plus bas restent codées en
+      dur sur la racine. Les trois pages juridiques déclarent donc la racine comme
+      leur propre version canonique, l'inverse de ce que le sitemap vient de
+      déclarer, et un aperçu WhatsApp de `/conditions` affiche celui de la racine.
+      Les poser depuis React ne réglerait que la moitié du problème : le robot qui
+      prévisualise un lien WhatsApp lit le HTML brut et n'exécute jamais le
+      JavaScript, donc une valeur posée après le montage ne lui parvient jamais —
+      seul Google, qui rend la page, en profiterait, et encore, avec une balise
+      injectée après coup qu'il traite comme moins sûre qu'une balise déjà présente
+      dans le HTML servi. Le vrai correctif demande une page HTML distincte par
+      route — prérendue au build ou réécrite par une fonction Netlify — et reste à
+      faire (voir le rapport de cette tâche).
     -->
     <link rel="canonical" href="https://kolek.cash/" />
 
