@@ -42,9 +42,21 @@ create table if not exists public.acceptations_conditions (
 comment on table public.acceptations_conditions is
   'Un événement par acceptation des conditions générales. Jamais écrasé : l''historique des versions est la preuve.';
 
--- Le webhook retrouve la ligne par la demande au moment de poser collecteur_id.
-create index if not exists acceptations_conditions_demande_idx
-  on public.acceptations_conditions (demande_id);
+-- Une demande donne lieu à une acceptation, et une seule : elle est écrite au
+-- moment où le formulaire part, sur une ligne `demandes_ouverture` qui vient
+-- d'être insérée. Le renouvellement, lui, n'a pas de demande — d'où le
+-- « where demande_id is not null », qui laisse passer autant d'acceptations
+-- authentifiées que le collecteur en signera au fil des versions.
+--
+-- Sans cette unicité, la mise à jour qui relie l'acceptation au compte
+-- (`_shared/ouvrir-compte.ts`) relierait toutes les lignes nulles d'une même
+-- demande en un seul passage, et le raisonnement de son filtre
+-- `.is('collecteur_id', null)` reposerait sur un invariant que rien ne tient.
+-- Sert aussi les recherches du webhook par demande — l'index ordinaire qui
+-- les servait devient redondant, un index unique répond aux mêmes requêtes.
+create unique index if not exists acceptations_conditions_demande_unique
+  on public.acceptations_conditions (demande_id)
+  where demande_id is not null;
 
 -- La question du jour du litige : qu'a accepté cette personne, et quand.
 create index if not exists acceptations_conditions_collecteur_idx
