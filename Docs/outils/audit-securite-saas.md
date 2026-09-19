@@ -71,7 +71,9 @@ Ouvrir le fichier, lire le contexte. Les faux positifs classiques, à écarter s
 - `select('*')` sur une table sans données sensibles, ou sur une requête déjà filtrée par RLS ;
 - `dangerouslySetInnerHTML` sur du contenu constant écrit par le développeur, non fourni par un utilisateur.
 
-À l'inverse, l'absence de signal ne prouve rien : un `grep` ne voit pas ce qui n'est pas dans le code. Cinq contrôles échappent complètement au scan et se vérifient à la main — **RLS (4), chiffrement (5), cookies (9), hachage des mots de passe (10), uploads (16)**. Les traiter systématiquement.
+À l'inverse, l'absence de signal ne prouve rien : un `grep` ne voit pas ce qui n'est pas dans le code. **Six** contrôles échappent complètement au scan et se vérifient à la main — **RLS (4), chiffrement (5), cookies (9), hachage des mots de passe (10), anti-bot (12), uploads (16)**. Les traiter systématiquement.
+
+Un septième n'est couvert qu'**en apparence** : le scan range « 18/19 » sous un même titre, mais il n'y cherche que des chaînes de headers dans le code. Cela ne dit rien du contrôle **19 (HTTPS forcé)**, qui se mesure sur le service en ligne — `curl -sI http://mon-app.com` doit répondre par une 301 vers `https://`. Trouver `Strict-Transport-Security` dans un fichier de configuration ne prouve pas que la redirection existe.
 
 ### 4. Compléter le scan à la lecture
 
@@ -183,8 +185,14 @@ Sur un projet vibe-codé, ces quatre-là expliquent à elles seules la majorité
 # Usage : bash scripts/scan.sh [chemin_du_projet]
 #
 # Ce script ne conclut rien : il rassemble en une passe les signaux bruts
-# des contrôles 1, 2, 3, 6, 8, 13, 15, 17, 20. Chaque résultat doit ensuite
-# être ouvert et confirmé — voir la section « faux positifs » de checklist.md.
+# des contrôles 1, 2, 3, 6, 7, 8, 11, 13, 14, 15, 17, 18 et 20, plus les routes
+# de debug oubliées. Chaque résultat doit ensuite être ouvert et confirmé —
+# voir la section « faux positifs » de checklist.md.
+#
+# Ce qu'il ne touche pas, et qu'il ne faut pas croire couvert : 4 (RLS),
+# 5 (chiffrement), 9 (cookies), 10 (hachage), 12 (anti-bot), 16 (uploads).
+# Ni 19 : chercher « Strict-Transport-Security » dans le code ne dit rien
+# d'une redirection HTTP vers HTTPS, qui se teste en ligne.
 
 set -uo pipefail
 CIBLE="${1:-.}"
@@ -224,7 +232,9 @@ if [ -d .git ]; then
   git log --all --full-history --name-only --pretty=format: 2>/dev/null \
     | sort -u | grep -Ei "^\.env($|\.)|credential|secret|\.pem$|\.key$|serviceaccount" | head -15 || rien
   echo "  .env ignoré par git :"
-  grep -qE "^\.?env" .gitignore 2>/dev/null && echo "    oui" || echo "    NON — .gitignore ne couvre pas .env"
+  # `^\.?env` ratait `*.env`, une forme courante, et acceptait `environment/`,
+  # qui ne couvre rien. Le point est exigé, l'étoile optionnelle tolérée.
+  grep -qE "^[[:space:]]*\*?\.env" .gitignore 2>/dev/null && echo "    oui" || echo "    NON — .gitignore ne couvre pas .env"
   echo "  .env actuellement suivi par git :"
   git ls-files 2>/dev/null | grep -E "^\.env" | head -5 || echo "    non"
 else
@@ -268,7 +278,13 @@ lancer "grep -rln \"from 'zod'\|from \\\"zod\\\"\|require('joi')\|from 'yup'\|su
 
 titre "20. Dépendances"
 if [ -f package-lock.json ] || [ -f yarn.lock ] || [ -f pnpm-lock.yaml ]; then
-  npm audit --omit=dev 2>/dev/null | tail -12 || echo "  (npm audit indisponible)"
+  # `npm audit` sort en 1 **dès qu'une vulnérabilité est trouvée** : son code
+  # de sortie dit « des failles existent », pas « la commande a échoué ». Avec
+  # `set -o pipefail`, le repli tirait donc exactement quand l'audit avait
+  # marché — les failles s'affichaient, suivies de « npm audit indisponible ».
+  # C'est la sortie, pas le code, qui distingue les deux cas.
+  sortie=$(npm audit --omit=dev 2>/dev/null) || true
+  if [ -n "$sortie" ]; then echo "$sortie" | tail -12; else echo "  (npm audit indisponible)"; fi
 else
   echo "  (pas de lockfile — npm audit impossible)"
 fi
@@ -329,8 +345,13 @@ grep -c "^\.env" .gitignore
 
 **Vérifier.**
 ```bash
+# Sur un projet qui ne range pas son code dans src/, app/ ou components/, la
+# commande ci-dessous ne sort rien — et une sonde muette se lit comme un
+# résultat propre. Chercher partout, puis écarter les fichiers serveur à la
+# lecture : c'est leur place normale.
 grep -rn "service_role\|SUPABASE_SERVICE\|serviceAccountKey\|createClient(" \
-  --include="*.js" --include="*.jsx" --include="*.ts" --include="*.tsx" src/ app/ components/ 2>/dev/null
+  --include="*.js" --include="*.jsx" --include="*.ts" --include="*.tsx" . \
+  --exclude-dir={node_modules,.git,dist,build,.next}
 ```
 Un JWT Supabase se décode : si le champ `role` vaut `service_role`, la clé est administrateur. Vérifier chaque `createClient()` appelé depuis un fichier du frontend.
 
@@ -571,8 +592,12 @@ select tablename, policyname, cmd, qual, with_check
 from pg_policies where schemaname = 'public' order by tablename;
 
 -- Tables avec RLS mais sans aucune policy : inaccessibles (bug fonctionnel)
+-- La jointure porte sur le schéma **et** le nom : sans `p.schemaname`, une
+-- policy posée sur une table homonyme d'un autre schéma satisfait la jointure
+-- et masque une table réellement sans protection.
 select t.tablename from pg_tables t
-left join pg_policies p on p.tablename = t.tablename
+left join pg_policies p
+  on p.tablename = t.tablename and p.schemaname = t.schemaname
 where t.schemaname = 'public' and t.rowsecurity = true and p.policyname is null;
 
 -- Fonctions en SECURITY DEFINER : elles s'exécutent avec les droits du créateur
