@@ -1,144 +1,48 @@
-/**
- * Les routes de App.tsx et les règles de netlify.toml se répondent-elles ?
- *
- *   node scripts/verifier-routes.mjs        (npm run verifier:routes)
- *
- * ## Le défaut visé
- *
- * `App.tsx` route à la main, sans bibliothèque : chaque page connue y est un
- * `if (chemin === X) return <Page />`. Depuis la tâche 6 de l'audit du
- * 2026-09-04 (point A.3), `netlify.toml` n'avale plus tout par un joker
- * `/*` — il énumère les mêmes routes, pour que Netlify puisse rendre un vrai
- * 404 sur le reste. Ce sont donc deux listes, dans deux fichiers, dans deux
- * langages, écrites à des moments différents, et rien ne les lie au moment
- * où on les tape.
- *
- * Une route ajoutée à `App.tsx` sans sa règle dans `netlify.toml` marche en
- * développement — Vite sert tout — et rend 404 en production, silencieusement
- * : aucune épreuve du site ne visite `netlify.toml`, `verifier-mentions.mjs`
- * ne lit que les sources React, et `npm test` ne descend pas dans
- * `scripts/`. C'est exactement le profil d'une mention légale qui redevient
- * introuvable sans qu'aucun voyant ne s'allume — pire qu'une absence,
- * puisqu'elle a existé et cesserait de répondre.
- *
- * ## Ce que ce script compare
- *
- * 1. les routes que `App.tsx` dispatche vers une page (tout sauf le repli
- *    `<Vitrine />`), résolues à leur valeur littérale via `liens.ts` quand
- *    elles sont nommées par une constante plutôt qu'écrites en dur ;
- * 2. les chemins déclarés dans `netlify.toml` par une règle
- *    `to = "/index.html"`, `status = 200`, dont le `from` est un chemin
- *    relatif — ni le joker, ni la redirection de l'ancien domaine.
- *
- * Les deux ensembles doivent être exactement les mêmes. Un manque d'un côté
- * ou de l'autre est nommé, jamais résumé en un compte : un compte qui tombe
- * de 4 à 3 ne dit pas laquelle des quatre routes a disparu.
- *
- * ## Le joker
- *
- * Une règle `from = "/*"` vers `/index.html` en 200 annulerait, à elle
- * seule, tout le travail de la tâche 6 : elle réabsorbe le 404 dans un 200,
- * quoi que disent les routes nommées à côté d'elle — Netlify applique la
- * première correspondance, et un joker replacé n'importe où avant elles les
- * rend inatteignables. Ce script le refuse s'il reparaît.
- */
-
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const APP_TSX = 'apps/site/src/App.tsx';
-export const LIENS_TS = 'apps/site/src/vitrine/liens.ts';
+/**
+ * La table des routes et le `netlify.toml` doivent décrire le même site.
+ *
+ * ## Le défaut que ce script empêche
+ *
+ * Une route ajoutée à `apps/site/src/vitrine/routes.ts` sans sa règle de
+ * réécriture marche en développement — Vite sert tout — et rend **404 en
+ * production**. Rien dans `npm test` ne visite `netlify.toml` : aucune épreuve
+ * du site ne peut voir ce décalage.
+ *
+ * ## Ce qu'il vérifie depuis le 2026-09-20
+ *
+ * Il lisait `App.tsx`, dont il extrayait les `if (chemin === …) return` par
+ * expression régulière. Cette forme a disparu : les routes vivent maintenant
+ * dans une table, lue par le routage, par le prérendu et par le sitemap. Le
+ * script lit donc la table — un import, plus une analyse de texte.
+ *
+ * Trois reproches possibles :
+ *
+ * 1. **une route sans règle** — elle rendrait 404 en production ;
+ * 2. **une règle orpheline** — page retirée, ou faute de frappe qui masque la
+ *    vraie route derrière un 404 ;
+ * 3. **une règle qui vise le mauvais fichier** — le reproche neuf. Depuis que
+ *    `scripts/prerendre.mjs` écrit une page par route, une règle pointée sur
+ *    `/index.html` servirait la page d'accueil sous l'adresse des conditions :
+ *    le contenu et la balise canonique d'une autre page, c'est-à-dire le
+ *    défaut que le prérendu vient de fermer, réintroduit par une seule ligne.
+ *
+ * Et toujours le joker `/*`, dont le retour annulerait le vrai 404.
+ *
+ * ## Ce qu'il ne vérifie pas
+ *
+ * Que `App.tsx` sache rendre chaque route : c'est `App.test.tsx` qui le tient,
+ * en rendant chaque chemin de la table et en refusant qu'il retombe sur la
+ * vitrine. Et que le sitemap suive : c'est `scripts/engendrer-sitemap.mjs
+ * --verifier`.
+ */
+
+export const ROUTES_TS = 'apps/site/src/vitrine/routes.ts';
 export const NETLIFY_TOML = 'apps/site/netlify.toml';
 
-/**
- * Blanchit les commentaires d'`App.tsx`, sans décaler les lignes.
- *
- * Le commentaire de tête du fichier écrit : « Le chemin est lu une fois, au
- * chargement. » — une phrase de prose qui mentionne `chemin` au même titre
- * qu'un vrai dispatch. Sans ce nettoyage, elle entrerait dans `inconnues` et
- * ferait échouer la garde sur un fichier qui n'a pourtant pas changé.
- *
- * Chaque caractère retiré est remplacé par une espace plutôt que supprimé :
- * les numéros de ligne restent justes pour les messages d'erreur.
- */
-function sansCommentaires(texte) {
-  return texte
-    .replace(/\/\*[\s\S]*?\*\//g, (bloc) => bloc.replace(/[^\r\n]/g, ' '))
-    .replace(/\/\/[^\r\n]*/g, (ligne) => ' '.repeat(ligne.length));
-}
-
-/**
- * Les routes que `App.tsx` fait mener à une page, dans l'ordre du fichier,
- * et ce qui n'a pas pu être résolu.
- *
- * Le repli final (`return <Vitrine />` sans condition) n'est pas une route :
- * c'est ce que Netlify sert déjà nativement pour `/`, fichier réel du
- * répertoire publié.
- *
- * Un nom qui n'est ni une chaîne littérale ni une constante connue de
- * `liens.ts` va dans `inconnues` plutôt que d'être tu : un routage qu'on ne
- * sait pas lire est un routage qu'on ne peut pas garder synchronisé, et le
- * signaler vaut mieux que de conclure sur un ensemble incomplet sans le dire.
- *
- * Le motif ne reconnaît qu'une seule forme de dispatch : `if (chemin === X)
- * return`. Un `switch (chemin)`, un `if (chemin === X) {` sur bloc, ou un
- * `chemin.startsWith(...)` seraient sinon ignorés sans bruit — la garde
- * conclurait « mêmes routes » pendant qu'une page neuve rend 404 en
- * production. Toute autre ligne qui mentionne `chemin`, hors de sa
- * déclaration, part donc elle aussi dans `inconnues` plutôt que d'être
- * tue : le reproche qui nomme une route inconnue (voir plus bas) fait le
- * reste.
- */
-export function routesDeAppTsx(texte, constantes) {
-  const routes = [];
-  const inconnues = [];
-
-  for (const ligne of sansCommentaires(texte).split(/\r?\n/)) {
-    if (/\bconst chemin\b/.test(ligne)) continue;
-
-    const dispatch = /if\s*\(chemin === (.+?)\)\s*return\b/.exec(ligne);
-    if (dispatch) {
-      const expr = dispatch[1].trim();
-      const litteral = /^'([^']*)'$/.exec(expr);
-      if (litteral) {
-        routes.push(litteral[1]);
-      } else if (Object.prototype.hasOwnProperty.call(constantes, expr)) {
-        routes.push(constantes[expr]);
-      } else {
-        inconnues.push(expr);
-      }
-      continue;
-    }
-
-    if (/\bchemin\b/.test(ligne)) inconnues.push(ligne.trim());
-  }
-
-  return { routes, inconnues };
-}
-
-/**
- * Les constantes de chemin exportées par `liens.ts`, sous la forme
- * `NOM -> '/valeur'`. Seules les exportations tenant sur une seule ligne sont
- * lues — c'est le cas de toutes les routes ; `CONTACT_DEMO`, assignée sur
- * deux lignes, n'en est pas une, et n'a pas à l'être : ce n'est pas un chemin
- * du site.
- */
-export function constantesDeLiens(texte) {
-  const constantes = {};
-  for (const m of texte.matchAll(/export const (\w+) = '([^']*)';/g)) {
-    constantes[m[1]] = m[2];
-  }
-  return constantes;
-}
-
-/**
- * Les blocs `[[redirects]]` de `netlify.toml`, en `{ from, to, status,
- * force }`. Les lignes de commentaire (`#`) sont retirées avant le
- * découpage : le long commentaire qui précède la règle
- * `kolek-site.netlify.app` n'en est séparé par aucune ligne vide, et un
- * découpage naïf sur les lignes vides le fondrait dans le même paragraphe
- * sans nuire à la lecture des clés qui nous intéressent.
- */
 export function blocsRedirects(texte) {
   const sansCommentaires = texte
     .split('\n')
@@ -161,60 +65,44 @@ export function blocsRedirects(texte) {
 }
 
 /**
- * Les chemins que `netlify.toml` réécrit vers la page unique — ni le joker,
- * ni la redirection permanente de l'ancien domaine, qui vise une autre
- * adresse et un autre statut.
+ * Les réécritures internes, par chemin.
+ *
+ * Toute règle en 200 vers un `.html` du site, quel que soit le fichier visé :
+ * une règle qui vise le mauvais fichier doit être **vue puis reprochée**, pas
+ * filtrée en silence — filtrée, elle deviendrait une route manquante, et le
+ * message parlerait d'un tout autre défaut que celui qui est là.
  */
-export function routesDeNetlify(blocs) {
-  return blocs
-    .filter(
-      (b) => b.to === '/index.html' && String(b.status) === '200' && b.from?.startsWith('/') && b.from !== '/*',
-    )
-    .map((b) => b.from);
+export function reecrituresDeNetlify(blocs) {
+  const par = new Map();
+  for (const b of blocs) {
+    if (String(b.status) !== '200') continue;
+    if (!b.from?.startsWith('/') || b.from === '/*') continue;
+    if (!b.to?.endsWith('.html')) continue;
+    par.set(b.from, b.to);
+  }
+  return par;
 }
 
-/**
- * Le joker est-il resté, ou revenu ? Une seule règle `/* -> /index.html` en
- * 200 suffit à annuler tout le travail de la tâche 6 : Netlify applique la
- * première correspondance, et un joker placé n'importe où avant le 404
- * implicite ravale toute adresse inconnue dans la page d'accueil.
- */
 export function jokerPresent(blocs) {
   return blocs.some((b) => b.from === '/*' && b.to === '/index.html' && String(b.status) === '200');
 }
 
-/**
- * Les reproches. Vide = `App.tsx` et `netlify.toml` dispatchent exactement
- * les mêmes routes, et aucun joker ne les a court-circuitées.
- */
-export function reproches({ appTsx, liens, netlifyToml }) {
+export function reproches({ routes, netlifyToml }) {
   const trouves = [];
 
-  const constantes = constantesDeLiens(liens);
-  const { routes: routesApp, inconnues } = routesDeAppTsx(appTsx, constantes);
-
-  for (const inconnue of inconnues) {
+  if (routes.length === 0) {
     trouves.push(
-      `App.tsx dispatche « ${inconnue} », qui n'est ni une chaîne littérale ` +
-        `ni une constante à une ligne de liens.ts : impossible de savoir quel ` +
-        `chemin en résulte, et donc de vérifier qu'il a sa règle.`,
-    );
-  }
-
-  if (routesApp.length === 0) {
-    trouves.push(
-      "Aucune route trouvée dans App.tsx : le motif « if (chemin === …) " +
-        "return » ne correspond à rien. Le script lit peut-être le mauvais " +
-        'fichier, ou App.tsx a changé de forme sans que ce script suive.',
+      `Aucune route dans ${ROUTES_TS} : le script lit peut-être le mauvais ` +
+        'fichier, ou la table a changé de forme sans que ce script suive.',
     );
   }
 
   const blocs = blocsRedirects(netlifyToml);
-  const routesNetlify = routesDeNetlify(blocs);
+  const reecritures = reecrituresDeNetlify(blocs);
 
-  if (routesNetlify.length === 0) {
+  if (reecritures.size === 0) {
     trouves.push(
-      "Aucune règle « to = /index.html, status = 200 » trouvée dans " +
+      'Aucune réécriture « status = 200 » vers un .html trouvée dans ' +
         'netlify.toml. Le script lit peut-être le mauvais fichier, ou toutes ' +
         'les routes nommées ont disparu.',
     );
@@ -224,30 +112,44 @@ export function reproches({ appTsx, liens, netlifyToml }) {
     trouves.push(
       'netlify.toml redirige encore /* vers /index.html en 200 : ce joker ' +
         "avale toute adresse inconnue avant qu'elle n'atteigne 404.html, et " +
-        'annule le vrai 404 que la tâche 6 doit rendre — même si les routes ' +
-        'nommées ci-dessous sont par ailleurs correctes.',
+        'annule le vrai 404 — même si les routes nommées sont par ailleurs ' +
+        'correctes.',
     );
   }
 
-  const ensembleApp = new Set(routesApp);
-  const ensembleNetlify = new Set(routesNetlify);
+  for (const route of routes) {
+    // La racine est servie par le fichier `dist/index.html` que Netlify trouve
+    // directement : elle n'a pas de règle, et ne doit pas en avoir.
+    if (route.chemin === '/') continue;
 
-  for (const route of ensembleApp) {
-    if (!ensembleNetlify.has(route)) {
+    const vise = reecritures.get(route.chemin);
+    if (vise === undefined) {
       trouves.push(
-        `${route} est dispatché par App.tsx mais n'a aucune règle dans ` +
+        `${route.chemin} est dans la table mais n'a aucune règle dans ` +
           'netlify.toml : cette page marche en développement — Vite sert tout ' +
           '— et rendrait 404 en production.',
+      );
+      continue;
+    }
+
+    const attendu = `/${route.fichier}`;
+    if (vise !== attendu) {
+      trouves.push(
+        `netlify.toml réécrit ${route.chemin} vers ${vise}, alors que le ` +
+          `prérendu écrit ${attendu}. Servir un autre fichier, c'est servir ` +
+          "le contenu et la balise canonique d'une autre page sous cette " +
+          'adresse.',
       );
     }
   }
 
-  for (const route of ensembleNetlify) {
-    if (!ensembleApp.has(route)) {
+  const chemins = new Set(routes.map((r) => r.chemin));
+  for (const from of reecritures.keys()) {
+    if (!chemins.has(from)) {
       trouves.push(
-        `netlify.toml réécrit ${route} vers /index.html, mais App.tsx ne ` +
-          "dispatche rien pour ce chemin : règle orpheline d'une page retirée, " +
-          "ou faute de frappe qui masque la vraie route derrière un 404.",
+        `netlify.toml réécrit ${from}, mais la table ne connaît pas ce ` +
+          "chemin : règle orpheline d'une page retirée, ou faute de frappe " +
+          'qui masque la vraie route derrière un 404.',
       );
     }
   }
@@ -255,22 +157,32 @@ export function reproches({ appTsx, liens, netlifyToml }) {
   return trouves;
 }
 
-function lire() {
-  return {
-    appTsx: readFileSync(APP_TSX, 'utf8'),
-    liens: readFileSync(LIENS_TS, 'utf8'),
-    netlifyToml: readFileSync(NETLIFY_TOML, 'utf8'),
-  };
+async function lire() {
+  /*
+    Résolu depuis le répertoire courant, et non depuis ce fichier.
+
+    Un `import('../apps/site/…')` se résoudrait depuis l'emplacement de ce
+    module, donc toujours sur le vrai dépôt — y compris quand les épreuves
+    lancent ce script sur un faux dépôt jetable pour vérifier qu'il sait
+    rougir. Le contrôle aurait alors lu la table saine pendant qu'on lui
+    présentait une table cassée, et serait passé au vert sur un dépôt
+    délibérément rompu : un garde-fou qu'on croit éprouvé et qui ne l'est pas.
+
+    Les autres contrôles du dépôt lisent tous leurs fichiers relativement au
+    répertoire courant ; celui-ci fait pareil.
+  */
+  const { ROUTES } = await import(pathToFileURL(resolve(process.cwd(), ROUTES_TS)).href);
+  return { routes: ROUTES, netlifyToml: readFileSync(NETLIFY_TOML, 'utf8') };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const trouves = reproches(lire());
+  const trouves = reproches(await lire());
 
   if (trouves.length > 0) {
-    console.error("App.tsx et netlify.toml ne dispatchent pas les mêmes routes :");
+    console.error('La table des routes et netlify.toml ne décrivent pas le même site :');
     for (const r of trouves) console.error(`  ${r}`);
     process.exit(1);
   }
 
-  console.log('App.tsx et netlify.toml dispatchent exactement les mêmes routes.');
+  console.log('La table des routes et netlify.toml décrivent exactement le même site.');
 }

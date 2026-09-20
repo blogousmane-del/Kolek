@@ -65,15 +65,30 @@ export function useAnimations<T extends HTMLElement>(
  * changement.
  */
 export function useMouvementAccepte(): boolean {
-  const [accepte, setAccepte] = useState(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return true;
-    return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  });
+  /*
+    Toujours `true` au premier rendu, et la préférence lue seulement ensuite.
+
+    Ce n'est pas un renoncement au réglage, c'est ce que l'hydratation exige.
+    Depuis que `scripts/prerendre.mjs` écrit ces pages dans le HTML servi,
+    `main.tsx` les hydrate au lieu de les reconstruire — et hydrater veut dire
+    que le premier rendu client doit produire exactement ce que le serveur a
+    produit. Le serveur, lui, n'a aucune préférence à lire : il rend une page
+    pour tout le monde. Lire `matchMedia` avant le premier rendu ferait donc
+    diverger tout visiteur en mouvement réduit, et React reconstruirait
+    l'arbre entier au lieu de l'hydrater.
+
+    L'effet ci-dessous s'exécute avant que le navigateur peigne. Personne ne
+    voit d'animation qu'il a refusée ; c'est éprouvé dans `animation.test.tsx`.
+  */
+  const [accepte, setAccepte] = useState(true);
 
   useEffect(() => {
     if (!window.matchMedia) return;
     const requete = window.matchMedia('(prefers-reduced-motion: reduce)');
     const suivre = () => setAccepte(!requete.matches);
+    // Au montage aussi, et pas seulement au changement : l'état part d'un
+    // `true` qui est une convention d'hydratation, pas une mesure.
+    suivre();
     requete.addEventListener('change', suivre);
     return () => requete.removeEventListener('change', suivre);
   }, []);
