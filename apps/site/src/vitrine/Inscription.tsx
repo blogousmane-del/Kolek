@@ -496,19 +496,28 @@ export function Inscription() {
                 Tu préfères écrire ?{' '}
                 <a href={CONTACT_DEMO} className="text-or/70 underline underline-offset-2">
                   Envoyer un courriel à GTCS
-                </a>{' '}
-                ·{' '}
-                {/* Onglet neuf, comme tout lien sortant : le formulaire à
+                </a>
+                {/* Le séparateur part avec le lien : `WHATSAPP` vaut `null`
+                    quand le numéro n'est pas fourni, et un « · » orphelin
+                    après le courriel se lirait comme une coupure.
+
+                    Onglet neuf, comme tout lien sortant : le formulaire à
                     moitié rempli ne doit pas être perdu pour avoir ouvert
                     WhatsApp. */}
-                <a
-                  href={WHATSAPP}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-or/70 underline underline-offset-2"
-                >
-                  Écrire sur WhatsApp
-                </a>
+                {WHATSAPP && (
+                  <>
+                    {' '}
+                    ·{' '}
+                    <a
+                      href={WHATSAPP}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-or/70 underline underline-offset-2"
+                    >
+                      Écrire sur WhatsApp
+                    </a>
+                  </>
+                )}
               </p>
             </form>
 

@@ -33,7 +33,10 @@ const COLONNES = [
     liens: [
       { href: APP_COLLECTEUR, libelle: 'Espace collecteur' },
       { href: INSCRIPTION, libelle: 'Ouvrir un compte' },
-      { href: WHATSAPP, libelle: 'WhatsApp' },
+      // Rien plutôt qu'un lien mort : `WHATSAPP` vaut `null` tant que
+      // `IDENTITE.whatsapp` est un trou, et un `wa.me` sans numéro ouvre une
+      // conversation vide, ce qui se voit moins qu'une absence.
+      ...(WHATSAPP ? [{ href: WHATSAPP, libelle: 'WhatsApp' }] : []),
       { href: CONTACT_DEMO, libelle: 'Écrire à GTCS' },
     ],
   },
@@ -45,7 +48,7 @@ const COLONNES = [
       { href: CONFIDENTIALITE, libelle: 'Confidentialité' },
     ],
   },
-] as const;
+];
 
 export function PiedDePage() {
   return (
