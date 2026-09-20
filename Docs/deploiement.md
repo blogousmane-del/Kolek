@@ -1427,8 +1427,16 @@ secrets du dépôt ce n'est plus forcément le cas. Ce que fait
   **toutes** les fonctions, pas seulement celles dont le fichier a changé ;
 - **mais seulement si `SUPABASE_ACCESS_TOKEN` est posé et accepté.** Deux
   étapes le contrôlent — présence, puis un `supabase projects list` qui tranche
-  la validité. Absent, le travail rend un `::warning` et les fonctions restent
-  à déployer à la main ;
+  la validité. Les deux échecs ne se ressemblent pas, et c'est voulu :
+  - **absent** — `::warning`, le travail se saute, la construction reste verte,
+    et les fonctions restent à déployer à la main ;
+  - **posé mais refusé** — `::error`, `exit 1`, **la construction passe au
+    rouge**. C'est le cas survenu à la fusion de #13 le 2026-09-19 : jeton
+    expiré, message verbatim « SUPABASE_ACCESS_TOKEN est posé mais Supabase le
+    refuse ». Le remède est dans le message : régénérer un jeton personnel (il
+    commence par `sbp_`), `gh secret set SUPABASE_ACCESS_TOKEN`, puis
+    `gh run rerun <id> --failed`. Un rouge ici ne dit rien des épreuves —
+    elles étaient vertes — et tout du fait que la production n'a pas bougé ;
 - le travail `rappel-migrations` : la migration, elle, ne part jamais. Un
   `::notice`, délibérément pas un échec, parce que `db push` demande le mot de
   passe de la base.
@@ -1591,9 +1599,11 @@ remettre le mobilier dans la pièce, en vert.
 
 ### 9.6 Les deux fusions, et le squash qui casse la pile
 
-Ce chantier arrive en **deux PR empilées** : #11 porte les trois textes
-juridiques, #13 la trace de leur acceptation, et #13 est basée sur la branche de
-#11. L'ordre et la méthode comptent tous les deux.
+Ce chantier est arrivé en **deux PR empilées** : #11 portait les trois textes
+juridiques, #13 la trace de leur acceptation, et #13 était basée sur la branche
+de #11. Les deux ont été fusionnées le 2026-09-19 — #11 en `2bd9509`, #13 en
+`a0c830a`, par commit de fusion les deux fois. L'ordre et la méthode comptaient
+tous les deux, et ce qui suit sert à la prochaine pile.
 
 **Fusionner #11 par un commit de fusion, jamais par un squash.** Le dépôt
 autorise les trois modes, et c'est le piège : un squash pose sur `main` un
@@ -1604,15 +1614,57 @@ une autre forme. Un commit de fusion garde la filiation, et #13 se réduit toute
 seule à ce qui lui appartient. `main` est d'ailleurs déjà tenue ainsi
 (`Merge pull request #7`).
 
-Supprimer la branche de #11 après la fusion : c'est ce qui déclenche le
-retarget automatique de #13 vers `main`.
+**Supprimer la branche de #11 après la fusion ne retargete pas #13 : GitHub la
+ferme.** Cette page a annoncé le contraire, et l'opération du 2026-09-19 l'a
+démentie — #13 est passée en `CLOSED`, base toujours
+`mentions-et-confidentialite`, branche disparue. Une PR close refuse alors les
+deux gestes qui la sauveraient :
+
+```
+Cannot change the base branch of a closed pull request. (updatePullRequest)
+Could not open the pull request. (reopenPullRequest)
+```
+
+La manœuvre de réparation, qui garde la revue et les commentaires — recréer la
+branche de base sur le commit qu'elle portait, c'est-à-dire le **second parent**
+du commit de fusion :
+
+```bash
+git push origin $(git rev-parse <commit_de_fusion>^2):refs/heads/<branche_de_base>
+gh pr reopen 13
+gh pr edit 13 --base main
+git push origin --delete <branche_de_base>    # sans risque : la base est main
+```
+
+Le retarget, lui, marche : c'est la réouverture qui exige que la branche existe.
+Plus simple à la prochaine pile : **retargeter la PR enfant sur `main` avant de
+supprimer la branche de base**, et l'ordre cesse d'être piégeux.
+
+Le commit de fusion garde sa raison d'être pour autant : sans lui, le retarget
+ferait réapparaître #13 entière et en conflit. Les deux règles se cumulent.
 
 **Ce que chaque fusion déclenche**, et ce n'est pas symétrique :
 
 | Fusion | Edge Functions touchées | Ce qui part |
 |---|---|---|
 | #11 — textes juridiques | **0** | Netlify publie les trois sites. Le travail `fonctions` conclut « aucune touchée » et saute |
-| #13 — trace de l'acceptation | **7** | Netlify republie, **et le déploiement des fonctions part** — le contrôle de version entre en production |
+| #13 — trace de l'acceptation | **3** | Netlify republie, **et le déploiement des fonctions part** — le contrôle de version entre en production |
+
+Les trois, et pourquoi — deux modifiées, une par ricochet :
+
+| Fonction | Raison |
+|---|---|
+| `demander-ouverture` | modifiée, plus `_shared/valider-demande` et `_shared/acceptation` |
+| `abonnement-payer` | modifiée, plus `_shared/version-conditions` et `_shared/acceptation` |
+| `chariow-webhook` | inchangée, mais importe `_shared/ouvrir-compte` qui a changé |
+
+Cette page a d'abord annoncé **sept**, comptées à vue. Le chiffre se mesure :
+les fichiers du diff de fusion, puis les importateurs de chaque module partagé
+touché. La production l'a confirmé après coup — sur **19 fonctions déployées,
+3 ont pris une version** à la vague de 2026-09-19 18:58, les 16 autres ne
+bougeant pas. C'est aussi la preuve directe de ce qu'annonce la §9.1 : le
+travail les déploie toutes, seule celle dont le contenu change prend une
+version.
 
 C'est donc à la fusion de #13, et seulement là, que s'ouvre la fenêtre décrite
 en §9.3 : un ancien paquet encore servi n'envoie pas de `version` et se fait
