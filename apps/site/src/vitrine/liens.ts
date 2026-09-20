@@ -12,7 +12,14 @@
  * l'intérieur du produit**, pas dans la boîte aux lettres de quelqu'un.
  */
 
-import { IDENTITE } from './legal/identite';
+// L'extension est explicite, et elle porte quelque chose : ce fichier est
+// importé **par Node** dans `scripts/generer-cgu.mjs`, qui y lit les chemins
+// des deux textes juridiques plutôt que de les recopier. Node ESM ne devine
+// pas une extension manquante là où Vite la devine, et ce module n'avait
+// jusqu'ici aucun import pour révéler la différence — le générateur a rougi au
+// CI à la première. `allowImportingTsExtensions` est posé dans
+// `tsconfig.app.json` : la forme est légale des deux côtés.
+import { IDENTITE } from './legal/identite.ts';
 
 /** L'application du collecteur. Site Netlify distinct — la vitrine y renvoie
     par une navigation ordinaire, ce qu'aucune directive CSP n'entrave. */
