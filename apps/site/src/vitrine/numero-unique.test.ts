@@ -4,20 +4,21 @@ import { IDENTITE } from './legal/identite';
 import { WHATSAPP } from './liens';
 
 /**
- * Le numéro de l'exploitant ne s'écrit qu'à un seul endroit.
+ * Le numéro de l'exploitant ne s'écrit qu'une fois, et sous une seule forme.
  *
  * `identite.ts` s'ouvre sur la règle : « Deux copies d'un nom ou d'un numéro
- * finissent par diverger. » Elle a pourtant été enfreinte pour ce numéro-là
- * jusqu'au 2026-09-19 — `liens.ts` portait les mêmes chiffres en dur, et le
- * champ `IDENTITE.whatsapp` n'avait aucun lecteur. Le fait d'identité était le
- * mort, la copie le vivant.
+ * finissent par diverger. » Elle a été enfreinte deux fois pour ce numéro-là.
  *
- * Aucune garde existante ne pouvait le voir : `verifier:mentions` contrôle
- * qu'un champ est renseigné, pas qu'il est lu, et une épreuve qui recopie le
- * numéro dans son attente devient la troisième copie au lieu de la sonde.
+ * Le 2026-09-19 : `liens.ts` portait `https://wa.me/…` en dur avec les chiffres
+ * recopiés, pendant que le champ `IDENTITE.whatsapp` n'avait aucun lecteur — le
+ * fait d'identité était le mort, la copie le vivant.
  *
- * D'où cette lecture des sources : les chiffres nus n'apparaissent que dans
- * `legal/identite.ts`. Partout ailleurs, on passe par le fait.
+ * Le 2026-09-20 : le champ `whatsapp` lui-même était une seconde écriture du
+ * numéro de `telephone`, en chiffres nus. Deux formes d'un seul fait, tenues
+ * d'accord à la main. Il est parti ; le lien se déduit.
+ *
+ * Aucune garde existante ne voyait ni l'une ni l'autre : `verifier:mentions`
+ * contrôle qu'un champ est renseigné, pas qu'il est lu, ni qu'il est seul.
  */
 
 const SOURCES = import.meta.glob('./**/*.{ts,tsx}', {
@@ -26,22 +27,31 @@ const SOURCES = import.meta.glob('./**/*.{ts,tsx}', {
   eager: true,
 }) as Record<string, string>;
 
+function porteursDe(aiguille: string): string[] {
+  return Object.entries(SOURCES)
+    .filter(([, source]) => source.includes(aiguille))
+    .map(([chemin]) => chemin.replace('./', ''))
+    .sort();
+}
+
 describe('le numéro de l’exploitant', () => {
-  it('ne s’écrit en chiffres nus que dans identite.ts', () => {
-    const chiffres = IDENTITE.whatsapp;
-    expect(chiffres, 'sans numéro, cette épreuve ne mesure rien').toBeTruthy();
+  const lisible = IDENTITE.telephone as string;
+  const nus = lisible.replace(/\D/g, '');
 
-    const porteurs = Object.entries(SOURCES)
-      .filter(([, source]) => source.includes(chiffres as string))
-      .map(([chemin]) => chemin.replace('./', ''))
-      .sort();
+  it('ne s’écrit que dans identite.ts, et sous sa seule forme lisible', () => {
+    expect(lisible, 'sans numéro, cette épreuve ne mesure rien').toBeTruthy();
 
-    // Témoin : la sonde doit trouver au moins la source qui fait autorité,
+    // Témoin positif : la sonde doit trouver la source qui fait autorité,
     // sinon c'est la lecture qui est muette, pas le dépôt qui est propre.
-    expect(porteurs).toEqual(['legal/identite.ts']);
+    expect(porteursDe(lisible)).toEqual(['legal/identite.ts']);
   });
 
-  it('se rend en lien wa.me sans jamais le recopier', () => {
-    expect(WHATSAPP).toBe(`https://wa.me/${IDENTITE.whatsapp}`);
+  it('n’existe nulle part en chiffres nus : cette forme se calcule', () => {
+    expect(nus).toHaveLength(13);
+    expect(porteursDe(nus)).toEqual([]);
+  });
+
+  it('se rend en lien wa.me sans jamais être recopié', () => {
+    expect(WHATSAPP).toBe(`https://wa.me/${nus}`);
   });
 });

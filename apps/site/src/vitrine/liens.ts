@@ -61,21 +61,27 @@ export const CONFIDENTIALITE = '/confidentialite';
  * formaté pour l'œil humain y ouvre une conversation vide — un lien mort qui
  * n'a pas l'air mort, le pire des deux.
  *
- * **Il se déduit de `IDENTITE`, il ne s'y recopie pas.** Ce fichier a porté
- * les mêmes chiffres en dur jusqu'au 2026-09-19, à côté d'un `identite.ts`
- * qui s'ouvre sur « deux copies d'un nom ou d'un numéro finissent par
- * diverger » — et dont le champ `whatsapp` n'avait, lui, aucun lecteur. Le
- * fait d'identité était donc le mort, et la copie le vivant. Changer de numéro
- * aurait laissé le pied de page ouvrir l'ancien, sans qu'aucune garde ne
- * bronche : `verifier:mentions` contrôle qu'un champ est renseigné, pas qu'il
- * est lu.
+ * **Il se déduit de `IDENTITE.telephone`, il ne s'y recopie pas.** Ce fichier
+ * a porté les mêmes chiffres en dur jusqu'au 2026-09-19, à côté d'un
+ * `identite.ts` qui s'ouvre sur « deux copies d'un nom ou d'un numéro
+ * finissent par diverger » — et dont le champ `whatsapp` n'avait, lui, aucun
+ * lecteur. Le fait d'identité était le mort, la copie le vivant.
+ *
+ * Ce champ `whatsapp` est parti le 2026-09-20 : il portait les mêmes chiffres
+ * que `telephone`, dans une autre forme. Deux écritures d'un seul fait que
+ * rien n'obligeait à rester d'accord — le défaut d'hier, d'un cran plus bas.
+ * Le retrait de tout ce qui n'est pas un chiffre suffit à passer de l'une à
+ * l'autre. L'exemple chiffré qui se trouvait ici a été retiré : la garde de
+ * `numero-unique.test.ts` l'a compté comme une copie, et elle avait raison —
+ * un exemple dans un commentaire ment le jour où le numéro change.
  *
  * `null` quand l'exploitant n'a pas fourni de numéro : le champ est un `Trou`,
  * et `https://wa.me/` sans chiffres ouvre une conversation vide. Les deux
  * appelants retirent alors le lien plutôt que d'en servir un mort.
  */
-export const WHATSAPP: string | null = IDENTITE.whatsapp
-  ? `https://wa.me/${IDENTITE.whatsapp}`
+const CHIFFRES_NUS = IDENTITE.telephone?.replace(/\D/g, '') ?? null;
+export const WHATSAPP: string | null = CHIFFRES_NUS
+  ? `https://wa.me/${CHIFFRES_NUS}`
   : null;
 
 /**

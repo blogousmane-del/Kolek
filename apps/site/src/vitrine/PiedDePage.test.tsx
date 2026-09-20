@@ -35,7 +35,9 @@ describe('pied de page', () => {
     // L'attente se déduit de `IDENTITE` au lieu de recopier les chiffres :
     // une épreuve qui porte sa propre copie du numéro ne peut pas signaler une
     // divergence, elle en devient la troisième.
-    expect(lien.getAttribute('href')).toBe(`https://wa.me/${IDENTITE.whatsapp}`);
+    expect(lien.getAttribute('href')).toBe(
+      `https://wa.me/${(IDENTITE.telephone as string).replace(/\D/g, '')}`,
+    );
     expect(lien.getAttribute('href')).toMatch(/^https:\/\/wa\.me\/\d{10,}$/);
     expect(lien.getAttribute('target')).toBe('_blank');
     expect(lien.getAttribute('rel')).toContain('noreferrer');
