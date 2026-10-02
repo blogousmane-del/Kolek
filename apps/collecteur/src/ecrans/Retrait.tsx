@@ -1,5 +1,13 @@
 import { MISES_PAR_CYCLE, formatMontant } from '@kolek/core';
-import { Bouton, Carte, Icone, Squelette, useEnLigne } from '@kolek/ui';
+import {
+  Bouton,
+  Carte,
+  Icone,
+  Pagination,
+  Squelette,
+  useEnLigne,
+  usePagination,
+} from '@kolek/ui';
 import { useState } from 'react';
 
 import type { ClientCible } from '../Coquille';
@@ -8,10 +16,25 @@ import { cloturerCarte } from '../ecritures-ecrans';
 import { useHorsLigne } from '../hors-ligne/useHorsLigne';
 import { enAttenteSurCarte, phraseAttenteCarte } from '../hors-ligne/vues';
 import { chargerCartesCloturables, type CarteCloturable } from '../lectures-ecrans';
+import { LIGNES_AFFICHEES_PAR_PAGE } from '../pagination';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
+import { nu } from '../recherche';
 import { useEstCollaborateur } from './commission';
 import { ActiverCarte } from './ActiverCarte';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
+
+/**
+ * Les filtres de la liste — le même rang de puces que l'écran Clients.
+ *
+ * Trois et pas davantage, parce que les données n'en portent pas plus : une
+ * carte est au bout de son cycle, ou elle ne l'est pas. Les deux cas appellent
+ * deux gestes différents. Au bout, rendre l'argent ou repartir sur une carte de
+ * plus ; en cours, un retrait anticipé, dont le montant ne se fait pas de tête.
+ */
+const FILTRES = ['Toutes', 'Cycle terminé', 'En cours'] as const;
+type Filtre = (typeof FILTRES)[number];
+
+const pluriel = (n: number) => (n > 1 ? 's' : '');
 
 /**
  * Retrait : clôturer une carte et rendre son solde au client.
@@ -79,6 +102,8 @@ export function Retrait({
       instantané de l'ancienne liste inviterait à la clôturer deux fois. C'est
       le seul écran où le cache doit être franchement invalidé. */
   const [tourLocal, setTourLocal] = useState(0);
+  const [recherche, setRecherche] = useState('');
+  const [filtre, setFiltre] = useState<Filtre>('Toutes');
 
   const {
     donnees: cartes,
@@ -97,7 +122,131 @@ export function Retrait({
   // toutes les cartes ne coûte pas un aller-retour réseau. Rien lu (lecture en
   // cours, ou en échec hors ligne) reste `null` : une liste vide dirait d'un
   // client qui a des cartes que toutes sont clôturées.
-  const visibles = client && cartes ? cartes.filter((c) => c.clientId === client.id) : cartes;
+  const duClient = client && cartes ? cartes.filter((c) => c.clientId === client.id) : cartes;
+
+  /**
+   * Quand le champ de recherche et les filtres existent.
+   *
+   * Pas sous un filtre client : la liste ne porte déjà qu'une personne, et un
+   * second filtre par-dessus ne retrancherait rien qu'on cherche. Pas non plus
+   * sur zéro ou une carte, où il n'y a rien à trouver — un champ posé au-dessus
+   * d'une liste d'un élément est du décor.
+   *
+   * Et le terme comme le filtre ne sont lus que si leurs commandes sont là.
+   * Sans cette garde, arriver ici depuis la fiche d'un client, la recherche
+   * restée pleine ou « En cours » resté choisi d'un passage précédent,
+   * masquerait ses cartes par un filtre devenu invisible — le pire défaut
+   * possible sur l'écran qui fait sortir l'argent.
+   */
+  const avecOutils = !client && (cartes?.length ?? 0) > 1;
+  const cherche = avecOutils ? nu(recherche.trim()) : '';
+  const filtreActif: Filtre = avecOutils ? filtre : 'Toutes';
+
+  // On cherche, on filtre, **puis** on découpe — l'ordre de l'écran Clients,
+  // et pour sa raison : découper d'abord ferait chercher dans la seule page
+  // affichée, et la recherche ne trouverait jamais une carte de la page deux.
+  const trouvees =
+    cherche && duClient ? duClient.filter((c) => nu(c.clientNom).includes(cherche)) : duClient;
+
+  const visibles =
+    trouvees && filtreActif !== 'Toutes'
+      ? trouvees.filter((c) => (filtreActif === 'Cycle terminé' ? c.cycleComplet : !c.cycleComplet))
+      : trouvees;
+
+  /**
+   * Vingt cartes par page, le seuil de l'écran Clients.
+   *
+   * `LIGNES_AFFICHEES_PAR_PAGE`, et non une valeur à part : deux écrans voisins
+   * qui découpent leur liste à deux tailles différentes, c'est une règle que le
+   * collecteur doit réapprendre en changeant d'onglet. `Pagination` se retire
+   * d'elle-même sous vingt et une cartes, et le crochet ramène la page dans ses
+   * bornes quand un retrait raccourcit la liste.
+   *
+   * Appelé avant le retour anticipé de la carte clôturée : un crochet ne se
+   * saute pas.
+   */
+  const {
+    page,
+    pages,
+    total: totalFiltre,
+    visibles: affichees,
+    allerA,
+  } = usePagination(visibles ?? [], LIGNES_AFFICHEES_PAR_PAGE);
+
+  /*
+    Toute nouvelle question se pose depuis le début de la liste, et referme la
+    confirmation ouverte.
+
+    Le retour en page 1 est celui de Clients : sans lui, on cherche depuis la
+    page trois et l'écran répond par le quarante et unième résultat, les
+    quarante premiers invisibles.
+
+    La fermeture est propre à cet écran. Une confirmation ouverte survit au
+    changement de liste, puisqu'elle vit dans l'état et non dans la carte : la
+    carte masquée par un filtre reparaissait, au retour sur « Toutes », avec
+    « Oui, faire le retrait » sous le doigt — un geste qui ne se défait pas, à
+    un appui de distance, sur une carte qu'on n'avait pas redemandée.
+
+    Ce sont des gestes, donc ça se fait dans les gestionnaires et non dans un
+    `useEffect` : rien à synchroniser après coup.
+  */
+  const changerRecherche = (terme: string) => {
+    setRecherche(terme);
+    setAConfirmer(null);
+    allerA(1);
+  };
+
+  const changerFiltre = (f: Filtre) => {
+    setFiltre(f);
+    setAConfirmer(null);
+    allerA(1);
+  };
+
+  const changerPage = (numero: number) => {
+    setAConfirmer(null);
+    allerA(numero);
+  };
+
+  /**
+   * Ce que la recherche a trouvé, et ce que le filtre en cache.
+   *
+   * Le compte et le total : une liste qui rétrécit sans dire de combien laisse
+   * croire qu'on a perdu des cartes. Et la part du filtre, comptée à part de
+   * celle de la recherche — sur l'écran Clients, compter sur la liste déjà
+   * filtrée faisait dire « aucun client trouvé » d'un client que le filtre
+   * cachait. Ici ce serait « aucune carte à ce nom » d'une carte bien là, et le
+   * collecteur conclurait qu'elle a déjà été rendue.
+   */
+  const nbTrouvees = trouvees?.length ?? 0;
+  const nbVisibles = visibles?.length ?? 0;
+  const masquees = nbTrouvees - nbVisibles;
+  const annonce =
+    !cherche || !duClient
+      ? ''
+      : nbTrouvees === 0
+        ? 'Aucune carte trouvée'
+        : masquees === 0
+          ? `${nbTrouvees} sur ${duClient.length} cartes`
+          : nbVisibles === 0
+            ? `${nbTrouvees} carte${pluriel(nbTrouvees)} trouvée${pluriel(nbTrouvees)}, masquée${pluriel(nbTrouvees)} par le filtre « ${filtreActif} »`
+            : `${nbVisibles} sur ${nbTrouvees}, dont ${masquees} masquée${pluriel(masquees)} par le filtre « ${filtreActif} »`;
+
+  /**
+   * Quel vide montrer, s'il y en a un.
+   *
+   * Trois vides qui ne se disent pas pareil. « Aucune carte active » sous une
+   * recherche qui ne trouve rien ferait croire que tout est clôturé, alors
+   * qu'on a mal tapé un nom ; sous un filtre, alors qu'on a seulement choisi
+   * « En cours » sur une liste de cycles terminés.
+   */
+  const vide: 'nom' | 'filtre' | 'liste' | null =
+    visibles?.length !== 0
+      ? null
+      : cherche && nbTrouvees === 0
+        ? 'nom'
+        : filtreActif !== 'Toutes'
+          ? 'filtre'
+          : 'liste';
 
   /**
    * Pourquoi le retrait d'une carte attend, ou `null` (spec J2b §7).
@@ -168,6 +317,10 @@ export function Retrait({
 
   return (
     <div className="flex-1 flex flex-col">
+      {/* Le champ a quitté l'en-tête le 2026-10-02, pour le corps de l'écran,
+          comme sur l'écran Clients — demande de l'exploitant, sur capture. Le
+          compte de la recherche a suivi : il vit sous le champ, dans sa région
+          d'annonce, et le sous-titre redevient celui de l'écran. */}
       <EnTeteEcran
         titre="Retrait"
         sousTitre="Clôturer une carte et rendre le solde"
@@ -200,6 +353,101 @@ export function Retrait({
               </div>
             )}
 
+            {/* Recherche — le dessin de l'écran Clients, et chacun de ses choix.
+
+                L'`input` est la surface : il porte le fond, la bordure et le
+                rayon, donc l'anneau de focus du système suit sa forme et il n'y
+                en a qu'un. L'icône et la croix flottent au-dessus. */}
+            {avecOutils && (
+              <div>
+                <div className="relative">
+                  <Icone
+                    nom="search"
+                    taille={16}
+                    // Sans `pointer-events-none`, l'icône avale le toucher qui
+                    // visait le début du champ.
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  />
+                  <input
+                    // `text` et non `search` : WebKit dessine sur `search` sa
+                    // propre croix, et l'iPhone en montrait deux, dont une de
+                    // 20 px qu'aucune épreuve ne touche.
+                    type="text"
+                    value={recherche}
+                    onChange={(e) => changerRecherche(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') changerRecherche('');
+                    }}
+                    // « Nom du client » et non « Nom, numéro ou marché » : une
+                    // carte à clôturer ne porte ni le numéro ni le marché de
+                    // son client. Promettre une recherche qu'on ne fait pas,
+                    // c'est lui faire taper un numéro qui ne trouvera rien.
+                    placeholder="Nom du client…"
+                    aria-label="Rechercher un client"
+                    // Le correcteur d'iOS réécrit un nom ivoirien en mot
+                    // français au deuxième caractère.
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    enterKeyHint="search"
+                    className="w-full min-h-11 pl-10 pr-12 bg-surface border-[1.5px] border-hairline/80 rounded-md text-champ font-body text-ink shadow-xs placeholder:text-muted-foreground focus:border-primary transition-colors"
+                  />
+                  {recherche && (
+                    <button
+                      type="button"
+                      onClick={() => changerRecherche('')}
+                      aria-label="Effacer la recherche"
+                      // 44 px : au marché, à une main, manquer une croix de
+                      // 20 px efface un caractère au lieu du terme.
+                      className="absolute right-1 top-1/2 -translate-y-1/2 min-w-11 min-h-11 flex items-center justify-center rounded-pill text-muted-foreground hover:text-ink cursor-pointer"
+                    >
+                      <Icone nom="x" taille={16} />
+                    </button>
+                  )}
+                </div>
+                {/* Montée avec le champ, vide tant qu'on n'a pas cherché : un
+                    lecteur d'écran n'annonce que les changements d'une région
+                    qu'il observe déjà. Insérée avec son texte, elle resterait
+                    muette. */}
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className={`px-1 text-xs font-body text-muted-foreground ${annonce ? 'mt-2' : ''}`}
+                >
+                  {annonce}
+                </p>
+              </div>
+            )}
+
+            {/* Filtres — le rang de puces de l'écran Clients.
+
+                `aria-pressed` en plus : sans lui, le lecteur d'écran lit trois
+                boutons et ne dit pas lequel est choisi — seule la couleur le
+                disait. */}
+            {avecOutils && (
+              <div
+                role="group"
+                aria-label="Filtrer les cartes"
+                className="flex gap-2 overflow-x-auto scrollbar-none pb-1"
+              >
+                {FILTRES.map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    aria-pressed={f === filtre}
+                    onClick={() => changerFiltre(f)}
+                    className={`px-4 py-1.5 rounded-md text-xs xs:text-sm font-body font-semibold border whitespace-nowrap cursor-pointer transition-all shadow-xs ${
+                      f === filtre
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-surface text-ink border-hairline/80 hover:bg-muted/50'
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {!cartes && !erreur && (
               <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
                 <Carte className="p-4 space-y-3">
@@ -221,7 +469,32 @@ export function Retrait({
               </div>
             )}
 
-            {visibles?.length === 0 && (
+            {/* « Aucune carte active » sous une recherche qui ne trouve rien
+                ferait croire au collecteur que toutes les cartes sont
+                clôturées, alors qu'il a mal tapé un nom. */}
+            {vide === 'nom' && (
+              <RienAMontrer
+                // `credit-card` et non `coins` : le vide porte sur des cartes,
+                // pas sur de l'argent — c'est le critère que `RienAMontrer`
+                // énonce pour sa liste courte, et il évite de l'élargir.
+                icone="credit-card"
+                titre="Aucune carte à ce nom"
+                detail="Vérifie l’orthographe, ou vide le champ pour revoir toutes les cartes."
+              />
+            )}
+
+            {/* Le même tort sous un filtre : la liste n'est pas vide, c'est le
+                choix de la puce qui ne retient rien. Le dire, et dire comment
+                revenir. */}
+            {vide === 'filtre' && (
+              <RienAMontrer
+                icone="credit-card"
+                titre={filtreActif === 'En cours' ? 'Aucune carte en cours' : 'Aucun cycle terminé'}
+                detail="Choisis « Toutes » pour revoir les autres cartes."
+              />
+            )}
+
+            {vide === 'liste' && (
               <RienAMontrer
                 icone="coins"
                 titre={client ? 'Aucune carte active pour ce client' : 'Aucune carte active'}
@@ -237,7 +510,7 @@ export function Retrait({
                 la plus longue du produit, et chaque carte tient dans la moitié
                 de la largeur. */}
             <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 lg:items-start">
-              {visibles?.map((carte, rang) => {
+              {affichees.map((carte, rang) => {
               const enConfirmation = aConfirmer?.carteId === carte.carteId;
               const retraitBloque = retraitBloquePour(carte.carteId);
 
@@ -347,6 +620,18 @@ export function Retrait({
               );
               })}
             </div>
+
+            {/* `-mx-4` : `Pagination` porte son propre retrait latéral, pensé
+                pour un écran sans marge comme Clients. Posée dans `CorpsEcran`,
+                qui a déjà le sien, elle se serait décalée de seize pixels de
+                plus que sur l’écran voisin. Montée seulement au-delà d’une
+                page : vide, son enveloppe ajouterait la marge de `space-y-4`
+                sous la dernière carte. */}
+            {pages > 1 && (
+              <div className="-mx-4">
+                <Pagination page={page} pages={pages} total={totalFiltre} onAller={changerPage} />
+              </div>
+            )}
           </>
         }
       />

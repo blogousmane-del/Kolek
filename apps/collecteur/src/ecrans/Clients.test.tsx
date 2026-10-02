@@ -557,3 +557,50 @@ describe('ce qui n’a pas encore quitté le téléphone (§8.3)', () => {
     expect(within(ligne).getByText('Carte pas encore envoyée')).toBeTruthy();
   });
 });
+
+/**
+ * Les filtres disent lequel est choisi, à l'œil et au lecteur d'écran.
+ *
+ * Jusqu'au 2026-10-02, seule la couleur le disait : vert foncé pour le filtre
+ * choisi, blanc pour les autres. Un lecteur d'écran lisait quatre boutons
+ * identiques, et la personne aveugle ne savait pas quelle liste elle entendait.
+ *
+ * L'écran Retrait, qui a repris ces filtres le même jour, porte `aria-pressed`
+ * depuis sa première version. Celui-ci le reçoit pour que les deux écrans
+ * restent le même rang de boutons, pour tout le monde.
+ */
+describe('les filtres annoncent celui qui est choisi', () => {
+  it('annonce « Tous » choisi à l’arrivée, et lui seul', async () => {
+    brancherTournee();
+    rendre();
+    await screen.findByText('Hj');
+
+    expect(screen.getByRole('button', { name: 'Tous' }).getAttribute('aria-pressed')).toBe('true');
+    for (const nom of ['Avec carte', 'Clôturées', 'Sans carte']) {
+      expect(screen.getByRole('button', { name: nom }).getAttribute('aria-pressed'), nom).toBe('false');
+    }
+  });
+
+  it('déplace l’annonce avec le choix', async () => {
+    brancherTournee();
+    rendre();
+    await screen.findByText('Hj');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sans carte' }));
+
+    expect(screen.getByRole('button', { name: 'Sans carte' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Tous' }).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('les groupe sous un nom, comme sur l’écran Retrait', async () => {
+    brancherTournee();
+    rendre();
+    await screen.findByText('Hj');
+
+    // Le lecteur d'écran annonce « Filtrer les clients, groupe » en entrant
+    // dans le rang : il sait ce que les quatre boutons ont en commun avant
+    // d'en entendre le premier.
+    const groupe = screen.getByRole('group', { name: 'Filtrer les clients' });
+    expect(within(groupe).getAllByRole('button')).toHaveLength(4);
+  });
+});

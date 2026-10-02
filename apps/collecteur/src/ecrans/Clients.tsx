@@ -22,6 +22,7 @@ import { TourneeAbsente, identifiantsEnAttente } from '../hors-ligne/vues';
 import { chargerListeClients } from '../lectures';
 import { LIGNES_AFFICHEES_PAR_PAGE } from '../pagination';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
+import { nu } from '../recherche';
 import { ChoixMise } from './ChoixMise';
 import { useEstCollaborateur } from './commission';
 import { FicheClient } from './FicheClient';
@@ -108,25 +109,7 @@ function correspond(client: Client, terme: string): boolean {
   return false;
 }
 
-/**
- * Ce que deux personnes tapent pareil : minuscules, sans accents.
- *
- * « Adjamé » est saisi avec son accent dans la fiche, et personne ne compose un
- * accent sur un clavier de téléphone au marché. Sans ce repli, la clef que
- * l'invite du champ propose — le marché — ne répond pas, et le collecteur cesse
- * de l'essayer.
- */
-function nu(texte: string): string {
-  return texte
-    .normalize('NFD')
-    // Les diacritiques combinants, que `NFD` vient de détacher de leur lettre.
-    // Écrits en échappements : une classe posée en caractères bruts se fait
-    // réécrire au premier outil qui touche au fichier, et `[0300-036f]` — ce
-    // qu'une substitution en a fait le 2026-09-09 — mange les chiffres 0, 3 et
-    // 6, donc la recherche par numéro.
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase();
-}
+/* `nu` vit dans `../recherche` : trois écrans cherchent un client par nom. */
 
 /** Les chiffres seuls, séparateurs et indicatifs de mise en forme retirés. */
 function chiffres(texte: string): string {
@@ -576,12 +559,22 @@ export function Clients({
         )}
       </div>
 
-      {/* Filtres */}
-      <div className="px-4 mt-3 flex gap-2 overflow-x-auto scrollbar-none pb-1">
+      {/* Filtres
+
+          `aria-pressed` depuis le 2026-10-02 : seule la couleur disait lequel
+          est choisi, et un lecteur d'écran lisait quatre boutons identiques.
+          Le groupe nommé annonce ce qu'ils ont en commun avant le premier.
+          Même rang que sur l'écran Retrait, qui les porte aussi. */}
+      <div
+        role="group"
+        aria-label="Filtrer les clients"
+        className="px-4 mt-3 flex gap-2 overflow-x-auto scrollbar-none pb-1"
+      >
         {FILTRES.map((f) => (
           <button
             key={f}
             type="button"
+            aria-pressed={f === filtre}
             onClick={() => changerFiltre(f)}
             className={`px-4 py-1.5 rounded-md text-xs xs:text-sm font-body font-semibold border whitespace-nowrap cursor-pointer transition-all shadow-xs ${
               f === filtre
