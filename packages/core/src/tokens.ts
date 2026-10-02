@@ -48,11 +48,11 @@ export const couleurs = {
   // La limite de ce qu'on touche, posée le 2026-10-02 avec le billet.
   //
   // `hairline` sépare deux surfaces ; il ne délimite pas un contrôle. Un champ
-  // de recherche bordé de `hairline` ne tient que 1,27:1 contre le papier,
+  // de recherche bordé de `hairline` ne tient que 1,28:1 contre le papier,
   // quand WCAG 1.4.11 en demande 3 pour la limite d'un composant. `trait`
   // tient 3,5:1 sur `surface` et 3,2:1 sur `canvas` : assez sombre pour
   // délimiter, et pas davantage. Les maquettes le montraient plus clair
-  // (`#D5D8D1`, 1,5:1) ; c'est l'écart que la spec assume.
+  // (`#D5D8D1`, 1,4:1) ; c'est l'écart que la spec assume.
   trait: '#858B81',
   canvas: '#F4F5F2',
   background: '#F4F5F2',
@@ -349,7 +349,9 @@ export const taillesTexte = {
 } as const;
 
 /**
- * Les deux familles du produit, **changées le 2026-09-17**.
+ * Les familles du produit. Les deux familles de texte sont
+ * **changées le 2026-09-17** ; la chasse fixe des chiffres de caisse (`mono`)
+ * s'y ajoute le 2026-10-02.
  *
  * ## Ce qui part, et pourquoi
  *
@@ -383,7 +385,8 @@ export const taillesTexte = {
  * requêtes économisées, une graisse continue de 200 à 800 au lieu de quatre
  * crans figés, contre douze pour cent de téléchargement en plus au premier
  * chargement. Sur la 3G d'Abidjan, un sixième de seconde, une seule fois : le
- * service worker garde les fichiers ensuite.
+ * cache HTTP garde ensuite les fichiers, servis `immutable` ; le service
+ * worker, lui, ne précharge aucune police.
  *
  * Les jeux `opsz` et `wdth` de Bricolage — taille optique et largeur — ne sont
  * **pas** pris : le fichier tous axes pèse 131 ko à lui seul, soit plus que les
@@ -407,11 +410,15 @@ export const polices = {
    * décomptes, reçus, compteurs et heures. Jamais une phrase. Le total du jour
    * reste en Bricolage : c'est l'affiche, pas une ligne de caisse.
    *
-   * La vitrine déclarait déjà cette valeur dans sa propre feuille ; elle la
+   * La vitrine déclarait déjà cette famille dans sa propre feuille ; elle la
    * reçoit désormais d'ici. Le collecteur n'en charge que la graisse 500 :
-   * 14 888 octets en latin, gardés ensuite par le service worker.
+   * 14 888 octets en latin, que garde le cache HTTP (`immutable`). Le service
+   * worker ne précharge aucune police : si le navigateur a vidé ce cache, un
+   * lancement hors ligne retombe sur le repli. L'administration ne charge pas
+   * Plex : la liste de repli est celle de Tailwind, recopiée telle quelle,
+   * pour que ses écrans ne changent pas.
    */
-  mono: "'IBM Plex Mono', ui-monospace, monospace",
+  mono: "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
 } as const;
 
 /**

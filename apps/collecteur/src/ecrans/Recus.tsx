@@ -503,7 +503,7 @@ function LigneJournal({
 
             {!estCloture && (
               <Detail terme="Numéro de reçu">
-                <span className="font-mono font-semibold">
+                <span className="font-mono font-medium">
                   {evenement.id.slice(0, 8).toUpperCase()}
                 </span>
               </Detail>

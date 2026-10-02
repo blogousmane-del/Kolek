@@ -315,8 +315,12 @@ describe('les quatre aplats de tuile', () => {
  */
 describe('le billet, jetons du 2026-10-02', () => {
   it('porte la police des chiffres de caisse', () => {
-    expect(polices.mono).toBe("'IBM Plex Mono', ui-monospace, monospace");
-    expect(genererCssTheme()).toContain("--font-mono: 'IBM Plex Mono', ui-monospace, monospace;");
+    expect(polices.mono).toBe(
+      "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+    );
+    expect(genererCssTheme()).toContain(
+      "--font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;",
+    );
   });
 
   it('porte le cran du total du jour, au-dessus de 4xl', () => {

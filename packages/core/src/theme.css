@@ -65,7 +65,7 @@
   --text-8xl: clamp(48px, 15vw, 120px);
   --font-body: 'Instrument Sans Variable', system-ui, sans-serif;
   --font-headings: 'Bricolage Grotesque Variable', 'Instrument Sans Variable', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   --container-formulaire: 360px;
   --container-carte: 520px;
   --container-liste: 640px;

@@ -367,7 +367,7 @@ précédente est close. La nouvelle repart de la case 1. »
   `primary`) au lieu du gris des maquettes : `Bouton` est partagé avec
   l'administration, et le contour vert délimite mieux.
 - **`trait` est plus sombre que le gris des maquettes** (`#858B81` contre
-  `#D5D8D1`) : le gris clair ne donnait que 1,5:1 à la limite d'un champ.
+  `#D5D8D1`) : le gris clair ne donnait que 1,4:1 à la limite d'un champ.
 - **Le tampon de l'encaissement est en haut à droite** de la carte, plus sur
   les cases : posé dessus, il cachait la case qu'il célèbre.
 - **Les libellés d'aujourd'hui restent** là où la maquette en inventait :
