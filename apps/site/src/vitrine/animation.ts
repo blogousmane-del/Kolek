@@ -14,30 +14,70 @@ import { useEffect, useRef, useState } from 'react';
  * qui l'ont demandé voient la page finie, sans les entrées. Ce n'est pas une
  * politesse décorative — les animations de défilement sont précisément la
  * catégorie qui déclenche les cinétoses.
+ *
+ * Et depuis le prérendu, une règle d'écran : **ce que le visiteur a déjà sous
+ * les yeux ne s'efface pas pour entrer en scène.** Voir `Etat`.
  */
 
 gsap.registerPlugin(ScrollTrigger);
 
 export { gsap, ScrollTrigger };
 
+/** L'écran au moment où React reprend la page, tel que `construire` le reçoit. */
+export type Etat = {
+  /**
+   * Le conteneur était déjà à l'écran avant que le JavaScript n'arrive.
+   *
+   * C'est le cas sur une page prérendue, dont le `#root` porte le
+   * `data-prerendu` de `scripts/prerendre.mjs`, pour un conteneur dont le haut
+   * est au-dessus du bas de l'écran : le hero toujours, une section quand le
+   * visiteur arrive par une ancre (`kolek.cash/#tarifs`) ou a défilé avant le
+   * JavaScript.
+   *
+   * Le visiteur l'a alors sous les yeux, et une entrée qui part d'une opacité
+   * nulle la lui retire pour la refaire apparaître. Mesuré le 2026-10-02 sur
+   * l'aperçu de la PR #19, sur un réseau 4G médiocre : le titre du hero peint
+   * à 4,7 s, React reprend la page à 5,8 s, le titre retombe à 10 % d'opacité
+   * et ne revient qu'à 6,7 s.
+   *
+   * Une entrée se garde donc de ce cas. Un mouvement qui ne cache rien, un
+   * reflet, une parallaxe, une boucle, n'a pas à s'en soucier.
+   */
+  dejaPeint: boolean;
+};
+
+/**
+ * Le haut du conteneur est au-dessus du bas de l'écran : le visiteur le voit,
+ * ou l'a déjà dépassé. Sans prérendu, rien n'était peint : l'écran d'attente
+ * occupait la page jusqu'à React.
+ */
+function estDejaPeint(conteneur: HTMLElement): boolean {
+  if (!conteneur.closest('[data-prerendu]')) return false;
+  return conteneur.getBoundingClientRect().top < window.innerHeight;
+}
+
 /**
  * Monte des animations sur un conteneur, avec le cycle de vie complet.
  *
  * `construire` reçoit le conteneur et ne s'exécute que si le visiteur accepte
- * le mouvement. Tout sélecteur y est scopé au conteneur par `gsap.context`.
+ * le mouvement. Tout sélecteur y est scopé au conteneur par `gsap.context`. Il
+ * reçoit aussi l'`Etat` de l'écran au moment où React a repris la page.
  */
 export function useAnimations<T extends HTMLElement>(
-  construire: (conteneur: T) => void,
+  construire: (conteneur: T, etat: Etat) => void,
 ): React.RefObject<T | null> {
   const ref = useRef<T>(null);
 
   useEffect(() => {
     if (!ref.current) return;
     const conteneur = ref.current;
+    // Mesuré une fois, au montage : c'est l'écran que le visiteur avait sous les
+    // yeux quand React est arrivé qui compte, pas celui d'après.
+    const etat: Etat = { dejaPeint: estDejaPeint(conteneur) };
 
     const mm = gsap.matchMedia();
     mm.add('(prefers-reduced-motion: no-preference)', () => {
-      const ctx = gsap.context(() => construire(conteneur), conteneur);
+      const ctx = gsap.context(() => construire(conteneur, etat), conteneur);
       return () => ctx.revert();
     });
 

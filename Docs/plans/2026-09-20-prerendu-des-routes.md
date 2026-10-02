@@ -243,7 +243,7 @@ Suites : 1251 épreuves d'espaces de travail, 317 épreuves de scripts,
 `verifier:routes`, `verifier:sitemap`, `verifier:tirets`, `verifier:champs` et
 `verifier:lint` au vert.
 
-## Cinq écarts avec la spécification, et pourquoi
+## Six écarts avec la spécification, et pourquoi
 
 **1. Le seuil de la garde est 120, non 200.** La spécification l'avait estimé ;
 la première construction l'a démenti, et c'est le garde-fou lui-même qui a
@@ -289,16 +289,52 @@ déjà à jour, qui sortait sinon « modifié » dans `git status` sans rien à 
 La contrainte « CRLF sur tout fichier » de ce plan vaut pour le répertoire de
 travail au poste, pas pour ce qu’un script compare.
 
+**6. Les entrées animées effaçaient ce que le prérendu venait de peindre.**
+Trouvé le 2026-10-02, après le point 2, par une mesure que ce plan n’avait pas
+prévue : l’opacité du titre du hero, relevée à chaque image dans Chrome, réseau
+bridé à 1,6 Mbit/s et 300 ms, mouvement accepté. Sur l’aperçu de la PR #19 :
+
+    4,7 s   titre peint, opacité 1,00     le HTML prérendu
+    5,8 s   React reprend la page
+    6,0 s   opacité 0,10                  l’entrée GSAP part de zéro
+    6,7 s   opacité 1,00
+
+Le visiteur qui commençait à lire voyait la phrase disparaître. Le contrôle de
+la tâche 4 ne pouvait pas le voir : il lisait la console, et les captures du
+hero étaient prises en mouvement réduit, le seul réglage où rien ne s’anime.
+
+L’hydratation n’y est pour rien, elle est propre. Toutes les entrées de la
+vitrine partent d’une opacité nulle : elles ont été écrites quand le contenu
+n’existait qu’après le JavaScript. `useAnimations` dit désormais à chaque
+section si elle était déjà à l’écran quand React est arrivé (`Etat.dejaPeint`),
+et les entrées s’en gardent. L’ouverture du hero ne joue donc plus en
+production ; le reflet sur « précision », qui ne cache rien, joue toujours. Les
+sections révélées au défilement gardent leur entrée, sauf à l’arrivée par une
+ancre. Même mesure après correction, sur `dist` : opacité minimale 1,00 pour le
+titre, et 1,00 pour les paliers d’une arrivée par `#tarifs`, qui tombaient à
+0,71 sur l’aperçu de l’ancien code. `deja-peint.test.tsx` tient la règle : onze
+épreuves, dont quatre témoins qui prouvent que la sonde voit un effacement.
+
+Au passage : l’ouverture du filigrane n’a jamais joué. `Rosace` ne transmet pas
+`data-filigrane` à son `<svg>`, depuis leur création commune le 2026-08-23.
+Défaut antérieur au prérendu, laissé hors de cette PR.
+
 ## Ce qui reste ouvert après ce plan
 
-Les points 2 à 5 de l’audit du 2026-09-20 :
+Les points 2 à 5 de l’audit du 2026-09-20, repris le 2026-10-02 dans la même PR :
 
-2. les mots-clés — `tontine`, `collecte journalière`, `Abidjan` : zéro
-   occurrence dans tout `apps/site/src` ;
-3. les données structurées JSON-LD ;
-4. le poids — 129 ko de JavaScript compressé, 49 ko de Bodoni pour six mots,
-   9 fichiers `.woff` servis à personne ;
-5. `scripts/verifier-seo.mjs`.
+2. les mots-clés : **faits**. Titre, description et phrase du hero portent
+   tontine, collecte journalière, banquier ambulant, tontinier, Abidjan et
+   Côte d’Ivoire, choisis par l’exploitant ; `routes.test.ts` refuse de les
+   perdre ;
+3. les données structurées JSON-LD : **gain faible** tant que Kolek n’a pas
+   d’avis clients réels, seuls à valoir des étoiles dans Google ;
+4. le poids : **mesuré** sur l’aperçu, un téléphone sans cache reçoit 15 ko de
+   HTML, 128 ko de JavaScript, 106 ko de polices et 13 ko de CSS. Les `.woff`
+   et les sous-ensembles inutiles ne partent jamais ; ce qui pèse relève du
+   design ;
+5. `scripts/verifier-seo.mjs` : la garde du prérendu (120 mots, canoniques
+   distinctes) et celle de `routes.test.ts` en tiennent lieu.
 
 Le point 1 est celui qui conditionne les autres : tant que le HTML servi porte
 14 mots, un mot-clé bien choisi ne se lit nulle part.
