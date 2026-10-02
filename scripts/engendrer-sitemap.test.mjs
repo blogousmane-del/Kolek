@@ -40,13 +40,12 @@ describe('le document engendré', () => {
     expect(engendrer(TABLE)).not.toContain('<lastmod>');
   });
 
-  it('écrit en CRLF, comme tout fichier versionné du dépôt', () => {
-    const xml = engendrer(TABLE);
-
-    // Vérifié sur la chaîne, jamais par grep : sous Git Bash, `grep` et `cat`
-    // masquent les `\r` et diraient que tout va bien sur un fichier mêlé.
-    expect(xml.match(/(?<!\r)\n/g)).toBeNull();
-    expect(xml.match(/\r\n/g).length).toBeGreaterThan(5);
+  it('écrit en LF, la forme sous laquelle le dépôt garde ses fichiers', () => {
+    // `core.autocrlf = true` : le dépôt stocke du LF, et le CRLF n'existe que
+    // dans un répertoire de travail Windows, posé par Git au checkout. Cette
+    // épreuve exigeait du CRLF jusqu'au 2026-10-02, sur la foi d'un CRLF lu
+    // dans le répertoire de travail et pris pour celui du dépôt.
+    expect(engendrer(TABLE).includes('\r')).toBe(false);
   });
 
   it('rend deux fois le même octet pour la même table', () => {
@@ -94,13 +93,45 @@ describe('en sous-processus, sur un faux dépôt', () => {
   it('échoue — code 1 — quand le fichier déclare une adresse absente de la table', () => {
     const menteur = engendrer(TABLE).replace(
       '</urlset>',
-      '  <url>\r\n    <loc>https://kolek.cash/tarifs</loc>\r\n  </url>\r\n</urlset>',
+      '  <url>\n    <loc>https://kolek.cash/tarifs</loc>\n  </url>\n</urlset>',
     );
 
     const resultat = executer(depot(menteur), '--verifier');
 
     expect(resultat.status).toBe(1);
     expect(resultat.stderr).toMatch(/dérivé de la table/);
+  });
+
+  /*
+    Le CI du 2026-10-02 : vert sous Windows, rouge sous Linux, sur un sitemap
+    qui n'avait pas bougé. Le clone Linux reçoit le LF du dépôt, le checkout
+    Windows du CRLF. Le contrôle doit accepter les deux, comme le fait déjà
+    `generer-theme.mjs`, qui a appris la même chose le 2026-08-24.
+  */
+  it('ne réécrit pas un fichier déjà à jour', () => {
+    // Le checkout Windows dépose du CRLF. Réécrire en LF un fichier inchangé
+    // le faisait marquer « modifié » par `git status`, sans aucune différence
+    // à montrer : constaté le 2026-10-02, au premier essai du générateur.
+    const crlf = engendrer(TABLE).replace(/\r?\n/g, '\r\n');
+    const cwd = depot(crlf);
+
+    const resultat = executer(cwd);
+
+    expect(resultat.status).toBe(0);
+    expect(readFileSync(join(cwd, SITEMAP), 'utf8')).toBe(crlf);
+    expect(resultat.stdout).toMatch(/déjà à jour/);
+  });
+
+  it('accepte le fichier tel que Git le dépose sous Linux, en LF', () => {
+    const lf = engendrer(TABLE).replace(/\r\n/g, '\n');
+
+    expect(executer(depot(lf), '--verifier').status).toBe(0);
+  });
+
+  it('accepte le fichier tel que Git le dépose sous Windows, en CRLF', () => {
+    const crlf = engendrer(TABLE).replace(/\r?\n/g, '\r\n');
+
+    expect(executer(depot(crlf), '--verifier').status).toBe(0);
   });
 
   it('échoue — code 1 — sur une simple retouche à la main', () => {

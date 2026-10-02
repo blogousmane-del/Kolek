@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -61,9 +61,16 @@ const ENTETE = `Engendré par scripts/engendrer-sitemap.mjs depuis
  * Fonction pure, et exportée pour cela : le mode `--verifier` compare sa
  * sortie au fichier versionné, et les épreuves la comparent sans rien écrire.
  *
- * Fins de ligne CRLF, comme tout fichier versionné du dépôt. Un `\n` seul ici
- * ferait échouer `--verifier` sur une machine et passer sur l'autre, pour une
- * différence que ni `grep` ni `cat` n'affichent sous Git Bash.
+ * Fins de ligne LF : c'est la forme sous laquelle le dépôt garde ses fichiers
+ * (`core.autocrlf = true`). Le CRLF n'existe que dans un répertoire de travail
+ * Windows, posé par Git au checkout.
+ *
+ * Cette fonction écrivait du CRLF jusqu'au 2026-10-02, sur la foi d'un CRLF lu
+ * dans le répertoire de travail et pris pour celui du dépôt. Comparé octet à
+ * octet, le contrôle passait sous Windows et échouait sur le clone Linux du CI,
+ * pour un sitemap qui n'avait pas bougé. Le commentaire d'alors prédisait
+ * l'échec — « passer sur une machine et échouer sur l'autre » — et en tirait la
+ * conclusion inverse.
  */
 export function engendrer(routes) {
   const lignes = [
@@ -81,7 +88,20 @@ export function engendrer(routes) {
   }
 
   lignes.push('</urlset>', '');
-  return lignes.join('\r\n');
+  return lignes.join('\n');
+}
+
+/**
+ * Les fins de ligne ne comptent pas dans la comparaison.
+ *
+ * Même règle, et même raison, que `generer-theme.mjs`, qui l'a apprise le
+ * 2026-08-24 : Git dépose du CRLF au checkout sous Windows et du LF sous Linux.
+ * Un contrôle qui distingue les deux crie au loup sur l'une des deux machines,
+ * pour un fichier qui n'a pas changé — et un contrôle qui crie au loup finit
+ * ignoré.
+ */
+function normaliser(texte) {
+  return texte.replace(/\r\n/g, '\n');
 }
 
 async function table() {
@@ -95,7 +115,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 
   if (process.argv.includes('--verifier')) {
     const present = readFileSync(SITEMAP, 'utf8');
-    if (present !== attendu) {
+    if (normaliser(present) !== normaliser(attendu)) {
       console.error(
         `${SITEMAP} a dérivé de la table des routes.\n` +
           '  Lance « npm run generer:sitemap » et valide le résultat.\n' +
@@ -106,8 +126,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     }
     console.log(`${SITEMAP} correspond à la table des routes.`);
   } else {
-    writeFileSync(SITEMAP, attendu, 'utf8');
     const compte = attendu.split('<loc>').length - 1;
-    console.log(`${SITEMAP} écrit — ${compte} adresses indexables.`);
+    // Un fichier déjà à jour n'est pas réécrit. Le checkout Windows le dépose
+    // en CRLF ; le réécrire en LF pour un contenu identique le faisait marquer
+    // « modifié » par `git status`, sans aucune différence à montrer.
+    const present = existsSync(SITEMAP) ? readFileSync(SITEMAP, 'utf8') : null;
+    if (present !== null && normaliser(present) === normaliser(attendu)) {
+      console.log(`${SITEMAP} déjà à jour — ${compte} adresses indexables.`);
+    } else {
+      writeFileSync(SITEMAP, attendu, 'utf8');
+      console.log(`${SITEMAP} écrit — ${compte} adresses indexables.`);
+    }
   }
 }

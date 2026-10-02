@@ -243,7 +243,7 @@ Suites : 1251 épreuves d'espaces de travail, 317 épreuves de scripts,
 `verifier:routes`, `verifier:sitemap`, `verifier:tirets`, `verifier:champs` et
 `verifier:lint` au vert.
 
-## Quatre écarts avec la spécification, et pourquoi
+## Cinq écarts avec la spécification, et pourquoi
 
 **1. Le seuil de la garde est 120, non 200.** La spécification l'avait estimé ;
 la première construction l'a démenti, et c'est le garde-fou lui-même qui a
@@ -273,6 +273,21 @@ disparu avec la table. Il importe désormais la table — et cet import se réso
 **depuis le répertoire courant**, non depuis le module. Sans cela il aurait lu
 la vraie table pendant que ses propres épreuves lui présentaient un faux dépôt
 cassé : un garde-fou qu'on croit éprouvé et qui ne l'est pas.
+
+**5. Le sitemap s’écrit en LF, et se compare sans ses fins de ligne.** Le
+générateur écrivait du CRLF, sur la foi d’un CRLF lu dans le répertoire de
+travail Windows et pris pour celui du dépôt. Or `core.autocrlf = true` : le
+dépôt garde du LF, et le CRLF n’est posé qu’au checkout Windows. Le premier CI
+de la PR #19 l’a dit, sur le clone Linux :
+
+    × le sitemap versionné correspond déjà à la table
+
+Vert au poste, rouge au CI, pour un sitemap qui n’avait pas bougé. Le
+générateur écrit désormais du LF et compare après normalisation, comme
+`generer-theme.mjs` le fait depuis le 2026-08-24 ; il ne réécrit plus un fichier
+déjà à jour, qui sortait sinon « modifié » dans `git status` sans rien à montrer.
+La contrainte « CRLF sur tout fichier » de ce plan vaut pour le répertoire de
+travail au poste, pas pour ce qu’un script compare.
 
 ## Ce qui reste ouvert après ce plan
 
