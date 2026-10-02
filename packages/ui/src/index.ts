@@ -43,3 +43,4 @@ export { NavBureau, type CleNavBureau } from './NavBureau';
 export { NavMobile, type CleNavCollecteur } from './NavMobile';
 export { Repli } from './Repli';
 export { Squelette, SqueletteKPI, SqueletteLigne } from './Squelette';
+export { Tampon, horodatageTampon, type MotTampon } from './Tampon';

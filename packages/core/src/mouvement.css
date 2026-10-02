@@ -198,6 +198,23 @@
   }
 }
 
+/* -------------------------------- 7. Tampon ------------------------------- */
+
+/* Le tampon se plaque : il arrive un peu plus grand, et frappe. Pas de rebond,
+ * un tampon ne rebondit pas. La durée est celle du toucher : c'est la réponse
+ * à un appui. La rotation de six degrés vit sur l'enveloppe du composant, pas
+ * ici, sans quoi cette animation l'écraserait. */
+@keyframes kolek-tampon {
+  from {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+}
+
+@utility anim-tampon {
+  animation: kolek-tampon var(--duree-toucher) var(--courbe-sortie) both;
+}
+
 /* ------------------------- Le commutateur général ------------------------ */
 
 /* Un seul bloc, en bas du fichier, qui couvre toute primitive présente et
@@ -209,7 +226,8 @@
   .anim-pression,
   .anim-reussite,
   .anim-voile,
-  .anim-feuille {
+  .anim-feuille,
+  .anim-tampon {
     animation: none !important;
     transition: none !important;
   }
