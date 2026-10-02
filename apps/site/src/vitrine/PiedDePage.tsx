@@ -93,7 +93,21 @@ export function PiedDePage() {
       </div>
 
       <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-white/8 pt-6">
-        <p className="font-body text-xs text-white/55">
+        {/* `suppressHydrationWarning` pour la seule raison que l'attribut
+            nomme : une valeur que le serveur et le client calculent
+            séparément, et qui peut légitimement différer.
+
+            Le prérendu fige l'année au moment de la construction. Une page
+            construite en décembre et visitée en janvier porterait l'année
+            passée dans son HTML, et l'année courante après hydratation. C'est
+            un écart d'un caractère, une fois par an, sur une ligne de bas de
+            page — mais sans cet attribut React le traiterait comme la
+            divergence qu'il ne peut pas distinguer d'un défaut, et
+            reconstruirait l'arbre.
+
+            Le visiteur voit toujours l'année juste : c'est le rendu client qui
+            gagne. */}
+        <p className="font-body text-xs text-white/55" suppressHydrationWarning>
           © {new Date().getFullYear()} GTCS · Kolek. Aucun flux d’épargne ne transite par cette
           page.
         </p>

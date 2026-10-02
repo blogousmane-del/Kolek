@@ -15,7 +15,10 @@ import { APP_COLLECTEUR, inscriptionPour } from './liens';
  * Le palier mis en avant est `PALIER_RECOMMANDE`, pas un choix de maquette.
  */
 export function Tarification() {
-  const ref = useAnimations<HTMLElement>((conteneur) => {
+  const ref = useAnimations<HTMLElement>((conteneur, { dejaPeint }) => {
+    // Déjà à l'écran à l'arrivée, par une ancre ou un défilement avant le
+    // JavaScript : la section est lue, l'entrée l'effacerait. Voir `Etat`.
+    if (dejaPeint) return;
     entree('[data-palier]', {
       stagger: 0.15,
       scrollTrigger: { trigger: conteneur, start: 'top 70%' },

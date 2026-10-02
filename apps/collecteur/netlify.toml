@@ -26,7 +26,14 @@
   #
   # Convention Netlify : code de sortie 0 = ne pas construire. `git diff
   # --quiet` rend 0 quand rien n'a bougé — c'est exactement ce qu'on veut.
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/collecteur packages"
+  #
+  # **Et chaque script que la construction exécute doit y figurer.** Depuis le
+  # 2026-10-02 : `garde-env.mjs` et `decouper-lib.mjs`, importés par
+  # `vite.config.ts`. Avant, ni l’un ni l’autre n’y était : une correction du seul
+  # `garde-env.mjs` — la garde qui refuse de compiler une clé de service dans le
+  # paquet — aurait été fusionnée et jamais construite. `npm run verifier:ignore`
+  # refuse désormais une règle qui oublie un script de construction.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/collecteur packages scripts/garde-env.mjs scripts/decouper-lib.mjs"
 
 [build.environment]
   NODE_VERSION = "26"

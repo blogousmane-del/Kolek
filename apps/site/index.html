@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kolek — L’épargne du marché, enfin sécurisée</title>
+    <title>Kolek · Application de tontine et collecte journalière</title>
     <meta
       name="description"
-      content="Kolek remplace le carnet du banquier ambulant par un téléphone : chaque mise comptée, chaque caisse rapprochée, chaque franc tracé. Abonnement fixe en FCFA — jamais de commission sur l’épargne."
+      content="Le carnet du banquier ambulant et du tontinier, sur téléphone : chaque mise comptée, chaque caisse rapprochée. Pour les collecteurs d’Abidjan, Côte d’Ivoire."
     />
     <meta name="theme-color" content="#06140E" />
 
@@ -20,18 +20,27 @@
       plusieurs pages au même contenu HTML initial et choisirait lui-même laquelle
       garder.
 
-      Connu et non corrigé ici : cette balise et `og:url` plus bas restent codées en
-      dur sur la racine. Les trois pages juridiques déclarent donc la racine comme
-      leur propre version canonique, l'inverse de ce que le sitemap vient de
-      déclarer, et un aperçu WhatsApp de `/conditions` affiche celui de la racine.
-      Les poser depuis React ne réglerait que la moitié du problème : le robot qui
-      prévisualise un lien WhatsApp lit le HTML brut et n'exécute jamais le
-      JavaScript, donc une valeur posée après le montage ne lui parvient jamais —
-      seul Google, qui rend la page, en profiterait, et encore, avec une balise
-      injectée après coup qu'il traite comme moins sûre qu'une balise déjà présente
-      dans le HTML servi. Le vrai correctif demande une page HTML distincte par
-      route — prérendue au build ou réécrite par une fonction Netlify — et reste à
-      faire (voir le rapport de cette tâche).
+      **Ce fichier est le gabarit, plus la seule page servie.** Depuis le
+      2026-09-20, `scripts/prerendre.mjs` le lit après `vite build` et en tire une
+      page par route — `dist/conditions/index.html` et les autres — dont il
+      remplace le titre, la description, cette balise canonique et les `og:*` par
+      les valeurs de `apps/site/src/vitrine/routes.ts`.
+
+      La valeur écrite ici est donc celle de la racine, et elle est juste : c'est
+      la racine que sert `dist/index.html`. Les autres routes reçoivent la leur à
+      la construction.
+
+      Jusqu'à cette date, les cinq routes servaient ce fichier tel quel. Les trois
+      pages juridiques déclaraient donc la racine comme leur propre version
+      canonique, l'inverse de ce que le sitemap déclarait, et un aperçu WhatsApp de
+      `/conditions` affichait celui de la racine. Les poser depuis React n'aurait
+      réglé que la moitié du problème : le robot qui prévisualise un lien WhatsApp
+      lit le HTML brut et n'exécute jamais le JavaScript, donc une valeur posée
+      après le montage ne lui serait jamais parvenue.
+
+      `scripts/prerendre.mjs` refuse d'écrire si cette balise est introuvable : un
+      gabarit remanié sans elle ferait sortir cinq pages portant la canonique
+      d'origine, en silence.
     -->
     <link rel="canonical" href="https://kolek.cash/" />
 
@@ -49,10 +58,10 @@
     <meta property="og:site_name" content="Kolek" />
     <meta property="og:locale" content="fr_FR" />
     <meta property="og:url" content="https://kolek.cash/" />
-    <meta property="og:title" content="Kolek — L’épargne du marché, enfin sécurisée" />
+    <meta property="og:title" content="Kolek · Application de tontine et collecte journalière" />
     <meta
       property="og:description"
-      content="Kolek remplace le carnet du banquier ambulant par un téléphone : chaque mise comptée, chaque caisse rapprochée, chaque franc tracé. Abonnement fixe en FCFA — jamais de commission sur l’épargne."
+      content="Le carnet du banquier ambulant et du tontinier, sur téléphone : chaque mise comptée, chaque caisse rapprochée. Pour les collecteurs d’Abidjan, Côte d’Ivoire."
     />
     <!-- Engendrée par `scripts/generer-marque.mjs` depuis `tokens.ts`, comme le
          favicon : une image de marque peinte à la main diverge de la palette au

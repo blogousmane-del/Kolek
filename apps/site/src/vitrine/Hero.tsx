@@ -24,31 +24,48 @@ import { Telephone } from './Telephone';
  * moteur de calcul applique.
  */
 export function Hero() {
-  const ref = useAnimations<HTMLElement>((conteneur) => {
+  const ref = useAnimations<HTMLElement>((conteneur, { dejaPeint }) => {
     const chrono = gsap.timeline({ delay: 0.15 });
 
     // L'ouverture, en trois temps qui se chevauchent. Une timeline plutôt que
     // trois tweens indépendants : c'est le chevauchement qui donne le poids —
     // trois entrées strictement séquentielles se lisent comme un diaporama.
-    chrono
-      .from('[data-entree]', { y: 40, opacity: 0, duration: 1, ease: 'power3.out', stagger: 0.08 })
-      // Le filigrane arrive après le texte, en s'ouvrant : sur un billet, la
-      // gravure est sous l'encre, pas devant.
-      .from(
-        '[data-filigrane]',
-        { scale: 0.85, opacity: 0, duration: 1.6, ease: 'power2.out' },
-        '-=1.1',
-      )
-      .from('[data-faciale]', { opacity: 0, duration: 2, ease: 'none' }, '-=1.4');
+    //
+    // Elle ne joue que sur un hero qui n'était pas déjà peint. Ses trois temps
+    // partent d'une opacité nulle, et la page d'accueil arrive prérendue depuis
+    // le 2026-09-20 : le visiteur lit le titre avant que le JavaScript
+    // n'arrive, et l'ouverture le lui retirait des yeux pour le refaire
+    // entrer. Voir `Etat` dans `animation.ts`.
+    //
+    // En production elle ne joue donc plus. Elle reste pour la page servie
+    // sans prérendu, celle du développement : Vite y sert le gabarit nu,
+    // l'écran d'attente précède React, et une ouverture y est à sa place. Ce
+    // qu'on voit là n'est donc pas l'arrivée du visiteur ; pour en juger,
+    // construire et servir `dist`.
+    if (!dejaPeint) {
+      chrono
+        .from('[data-entree]', { y: 40, opacity: 0, duration: 1, ease: 'power3.out', stagger: 0.08 })
+        // Le filigrane arrive après le texte, en s'ouvrant : sur un billet, la
+        // gravure est sous l'encre, pas devant.
+        .from(
+          '[data-filigrane]',
+          { scale: 0.85, opacity: 0, duration: 1.6, ease: 'power2.out' },
+          '-=1.1',
+        )
+        .from('[data-faciale]', { opacity: 0, duration: 2, ease: 'none' }, '-=1.4');
+    }
 
     // Le reflet or qui traverse le mot « précision », une fois. C'est le seul
     // moment de la page où l'or bouge de lui-même — le réserver au mot que la
     // marque revendique lui garde sa valeur.
+    //
+    // Il ne cache rien : il joue que le hero ait été peint ou non. Sur la
+    // page prérendue, c'est même le seul signe que la page s'éveille.
     chrono.fromTo(
       '[data-reflet]',
       { backgroundPosition: '-150% 0' },
       { backgroundPosition: '250% 0', duration: 1.8, ease: 'power2.inOut' },
-      '-=0.6',
+      dejaPeint ? 0 : '-=0.6',
     );
 
     // Parallaxe de sortie : le hero s'enfonce pendant que la page monte.
@@ -129,9 +146,19 @@ export function Hero() {
               troisième carte du produit (« L'argent reste dans ta main »), c'est
               la thèse du manifeste, et c'est le premier argument de la grille
               tarifaire. Le hero ne se lit qu'une fois, à l'arrivée ; il porte la
-              promesse que rien d'autre ne porte. */}
+              promesse que rien d'autre ne porte.
+
+              Le 2026-10-02, elle a pris une tête : « Le carnet de tontine du
+              collecteur, sur son téléphone ». Demande de l'exploitant, pour le
+              référencement : le grand titre au-dessus est une formule de marque
+              qui ne nomme pas le métier, et c'est le seul texte que Google lise
+              en premier. Cette tête le nomme — tontine, carnet, collecteur — sans
+              toucher au titre, et la promesse d'origine suit, intacte. Ce n'est
+              pas une redite : rien d'autre sur la page ne dit ce qu'est Kolek
+              avant la section produit. */}
           <p data-entree className="mt-5 max-w-xl font-body text-base leading-relaxed text-white/70 sm:mt-6 sm:text-lg">
-            Chaque mise comptée, chaque caisse rapprochée le soir, chaque franc tracé.
+            Le carnet de tontine du collecteur, sur son téléphone : chaque mise comptée, chaque
+            caisse rapprochée le soir, chaque franc tracé.
           </p>
 
           {/* Aucun des deux ne mène à une boîte aux lettres. Avant le 2026-08-23 ils

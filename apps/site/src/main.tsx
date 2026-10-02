@@ -29,7 +29,7 @@ import './styles.css';
 
 import { Filet } from '@kolek/ui';
 import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 
 import App from './App';
 
@@ -37,10 +37,35 @@ import App from './App';
 // `font-src` distant. La maquette Banani importait la feuille Google ; sur une
 // page de vente ce serait aussi un appel tiers avant le premier octet utile.
 
-createRoot(document.getElementById('root')!).render(
+const racine = document.getElementById('root')!;
+
+const arbre = (
   <StrictMode>
     <Filet message="Une erreur a interrompu l’affichage de la page. Recharge : rien n’a été envoyé.">
       <App />
     </Filet>
-  </StrictMode>,
+  </StrictMode>
 );
+
+/*
+  Hydrater ce qui a été prérendu, construire le reste.
+
+  `scripts/prerendre.mjs` écrit le contenu de quatre routes directement dans le
+  HTML servi, et marque leur `#root` d'un `data-prerendu`. Sur celles-là,
+  `hydrateRoot` reprend le balisage existant : le texte est déjà peint quand
+  React arrive, et il n'est pas repeint.
+
+  `createRoot` reste pour les autres — aujourd'hui `/inscription`, dont le
+  contenu dépend de la chaîne de requête et qui sert donc l'écran d'attente.
+  L'hydrater reviendrait à demander à React de reconnaître un formulaire dans
+  une barre de chargement : divergence signalée, arbre reconstruit, à chaque
+  visite.
+
+  Le marqueur est lu, et non deviné. Chercher si `#root` a des enfants ne
+  distinguerait pas une page prérendue de l'écran d'attente, qui en a aussi.
+*/
+if (racine.hasAttribute('data-prerendu')) {
+  hydrateRoot(racine, arbre);
+} else {
+  createRoot(racine).render(arbre);
+}

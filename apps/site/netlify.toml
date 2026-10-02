@@ -19,7 +19,21 @@
   publish = "apps/site/dist"
   # Voir la note longue dans le netlify.toml du collecteur : sans cette ligne,
   # une correction dans `packages/` ne reconstruit pas ce site.
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/site packages"
+  #
+  # **Et chaque script que la construction exécute doit y figurer.** Depuis le
+  # 2026-10-02, la liste nomme les trois que la construction de ce site lit
+  # hors de `apps/site` : `garde-env.mjs` et `decouper-lib.mjs`, importés par
+  # `vite.config.ts`, et `prerendre.mjs`, lancé après `vite build` pour écrire
+  # une page HTML par route. Avant, aucun n'y était : une correction du seul
+  # `prerendre.mjs` — une balise canonique mal posée, par exemple — aurait été
+  # validée, fusionnée, et jamais construite. Netlify aurait continué de servir
+  # l'ancienne page en annonçant un déploiement « ignoré », ce qu'on ne lit pas.
+  #
+  # Nommés un par un plutôt que `scripts` en entier : ce répertoire porte une
+  # trentaine de contrôles qui ne touchent pas au site, et chacun déclencherait
+  # une reconstruction pour rien. Un script ajouté à la construction s'ajoute
+  # ici.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/site packages scripts/garde-env.mjs scripts/decouper-lib.mjs scripts/prerendre.mjs"
 
 [build.environment]
   NODE_VERSION = "26"
@@ -65,13 +79,26 @@
 # l'une des règles ci-dessous. Rien à faire pour la racine ou pour les
 # ressources : Netlify les sert directement, avant même d'essayer une règle.
 #
-# Ces quatre chemins sont la seule autre liste des routes que connaît
-# `App.tsx:24-29`. Une route ajoutée là-bas sans sa règle ici marche en
-# développement — Vite sert tout — et rend 404 en production, sans qu'aucune
-# épreuve du site ne le remarque : rien, dans `npm test`, ne visite ce
-# fichier. `scripts/verifier-routes.mjs` (`npm run verifier:routes`) lit les
-# deux fichiers et échoue si l'une des deux listes contient une route que
-# l'autre ignore, ou si ce joker reparaît.
+# **Chaque règle vise le fichier de sa route, et non plus `/index.html`.**
+# Depuis le 2026-09-20, `scripts/prerendre.mjs` écrit une page par route —
+# `dist/conditions/index.html` porte le texte des conditions, son titre et sa
+# propre balise canonique. Réécrire vers `/index.html` servirait de nouveau à
+# tout le monde la page d'accueil, c'est-à-dire précisément le défaut que le
+# prérendu vient de fermer : 14 mots indexables et une canonique unique pour
+# cinq adresses.
+#
+# La cible est nommée plutôt que laissée aux « jolies adresses » de Netlify,
+# qui servirait `conditions/index.html` toute seule : une règle explicite se
+# lit, et `scripts/verifier-routes.mjs` peut la comparer à la table.
+#
+# La liste de référence des routes est `apps/site/src/vitrine/routes.ts`, qui
+# porte aussi le titre, la description et l'indexabilité de chacune. Une route
+# ajoutée là-bas sans sa règle ici marche en développement — Vite sert tout —
+# et rend 404 en production, sans qu'aucune épreuve du site ne le remarque :
+# rien, dans `npm test`, ne visite ce fichier.
+# `scripts/verifier-routes.mjs` (`npm run verifier:routes`) lit la table et ce
+# fichier, et échoue si l'un contient une route que l'autre ignore, si une
+# règle vise le mauvais fichier, ou si ce joker reparaît.
 #
 # La barre oblique finale n'a pas besoin de sa propre règle : Netlify
 # normalise les adresses avant de tester les règles de réécriture internes
@@ -81,22 +108,22 @@
 # autre site échapperait à cette normalisation ; ce n'est pas le cas ici.
 [[redirects]]
   from = "/inscription"
-  to = "/index.html"
+  to = "/inscription/index.html"
   status = 200
 
 [[redirects]]
   from = "/mentions-legales"
-  to = "/index.html"
+  to = "/mentions-legales/index.html"
   status = 200
 
 [[redirects]]
   from = "/conditions"
-  to = "/index.html"
+  to = "/conditions/index.html"
   status = 200
 
 [[redirects]]
   from = "/confidentialite"
-  to = "/index.html"
+  to = "/confidentialite/index.html"
   status = 200
 
 # Contrairement aux deux applications, ce site a vocation à être indexé : c'est
@@ -133,11 +160,16 @@
 
 # Le formulaire d'ouverture de compte reste hors de l'index.
 #
-# Il est servi par la même réécriture que la vitrine, donc par le même
-# `index.html` : Google verrait deux adresses au contenu initial identique. La
-# balise canonique le dit déjà, mais un en-tête est plus sûr qu'une balise — le
-# routage de `App.tsx` est lu au chargement, et un `noindex` injecté après coup
-# par JavaScript arrive après le passage du robot.
+# Depuis le prérendu (2026-09-20), `/inscription` a son propre fichier,
+# `inscription/index.html`, et ce fichier porte déjà
+# `<meta name="robots" content="noindex">` dans le HTML servi :
+# `scripts/prerendre.mjs` l'y écrit pour toute route que `routes.ts` déclare
+# non indexable. Cet en-tête la double, et les deux ne tombent pas ensemble :
+# la balise vit dans un gabarit qu'on remanie, l'en-tête vit ici.
+#
+# Jusqu'à cette date, la page était servie par le même `index.html` que la
+# vitrine, et cet en-tête était sa seule protection : un `noindex` posé par
+# JavaScript arrive après le passage du robot.
 #
 # Rien à cacher ici : la page est publique et le restera. Ce qu'on évite, c'est
 # qu'une recherche « Kolek » tombe sur un formulaire vide au lieu de la page qui

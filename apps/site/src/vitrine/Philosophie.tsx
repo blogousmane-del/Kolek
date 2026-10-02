@@ -26,15 +26,20 @@ function EnMots({ texte, className }: { texte: string; className?: string }) {
 }
 
 export function Philosophie() {
-  const ref = useAnimations<HTMLElement>((conteneur) => {
-    gsap.from('[data-mot]', {
-      y: 30,
-      opacity: 0,
-      duration: 0.8,
-      ease: 'power3.out',
-      stagger: 0.05,
-      scrollTrigger: { trigger: conteneur, start: 'top 65%' },
-    });
+  const ref = useAnimations<HTMLElement>((conteneur, { dejaPeint }) => {
+    // Les mots ne se révèlent pas sur un manifeste déjà à l'écran à l'arrivée :
+    // il est lu, l'entrée l'effacerait. La texture, elle, ne cache rien. Voir
+    // `Etat` dans `animation.ts`.
+    if (!dejaPeint) {
+      gsap.from('[data-mot]', {
+        y: 30,
+        opacity: 0,
+        duration: 0.8,
+        ease: 'power3.out',
+        stagger: 0.05,
+        scrollTrigger: { trigger: conteneur, start: 'top 65%' },
+      });
+    }
     // La texture recule moins vite que le texte : la profondeur d'un billet
     // tenu à contre-jour.
     gsap.to('[data-parallaxe]', {
