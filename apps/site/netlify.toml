@@ -160,11 +160,16 @@
 
 # Le formulaire d'ouverture de compte reste hors de l'index.
 #
-# Il est servi par la même réécriture que la vitrine, donc par le même
-# `index.html` : Google verrait deux adresses au contenu initial identique. La
-# balise canonique le dit déjà, mais un en-tête est plus sûr qu'une balise — le
-# routage de `App.tsx` est lu au chargement, et un `noindex` injecté après coup
-# par JavaScript arrive après le passage du robot.
+# Depuis le prérendu (2026-09-20), `/inscription` a son propre fichier,
+# `inscription/index.html`, et ce fichier porte déjà
+# `<meta name="robots" content="noindex">` dans le HTML servi :
+# `scripts/prerendre.mjs` l'y écrit pour toute route que `routes.ts` déclare
+# non indexable. Cet en-tête la double, et les deux ne tombent pas ensemble :
+# la balise vit dans un gabarit qu'on remanie, l'en-tête vit ici.
+#
+# Jusqu'à cette date, la page était servie par le même `index.html` que la
+# vitrine, et cet en-tête était sa seule protection : un `noindex` posé par
+# JavaScript arrive après le passage du robot.
 #
 # Rien à cacher ici : la page est publique et le restera. Ce qu'on évite, c'est
 # qu'une recherche « Kolek » tombe sur un formulaire vide au lieu de la page qui
