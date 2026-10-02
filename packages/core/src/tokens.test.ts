@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { couleurs, genererCssTheme, grille, mesures, rayons, taillesTexte } from './tokens';
+import { couleurs, genererCssTheme, grille, mesures, polices, rayons, taillesTexte } from './tokens';
 
 describe('tokens du Design System', () => {
   it("porte la couleur d'action de la marque", () => {
@@ -302,5 +302,46 @@ describe('les quatre aplats de tuile', () => {
     expect(contraste(couleurs.tuileGestionEncre, couleurs.surface)).toBeGreaterThan(
       contraste(couleurs.or, couleurs.surface),
     );
+  });
+});
+
+/**
+ * Les jetons du billet, posés le 2026-10-02.
+ *
+ * `trait` délimite ce qu'on touche, et c'est un seuil d'objet graphique qui
+ * s'applique : 3:1, WCAG 1.4.11. Il doit le tenir sur les deux fonds où vit
+ * un contrôle, et rester plus clair que le texte muet — il délimite, il ne se
+ * lit pas.
+ */
+describe('le billet, jetons du 2026-10-02', () => {
+  it('porte la police des chiffres de caisse', () => {
+    expect(polices.mono).toBe("'IBM Plex Mono', ui-monospace, monospace");
+    expect(genererCssTheme()).toContain("--font-mono: 'IBM Plex Mono', ui-monospace, monospace;");
+  });
+
+  it('porte le cran du total du jour, au-dessus de 4xl', () => {
+    expect(taillesTexte.total).toBe('44px');
+    expect(Number.parseFloat(taillesTexte.total)).toBeGreaterThan(
+      Number.parseFloat(taillesTexte['4xl']),
+    );
+    expect(genererCssTheme()).toContain('--text-total: 44px;');
+  });
+
+  it('tient 3:1 pour la limite d’un contrôle, sur la surface', () => {
+    expect(contraste(couleurs.trait, couleurs.surface)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('tient 3:1 pour la limite d’un contrôle, sur le canevas', () => {
+    expect(contraste(couleurs.trait, couleurs.canvas)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('reste plus clair que le texte muet', () => {
+    expect(contraste(couleurs.trait, couleurs.surface)).toBeLessThan(
+      contraste(couleurs.mutedForeground, couleurs.surface),
+    );
+  });
+
+  it('arrive jusqu’à Tailwind sous le nom `border-trait`', () => {
+    expect(genererCssTheme()).toContain('--color-trait: #858B81;');
   });
 });

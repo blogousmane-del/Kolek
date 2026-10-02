@@ -10,6 +10,9 @@
 // avec les mesures.
 import '@fontsource-variable/bricolage-grotesque/wght.css';
 import '@fontsource-variable/instrument-sans/wght.css';
+// Les chiffres de caisse : une graisse, la 500. Le pourquoi est dans
+// `polices.mono`, packages/core/src/tokens.ts.
+import '@fontsource/ibm-plex-mono/500.css';
 import './styles.css';
 
 import { StrictMode } from 'react';

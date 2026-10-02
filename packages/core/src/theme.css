@@ -15,6 +15,7 @@
   --color-muted-foreground: #666B64;
   --color-hairline: #E6E3DA;
   --color-border: #E6E3DA;
+  --color-trait: #858B81;
   --color-canvas: #F4F5F2;
   --color-background: #F4F5F2;
   --color-surface: #FFFFFF;
@@ -57,12 +58,14 @@
   --text-2xl: 24px;
   --text-3xl: 28px;
   --text-4xl: 36px;
+  --text-total: 44px;
   --text-5xl: clamp(32px, 8vw, 48px);
   --text-6xl: clamp(36px, 10vw, 64px);
   --text-7xl: clamp(40px, 12vw, 88px);
   --text-8xl: clamp(48px, 15vw, 120px);
   --font-body: 'Instrument Sans Variable', system-ui, sans-serif;
   --font-headings: 'Bricolage Grotesque Variable', 'Instrument Sans Variable', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --container-formulaire: 360px;
   --container-carte: 520px;
   --container-liste: 640px;

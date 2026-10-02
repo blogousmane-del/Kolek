@@ -45,6 +45,15 @@ export const couleurs = {
   mutedForeground: '#666B64',
   hairline: '#E6E3DA',
   border: '#E6E3DA',
+  // La limite de ce qu'on touche, posée le 2026-10-02 avec le billet.
+  //
+  // `hairline` sépare deux surfaces ; il ne délimite pas un contrôle. Un champ
+  // de recherche bordé de `hairline` ne tient que 1,27:1 contre le papier,
+  // quand WCAG 1.4.11 en demande 3 pour la limite d'un composant. `trait`
+  // tient 3,5:1 sur `surface` et 3,2:1 sur `canvas` : assez sombre pour
+  // délimiter, et pas davantage. Les maquettes le montraient plus clair
+  // (`#D5D8D1`, 1,5:1) ; c'est l'écart que la spec assume.
+  trait: '#858B81',
   canvas: '#F4F5F2',
   background: '#F4F5F2',
   surface: '#FFFFFF',
@@ -305,6 +314,16 @@ export const taillesTexte = {
   '4xl': '36px',
 
   /**
+   * Le total du jour, sur l'en-tête de l'accueil, et lui seul.
+   *
+   * C'est l'affiche de l'écran, en Bricolage, au-dessus de `4xl`. Il ne
+   * s'applique qu'à partir de `xs` (390 px) : dessous, l'écran repasse en
+   * `text-4xl`, selon la règle que `ruptures.xs` documente pour les montants
+   * à sept chiffres.
+   */
+  total: '44px',
+
+  /**
    * Les tailles d'affiche — la vitrine, et elle seule.
    *
    * Elles sont **fluides**, et c'est une correction du 2026-08-23. L'échelle
@@ -381,6 +400,18 @@ export const taillesTexte = {
 export const polices = {
   body: "'Instrument Sans Variable', system-ui, sans-serif",
   headings: "'Bricolage Grotesque Variable', 'Instrument Sans Variable', system-ui, sans-serif",
+  /**
+   * Les chiffres de caisse, entrés dans les applications le 2026-10-02.
+   *
+   * Tout montant qu'on compte s'écrit en chasse fixe : soldes, mises, relevés,
+   * décomptes, reçus, compteurs et heures. Jamais une phrase. Le total du jour
+   * reste en Bricolage : c'est l'affiche, pas une ligne de caisse.
+   *
+   * La vitrine déclarait déjà cette valeur dans sa propre feuille ; elle la
+   * reçoit désormais d'ici. Le collecteur n'en charge que la graisse 500 :
+   * 14 888 octets en latin, gardés ensuite par le service worker.
+   */
+  mono: "'IBM Plex Mono', ui-monospace, monospace",
 } as const;
 
 /**
