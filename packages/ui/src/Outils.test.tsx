@@ -21,16 +21,20 @@ const OUTILS: Outil[] = [
 
 describe('les outils', () => {
   it('rendent un bouton par outil, nommé par son libellé', () => {
-    const { container } = render(<Outils outils={OUTILS} />);
+    render(<Outils outils={OUTILS} />);
     expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual([
       'Souscrire',
       'Rapprochement',
       'Reçus',
     ]);
-    const grid = container.querySelector('.grid');
-    expect(grid?.className).toContain('grid-cols-2');
-    expect(grid?.className).toContain('lg:grid-cols-4');
-    expect(grid?.className).not.toMatch(/sm:grid-cols/);
+  });
+
+  it('se rangent sur deux colonnes, quatre avec la barre latérale', () => {
+    const { container } = render(<Outils outils={OUTILS} />);
+    const grille = container.querySelector('.grid');
+    expect(grille?.className).toContain('grid-cols-2');
+    expect(grille?.className).toContain('lg:grid-cols-4');
+    expect(grille?.className).not.toMatch(/sm:grid-cols/);
   });
 
   it('ouvrent l’outil touché', () => {
@@ -47,13 +51,18 @@ describe('les outils', () => {
 
   it('étirent le dernier outil quand la rangée de deux est incomplète', () => {
     render(<Outils outils={OUTILS} />);
-    const lastButton = screen.getByRole('button', { name: 'Reçus' });
-    const firstButton = screen.getByRole('button', { name: 'Souscrire' });
-    expect(lastButton.className).toContain('col-span-2');
-    expect(lastButton.className).not.toContain('col-span-1');
-    expect(firstButton.className).not.toContain('col-span-2');
-    const label = lastButton.querySelector('span');
-    expect(label?.className).not.toContain('truncate');
+    const dernier = screen.getByRole('button', { name: 'Reçus' });
+    const premier = screen.getByRole('button', { name: 'Souscrire' });
+    expect(dernier.className).toContain('col-span-2');
+    expect(dernier.className).not.toContain('col-span-1');
+    expect(premier.className).not.toContain('col-span-2');
+    // Sans `break-words`, « Rapprochement » (environ 100 px) reste sur une
+    // seule ligne dans les 86 px que laisse une tuile à 320 px, et
+    // `line-clamp-2` le rogne en silence.
+    const libelle = dernier.querySelector('span');
+    expect(libelle?.className).toContain('break-words');
+    expect(libelle?.className).toContain('line-clamp-2');
+    expect(libelle?.className).not.toContain('truncate');
   });
 
   it('éteignent un outil sans destination, et le disent', () => {

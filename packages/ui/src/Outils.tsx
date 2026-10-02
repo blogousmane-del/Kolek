@@ -33,12 +33,14 @@ export interface Outil {
  * sept outils d'un collaborateur se rangent quatre puis trois, et le dernier,
  * étiré sur deux, ferme encore la rangée.
  *
- * Le libellé enroule sur deux lignes et n'est jamais coupé. À 320 px (téléphones
- * d'entrée de gamme du marché cible), un outil sur deux colonnes laisse 86 px au
- * libellé ; « Rapprochement » (99,7 px) y est cassé par le navigateur grâce au
- * `hyphens-auto` et à la langue `<html lang="fr">` du collecteur.
+ * Le libellé n’est jamais tronqué. À 320 px (téléphones d’entrée de gamme du
+ * marché cible), un outil sur deux colonnes laisse 86 px au libellé, et
+ * « Rapprochement » en demande environ 100. `break-words` le casse alors au
+ * bord de la tuile au lieu de le laisser déborder ; `hyphens-auto` place cette
+ * cassure à une césure française, là où le navigateur a le dictionnaire
+ * (`<html lang="fr">` dans le collecteur) ; `line-clamp-2` le tient à deux
+ * lignes au plus.
  */
-
 export function Outils({ outils, anime = false }: { outils: Outil[]; anime?: boolean }) {
   const impair = outils.length % 2 === 1;
 

@@ -10,6 +10,9 @@ describe('Bouton', () => {
     render(
       <Bouton nomAccessible="Encaisser 2 000 FCFA sur la carte de Mariam">Encaisser 2 000</Bouton>,
     );
+    const bouton = screen.getByRole('button');
+    expect(bouton.getAttribute('aria-label')).toBe('Encaisser 2 000 FCFA sur la carte de Mariam');
+    expect(bouton.textContent).toBe('Encaisser 2 000');
     expect(
       screen.getByRole('button', { name: 'Encaisser 2 000 FCFA sur la carte de Mariam' }),
     ).toBeTruthy();
@@ -29,7 +32,7 @@ describe('Bouton', () => {
     expect(classes).not.toContain('text-base');
   });
 
-  it('garde sa taille par défaut sans le prop grand', () => {
+  it('garde sa taille par défaut sans la propriété grand', () => {
     render(<Bouton>Fiche</Bouton>);
     const classes = screen.getByRole('button', { name: 'Fiche' }).className;
     expect(classes).toContain('min-h-11');
