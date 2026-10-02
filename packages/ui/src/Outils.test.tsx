@@ -21,12 +21,16 @@ const OUTILS: Outil[] = [
 
 describe('les outils', () => {
   it('rendent un bouton par outil, nommé par son libellé', () => {
-    render(<Outils outils={OUTILS} />);
+    const { container } = render(<Outils outils={OUTILS} />);
     expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual([
       'Souscrire',
       'Rapprochement',
       'Reçus',
     ]);
+    const grid = container.querySelector('.grid');
+    expect(grid?.className).toContain('grid-cols-2');
+    expect(grid?.className).toContain('lg:grid-cols-4');
+    expect(grid?.className).not.toMatch(/sm:grid-cols/);
   });
 
   it('ouvrent l’outil touché', () => {
@@ -43,8 +47,13 @@ describe('les outils', () => {
 
   it('étirent le dernier outil quand la rangée de deux est incomplète', () => {
     render(<Outils outils={OUTILS} />);
-    expect(screen.getByRole('button', { name: 'Reçus' }).className).toContain('col-span-2');
-    expect(screen.getByRole('button', { name: 'Souscrire' }).className).not.toContain('col-span-2');
+    const lastButton = screen.getByRole('button', { name: 'Reçus' });
+    const firstButton = screen.getByRole('button', { name: 'Souscrire' });
+    expect(lastButton.className).toContain('col-span-2');
+    expect(lastButton.className).not.toContain('col-span-1');
+    expect(firstButton.className).not.toContain('col-span-2');
+    const label = lastButton.querySelector('span');
+    expect(label?.className).not.toContain('truncate');
   });
 
   it('éteignent un outil sans destination, et le disent', () => {

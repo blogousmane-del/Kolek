@@ -1,18 +1,7 @@
 import { formatMontant } from '@kolek/core';
 import type { ReactNode } from 'react';
 
-/**
- * Un décompte de caisse : des lignes, et le total sous un double filet.
- *
- * Il est né pour le retrait, où le collecteur rend de l'argent et ne peut pas
- * se tromper : « 31 mises × 1 000, moins la commission, à rendre 30 000 ».
- * C'est la forme qu'a tout ticket de caisse, et le collecteur peut le lire au
- * client avant de payer.
- *
- * Les points de conduite vivent dans le `dt`, et non entre le `dt` et le
- * `dd` : un `dl` n'admet entre eux ni `span` ni `div`. Ils sont décoratifs,
- * donc `aria-hidden`.
- */
+/** Une ligne du décompte de caisse. */
 export interface LigneDecompte {
   libelle: ReactNode;
   montant: number;
@@ -26,6 +15,18 @@ function signe(montant: number): string {
   return montant < 0 ? `−${FINE}${formatMontant(-montant)}` : formatMontant(montant);
 }
 
+/**
+ * Un décompte de caisse : des lignes, et le total sous un double filet.
+ *
+ * Il est né pour le retrait, où le collecteur rend de l'argent et ne peut pas
+ * se tromper : « 31 mises × 1 000, moins la commission, à rendre 30 000 ».
+ * C'est la forme qu'a tout ticket de caisse, et le collecteur peut le lire au
+ * client avant de payer.
+ *
+ * Les points de conduite vivent dans le `dt`, et non entre le `dt` et le
+ * `dd` : un `dl` n'admet entre eux ni `span` ni `div`. Ils sont décoratifs,
+ * donc `aria-hidden`.
+ */
 export function Decompte({
   lignes,
   total,

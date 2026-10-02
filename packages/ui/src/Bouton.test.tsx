@@ -28,4 +28,13 @@ describe('Bouton', () => {
     expect(classes).not.toContain('min-h-11');
     expect(classes).not.toContain('text-base');
   });
+
+  it('garde sa taille par défaut sans le prop grand', () => {
+    render(<Bouton>Fiche</Bouton>);
+    const classes = screen.getByRole('button', { name: 'Fiche' }).className;
+    expect(classes).toContain('min-h-11');
+    expect(classes).toContain('text-base');
+    expect(classes).not.toContain('min-h-14');
+    expect(classes).not.toContain('text-lg');
+  });
 });
