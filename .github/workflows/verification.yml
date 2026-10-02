@@ -48,9 +48,17 @@ on:
         default: false
 
 # Deux poussées rapprochées sur la même branche : seule la dernière compte.
+#
+# Sauf sur `main`, depuis le 2026-10-02. Chaque fusion y garde son verdict, et
+# un déploiement commencé y va à son terme : la poussée suivante attend au lieu
+# d'annuler. L'attente ne suffit pas à ne rien perdre : GitHub ne garde qu'une
+# exécution en attente par groupe, et une troisième poussée remplace la
+# deuxième, qui ne tourne jamais. Les plages du job `fonctions` et du rappel
+# des migrations se mesurent donc depuis le dernier run vert, et non depuis la
+# poussée précédente : voir `scripts/plage-depuis-le-dernier-vert.mjs`.
 concurrency:
   group: verification-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   depot:
@@ -268,6 +276,13 @@ jobs:
     # regardé.
     needs: [depot, base]
 
+    # Lire les runs du dépôt : la plage part du dernier run vert de `main`, que
+    # seule l'API de GitHub connaît. `contents: read` reste pour le checkout :
+    # nommer une permission retire toutes les autres.
+    permissions:
+      contents: read
+      actions: read
+
     # Groupe **distinct** de celui du fichier, et sans annulation. La règle du
     # haut annule une exécution en cours quand une nouvelle poussée arrive —
     # excellent pour des tests, désastreux au milieu d'un déploiement, qui
@@ -312,41 +327,45 @@ jobs:
       # remplace du code par le même code, tandis que sauter un déploiement
       # laisse la production en arrière **sans que rien ne le dise**. C'est
       # exactement ce qui s'est produit.
+      #
+      # ## Et ce qu'il laissait encore passer, le 2026-10-02
+      #
+      # Il comparait toute la poussée, mais depuis la poussée précédente
+      # (`github.event.before`). Quand le run de celle-ci avait été annulé, la
+      # #18 et la #19 fusionnées à deux minutes d'écart, ce qu'elle apportait
+      # n'entrait dans aucune plage. La base est désormais le dernier run vert de
+      # `main` : un run annulé, remplacé ou rouge ne la fait pas avancer, et la
+      # plage suivante reprend ce qu'il n'a pas fait. Le calcul vit dans
+      # `scripts/plage-depuis-le-dernier-vert.mjs`, éprouvé, et ce job est gardé
+      # par `scripts/workflow-verification.test.mjs`.
       - name: Y a-t-il quelque chose à déployer ?
         id: portee
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "Déclenchement manuel : on déploie."
-            echo "deployer=oui" >> "$GITHUB_OUTPUT"
+            echo "touche=oui" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          avant="${{ github.event.before }}"
-          if [ -z "$avant" ]             || [ "$avant" = "0000000000000000000000000000000000000000" ]             || ! git cat-file -e "$avant^{commit}" 2>/dev/null; then
-            echo "Plage de poussée introuvable ($avant) — on déploie par précaution."
-            echo "deployer=oui" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          # Une API muette rend une base vide : le script couvre alors tout.
+          depuis=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/verification.yml/runs?branch=main&event=push&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // empty' 2>/dev/null) || depuis=""
+          node scripts/plage-depuis-le-dernier-vert.mjs --chemin supabase/functions --depuis "$depuis" --jusqua "${{ github.sha }}"
 
-          modifiees=$(git diff --name-only "$avant" "${{ github.sha }}" -- supabase/functions || true)
-          if [ -n "$modifiees" ]; then
-            echo "$modifiees"
-            echo "deployer=oui" >> "$GITHUB_OUTPUT"
-          else
-            echo "Aucune Edge Function touchée entre $avant et ${{ github.sha }}."
-            echo "deployer=non" >> "$GITHUB_OUTPUT"
-          fi
-
+      # Un échec, et non plus un avertissement, depuis le 2026-10-02. Un run vert
+      # fait avancer la base de la plage : un déploiement sauté en vert sortirait
+      # ses fonctions de toute plage future, et personne ne les redéploierait. En
+      # rouge, le run suivant les reprend.
       - name: Le jeton est-il posé ?
         id: jeton
-        if: steps.portee.outputs.deployer == 'oui'
+        if: steps.portee.outputs.touche == 'oui'
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
-            echo "::warning title=Déploiement sauté::SUPABASE_ACCESS_TOKEN n'est pas posé dans les secrets du dépôt. Les fonctions modifiées restent à déployer à la main."
-            echo "pret=non" >> "$GITHUB_OUTPUT"
-          else
-            echo "pret=oui" >> "$GITHUB_OUTPUT"
+            echo "::error title=Déploiement impossible::SUPABASE_ACCESS_TOKEN n'est pas posé dans les secrets du dépôt. Les fonctions modifiées ne sont pas déployées : poser le jeton, puis relancer ce run."
+            exit 1
           fi
+          echo "pret=oui" >> "$GITHUB_OUTPUT"
 
       - uses: supabase/setup-cli@v1
         if: steps.jeton.outputs.pret == 'oui'
@@ -397,10 +416,20 @@ jobs:
     if: github.event_name == 'push'
     needs: [depot, base]
 
+    # Mêmes droits que le job `fonctions`, pour la même raison : la plage part du
+    # dernier run vert de `main`.
+    permissions:
+      contents: read
+      actions: read
+
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          # Historique entier, comme pour les fonctions : le dernier run vert
+          # peut être à plusieurs poussées d'ici. `fetch-depth: 2` et `HEAD~1` ne
+          # voyaient que le dernier commit, le défaut du 2026-09-09, resté ici
+          # jusqu'au 2026-10-02.
+          fetch-depth: 0
 
       # Les migrations restent manuelles : `supabase db push` demande le mot de
       # passe de la base, que Supabase n'affiche qu'à la création du projet. Le
@@ -410,12 +439,19 @@ jobs:
       #
       # Un `::notice` plutôt qu'un échec. Bloquer une poussée pour un rappel
       # serait vite contourné, et un garde-fou contourné ne garde plus rien.
-      - name: Signaler les migrations modifiées
+      - name: Quelles migrations depuis le dernier run vert ?
+        id: plage
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          modifiees=$(git diff --name-only HEAD~1 HEAD -- supabase/migrations || true)
-          if [ -n "$modifiees" ]; then
-            echo "$modifiees"
-            echo "::notice title=À appliquer à la main::Des migrations ont changé. Lancer « npx supabase db push », puis vérifier avec « npx supabase migration list --linked »."
+          depuis=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/verification.yml/runs?branch=main&event=push&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // empty' 2>/dev/null) || depuis=""
+          node scripts/plage-depuis-le-dernier-vert.mjs --chemin supabase/migrations --depuis "$depuis" --jusqua "${{ github.sha }}"
+
+      - name: Signaler les migrations modifiées
+        if: steps.plage.outputs.touche == 'oui'
+        run: |
+          if [ "${{ steps.plage.outputs.certaine }}" = "oui" ]; then
+            echo "::notice title=À appliquer à la main::Des migrations ont changé depuis le dernier run vert. Lancer « npx supabase db push », puis vérifier avec « npx supabase migration list --linked »."
           else
-            echo "Aucune migration touchée par cette poussée."
+            echo "::notice title=À vérifier à la main::La plage depuis le dernier run vert est inconnue. Vérifier avec « npx supabase migration list --linked » qu'aucune migration n'attend."
           fi
