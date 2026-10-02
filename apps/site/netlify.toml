@@ -19,7 +19,21 @@
   publish = "apps/site/dist"
   # Voir la note longue dans le netlify.toml du collecteur : sans cette ligne,
   # une correction dans `packages/` ne reconstruit pas ce site.
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/site packages"
+  #
+  # **Et chaque script que la construction exécute doit y figurer.** Depuis le
+  # 2026-10-02, la liste nomme les trois que la construction de ce site lit
+  # hors de `apps/site` : `garde-env.mjs` et `decouper-lib.mjs`, importés par
+  # `vite.config.ts`, et `prerendre.mjs`, lancé après `vite build` pour écrire
+  # une page HTML par route. Avant, aucun n'y était : une correction du seul
+  # `prerendre.mjs` — une balise canonique mal posée, par exemple — aurait été
+  # validée, fusionnée, et jamais construite. Netlify aurait continué de servir
+  # l'ancienne page en annonçant un déploiement « ignoré », ce qu'on ne lit pas.
+  #
+  # Nommés un par un plutôt que `scripts` en entier : ce répertoire porte une
+  # trentaine de contrôles qui ne touchent pas au site, et chacun déclencherait
+  # une reconstruction pour rien. Un script ajouté à la construction s'ajoute
+  # ici.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- apps/site packages scripts/garde-env.mjs scripts/decouper-lib.mjs scripts/prerendre.mjs"
 
 [build.environment]
   NODE_VERSION = "26"
