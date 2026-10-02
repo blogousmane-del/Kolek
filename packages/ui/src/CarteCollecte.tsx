@@ -27,7 +27,13 @@ interface Props {
    * écritures. Elle réserve une place, l'écran décide ce qui s'y met.
    */
   action?: ReactNode;
-  /** La case qu'on vient de payer, en vert de réussite le temps du geste. */
+  /**
+   * La case qu'on vient de payer, en vert de réussite le temps du geste.
+   *
+   * Toujours une case déjà payée : `neuve <= jourCourant`. Au-delà, `etatDe`
+   * lui donne le pas sur les autres états et elle cacherait le cercle de la
+   * prochaine case.
+   */
   neuve?: number;
   /** Ce qui se pose sur la carte, en haut à droite : le tampon d'un geste. */
   tampon?: ReactNode;
@@ -111,6 +117,7 @@ export function CarteCollecte({
     >
       <Onde
         lignes={7}
+        traitFixe
         className="pointer-events-none absolute inset-x-0 top-0 h-2.5 w-full text-primary/30"
       />
       {tampon && <div className="absolute right-3 top-3.5 z-10">{tampon}</div>}

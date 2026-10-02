@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { couleurs, genererCssTheme, grille, mesures, polices, rayons, taillesTexte } from './tokens';
+import {
+  couleurs,
+  degrades,
+  genererCssTheme,
+  grille,
+  mesures,
+  polices,
+  rayons,
+  taillesTexte,
+} from './tokens';
 
 describe('tokens du Design System', () => {
   it("porte la couleur d'action de la marque", () => {
@@ -347,5 +356,33 @@ describe('le billet, jetons du 2026-10-02', () => {
 
   it('arrive jusqu’à Tailwind sous le nom `border-trait`', () => {
     expect(genererCssTheme()).toContain('--color-trait: #858B81;');
+  });
+});
+
+/**
+ * Le dégradé de la carte de collecte est parti le 2026-10-02 avec le billet :
+ * la carte est papier, filet et gravure. Il vivait dans `degrades`, sous la clé
+ * `degradeCarte`, d'où la variable `--degrade-carte`.
+ *
+ * Les deux épreuves d'absence ont un témoin, la troisième : sans lui, un
+ * `degrades` vidé ou un générateur cassé les laisserait vertes.
+ */
+describe('les dégradés, sans celui de la carte de collecte', () => {
+  it('ne garde plus la clé `degradeCarte`', () => {
+    expect(Object.keys(degrades)).not.toContain('degradeCarte');
+  });
+
+  it('n’émet plus `--degrade-carte` dans le thème', () => {
+    expect(genererCssTheme()).not.toContain('--degrade-carte');
+  });
+
+  it('garde ceux qui servent encore : le hero et les quatre zones', () => {
+    const css = genererCssTheme();
+    for (const nom of ['hero', 'zone-0', 'zone-1', 'zone-2', 'zone-3']) {
+      expect(css).toContain(`--degrade-${nom}:`);
+    }
+    expect(Object.keys(degrades)).toEqual(
+      expect.arrayContaining(['degradeHero', 'degradeZone0', 'degradeZone1', 'degradeZone2', 'degradeZone3']),
+    );
   });
 });

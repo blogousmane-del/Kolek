@@ -88,7 +88,20 @@ export function Rosace({
  * `preserveAspectRatio="none"` est délibéré — la bande s'étire à la largeur
  * qu'on lui donne, comme sur un billet dont le format varie.
  */
-export function Onde({ lignes = 12, className = '' }: { lignes?: number; className?: string }) {
+export function Onde({
+  lignes = 12,
+  className = '',
+  traitFixe = false,
+}: {
+  lignes?: number;
+  className?: string;
+  /**
+   * Le trait garde un demi-pixel sur tout affichage, quelle que soit la
+   * hauteur de la bande : pour les bandes minces, où le trait étiré
+   * disparaîtrait. Par défaut, il suit la bande dans son étirement.
+   */
+  traitFixe?: boolean;
+}) {
   const chemins = Array.from({ length: lignes }, (_, i) => {
     const phase = (i / lignes) * Math.PI;
     const amplitude = 12 + 10 * Math.sin(phase);
@@ -101,7 +114,14 @@ export function Onde({ lignes = 12, className = '' }: { lignes?: number; classNa
   return (
     <svg aria-hidden viewBox="0 0 1000 100" preserveAspectRatio="none" className={className}>
       {chemins.map((d, i) => (
-        <path key={i} d={d} fill="none" stroke="currentColor" strokeWidth={0.6} />
+        <path
+          key={i}
+          d={d}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={traitFixe ? 0.5 : 0.6}
+          vectorEffect={traitFixe ? 'non-scaling-stroke' : undefined}
+        />
       ))}
     </svg>
   );

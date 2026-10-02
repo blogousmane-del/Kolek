@@ -134,4 +134,35 @@ describe('CarteCollecte — le billet', () => {
     const { container } = carte();
     expect(container.innerHTML).toContain('@max-[240px]:grid-cols-8');
   });
+
+  it('cercle la première case d’une carte sans mise encaissée', () => {
+    const { container } = carte({ jourCourant: 0, solde: '0' });
+    const e = etats(container);
+    // Les trente et une cases en premier : sans elles, les lignes suivantes
+    // passeraient sur une liste vide.
+    expect(e).toHaveLength(31);
+    expect(e[0]).toBe('prochaine');
+    expect(e).not.toContain('payee');
+    expect(e.slice(1).every((x) => x === 'a-venir')).toBe(true);
+  });
+
+  it('peint les trente et une cases d’une carte pleine, sans en cercler aucune', () => {
+    const { container } = carte({ jourCourant: 31, solde: '62 000' });
+    const e = etats(container);
+    // Les trente et une cases en premier, pour la même raison.
+    expect(e).toHaveLength(31);
+    expect(e.every((x) => x === 'payee')).toBe(true);
+    expect(e).not.toContain('prochaine');
+  });
+
+  it('grave sa bande à trait fixe : le trait ne s’amincit pas avec la hauteur', () => {
+    // La bande ne fait que 10 px de haut pour une boîte de 100 unités : sans
+    // `vector-effect`, son trait tombe à 0,06 px et la gravure disparaît.
+    const { container } = carte();
+    const effets = [...container.querySelectorAll('svg path')].map((t) =>
+      t.getAttribute('vector-effect'),
+    );
+    expect(effets.length).toBeGreaterThan(0);
+    expect(new Set(effets)).toEqual(new Set(['non-scaling-stroke']));
+  });
 });
