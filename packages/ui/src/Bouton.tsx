@@ -22,6 +22,17 @@ interface Props {
   title?: string;
   onClick?: () => void;
   className?: string;
+  /**
+   * Le nom que lit un lecteur d'écran, quand le libellé ne suffit pas.
+   *
+   * « Encaisser 2 000 » sous une carte dit le geste, pas la carte. Le nom
+   * accessible le dit : « Encaisser 2 000 FCFA sur la carte de Mariam ». Il
+   * doit **contenir** le libellé visible (WCAG 2.5.3), sans quoi un utilisateur
+   * qui commande à la voix ne retrouve pas le bouton qu'il voit.
+   */
+  nomAccessible?: string;
+  /** Le bouton du geste principal d'un écran : 56 px au lieu de 44. */
+  grand?: boolean;
 }
 
 /**
@@ -44,6 +55,8 @@ export function Bouton({
   title,
   onClick,
   className = '',
+  nomAccessible,
+  grand = false,
 }: Props) {
   return (
     <button
@@ -51,7 +64,11 @@ export function Bouton({
       disabled={disabled}
       title={title}
       onClick={onClick}
-      className={`anim-pression min-h-11 px-5 rounded-md font-body font-semibold text-base flex items-center justify-center gap-2 ${
+      aria-label={nomAccessible}
+      // Deux tailles écrites en entier, et jamais l'une ajoutée par-dessus
+      // l'autre : deux `min-h-*` dans une même classe, c'est l'ordre de la
+      // feuille de style qui tranche, pas l'intention.
+      className={`anim-pression ${grand ? 'min-h-14 text-lg' : 'min-h-11 text-base'} px-5 rounded-md font-body font-semibold flex items-center justify-center gap-2 ${
         VARIANTES[variante]
       } ${pleineLargeur ? 'w-full' : ''} ${
         disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'

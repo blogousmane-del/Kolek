@@ -42,6 +42,7 @@ export { LigneTransaction, type TypeMontant } from './LigneTransaction';
 export { Logo, Marque } from './Logo';
 export { NavBureau, type CleNavBureau } from './NavBureau';
 export { NavMobile, type CleNavCollecteur } from './NavMobile';
+export { Outils, type Outil } from './Outils';
 export { Repli } from './Repli';
 export { Segments, type Segment } from './Segments';
 export { Squelette, SqueletteKPI, SqueletteLigne } from './Squelette';

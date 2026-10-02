@@ -1,0 +1,31 @@
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { Bouton } from './Bouton';
+
+afterEach(cleanup);
+
+describe('Bouton', () => {
+  it('prend le nom accessible qu’on lui donne', () => {
+    render(
+      <Bouton nomAccessible="Encaisser 2 000 FCFA sur la carte de Mariam">Encaisser 2 000</Bouton>,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Encaisser 2 000 FCFA sur la carte de Mariam' }),
+    ).toBeTruthy();
+  });
+
+  it('garde son libellé pour nom quand on ne lui en donne pas', () => {
+    render(<Bouton>Fiche</Bouton>);
+    expect(screen.getByRole('button', { name: 'Fiche' }).hasAttribute('aria-label')).toBe(false);
+  });
+
+  it('grandit sans que deux hauteurs se disputent la classe', () => {
+    render(<Bouton grand>Encaisser</Bouton>);
+    const classes = screen.getByRole('button', { name: 'Encaisser' }).className;
+    expect(classes).toContain('min-h-14');
+    expect(classes).toContain('text-lg');
+    expect(classes).not.toContain('min-h-11');
+    expect(classes).not.toContain('text-base');
+  });
+});
