@@ -45,7 +45,7 @@ interface Entree {
 /** Le geste du métier, isolé : c'est celui qu'on fait quarante fois par jour. */
 const ENCAISSEMENT: Entree = {
   cle: 'encaisser',
-  icone: 'circle-dollar-sign',
+  icone: 'banknote',
   libelle: 'Encaisser',
 };
 
@@ -130,8 +130,8 @@ export function NavBureau({ actif, onNaviguer, onDeconnexion, nom }: Props) {
         <Logo className="h-9 text-surface" />
       </div>
 
-      {/* L'encaissement, détaché et en couleur : sur la barre du bas il sort du
-          rang par un bouton saillant, et il doit garder ce statut ici. */}
+      {/* L'encaissement, détaché et en couleur : sur la barre du bas il reste
+          distinct, en touche pleine, et il doit garder ce statut ici. */}
       <div className="mb-6 px-3">
         <button
           type="button"
