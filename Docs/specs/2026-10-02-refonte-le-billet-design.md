@@ -103,8 +103,11 @@ Les jetons existants restent, valeurs comprises : `primary` (vert coffre,
 la limite d'un contrôle. Les maquettes montraient un gris plus clair ; voir
 « Écarts assumés ».
 
-**Partent** : les huit jetons `tuile*` et `degradeCarte`, dont les seuls
-emplois disparaissent avec `ActionsRapides` et `CarteCollecte`.
+**Part** : `degradeCarte`, dont le seul emploi disparaît avec l'ancienne
+`CarteCollecte`. **Les huit jetons `tuile*` restent** jusqu'au chantier 3 :
+`ActionsRapides` les porte, et le tableau de bord de l'administration
+(`TableauDeBord.tsx:341`) l'emploie en plus de l'accueil du collecteur. Le
+collecteur cesse de s'en servir dès ce chantier (voir `Outils`).
 
 **L'or** reste où il est (la pièce du logo) et gagne une place : la gravure
 sur fond sombre, entre 15 et 30 % d'opacité. Jamais sur un montant, jamais sur
@@ -152,7 +155,7 @@ L'échelle des rayons ne change pas. Ce chantier en fixe l'emploi :
 | `md` 6 px | Bouton, champ, segment actif |
 | `lg` 10 px | Liste, outil, piste des segments, touche « Encaisser » |
 | `xl` 12 px | Carte de collecte, bloc de caisse, haut de la feuille |
-| `pill` | Avatar, pastille « Cycle 1 », point d'état |
+| `pill` | Avatar, pastille du cycle, point d'état |
 
 Les listes ne sont plus des piles de cartes : une surface `surface`, bordée
 de `hairline`, des lignes séparées par un filet. Une carte n'existe que si
@@ -163,10 +166,10 @@ elle représente un objet : la carte de collecte.
 La signature, et elle se mérite. Trois places, pas une de plus :
 
 1. **L'en-tête de l'accueil** : rosace en filigrane à droite (`Rosace`,
-   22 pétales, excentricité 0,38) et bande `Onde` en pied, or à 15 et 26 %.
+   22 pétales, excentricité 0,38) et bande `Onde` en pied, or à 15 et 25 %.
    La rosace **ne tourne plus**.
-2. **La bande de l'encaissement** : `Onde` seule, or à 28 %.
-3. **Le bord haut de chaque carte de collecte** : `Onde` fine (9 px), vert
+2. **La bande de l'encaissement** : `Onde` seule, or à 30 %.
+3. **Le bord haut de chaque carte de collecte** : `Onde` fine (10 px), vert
    coffre à 30 %. C'est elle qui fait de la carte un billet.
 
 Les écrans secondaires n'en portent pas.
@@ -174,10 +177,13 @@ Les écrans secondaires n'en portent pas.
 ### Icônes
 
 Lucide reste : c'est la dépendance du projet et son registre est tenu.
-Deux icônes entrent dans `Icone.tsx` : **`banknote`** (encaisser : un billet,
-plus un « $ ») et **`scale`** (rapprochement : la balance de la caisse).
-`circle-dollar-sign` quitte le collecteur ; il reste dans le registre pour
-`superadmin/Promos.tsx` jusqu'au chantier 3.
+Trois icônes entrent dans `Icone.tsx` : **`banknote`** (encaisser : un
+billet, plus un « $ »), **`scale`** (rapprochement : la balance de la caisse)
+et **`receipt-text`** (reçus : l'icône `receipt` de Lucide dessine un « $ »
+sur le ticket). Toutes trois existent dans `lucide-react` 1.31.0, vérifié dans
+ses déclarations. `circle-dollar-sign` et `receipt` quittent les écrans de ce
+chantier ; ils restent dans le registre pour les autres écrans et
+`superadmin/Promos.tsx`, jusqu'aux chantiers 2 et 3.
 
 ### Le tampon
 
@@ -194,34 +200,46 @@ il ne cache ni les cases ni le solde.
 | CLÔTURÉE | `positive` | Le retrait est inscrit |
 
 Le tampon suit l'état de l'opération dans la file (`useHorsLigne`) : écran
-ouvert, GARDÉE devient ENCAISSÉ dès que l'envoi part. Il est `aria-hidden` :
-la ligne d'état en `role="status"` dit la même chose aux lecteurs d'écran. Il arrive en 180 ms (échelle 1,15 vers 1, opacité
-0 vers 1) ; sous `prefers-reduced-motion`, il apparaît sans mouvement.
+ouvert, GARDÉE devient ENCAISSÉ dès que l'envoi part. **Une mise refusée par
+le serveur ne reçoit aucun tampon** : la ligne d'état dit « Le serveur a
+refusé cette mise. Le détail est dans les alertes. » Un tampon ENCAISSÉ sur
+une mise refusée mentirait. Tant que l'écran n'a pas relu la file après
+l'écriture, l'état est GARDÉE : c'est le plus prudent des deux. Il est
+`aria-hidden` :
+la ligne d'état en `role="status"` dit la même chose aux lecteurs d'écran.
+Il arrive en `--duree-toucher` (150 ms, la durée des retours d'appui du
+produit ; échelle 1,15 vers 1, opacité 0 vers 1) ; sous
+`prefers-reduced-motion`, il apparaît sans mouvement.
 
 ### Le document de référence
 
 `Docs/Kolek Design System.md` est mis à jour dans ce chantier : §3.1 (le
-jeton `trait`, la fin des tuiles), §3.2 (il nomme encore Plus Jakarta Sans et
-Sora, remplacées le 2026-09-17 ; Plex Mono et la règle des montants), et
-deux sections nouvelles, la gravure et le tampon.
+jeton `trait`, le départ de `degradeCarte`), §3.2 (il nomme encore Plus
+Jakarta Sans et Sora, remplacées le 2026-09-17 ; Plex Mono et la règle des
+montants), §3.5 et §3.6 (l'ombre d'action, les icônes sans « $ »), §4 (le
+billet, la touche de la barre, les outils, les segments, `grand` et
+`nomAccessible`), et trois sections nouvelles : le tampon, le décompte, la
+gravure.
 
 ## Les composants partagés
 
 | Composant | Ce qui change | Effet hors collecteur |
 |---|---|---|
-| `CarteCollecte` | Devient le billet : fond `surface`, filet `hairline`, `Onde` en haut, nom en Bricolage, mise et solde en Plex Mono, pastille « Cycle 1 ». Cases : payées en `primary`, la prochaine cerclée de 2 px, à venir en `canvas` bordée de `trait`/40. Plus de dégradé, de cercles ni de verre. Mêmes propriétés ; en plus, `neuve` (la case qu'on vient de payer, en `positive`), `tampon` (un nœud), `etiquetteSolde`. Le format réduit garde ses huit colonnes sous 240 px. | **Vitrine** : le téléphone du hero montre le billet. Rien d'autre n'y bouge. |
-| `NavMobile` | Cinq entrées à plat. « Encaisser » devient une **touche** dans la barre (rectangle `primary`, rayon `lg`, icône `banknote`), plus un rond qui flotte. Onglet actif : encre `primary` et filet de 2 px au-dessus. | Aucun |
+| `CarteCollecte` | Devient le billet : fond `surface`, filet `hairline`, `Onde` en haut, nom en Bricolage, mise et solde en Plex Mono, pastille du cycle quand l'écran le connaît. Cases : payées en `primary`, la prochaine cerclée de 2 px, à venir en `canvas` bordée de `trait`/40. Plus de dégradé, de cercles ni de verre. Mêmes propriétés, même sens de `jourCourant` (les mises encaissées) ; **`cycle` devient facultatif** : l'accueil et l'encaissement écrivaient « Cycle 1 » en dur, ce qui était faux pour un client à sa deuxième carte, et ne le passent plus. En plus, `neuve` (la case qu'on vient de payer, en `positive`), `tampon` et `surtitre` (des nœuds), `etiquetteSolde`, et `close` (une carte clôturée ne cercle plus de prochaine case). Le libellé « Mise / jour » et le montant qui le suit restent frères : la fiche les lit. Le compteur devient `29/31`, d'un seul tenant. Le format réduit garde ses huit colonnes sous 240 px. | **Vitrine** : le téléphone du hero montre le billet. Rien d'autre n'y bouge. **Fiche client** (chantier 2) : son carrousel montre déjà le billet. |
+| `NavMobile` | Cinq entrées à plat. « Encaisser » devient une **touche** dans la barre (rectangle `primary`, rayon `lg`, icône `banknote`), plus un rond qui flotte. Onglet actif : encre `primary` et filet de 2 px au-dessus, `aria-current="page"`. | Aucun |
 | `NavBureau` | Icône `banknote` | Aucun |
-| `ActionsRapides` | Devient la grille d'**outils** : deux colonnes de boutons neutres (`surface`, `hairline`, rayon `lg`, 52 px), icône `primary` à gauche, libellé. La propriété `famille` disparaît. | Aucun (seul l'accueil l'emploie) |
-| `Icone` | `banknote`, `scale` | Les trois fronts : quelques centaines d'octets |
-| `Feuille` | Rayon `xl` en haut, poignée, voile `darkCanvas` à 48 % | Aucun (seule la fiche l'emploie) |
+| **`Outils`** (nouveau) | La grille des outils de l'accueil : deux colonnes de boutons neutres (`surface`, `hairline`, rayon `lg`, 52 px), icône `primary` à gauche, libellé. Remplace `ActionsRapides` sur l'accueil du collecteur ; `ActionsRapides` ne bouge pas, l'administration s'en sert. | Aucun |
+| `Bouton` | Deux propriétés facultatives. `nomAccessible` (posée en `aria-label`) : le bouton « Encaisser 2 000 » de la carte doit dire sur quelle carte il agit. `grand` (56 px, `text-lg`) : le geste d'un écran qui fait bouger l'argent ; une hauteur passée par `className` se disputerait avec `min-h-11`. Variantes inchangées. | Aucun (rien ne les passe) |
+| `Icone` | `banknote`, `scale`, `receipt-text` | Les trois fronts : quelques centaines d'octets |
+| `Feuille` | Rayon `xl` en haut, poignée, voile `darkCanvas` à 48 %. Elle sert désormais au décompte du retrait. | Aucun |
 | **`Tampon`** (nouveau) | Voir plus haut | Aucun |
 | **`Segments`** (nouveau) | Rangée de trois à quatre choix exclusifs, chacun avec son compte, `aria-pressed`, dans une piste `lg` | Aucun |
 | **`Decompte`** (nouveau) | Lignes « libellé, points de conduite, montant », total sous un double filet | Aucun |
 
 `EnTeteEcran` (dans `apps/collecteur`) prend le dessin des écrans
 secondaires : bouton de retour rond (`surface`, bordé de `trait`), titre en
-Bricolage `text-xl` comme aujourd'hui, sous-titre en encre douce. Il sert à quatorze écrans ; ce
+Bricolage `text-xl` comme aujourd'hui, sous-titre en encre douce passé de
+`text-xs` à `text-sm`. Il sert à quatorze écrans ; ce
 chantier l'emploie sur Retrait, les autres le reçoivent sans autre changement.
 
 ## Les écrans pilotes
@@ -231,17 +249,24 @@ chantier l'emploie sur Retrait, les autres le reçoivent sans autre changement.
 - **En-tête sombre** pleine largeur (`--degrade-hero`), avec la rosace et
   l'onde. Le nom du collecteur et son avatar ; l'avatar mène au même écran que
   l'onglet Profil. Le bouton de déconnexion quitte l'en-tête : il existe déjà
-  dans `Plus.tsx`.
+  dans `Plus.tsx`, et la propriété `onDeconnexion` d'`Accueil` disparaît.
 - « Encaissé aujourd'hui · 23 mises », puis le total en Bricolage (jeton
-  `total`, `text-4xl` sous `xs`).
+  `total`, `text-4xl` sous `xs`). Le nombre de mises est un champ de plus de
+  `TableauCollecteur`, `misesAujourdhui`, compté par `tableauDepuis` sur les
+  mêmes versements que `encaisseAujourdhui` (depuis minuit local). C'est un
+  calcul sur la tournée, pas une lecture.
 - **Les trois chiffres en ligne**, sous un filet : Clients, Cartes actives,
   Encours (FCFA). Valeurs en Plex Mono, séparées par des filets verticaux,
   alignées à gauche. Sans tournée, chaque valeur dit « — », comme aujourd'hui.
 - `BandeauHorsLigne` reste dans l'en-tête.
-- **La carte à finir** vient se poser sur l'en-tête (46 px de recouvrement).
+- **La carte à finir** vient se poser sur l'en-tête (48 px de recouvrement).
   Elle garde son titre, posé dans la carte au-dessus du nom : « À finir en
-  premier · la plus avancée de tes 38 cartes », et le lien « Toutes les
-  cartes ». Dessous, ses deux commandes : « Encaisser 2 000 » et « Fiche ».
+  premier · la plus avancée de tes 38 cartes actives », et le lien « Toutes les
+  cartes » (le `surtitre` de la carte). Dans sa fente, deux `Bouton` :
+  « Encaisser 2 000 » (nom accessible « Encaisser 2 000 FCFA sur la carte de
+  Mariam Traoré ») et « Fiche » (« Ouvrir la fiche de Mariam Traoré »).
+  `ActionsCarte` et ses pastilles rondes ne servent plus qu'au carrousel de la
+  fiche, jusqu'au chantier 2.
 - Les messages de la file (attente longue, refus, stockage) gardent leur
   place, entre la carte et les outils.
 - **Outils** : Souscrire, Retrait, Rapprochement, Reçus, Alertes, Avis,
@@ -252,7 +277,8 @@ chantier l'emploie sur Retrait, les autres le reçoivent sans autre changement.
 
 **Temps 1, choisir la carte** (l'onglet ouvert sans carte). Bande sombre
 « Encaisser », sous-titre « Choisis la carte du client. » Champ de recherche
-(nom, numéro ou marché, avec la normalisation `nu` de `recherche.ts`), puis
+(nom, numéro ou marché : la règle `correspond` de `Clients.tsx`, déplacée
+dans `recherche.ts` sous le nom `correspondClient` pour servir aux deux), puis
 les cartes actives, **les plus avancées d'abord** (à égalité, par nom). Une
 carte à 31 mises n'y figure pas : elle relève du retrait. Chaque ligne est un
 bouton entier : nom, marché, mise par jour, jauge de 31 traits, `29/31`. La
@@ -270,45 +296,66 @@ la carte. »
 Cycle complet : bouton désactivé et phrase actuelle, inchangée.
 
 **Temps 3, encaissé.** La case 30 se remplit en `positive`, le tampon se pose
-sur la carte. La ligne d'état : « 2 000 FCFA pour Mariam Traoré, case 30. »
-puis « Envoyée · reçu n° 7F3A21C9 », ou, tant que l'opération attend dans la
-file, « Gardée sur ce téléphone. Partira avec le réseau. · reçu n°
-7F3A21C9 » avec le tampon GARDÉE. L'heure est celle du tampon, l'heure de
+sur la carte. La ligne d'état, en trois lignes : « 2 000 FCFA pour Mariam
+Traoré, case 30. », puis « Envoyée. » ou, tant que l'opération attend dans la
+file, « Gardée sur ce téléphone, elle partira avec le réseau. » (tampon
+GARDÉE), puis « Reçu n° 7F3A21C9 ». L'heure est celle du tampon, l'heure de
 l'encaissement : la file ne garde pas l'heure de l'envoi, et la maquette qui
-écrivait « Envoyée à 11:47 » l'inventait. Deux commandes : **« Client suivant »** (retour au temps 1,
-recherche vidée) et **« Reçu »** (les reçus de ce client, par le chemin
-`allerAuxRecus` qui existe). Les erreurs gardent leur forme et leur texte.
+écrivait « Envoyée à 11:47 » l'inventait. L'état vient d'une vue pure,
+`etatEnvoiMise`, à côté de `enAttenteSurCarte`. Le numéro de reçu vient de
+`numeroDeRecu(miseId)`, extrait de `Recus.tsx:507` pour servir aux deux
+écrans. Deux commandes : **« Client suivant »** (retour au temps 1, recherche
+vidée) et **« Reçu »** (les reçus de ce client, par le chemin `allerAuxRecus`
+qui existe). Après le succès, le bouton « Encaisser » n'est plus rendu du
+tout : le serveur accepte deux mises le même jour sur une carte, et l'écran
+ne doit pas en offrir une seconde. Les erreurs gardent leur forme et leur
+texte. Une mise que le serveur refuse ne remplit pas sa case et n'a ni
+tampon, ni numéro de reçu, ni commande « Reçu » : il n'y a pas de reçu d'une
+mise refusée. Reste « Client suivant ».
+
+`Encaisser` reçoit deux propriétés de la coquille : `onChoisir(carte | null)`
+(choisir dans la liste, revenir à la liste) et `onRecus(clientNom)`. Le
+retour du temps 2 ne mène plus à Clients mais au temps 1.
 
 ### Retrait
 
 **La liste.** `EnTeteEcran` « Retrait », « Clôturer une carte et rendre le
 solde ». Recherche quand il y a plus d'une carte (comme aujourd'hui).
-Les filtres deviennent des `Segments` : « Toutes 38 · Terminées 3 · En
-cours 35 », comptés après la recherche. Sous « Toutes », deux groupes titrés
+Les filtres deviennent des `Segments` : « Toutes 38 · Cycle terminé 3 · En
+cours 35 », comptés après la recherche. Les libellés restent ceux
+d'aujourd'hui, et le compte est `aria-hidden` : le nom de chaque segment est
+son libellé seul, que les phrases d'annonce reprennent déjà (« masquée par le
+filtre « Cycle terminé » »). Sous « Toutes », deux groupes titrés
 avec leur compte : « Cycle terminé » puis « En cours ». Une ligne par carte :
 nom, `31/31 · 1 000/j`, et à droite le montant à rendre en Plex Mono avec
 « à rendre ». Un cycle terminé porte un trait `positive` à gauche.
 
 **Le dépli.** Toucher une ligne la déplie (`aria-expanded`), une seule à la
 fois : la phrase de la commission, dite une fois et plus sur chaque carte,
-puis « Faire le retrait » et, pour un cycle terminé, « Nouvelle carte »
-(`ActiverCarte`, mise reprise). Le message de blocage (`retraitBloquePour`)
+puis « Faire le retrait » et, pour un cycle terminé, « Activer une carte »
+(`ActiverCarte` tel qu'il est, mise reprise). Le message de blocage (`retraitBloquePour`)
 s'y lit. Changer de recherche, de filtre ou de page referme le dépli et la
 confirmation, comme le code le fait aujourd'hui pour la confirmation.
 
-**Le décompte.** « Faire le retrait » ouvre une `Feuille` : « Rendre 30 000
-FCFA à Rokia Sangaré ? », puis le `Decompte` : « 31 mises × 1 000 »,
+**Le décompte.** « Faire le retrait » ouvre une `Feuille` titrée « Rendre
+30 000 FCFA ? », sous-titrée « à Rokia Sangaré » (le titre de `Feuille` est
+tronqué sur une ligne : le montant y tient, un nom long non), puis le
+`Decompte` : « 31 mises × 1 000 »,
 « Ta commission, case 1 » (« Part de ton titulaire » pour un collaborateur),
 et « À rendre » sous le double filet. Puis : « La carte se clôture. C'est
 définitif : le retrait ne pourra pas être défait. » Deux commandes : « Oui,
 rendre 30 000 FCFA » et « Annuler ».
 
-**Clôturée.** Sous-titre « Carte clôturée ». La carte pleine, `etiquetteSolde`
-« Rendu au client », tampon CLÔTURÉE. « Remets 30 000 FCFA à Rokia Sangaré,
+**Clôturée.** Sous-titre « Carte clôturée ». La carte rendue, `etiquetteSolde`
+« Rendu au client », tampon CLÔTURÉE ; `close` : une carte rendue avant la fin
+de son cycle ne cercle pas de prochaine case. « Remets 30 000 FCFA à Rokia Sangaré,
 en main propre. » en Bricolage `text-xl`, puis « Le retrait est inscrit au
 journal. Il ne peut plus être défait. » Deux commandes : « Retour aux
-cartes » et, si le cycle était complet, « Nouvelle carte » (le même
-`ActiverCarte` que dans le dépli).
+cartes » et, si le cycle était complet, « Activer une carte » (le même
+`ActiverCarte` que dans le dépli). Sa phrase d'aujourd'hui (« son solde reste
+dû au client ») serait fausse après un retrait : `ActiverCarte` reçoit une
+propriété facultative, `explication`, et l'écran clôturé y passe « La carte
+précédente est close. La nouvelle repart de la case 1. »
 
 ## Écarts assumés avec les maquettes
 
@@ -323,6 +370,13 @@ cartes » et, si le cycle était complet, « Nouvelle carte » (le même
   `#D5D8D1`) : le gris clair ne donnait que 1,5:1 à la limite d'un champ.
 - **Le tampon de l'encaissement est en haut à droite** de la carte, plus sur
   les cases : posé dessus, il cachait la case qu'il célèbre.
+- **Les libellés d'aujourd'hui restent** là où la maquette en inventait :
+  « Cycle terminé » et non « Terminées », « Activer une carte » et non
+  « Nouvelle carte ». Ce sont les noms que les phrases d'annonce, le composant
+  `ActiverCarte` et les épreuves emploient déjà.
+- **Le compteur de mises de la carte se lit `29/31`**, sans le pourcentage
+  d'aujourd'hui (`29/31 j · 94 %`), comme sur la maquette ; les épreuves de la
+  fiche qui le lisent passent au nouveau texte.
 - **« Envoyée » ne porte pas d'heure.** La maquette écrivait « Envoyée à
   11:47 » ; la file ne garde pas l'heure d'envoi, et l'heure affichée est
   celle de l'encaissement, sur le tampon.
@@ -341,10 +395,11 @@ cartes » et, si le cycle était complet, « Nouvelle carte » (le même
 
 Chaque comportement neuf arrive par une épreuve vue rouge avant le code.
 
-**`@kolek/core`** : plus aucun jeton `tuile*` ni `degradeCarte` ; `trait`
-présent et à 3:1 au moins sur `surface` et sur `canvas` (paire ajoutée à
-`verifier:contraste`) ; `--font-mono` et `--color-trait` dans `theme.css`
-(`verifier:theme`).
+**`@kolek/core`** : plus de `degradeCarte` (les `tuile*` restent, voir
+« Couleurs ») ; `trait` présent et à 3:1 au moins sur `surface` et sur
+`canvas` (épreuves de `tokens.test.ts` : `verifier:contraste` ne lit que le
+blanc translucide des écrans) ; `--font-mono` et `--color-trait` dans
+`theme.css` (`verifier:theme`).
 
 **`@kolek/ui`**
 - `CarteCollecte` : 31 cases, l'état de chacune lisible en attribut
@@ -356,21 +411,28 @@ présent et à 3:1 au moins sur `surface` et sur `canvas` (paire ajoutée à
 - `Decompte` : lignes, total, montants par `formatMontant`.
 - `NavMobile` : cinq entrées, la touche dans la barre (plus de `-mt-5`),
   icône `banknote`, `aria-current` sur l'entrée active.
-- `ActionsRapides` : plus de `famille`, plus de classe `tuile`.
+- `Outils` : deux colonnes, aucune classe `tuile`, un bouton par outil.
+- `Bouton` : `nomAccessible` devient l'`aria-label`, et son absence n'en pose
+  aucun.
 
 **Collecteur**
 - `cartesAEncaisser` : seulement les cartes actives sous 31 mises, nom et
   marché joints, ordre décroissant des mises puis par nom.
+- `etatEnvoiMise` : GARDÉE tant que l'opération est en file ou que la file
+  n'a pas été relue ; ENVOYÉE quand l'opération a quitté la file et que la
+  mise est dans la tournée ; REFUSÉE quand elle est à consigner ou refusée.
+- `misesAujourdhui`, `correspondClient`, `numeroDeRecu`.
 - Encaisser : sans carte, la liste ; une ligne mène à la confirmation ;
-  « Solde après » juste ; succès, tampon ENCAISSÉ ou GARDÉE selon la file,
-  numéro de reçu tiré de l'opération ; « Client suivant » ramène à la liste,
-  recherche vide.
+  « Solde après » juste ; succès, tampon ENCAISSÉ ou GARDÉE selon la file, pas
+  de tampon sur un refus, numéro de reçu tiré de la mise ; plus de bouton
+  « Encaisser » après le succès ; « Client suivant » ramène à la liste.
 - Accueil : les trois chiffres, pas de bouton de déconnexion, la liste des
   outils (Équipe pour le titulaire seulement), le titre « À finir en
   premier » (témoin du défaut du 2026-08-23).
 - Retrait : lignes compactes, dépli unique, phrase de commission dans le
   dépli seulement, feuille et décompte, fermeture sur recherche, filtre et
-  page, état clôturé avec tampon, « Nouvelle carte » pour un cycle complet.
+  page, état clôturé avec tampon, « Activer une carte » pour un cycle
+  complet, avec la phrase d'après la clôture.
 
 **Regard.** Captures par Chrome sans interface, sur la pile locale et jamais
 sur 5173/5174 : les trois écrans dans chacun de leurs temps, à 360 × 800,
@@ -405,4 +467,4 @@ renommage.
 - Un mode sombre, un changement de bibliothèque d'icônes.
 - Toute fonction nouvelle au-delà des trois que les maquettes montrent et
   que les données portent déjà : le sélecteur de carte de l'onglet
-  « Encaisser », « Solde après », « Nouvelle carte » après un retrait.
+  « Encaisser », « Solde après », « Activer une carte » après un retrait.
