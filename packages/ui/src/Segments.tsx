@@ -1,3 +1,9 @@
+export interface Segment<C extends string> {
+  cle: C;
+  libelle: string;
+  compte?: number;
+}
+
 /**
  * Des choix exclusifs, rangés dans une piste : les filtres d'une liste.
  *
@@ -14,12 +20,6 @@
  * blanc sur la piste ne tient qu'environ 1,1:1, et l'état choisi doit se
  * voir à 3:1 (WCAG 1.4.11).
  */
-export interface Segment<C extends string> {
-  cle: C;
-  libelle: string;
-  compte?: number;
-}
-
 export function Segments<C extends string>({
   nom,
   segments,
@@ -32,10 +32,12 @@ export function Segments<C extends string>({
   onChoisir: (cle: C) => void;
 }) {
   return (
+    // Des colonnes égales tant que la place le permet, jamais plus étroites que leur texte :
+    // à 320 px, « Cycle terminé 12 » sortait de sa pastille. Au-delà, la piste défile en elle-même plutôt que de pousser la page.
     <div
       role="group"
       aria-label={nom}
-      className="grid grid-flow-col auto-cols-fr gap-1 rounded-lg bg-muted p-1"
+      className="grid grid-flow-col auto-cols-[minmax(max-content,1fr)] gap-1 rounded-lg bg-muted p-1 overflow-x-auto"
     >
       {segments.map((segment) => {
         const actif = segment.cle === choisi;

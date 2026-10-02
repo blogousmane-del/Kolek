@@ -47,6 +47,7 @@ describe('les segments', () => {
     rendre(onChoisir);
     fireEvent.click(screen.getByRole('button', { name: 'Cycle terminé' }));
     expect(onChoisir).toHaveBeenCalledWith('Cycle terminé');
+    expect(onChoisir).toHaveBeenCalledTimes(1);
   });
 
   it('se passent de compte quand on n’en donne pas', () => {
@@ -62,5 +63,22 @@ describe('les segments', () => {
       />,
     );
     expect(screen.getByRole('button', { name: 'Jour' }).textContent).toBe('Jour');
+  });
+
+  it('affichent un compte à zéro', () => {
+    render(
+      <Segments
+        nom="Statuts"
+        segments={[
+          { cle: 'actif', libelle: 'Actif', compte: 0 },
+        ]}
+        choisi="actif"
+        onChoisir={vi.fn()}
+      />,
+    );
+    const button = screen.getByRole('button', { name: 'Actif' });
+    expect(button).toBeTruthy();
+    expect(button.textContent).toBe('Actif0');
+    expect(screen.getByText('0').getAttribute('aria-hidden')).toBe('true');
   });
 });
