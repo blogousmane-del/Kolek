@@ -559,12 +559,22 @@ export function Clients({
         )}
       </div>
 
-      {/* Filtres */}
-      <div className="px-4 mt-3 flex gap-2 overflow-x-auto scrollbar-none pb-1">
+      {/* Filtres
+
+          `aria-pressed` depuis le 2026-10-02 : seule la couleur disait lequel
+          est choisi, et un lecteur d'écran lisait quatre boutons identiques.
+          Le groupe nommé annonce ce qu'ils ont en commun avant le premier.
+          Même rang que sur l'écran Retrait, qui les porte aussi. */}
+      <div
+        role="group"
+        aria-label="Filtrer les clients"
+        className="px-4 mt-3 flex gap-2 overflow-x-auto scrollbar-none pb-1"
+      >
         {FILTRES.map((f) => (
           <button
             key={f}
             type="button"
+            aria-pressed={f === filtre}
             onClick={() => changerFiltre(f)}
             className={`px-4 py-1.5 rounded-md text-xs xs:text-sm font-body font-semibold border whitespace-nowrap cursor-pointer transition-all shadow-xs ${
               f === filtre
