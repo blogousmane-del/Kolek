@@ -88,11 +88,25 @@ export function adresseDe(route: Route): string {
 
 export const ROUTES: readonly Route[] = [
   {
+    /*
+      Les mots que les collecteurs tapent dans Google, choisis par l'exploitant
+      le 2026-10-02 : tontine, collecte journalière, banquier ambulant,
+      tontinier, carnet, Abidjan, Côte d'Ivoire. Les concurrents directs en Côte
+      d'Ivoire — Tondi, Tonty, My Tontine, Tonti — se présentent tous par
+      « tontine » ; un document de l'OIT nomme « tontine commerciale » le métier
+      même de Kolek, un collecteur qui passe d'étal en étal et garde une mise
+      par cycle.
+
+      Le titre porte le nom du produit et de sa catégorie, la description les
+      mots du métier et du lieu. Le grand titre de la page, lui, ne bouge pas :
+      l'exploitant l'a gardé pour la marque. `routes.test.ts` refuse un titre ou
+      une description qui perdrait ces mots.
+    */
     chemin: '/',
     fichier: 'index.html',
-    titre: 'Kolek · L’épargne du marché, enfin sécurisée',
+    titre: 'Kolek · Application de tontine et collecte journalière',
     description:
-      'Kolek remplace le carnet du banquier ambulant par un téléphone : chaque mise comptée, chaque caisse rapprochée, chaque franc tracé.',
+      'Le carnet du banquier ambulant et du tontinier, sur téléphone : chaque mise comptée, chaque caisse rapprochée. Pour les collecteurs d’Abidjan, Côte d’Ivoire.',
     indexable: true,
     prerendu: true,
   },

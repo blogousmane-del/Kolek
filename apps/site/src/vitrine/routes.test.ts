@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+// Par Vite et non par le disque, comme `sources.test-utils.ts` : sous jsdom,
+// `import.meta.url` n'est pas une adresse `file:`, et un chemin relatif au
+// répertoire courant changerait de sens selon d'où la suite est lancée.
+import gabarit from '../../index.html?raw';
 import { CONDITIONS, CONFIDENTIALITE, INSCRIPTION, MENTIONS_LEGALES } from './liens';
 import { ROUTES } from './routes';
 
@@ -92,5 +96,39 @@ describe('la table des routes', () => {
     // divergence.
     const nonRendues = ROUTES.filter((r) => !r.prerendu).map((r) => r.chemin);
     expect(nonRendues).toEqual([INSCRIPTION]);
+  });
+  /*
+    Les mots que les collecteurs tapent, choisis par l’exploitant le
+    2026-10-02 : tontine, collecte journalière, banquier ambulant, tontinier,
+    carnet, Abidjan, Côte d’Ivoire. Le titre et la description sont ce que
+    Google affiche dans ses résultats ; une réécriture qui les perdrait
+    rendrait la page introuvable sur ces recherches sans qu’aucun écran ne
+    change.
+  */
+  it('garde dans le titre et la description de l’accueil les mots que les collecteurs cherchent', () => {
+    const accueil = ROUTES.find((r) => r.chemin === '/');
+
+    for (const mot of ['tontine', 'collecte journalière']) {
+      expect(accueil?.titre, mot).toContain(mot);
+    }
+    for (const mot of ['banquier ambulant', 'tontinier', 'carnet', 'Abidjan', 'Côte d’Ivoire']) {
+      expect(accueil?.description, mot).toContain(mot);
+    }
+  });
+
+  /*
+    `index.html` est le gabarit que le prérendu remplit. Ses titre et
+    description sont réécrits à la construction, mais ce sont eux que sert le
+    serveur de développement, et eux qui restent si le prérendu ne passe pas.
+    Deux formulations finissent par diverger : c’était déjà le cas, le
+    gabarit portant encore « Kolek — » quand la table disait « Kolek · ».
+  */
+  it('laisse au gabarit index.html les titre et description de l’accueil', () => {
+    const accueil = ROUTES.find((r) => r.chemin === '/');
+
+    expect(gabarit.match(/<title>([^<]*)<\/title>/)?.[1]).toBe(accueil?.titre);
+    expect(gabarit.match(/name="description"\s+content="([^"]*)"/)?.[1]).toBe(accueil?.description);
+    expect(gabarit.match(/property="og:title" content="([^"]*)"/)?.[1]).toBe(accueil?.titre);
+    expect(gabarit.match(/property="og:description"\s+content="([^"]*)"/)?.[1]).toBe(accueil?.description);
   });
 });

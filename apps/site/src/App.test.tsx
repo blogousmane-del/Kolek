@@ -90,6 +90,14 @@ describe('le routage du site public', () => {
     expect(titres[0].textContent).toContain('précision');
   });
 
+  it('dit ce qu’est Kolek, dans les mots qu’on cherche, sous le grand titre', () => {
+    render(<App chemin="/" />);
+
+    // Le grand titre garde sa formule de marque ; c’est la phrase dessous qui
+    // nomme le métier, et c’est elle que le prérendu écrit dans le HTML servi.
+    expect(screen.getByText(/carnet de tontine du collecteur/)).toBeTruthy();
+  });
+
   it('rend la vitrine pour un chemin inconnu, comme avant', () => {
     render(<App chemin="/rien-de-connu" />);
 

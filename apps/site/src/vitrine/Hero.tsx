@@ -129,9 +129,19 @@ export function Hero() {
               troisième carte du produit (« L'argent reste dans ta main »), c'est
               la thèse du manifeste, et c'est le premier argument de la grille
               tarifaire. Le hero ne se lit qu'une fois, à l'arrivée ; il porte la
-              promesse que rien d'autre ne porte. */}
+              promesse que rien d'autre ne porte.
+
+              Le 2026-10-02, elle a pris une tête : « Le carnet de tontine du
+              collecteur, sur son téléphone ». Demande de l'exploitant, pour le
+              référencement : le grand titre au-dessus est une formule de marque
+              qui ne nomme pas le métier, et c'est le seul texte que Google lise
+              en premier. Cette tête le nomme — tontine, carnet, collecteur — sans
+              toucher au titre, et la promesse d'origine suit, intacte. Ce n'est
+              pas une redite : rien d'autre sur la page ne dit ce qu'est Kolek
+              avant la section produit. */}
           <p data-entree className="mt-5 max-w-xl font-body text-base leading-relaxed text-white/70 sm:mt-6 sm:text-lg">
-            Chaque mise comptée, chaque caisse rapprochée le soir, chaque franc tracé.
+            Le carnet de tontine du collecteur, sur son téléphone : chaque mise comptée, chaque
+            caisse rapprochée le soir, chaque franc tracé.
           </p>
 
           {/* Aucun des deux ne mène à une boîte aux lettres. Avant le 2026-08-23 ils
