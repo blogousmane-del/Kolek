@@ -463,20 +463,15 @@ export const elevations = {
 /**
  * Dégradés. Ils ne rentrent dans aucun espace de noms Tailwind, donc aucune
  * classe n'en sort : ils sont exposés en variables libres et consommés par
- * `bg-[image:var(--degrade-carte)]`. Les garder ici plutôt qu'en dur dans
- * trois composants est ce qui empêche la carte de collecte et la carte de zone
- * de diverger silencieusement.
+ * `bg-[image:var(--degrade-zone-0)]` ou `bg-[image:var(--degrade-hero)]`.
  *
- * `degradeCarte` a été saturé le 2026-08-20 et ne partage donc plus ses teintes
- * avec les dégradés de zone. La divergence est voulue, et elle est écrite ici
- * pour qu'elle ne soit pas silencieuse : la carte de collecte se lit dehors, en
- * plein soleil, sur un téléphone d'entrée de gamme. Les cartes de zone se
- * lisent au bureau, sur un écran d'administration. Ce ne sont pas les mêmes
- * conditions, donc pas le même contraste. L'encre de la carte est passée de
- * `--color-sidebar` à `--color-ink` pour la même raison.
+ * `degradeCarte`, le vert-bleu-violet de la carte de collecte, est parti le
+ * 2026-10-02 avec le billet : la carte est désormais papier, filet et
+ * gravure, et ne porte plus aucun dégradé. Les dégradés de zone servent
+ * l'administration ; `degradeHero` sert la vitrine, l'en-tête de l'accueil du
+ * collecteur et la bande de l'encaissement.
  */
 export const degrades = {
-  degradeCarte: 'linear-gradient(135deg, #8FC79E 0%, #6FA3C9 60%, #8A96C4 100%)',
   // Réalignés le 2026-09-04 sur la nouvelle échelle `chart*`. Ils en étaient
   // tirés à l'origine ; les laisser sur les anciennes valeurs aurait fait
   // diverger la carte de zone de la liste « Top zones » qui décrit les mêmes

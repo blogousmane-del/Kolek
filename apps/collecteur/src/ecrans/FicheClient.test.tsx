@@ -494,18 +494,18 @@ describe('fiche d’un client à plusieurs cartes', () => {
     rendreFiche();
 
     // kB est en face : 20 mises sur 31.
-    expect(await screen.findByText('20/31 j · 65 %')).toBeTruthy();
+    expect(await screen.findByText('20/31')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: ENCAISSER_6000 }));
 
     // Rien n'est montré comme fait avant d'être sur le disque (§4.1).
-    expect(screen.getByText('20/31 j · 65 %')).toBeTruthy();
+    expect(screen.getByText('20/31')).toBeTruthy();
 
     await act(async () => {
       ecrire(MISE_ENREGISTREE);
     });
     await laisserEcrire();
 
-    expect(screen.getByText('21/31 j · 68 %')).toBeTruthy();
+    expect(screen.getByText('21/31')).toBeTruthy();
     expect(screen.getByText(/FCFA encaissé/)).toBeTruthy();
   });
 
@@ -555,7 +555,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
     // n'a touché le serveur.
     expect(annulerMise).toHaveBeenCalledWith('col1', 'op-1');
     expect(screen.getByRole('button', { name: ENCAISSER_6000 })).toBeTruthy();
-    expect(screen.getByText('20/31 j · 65 %')).toBeTruthy();
+    expect(screen.getByText('20/31')).toBeTruthy();
   });
 
   it('retire « Annuler » à la fin du sursis, et garde la mise', async () => {
@@ -598,7 +598,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
 
     expect(screen.queryByRole('button', { name: 'Annuler' })).toBeNull();
     expect(screen.getByText(/FCFA encaissé/)).toBeTruthy();
-    expect(screen.getByText('21/31 j · 68 %')).toBeTruthy();
+    expect(screen.getByText('21/31')).toBeTruthy();
   });
 
   it('efface la mise annulée même si l’arrière-plan l’a fait partir pendant l’annulation', async () => {
@@ -641,7 +641,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
 
     expect(screen.queryByText(/FCFA encaissé/)).toBeNull();
     expect(screen.getByRole('button', { name: ENCAISSER_6000 })).toBeTruthy();
-    expect(screen.getByText('20/31 j · 65 %')).toBeTruthy();
+    expect(screen.getByText('20/31')).toBeTruthy();
     expect(onEcriture).toHaveBeenCalledTimes(1);
   });
 
@@ -713,7 +713,7 @@ describe('fiche d’un client à plusieurs cartes', () => {
 
     expect(await screen.findByText(/rien n’a été compté/)).toBeTruthy();
     // Rien n'est sur le disque : la case le dit, et il n'y a rien à annuler.
-    expect(screen.getByText('20/31 j · 65 %')).toBeTruthy();
+    expect(screen.getByText('20/31')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Annuler' })).toBeNull();
 
     enregistrerMise.mockResolvedValueOnce(MISE_ENREGISTREE);
@@ -862,8 +862,8 @@ describe('ce qui attend part quand on cesse de regarder', () => {
 
     expect(screen.getByRole('button', { name: 'Annuler' })).toBeTruthy();
     // Compté une fois : la relecture et l'attente disent le même jour.
-    expect(screen.getByText('21/31 j · 68 %')).toBeTruthy();
-    expect(screen.queryByText(/22\/31 j/)).toBeNull();
+    expect(screen.getByText('21/31')).toBeTruthy();
+    expect(screen.queryByText('22/31')).toBeNull();
   });
 });
 
