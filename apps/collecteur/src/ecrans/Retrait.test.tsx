@@ -364,7 +364,7 @@ describe('la recherche par nom', () => {
   };
 
   function champ() {
-    return screen.getByRole('searchbox', { name: 'Chercher un client' });
+    return screen.getByRole('textbox', { name: 'Rechercher un client' }) as HTMLInputElement;
   }
 
   it('ne pose pas de champ quand il n’y a rien à chercher', () => {
@@ -374,7 +374,7 @@ describe('la recherche par nom', () => {
 
     // Un champ au-dessus d'une liste d'un seul élément est du décor, et il
     // pousse la seule carte plus bas sous le pouce.
-    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Rechercher un client' })).toBeNull();
   });
 
   it('pose le champ dès qu’il y a plus d’une carte', () => {
@@ -383,12 +383,37 @@ describe('la recherche par nom', () => {
     expect(champ()).toBeTruthy();
   });
 
+  /*
+    Le dessin de l'écran Clients, et chacun de ses choix, parce que chacun
+    répond à un défaut constaté là-bas. `text` et non `search` : WebKit dessine
+    sur `search` sa propre croix, et l'iPhone en montrait deux, dont une de
+    20 px. Ni majuscule ni correcteur automatiques : le correcteur d'iOS
+    réécrit un nom ivoirien en mot français au deuxième caractère.
+  */
+  it('porte le dessin de la recherche de l’écran Clients', () => {
+    rendre();
+
+    expect(champ().type).toBe('text');
+    expect(champ().placeholder).toBe('Nom du client…');
+    expect(champ().getAttribute('autocapitalize')).toBe('none');
+    expect(champ().getAttribute('autocorrect')).toBe('off');
+    expect(champ().getAttribute('spellcheck')).toBe('false');
+  });
+
+  it('a quitté l’en-tête pour le corps de l’écran, comme sur Clients', () => {
+    rendre();
+
+    // Le sous-titre reste celui de l'écran : le compte de la recherche vit
+    // désormais sous le champ, dans sa région d'annonce.
+    expect(screen.getByText('Clôturer une carte et rendre le solde')).toBeTruthy();
+  });
+
   it('ne pose pas de champ sous un filtre client', () => {
     rendre({ client: HJ });
 
     // La liste ne porte déjà qu'une personne : un second filtre par-dessus ne
     // retrancherait rien qu'on cherche.
-    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Rechercher un client' })).toBeNull();
   });
 
   it('retrouve un client sans son accent ni sa majuscule', () => {
@@ -409,8 +434,47 @@ describe('la recherche par nom', () => {
 
     // Une liste qui rétrécit sans dire de combien laisse croire qu'on a perdu
     // des cartes — sur l'écran qui fait sortir l'argent, c'est le doute le
-    // plus cher.
-    expect(screen.getByText('1 sur 3 cartes')).toBeTruthy();
+    // plus cher. Et dans une région d'annonce, pour que le lecteur d'écran le
+    // dise sans voler le focus au champ.
+    const annonce = screen.getByText('1 sur 3 cartes');
+    expect(annonce.getAttribute('role')).toBe('status');
+  });
+
+  it('garde la région d’annonce montée avant toute recherche', () => {
+    rendre();
+
+    // Un lecteur d'écran n'annonce que les changements d'une région qu'il
+    // observe déjà. Insérée avec son texte, elle resterait muette.
+    const region = champ().closest('div')?.parentElement?.querySelector('[role="status"]');
+    expect(region).toBeTruthy();
+    expect(region?.textContent).toBe('');
+  });
+
+  it('efface le terme à la croix', () => {
+    rendre();
+    fireEvent.change(champ(), { target: { value: 'ka' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Effacer la recherche' }));
+
+    expect(champ().value).toBe('');
+    expect(screen.getAllByText('Hj')).toHaveLength(2);
+  });
+
+  it('efface le terme à la touche Échap', () => {
+    rendre();
+    fireEvent.change(champ(), { target: { value: 'ka' } });
+
+    // Le seul geste qui ne demande pas de viser : la main qui tape n'a pas à
+    // retrouver la croix.
+    fireEvent.keyDown(champ(), { key: 'Escape' });
+
+    expect(champ().value).toBe('');
+  });
+
+  it('ne montre pas de croix tant que le champ est vide', () => {
+    rendre();
+
+    expect(screen.queryByRole('button', { name: 'Effacer la recherche' })).toBeNull();
   });
 
   it('ne dit pas que les cartes sont clôturées quand c’est le nom qui ne tombe pas', () => {
@@ -436,5 +500,259 @@ describe('la recherche par nom', () => {
     // l'effacer. Sans cette garde, arriver ici depuis la fiche d'un client
     // masquerait ses cartes par un filtre devenu invisible.
     expect(screen.getAllByText('Hj')).toHaveLength(2);
+  });
+});
+
+/**
+ * Les filtres de la liste — le même rang de puces que l'écran Clients.
+ *
+ * Trois et pas davantage, parce que les données n'en portent pas plus : une
+ * carte est au bout de son cycle, ou elle ne l'est pas. Les deux cas appellent
+ * deux gestes différents — au bout, rendre l'argent ou repartir sur une carte
+ * de plus ; en cours, un retrait anticipé dont le montant ne se fait pas de
+ * tête.
+ */
+describe('les filtres', () => {
+  function puce(nom: string) {
+    return screen.getByRole('button', { name: nom });
+  }
+
+  function retraits() {
+    return screen.queryAllByRole('button', { name: 'Faire le retrait' });
+  }
+
+  it('propose trois filtres, « Toutes » choisi à l’arrivée', () => {
+    rendre();
+
+    // `aria-pressed` : sans lui, le lecteur d'écran lit trois boutons et ne
+    // dit pas lequel est choisi — la couleur seule le disait.
+    expect(puce('Toutes').getAttribute('aria-pressed')).toBe('true');
+    expect(puce('Cycle terminé').getAttribute('aria-pressed')).toBe('false');
+    expect(puce('En cours').getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('ne garde que les cartes au bout de leur cycle', () => {
+    rendre();
+
+    fireEvent.click(puce('Cycle terminé'));
+
+    expect(retraits()).toHaveLength(2);
+    expect(puce('Cycle terminé').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('ne garde que les cartes en cours', () => {
+    rendre();
+
+    fireEvent.click(puce('En cours'));
+
+    expect(retraits()).toHaveLength(1);
+    expect(screen.queryByText('Ka')).toBeNull();
+  });
+
+  it('se combine à la recherche', () => {
+    rendre();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Rechercher un client' }), {
+      target: { value: 'hj' },
+    });
+
+    fireEvent.click(puce('Cycle terminé'));
+
+    // Hj tient une carte pleine et une en cours : seule la pleine reste.
+    expect(retraits()).toHaveLength(1);
+    expect(screen.getAllByText('Hj')).toHaveLength(1);
+  });
+
+  it('dit que c’est le filtre qui cache, quand la recherche a bien trouvé', () => {
+    rendre();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Rechercher un client' }), {
+      target: { value: 'ka' },
+    });
+
+    fireEvent.click(puce('En cours'));
+
+    // Le pire mensonge possible ici : « aucune carte à ce nom », quand le nom
+    // est juste et que c'est le filtre qui la cache. Le collecteur en
+    // conclurait que la carte a déjà été clôturée.
+    expect(screen.getByText('1 carte trouvée, masquée par le filtre « En cours »')).toBeTruthy();
+    expect(screen.queryByText('Aucune carte à ce nom')).toBeNull();
+  });
+
+  it('dit combien le filtre en cache, quand il en laisse', () => {
+    rendre();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Rechercher un client' }), {
+      target: { value: 'hj' },
+    });
+
+    fireEvent.click(puce('En cours'));
+
+    expect(screen.getByText('1 sur 2, dont 1 masquée par le filtre « En cours »')).toBeTruthy();
+  });
+
+  it('nomme le vide d’un filtre, et ne dit pas que tout est clôturé', () => {
+    donnees = [CARTE_PLEINE_HJ, CARTE_PLEINE_KA];
+    rendre();
+
+    fireEvent.click(puce('En cours'));
+
+    expect(screen.getByText('Aucune carte en cours')).toBeTruthy();
+    expect(screen.queryByText('Aucune carte active')).toBeNull();
+  });
+
+  it('nomme le vide de l’autre filtre', () => {
+    donnees = [CARTE_EN_COURS_HJ, { ...CARTE_EN_COURS_HJ, carteId: 'k9', clientNom: 'Zé' }];
+    rendre();
+
+    fireEvent.click(puce('Cycle terminé'));
+
+    expect(screen.getByText('Aucun cycle terminé')).toBeTruthy();
+  });
+
+  it('ne pose pas de filtres sous un filtre client', () => {
+    rendre({ client: HJ });
+
+    expect(screen.queryByRole('button', { name: 'En cours' })).toBeNull();
+  });
+
+  it('ne pose pas de filtres quand il n’y a qu’une carte', () => {
+    donnees = [CARTE_PLEINE_HJ];
+    rendre();
+
+    expect(screen.queryByRole('button', { name: 'Toutes' })).toBeNull();
+  });
+
+  it('cesse de filtrer dès que les filtres disparaissent', () => {
+    const { rerender } = rendre();
+    fireEvent.click(puce('En cours'));
+
+    rerender(
+      <Retrait revision={0} collecteurId="col1" onRetour={vi.fn()} onEcriture={vi.fn()} client={HJ} />,
+    );
+
+    // Même garde que pour la recherche, et pour la même raison : arrivé
+    // depuis la fiche de Hj avec « En cours » resté choisi, sa carte pleine
+    // serait cachée par un filtre que plus rien n'affiche.
+    expect(screen.getAllByText('Hj')).toHaveLength(2);
+  });
+
+  it('referme une confirmation ouverte quand la liste change', () => {
+    rendre();
+    fireEvent.click(retraits()[0]);
+    expect(screen.getByRole('button', { name: 'Oui, faire le retrait' })).toBeTruthy();
+
+    fireEvent.click(puce('En cours'));
+    fireEvent.click(puce('Toutes'));
+
+    // Un geste qui ne se défait pas, à un appui de distance, sur une carte qui
+    // vient de reparaître sans qu'on l'ait redemandée. La confirmation se
+    // rouvre au doigt, jamais d'elle-même.
+    expect(screen.queryByRole('button', { name: 'Oui, faire le retrait' })).toBeNull();
+  });
+});
+
+/**
+ * La pagination — vingt cartes par page, le seuil de l'écran Clients.
+ *
+ * `LIGNES_AFFICHEES_PAR_PAGE`, et non une valeur à part : deux écrans voisins
+ * qui découpent leur liste à deux tailles différentes, c'est une règle que le
+ * collecteur doit réapprendre en changeant d'onglet.
+ */
+describe('la pagination', () => {
+  function cartes(n: number) {
+    return Array.from({ length: n }, (_, i) => ({
+      carteId: `p${i}`,
+      clientId: `c${i}`,
+      clientNom: `Client ${String(i + 1).padStart(2, '0')}`,
+      mise: 1000,
+      misesEncaissees: 5,
+      restituable: 4000,
+      cycleComplet: false,
+    }));
+  }
+
+  function retraits() {
+    return screen.queryAllByRole('button', { name: 'Faire le retrait' });
+  }
+
+  function suivante() {
+    return screen.getByRole('button', { name: 'Page suivante' });
+  }
+
+  it('ne pagine pas jusqu’à vingt cartes', () => {
+    donnees = cartes(20);
+
+    rendre();
+
+    expect(retraits()).toHaveLength(20);
+    expect(screen.queryByRole('button', { name: 'Page suivante' })).toBeNull();
+  });
+
+  it('montre vingt cartes par page au-delà', () => {
+    donnees = cartes(25);
+
+    rendre();
+
+    expect(retraits()).toHaveLength(20);
+    expect(screen.getByText('Client 01')).toBeTruthy();
+    expect(screen.queryByText('Client 21')).toBeNull();
+
+    fireEvent.click(suivante());
+
+    expect(retraits()).toHaveLength(5);
+    expect(screen.getByText('Client 21')).toBeTruthy();
+  });
+
+  it('repart de la première page à chaque recherche', () => {
+    donnees = cartes(45);
+    rendre();
+    fireEvent.click(suivante());
+    fireEvent.click(suivante());
+    expect(screen.getByText('Client 41')).toBeTruthy();
+
+    // « client » trouve les quarante-cinq : trois pages, donc la troisième
+    // resterait valide. Sans le retour au début, la recherche répondrait par
+    // le quarante et unième résultat, les quarante premiers invisibles.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Rechercher un client' }), {
+      target: { value: 'client' },
+    });
+
+    expect(screen.getByText('Client 01')).toBeTruthy();
+    expect(screen.queryByText('Client 41')).toBeNull();
+  });
+
+  it('repart de la première page à chaque filtre', () => {
+    donnees = cartes(45);
+    rendre();
+    fireEvent.click(suivante());
+    fireEvent.click(suivante());
+
+    fireEvent.click(screen.getByRole('button', { name: 'En cours' }));
+
+    expect(screen.getByText('Client 01')).toBeTruthy();
+  });
+
+  it('pagine ce qui reste après la recherche, pas la liste entière', () => {
+    donnees = cartes(45);
+    rendre();
+
+    // « 0 » ne retient que Client 01 à Client 09, Client 10, 20, 30 et 40 :
+    // treize cartes, donc une seule page. Découper avant de chercher aurait
+    // laissé la commande de page sur une liste qui n'en a plus besoin.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Rechercher un client' }), {
+      target: { value: '0' },
+    });
+
+    expect(retraits()).toHaveLength(13);
+    expect(screen.queryByRole('button', { name: 'Page suivante' })).toBeNull();
+  });
+
+  it('referme une confirmation ouverte quand on change de page', () => {
+    donnees = cartes(25);
+    rendre();
+    fireEvent.click(retraits()[0]);
+
+    fireEvent.click(suivante());
+    fireEvent.click(screen.getByRole('button', { name: 'Page précédente' }));
+
+    expect(screen.queryByRole('button', { name: 'Oui, faire le retrait' })).toBeNull();
   });
 });
