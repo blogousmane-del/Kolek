@@ -140,10 +140,13 @@ sept chiffres. Aucune taille en dur.
 
 Plex Mono est déjà une dépendance de la vitrine (`@fontsource/ibm-plex-mono`,
 graisse 400). Le collecteur prend la **graisse 500 seule** : un fichier latin
-de 14 888 octets, mesuré dans `node_modules`, gardé ensuite par le service
-worker. Le jeton `polices.mono` produit `--font-mono` dans `theme.css`, à la
-valeur que la vitrine déclarait déjà dans `apps/site/src/styles.css:15` ; la
-déclaration locale de la vitrine est retirée, son rendu ne change pas.
+de 14 888 octets, mesuré dans `node_modules`, que garde le cache HTTP
+(`immutable`) ; le service worker ne précharge aucune police. Le jeton
+`polices.mono` produit `--font-mono` dans `theme.css` : IBM Plex Mono en tête,
+puis la liste mono de Tailwind recopiée telle quelle, pour que l'administration,
+qui ne charge pas Plex, ne change pas. La déclaration locale de la vitrine
+(`apps/site/src/styles.css:15`) est retirée : même famille en tête, seul le
+repli s'allonge.
 
 ### Formes
 

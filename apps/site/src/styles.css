@@ -12,7 +12,8 @@
    servir. La chasse fixe, elle, y est entrée le 2026-10-02 : les applications
    comptent en IBM Plex Mono, et `--font-mono` vient désormais de `theme.css`.
    Même famille en tête ; seul le repli s'allonge (la liste mono de Tailwind),
-   et la vitrine, qui charge Plex, ne le voit que si la police échoue. */
+   et la vitrine, qui charge Plex, ne le voit que le temps que Plex arrive
+   (`font-display: swap`), ou si la police échoue. */
 @theme {
   --font-drama: 'Bodoni Moda', 'Times New Roman', Georgia, serif;
 }

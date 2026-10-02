@@ -131,7 +131,7 @@ Attendu : `index.html`, `assets/`, et un dossier par route prérendue.
 - Modify : `apps/site/src/styles.css:10-16`
 
 **Interfaces :**
-- Produces : classes `border-trait`, `bg-trait/40`, `text-total`, `font-mono` (IBM Plex Mono), jetons `couleurs.trait = '#858B81'`, `taillesTexte.total = '44px'`, `polices.mono = "'IBM Plex Mono', ui-monospace, monospace"`.
+- Produces : classes `border-trait`, `bg-trait/40`, `text-total`, `font-mono` (IBM Plex Mono), jetons `couleurs.trait = '#858B81'`, `taillesTexte.total = '44px'`, `polices.mono = "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace"`.
 
 - [ ] **Step 1 : Écrire les épreuves des trois jetons**
 
@@ -160,8 +160,12 @@ Puis ajouter à la fin du fichier :
  */
 describe('le billet, jetons du 2026-10-02', () => {
   it('porte la police des chiffres de caisse', () => {
-    expect(polices.mono).toBe("'IBM Plex Mono', ui-monospace, monospace");
-    expect(genererCssTheme()).toContain("--font-mono: 'IBM Plex Mono', ui-monospace, monospace;");
+    expect(polices.mono).toBe(
+      "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+    );
+    expect(genererCssTheme()).toContain(
+      "--font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;",
+    );
   });
 
   it('porte le cran du total du jour, au-dessus de 4xl', () => {
@@ -214,11 +218,11 @@ du bloc `couleurs`, ajouter :
   // La limite de ce qu'on touche, posée le 2026-10-02 avec le billet.
   //
   // `hairline` sépare deux surfaces ; il ne délimite pas un contrôle. Un champ
-  // de recherche bordé de `hairline` ne tient que 1,27:1 contre le papier,
+  // de recherche bordé de `hairline` ne tient que 1,28:1 contre le papier,
   // quand WCAG 1.4.11 en demande 3 pour la limite d'un composant. `trait`
   // tient 3,5:1 sur `surface` et 3,2:1 sur `canvas` : assez sombre pour
   // délimiter, et pas davantage. Les maquettes le montraient plus clair
-  // (`#D5D8D1`, 1,5:1) ; c'est l'écart que la spec assume.
+  // (`#D5D8D1`, 1,4:1) ; c'est l'écart que la spec assume.
   trait: '#858B81',
 ```
 
@@ -258,11 +262,15 @@ export const polices = {
    * décomptes, reçus, compteurs et heures. Jamais une phrase. Le total du jour
    * reste en Bricolage : c'est l'affiche, pas une ligne de caisse.
    *
-   * La vitrine déclarait déjà cette valeur dans sa propre feuille ; elle la
+   * La vitrine déclarait déjà cette famille dans sa propre feuille ; elle la
    * reçoit désormais d'ici. Le collecteur n'en charge que la graisse 500 :
-   * 14 888 octets en latin, gardés ensuite par le service worker.
+   * 14 888 octets en latin, que garde le cache HTTP (`immutable`). Le service
+   * worker ne précharge aucune police : si le navigateur a vidé ce cache, un
+   * lancement hors ligne retombe sur le repli. L'administration ne charge pas
+   * Plex : la liste de repli est celle de Tailwind, recopiée telle quelle,
+   * pour que ses écrans ne changent pas.
    */
-  mono: "'IBM Plex Mono', ui-monospace, monospace",
+  mono: "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
 } as const;
 ```
 
@@ -325,8 +333,10 @@ par :
 /* La voix propre à la vitrine. Elle ne rentre pas dans `tokens.ts` : les
    applications n'ont pas d'emphase dramatique, et l'y mettre inviterait à s'en
    servir. La chasse fixe, elle, y est entrée le 2026-10-02 : les applications
-   comptent en IBM Plex Mono, et `--font-mono` vient désormais de `theme.css`,
-   à la même valeur. Le rendu de la vitrine ne change pas. */
+   comptent en IBM Plex Mono, et `--font-mono` vient désormais de `theme.css`.
+   Même famille en tête ; seul le repli s'allonge (la liste mono de Tailwind),
+   et la vitrine, qui charge Plex, ne le voit que le temps que Plex arrive
+   (`font-display: swap`), ou si la police échoue. */
 @theme {
   --font-drama: 'Bodoni Moda', 'Times New Roman', Georgia, serif;
 }
@@ -4795,7 +4805,7 @@ export function Retrait({
                 L'`input` est la surface : il porte le fond, la bordure et le
                 rayon, donc l'anneau de focus du système suit sa forme et il n'y
                 en a qu'un. L'icône et la croix flottent au-dessus. La bordure
-                est en `trait` : `hairline` ne donnait que 1,5:1 à la limite du
+                est en `trait` : `hairline` ne tenait que 1,28:1 à la limite du
                 champ. */}
             {avecOutils && (
               <div>
