@@ -390,6 +390,10 @@ function Confirmation({
   const etatRef = useRef<HTMLDivElement>(null);
   // La phrase d'envoi : « Reçu », tant qu'il est éteint, la prend pour description.
   const idPhrase = useId();
+  // La phrase sous « Encaisser » : sur une carte pleine, le bouton éteint la prend
+  // pour description. Un bouton `disabled` ne prend pas le focus, il ne dirait
+  // pas pourquoi.
+  const idRaison = useId();
 
   // Au succès le bouton « Encaisser » disparaît, et le focus qu'il avait avec
   // lui : il tomberait sur <body>, et la ligne d'état, insérée déjà remplie,
@@ -503,11 +507,12 @@ function Confirmation({
                   : `Encaisser ${formatMontant(carte.mise)} FCFA sur la carte de ${carte.clientNom}`
               }
               disabled={envoi || collecteurId === null || complet}
+              decritPar={complet ? idRaison : undefined}
               onClick={confirmer}
             >
               {envoi ? 'Enregistrement…' : 'Encaisser'}
             </Bouton>
-            <p className="mt-2 text-center font-body text-xs text-muted-foreground">
+            <p id={idRaison} className="mt-2 text-center font-body text-xs text-muted-foreground">
               {complet
                 ? `Le cycle de ${MISES_PAR_CYCLE} mises est complet. La carte doit être clôturée.`
                 : 'Montant fixé à l’ouverture de la carte.'}

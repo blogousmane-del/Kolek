@@ -327,11 +327,25 @@ describe('temps 2, confirmer', () => {
     rendre({ carte: { ...CARTE, misesEncaissees: 31 } });
 
     expect(bouton().disabled).toBe(true);
-    expect(
-      screen.getByText('Le cycle de 31 mises est complet. La carte doit être clôturée.'),
-    ).toBeTruthy();
+    const raison = screen.getByText(
+      'Le cycle de 31 mises est complet. La carte doit être clôturée.',
+    );
+    expect(raison).toBeTruthy();
     // Une case 32 n'existe pas : le bloc de caisse ne l'annonce pas.
     expect(screen.queryByText(/^Mise du jour/)).toBeNull();
+
+    // Un bouton éteint ne prend pas le focus et ne dit pas pourquoi : la phrase
+    // qui l'explique est déjà là, et le bouton la désigne pour qu'elle soit lue avec lui.
+    const id = bouton().getAttribute('aria-describedby');
+    expect(id, 'le bouton éteint désigne sa raison').toBeTruthy();
+    expect(document.getElementById(id ?? '')).toBe(raison);
+  });
+
+  it('ne décrit pas le bouton d’une carte ordinaire : rien ne l’éteint', () => {
+    rendre();
+
+    expect(bouton().disabled).toBe(false);
+    expect(bouton().hasAttribute('aria-describedby')).toBe(false);
   });
 
   it('écrit la mise de la carte, à l’heure de l’appui', async () => {
