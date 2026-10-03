@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { viderCache } from '../cache';
@@ -168,6 +168,8 @@ describe('le retrait', () => {
     );
 
     expect(await screen.findByText('Aya Koffi')).toBeTruthy();
+    // La règle se lit dans le dépli : la ligne ne la répète plus.
+    fireEvent.click(screen.getByRole('button', { name: /^Aya Koffi/ }));
     expect(document.body.textContent).toContain('qui est ta commission');
   });
 
@@ -184,6 +186,8 @@ describe('le retrait', () => {
     );
 
     expect(await screen.findByText('Aya Koffi')).toBeTruthy();
+    // La règle se lit dans le dépli : la ligne ne la répète plus.
+    fireEvent.click(screen.getByRole('button', { name: /^Aya Koffi/ }));
     expect(document.body.textContent).toContain('qui revient à ton titulaire');
     expect(document.body.textContent).not.toContain('ta commission');
   });

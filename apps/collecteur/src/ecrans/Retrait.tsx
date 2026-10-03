@@ -4,6 +4,7 @@ import {
   Carte,
   Icone,
   Pagination,
+  Segments,
   Squelette,
   useEnLigne,
   usePagination,
@@ -24,7 +25,7 @@ import { ActiverCarte } from './ActiverCarte';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 
 /**
- * Les filtres de la liste — le même rang de puces que l'écran Clients.
+ * Les filtres de la liste.
  *
  * Trois et pas davantage, parce que les données n'en portent pas plus : une
  * carte est au bout de son cycle, ou elle ne l'est pas. Les deux cas appellent
@@ -42,10 +43,16 @@ const pluriel = (n: number) => (n > 1 ? 's' : '');
  * C'est le seul écran de l'application qui fait **sortir** de l'argent. Il est
  * construit en conséquence.
  *
+ * **Une ligne par carte, le détail quand on le demande** (2026-10-02). Les
+ * cartes faisaient 240 px de haut, la même phrase de commission répétée sur
+ * chacune, et une carte à 0 FCFA aussi grosse qu'une carte à rendre. La ligne
+ * dit le nom, l'avancement et le montant à rendre ; la toucher la déplie, une
+ * seule à la fois, sur la règle de la commission et les deux gestes.
+ *
  * **Le montant est affiché avant confirmation, et il vient du serveur.** Le
- * collecteur voit ce qu'il va rendre, en toutes lettres, avant de toucher au
- * bouton. La règle — la première mise est sa commission — est rappelée sur la
- * même carte, parce que c'est là qu'un client peut la contester.
+ * collecteur voit ce qu'il va rendre, en chiffres, avant de toucher au bouton.
+ * La règle — la première mise est sa commission — est rappelée dans le dépli,
+ * parce que c'est là qu'un client peut la contester.
  *
  * **La confirmation est en deux temps.** Un retrait ne se défait pas : `retraits`
  * porte un déclencheur d'immuabilité, et la carte clôturée ne se rouvre pas. Un
@@ -93,6 +100,9 @@ export function Retrait({
   const enLigne = useEnLigne();
   const { operations, file } = useHorsLigne();
   const [aConfirmer, setAConfirmer] = useState<CarteCloturable | null>(null);
+  /** La ligne dépliée. Une seule à la fois : deux lignes dépliées, ce sont
+      deux boutons « Faire le retrait » sous le même pouce. */
+  const [ouverte, setOuverte] = useState<string | null>(null);
   // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit.
   const premier = usePremierRendu();
   const [envoi, setEnvoi] = useState(false);
@@ -154,6 +164,16 @@ export function Retrait({
       : trouvees;
 
   /**
+   * Les cycles terminés devant : ce sont les cartes qu'on vient rendre. Le tri
+   * est stable, donc l'ordre du serveur tient à l'intérieur de chaque groupe ;
+   * et il précède le découpage, sans quoi chaque page aurait son propre
+   * « devant ».
+   */
+  const rangees = visibles
+    ? [...visibles].sort((a, b) => Number(b.cycleComplet) - Number(a.cycleComplet))
+    : null;
+
+  /**
    * Vingt cartes par page, le seuil de l'écran Clients.
    *
    * `LIGNES_AFFICHEES_PAR_PAGE`, et non une valeur à part : deux écrans voisins
@@ -171,11 +191,11 @@ export function Retrait({
     total: totalFiltre,
     visibles: affichees,
     allerA,
-  } = usePagination(visibles ?? [], LIGNES_AFFICHEES_PAR_PAGE);
+  } = usePagination(rangees ?? [], LIGNES_AFFICHEES_PAR_PAGE);
 
   /*
-    Toute nouvelle question se pose depuis le début de la liste, et referme la
-    confirmation ouverte.
+    Toute nouvelle question se pose depuis le début de la liste, et referme le
+    dépli comme la confirmation.
 
     Le retour en page 1 est celui de Clients : sans lui, on cherche depuis la
     page trois et l'écran répond par le quarante et unième résultat, les
@@ -185,26 +205,39 @@ export function Retrait({
     changement de liste, puisqu'elle vit dans l'état et non dans la carte : la
     carte masquée par un filtre reparaissait, au retour sur « Toutes », avec
     « Oui, faire le retrait » sous le doigt — un geste qui ne se défait pas, à
-    un appui de distance, sur une carte qu'on n'avait pas redemandée.
+    un appui de distance, sur une carte qu'on n'avait pas redemandée. Le dépli
+    suit la même règle, pour la même raison.
 
     Ce sont des gestes, donc ça se fait dans les gestionnaires et non dans un
     `useEffect` : rien à synchroniser après coup.
   */
+  const fermer = () => {
+    setOuverte(null);
+    setAConfirmer(null);
+  };
+
   const changerRecherche = (terme: string) => {
     setRecherche(terme);
-    setAConfirmer(null);
+    fermer();
     allerA(1);
   };
 
   const changerFiltre = (f: Filtre) => {
     setFiltre(f);
-    setAConfirmer(null);
+    fermer();
     allerA(1);
   };
 
   const changerPage = (numero: number) => {
-    setAConfirmer(null);
+    fermer();
     allerA(numero);
+  };
+
+  /** Déplier une ligne replie l'autre, et referme sa confirmation : elle se
+      rouvre au doigt, jamais d'elle-même. */
+  const basculer = (carteId: string) => {
+    setOuverte((o) => (o === carteId ? null : carteId));
+    setAConfirmer(null);
   };
 
   /**
@@ -231,6 +264,14 @@ export function Retrait({
             ? `${nbTrouvees} carte${pluriel(nbTrouvees)} trouvée${pluriel(nbTrouvees)}, masquée${pluriel(nbTrouvees)} par le filtre « ${filtreActif} »`
             : `${nbVisibles} sur ${nbTrouvees}, dont ${masquees} masquée${pluriel(masquees)} par le filtre « ${filtreActif} »`;
 
+  /** Les comptes des segments, faits sur ce que la recherche a trouvé : chaque
+      segment dit ce qu'il montrerait si on le choisissait. */
+  const comptes: Record<Filtre, number> = {
+    Toutes: nbTrouvees,
+    'Cycle terminé': trouvees?.filter((c) => c.cycleComplet).length ?? 0,
+    'En cours': trouvees?.filter((c) => !c.cycleComplet).length ?? 0,
+  };
+
   /**
    * Quel vide montrer, s'il y en a un.
    *
@@ -247,6 +288,19 @@ export function Retrait({
         : filtreActif !== 'Toutes'
           ? 'filtre'
           : 'liste';
+
+  /**
+   * Sous « Toutes », deux groupes titrés : les cycles terminés, puis les
+   * cartes en cours. Sous un filtre, une seule liste sans titre : le segment
+   * choisi le dit déjà.
+   */
+  const groupes: { titre: Filtre | null; membres: CarteCloturable[] }[] =
+    filtreActif === 'Toutes'
+      ? [
+          { titre: 'Cycle terminé', membres: affichees.filter((c) => c.cycleComplet) },
+          { titre: 'En cours', membres: affichees.filter((c) => !c.cycleComplet) },
+        ]
+      : [{ titre: null, membres: affichees }];
 
   /**
    * Pourquoi le retrait d'une carte attend, ou `null` (spec J2b §7).
@@ -286,9 +340,125 @@ export function Retrait({
     }
 
     setFait({ nom: aConfirmer.clientNom, montant: resultat.montantRestitue });
-    setAConfirmer(null);
+    fermer();
     setTourLocal((t) => t + 1);
     onEcriture();
+  }
+
+  /** La règle de la commission, dite une fois, dans le dépli. */
+  function phraseCommission(carte: CarteCloturable): string {
+    const n = carte.misesEncaissees;
+    if (n === 0) return 'Aucune mise encaissée : rien à rendre, rien à garder.';
+    return `${n} mise${pluriel(n)} encaissée${pluriel(n)}, moins la première, ${
+      estCollaborateur ? 'qui revient à ton titulaire' : 'qui est ta commission'
+    } (${formatMontant(carte.mise)} FCFA).`;
+  }
+
+  function ligne(carte: CarteCloturable, rang: number) {
+    const deplie = ouverte === carte.carteId;
+    const retraitBloque = retraitBloquePour(carte.carteId);
+    const enConfirmation = aConfirmer?.carteId === carte.carteId;
+
+    return (
+      <li
+        key={carte.carteId}
+        className={`relative ${premier ? 'anim-cascade' : ''}`}
+        style={rangCascade(rang, premier)}
+      >
+        {/* Le trait d'un cycle terminé : la carte qu'on vient rendre se voit
+            avant qu'on lise son compteur. */}
+        {carte.cycleComplet && (
+          <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-positive" />
+        )}
+        <button
+          type="button"
+          aria-expanded={deplie}
+          aria-controls={deplie ? `depli-${carte.carteId}` : undefined}
+          onClick={() => basculer(carte.carteId)}
+          className="anim-pression flex w-full cursor-pointer items-center gap-3 py-3 pl-4 pr-3 text-left"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-body text-base font-semibold text-ink">
+              {carte.clientNom}
+            </span>
+            <span className="mt-0.5 block font-body text-xs text-muted-foreground">
+              <span className="font-mono">
+                {carte.misesEncaissees}/{MISES_PAR_CYCLE}
+              </span>{' '}
+              · <span className="font-mono">{formatMontant(carte.mise)}</span>/j
+            </span>
+          </span>
+          <span className="shrink-0 text-right">
+            <span className="block font-mono text-base font-medium text-ink tabular-nums">
+              {formatMontant(carte.restituable)}{' '}
+              <span className="font-body text-xs font-medium text-muted-foreground">FCFA</span>
+            </span>
+            <span className="block font-body text-xs text-muted-foreground">à rendre</span>
+          </span>
+          <Icone
+            nom="chevron-down"
+            taille={16}
+            className={`shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${deplie ? 'rotate-180' : ''}`}
+          />
+        </button>
+
+        {deplie && (
+          <div id={`depli-${carte.carteId}`} className="space-y-3 px-4 pb-4">
+            <p className="font-body text-sm text-muted-foreground">{phraseCommission(carte)}</p>
+
+            {!enConfirmation ? (
+              <>
+                {/* Deux portes, et elles se valent : rendre l'argent, ou le
+                    laisser et repartir sur une carte de plus. Le collecteur est
+                    devant le client quand celui-ci choisit — la seconde ne peut
+                    pas être deux écrans plus loin.
+
+                    La seconde n'apparaît que sur une carte terminée. Sur une
+                    carte en cours, elle prélèverait une commission — la
+                    première mise du nouveau cycle — que personne n'a demandée. */}
+                <div className="flex flex-wrap gap-2">
+                  <Bouton disabled={retraitBloque !== null} onClick={() => setAConfirmer(carte)}>
+                    Faire le retrait
+                  </Bouton>
+                  {carte.cycleComplet && (
+                    <ActiverCarte
+                      collecteurId={collecteurId}
+                      clientId={carte.clientId}
+                      misePreremplie={carte.mise}
+                      identifiant={`retrait-${carte.carteId}`}
+                      onOuverte={onEcriture}
+                    />
+                  )}
+                </div>
+                {retraitBloque && (
+                  <p className="m-0 font-body text-xs text-muted-foreground">{retraitBloque}</p>
+                )}
+              </>
+            ) : (
+              <div className="space-y-2">
+                {/* Les deux faits, et pas un seul : ce qu'on rend, et ce que la
+                    carte devient. */}
+                <p className="rounded-md bg-info-tint p-3 font-body text-sm text-ink">
+                  Confirmer le retrait de <strong>{formatMontant(carte.restituable)} FCFA</strong>{' '}
+                  pour {carte.clientNom} ? La carte se clôture, c’est définitif.
+                </p>
+                <div className="flex gap-2">
+                  <Bouton onClick={confirmer} disabled={envoi || retraitBloque !== null}>
+                    {envoi ? 'Retrait…' : 'Oui, faire le retrait'}
+                  </Bouton>
+                  <Bouton variante="contour" onClick={() => setAConfirmer(null)} disabled={envoi}>
+                    Annuler
+                  </Bouton>
+                </div>
+                {retraitBloque && (
+                  <p className="m-0 font-body text-xs text-muted-foreground">{retraitBloque}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </li>
+    );
   }
 
   if (fait) {
@@ -316,7 +486,7 @@ export function Retrait({
   }
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="flex flex-1 flex-col">
       {/* Le champ a quitté l'en-tête le 2026-10-02, pour le corps de l'écran,
           comme sur l'écran Clients — demande de l'exploitant, sur capture. Le
           compte de la recherche a suivi : il vit sous le champ, dans sa région
@@ -325,15 +495,13 @@ export function Retrait({
         titre="Retrait"
         sousTitre="Clôturer une carte et rendre le solde"
         onRetour={onRetour}
-        largeur="large"
       />
 
       <CorpsEcran
-        largeur="large"
         enfants={
           <>
             {erreur && (
-              <p role="alert" className="bg-negative-tint text-negative text-sm font-body p-3 rounded-md">
+              <p role="alert" className="rounded-md bg-negative-tint p-3 font-body text-sm text-negative">
                 {erreur}
               </p>
             )}
@@ -343,8 +511,8 @@ export function Retrait({
                 visible — sinon le seul moyen de revoir les autres est de
                 repartir de l'accueil. */}
             {client && (
-              <div className="flex items-center justify-between gap-3 bg-info-tint rounded-md px-3 py-2">
-                <p className="font-body text-sm text-ink m-0">Cartes de {client.nom}</p>
+              <div className="flex items-center justify-between gap-3 rounded-md bg-info-tint px-3 py-2">
+                <p className="m-0 font-body text-sm text-ink">Cartes de {client.nom}</p>
                 {onToutesLesCartes && (
                   <Bouton variante="contour" onClick={onToutesLesCartes}>
                     Voir toutes les cartes
@@ -357,7 +525,9 @@ export function Retrait({
 
                 L'`input` est la surface : il porte le fond, la bordure et le
                 rayon, donc l'anneau de focus du système suit sa forme et il n'y
-                en a qu'un. L'icône et la croix flottent au-dessus. */}
+                en a qu'un. L'icône et la croix flottent au-dessus. La bordure
+                est en `trait` : `hairline` ne tenait que 1,28:1 à la limite du
+                champ. */}
             {avecOutils && (
               <div>
                 <div className="relative">
@@ -366,7 +536,7 @@ export function Retrait({
                     taille={16}
                     // Sans `pointer-events-none`, l'icône avale le toucher qui
                     // visait le début du champ.
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
                   />
                   <input
                     // `text` et non `search` : WebKit dessine sur `search` sa
@@ -390,7 +560,7 @@ export function Retrait({
                     autoCorrect="off"
                     spellCheck={false}
                     enterKeyHint="search"
-                    className="w-full min-h-11 pl-10 pr-12 bg-surface border-[1.5px] border-hairline/80 rounded-md text-champ font-body text-ink shadow-xs placeholder:text-muted-foreground focus:border-primary transition-colors"
+                    className="min-h-11 w-full rounded-md border border-trait bg-surface pl-10 pr-12 font-body text-champ text-ink placeholder:text-muted-foreground transition-colors focus:border-primary"
                   />
                   {recherche && (
                     <button
@@ -399,7 +569,7 @@ export function Retrait({
                       aria-label="Effacer la recherche"
                       // 44 px : au marché, à une main, manquer une croix de
                       // 20 px efface un caractère au lieu du terme.
-                      className="absolute right-1 top-1/2 -translate-y-1/2 min-w-11 min-h-11 flex items-center justify-center rounded-pill text-muted-foreground hover:text-ink cursor-pointer"
+                      className="absolute right-1 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-pill text-muted-foreground hover:text-ink"
                     >
                       <Icone nom="x" taille={16} />
                     </button>
@@ -412,60 +582,40 @@ export function Retrait({
                 <p
                   role="status"
                   aria-live="polite"
-                  className={`px-1 text-xs font-body text-muted-foreground ${annonce ? 'mt-2' : ''}`}
+                  className={`px-1 font-body text-xs text-muted-foreground ${annonce ? 'mt-2' : ''}`}
                 >
                   {annonce}
                 </p>
               </div>
             )}
 
-            {/* Filtres — le rang de puces de l'écran Clients.
-
-                `aria-pressed` en plus : sans lui, le lecteur d'écran lit trois
-                boutons et ne dit pas lequel est choisi — seule la couleur le
-                disait. */}
+            {/* Les filtres, en segments qui disent leur compte. Le compte est
+                `aria-hidden` : le nom de chaque segment reste son libellé seul,
+                celui que les phrases d'annonce reprennent (« masquée par le
+                filtre « Cycle terminé » »). */}
             {avecOutils && (
-              <div
-                role="group"
-                aria-label="Filtrer les cartes"
-                className="flex gap-2 overflow-x-auto scrollbar-none pb-1"
-              >
-                {FILTRES.map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    aria-pressed={f === filtre}
-                    onClick={() => changerFiltre(f)}
-                    className={`px-4 py-1.5 rounded-md text-xs xs:text-sm font-body font-semibold border whitespace-nowrap cursor-pointer transition-all shadow-xs ${
-                      f === filtre
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-surface text-ink border-hairline/80 hover:bg-muted/50'
-                    }`}
-                  >
-                    {f}
-                  </button>
-                ))}
-              </div>
+              <Segments
+                nom="Filtrer les cartes"
+                segments={FILTRES.map((f) => ({ cle: f, libelle: f, compte: comptes[f] }))}
+                choisi={filtre}
+                onChoisir={changerFiltre}
+              />
             )}
 
             {!cartes && !erreur && (
-              <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-                <Carte className="p-4 space-y-3">
-                  <div className="flex justify-between">
-                    <Squelette hauteur="h-5" largeur="w-28" />
-                    <Squelette hauteur="h-4" largeur="w-20" />
+              <div
+                aria-hidden
+                className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline bg-surface"
+              >
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-3.5">
+                    <div className="flex-1 space-y-2">
+                      <Squelette hauteur="h-4" largeur="w-1/2" />
+                      <Squelette hauteur="h-3" largeur="w-1/3" />
+                    </div>
+                    <Squelette hauteur="h-5" largeur="w-20" />
                   </div>
-                  <Squelette hauteur="h-16" largeur="w-full" />
-                  <Squelette hauteur="h-10" largeur="w-32" />
-                </Carte>
-                <Carte className="p-4 space-y-3">
-                  <div className="flex justify-between">
-                    <Squelette hauteur="h-5" largeur="w-28" />
-                    <Squelette hauteur="h-4" largeur="w-20" />
-                  </div>
-                  <Squelette hauteur="h-16" largeur="w-full" />
-                  <Squelette hauteur="h-10" largeur="w-32" />
-                </Carte>
+                ))}
               </div>
             )}
 
@@ -484,7 +634,7 @@ export function Retrait({
             )}
 
             {/* Le même tort sous un filtre : la liste n'est pas vide, c'est le
-                choix de la puce qui ne retient rien. Le dire, et dire comment
+                choix du segment qui ne retient rien. Le dire, et dire comment
                 revenir. */}
             {vide === 'filtre' && (
               <RienAMontrer
@@ -506,127 +656,30 @@ export function Retrait({
               />
             )}
 
-            {/* Deux colonnes sur bureau : la liste des cartes à clôturer est
-                la plus longue du produit, et chaque carte tient dans la moitié
-                de la largeur. */}
-            <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 lg:items-start">
-              {affichees.map((carte, rang) => {
-              const enConfirmation = aConfirmer?.carteId === carte.carteId;
-              const retraitBloque = retraitBloquePour(carte.carteId);
-
-              return (
-                <Carte
-                  key={carte.carteId}
-                  className={`p-4 rounded-lg border border-hairline/80 shadow-xs ${carte.cycleComplet ? 'border-positive/80 shadow-positive/5 ring-1 ring-positive/20' : ''} ${
-                    premier ? 'anim-cascade' : ''
-                  }`}
-                  style={rangCascade(rang, premier)}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="min-w-0">
-                      <p className="font-headings font-bold text-base text-ink truncate">
-                        {carte.clientNom}
-                      </p>
-                      <p className="font-body text-xs text-muted-foreground">
-                        {carte.misesEncaissees}/{MISES_PAR_CYCLE} mises · {formatMontant(carte.mise)}{' '}
-                        FCFA par jour
-                      </p>
-                    </div>
-                    {carte.cycleComplet && (
-                      <span className="px-2.5 py-1 rounded-pill text-xs font-body font-semibold bg-positive-tint text-positive whitespace-nowrap shrink-0">
-                        Cycle terminé
+            {groupes.map(({ titre, membres }) =>
+              membres.length === 0 ? null : (
+                <section key={titre ?? 'filtre'}>
+                  {titre && (
+                    <h2 className="mb-2 flex items-baseline justify-between px-1 font-body text-sm font-semibold text-ink">
+                      {titre}{' '}
+                      <span aria-hidden className="font-mono text-xs font-medium text-muted-foreground">
+                        {comptes[titre]}
                       </span>
-                    )}
-                  </div>
-
-                  <div className="bg-canvas rounded-md p-3 mb-3">
-                    <p className="text-xs font-body text-muted-foreground mb-0.5">
-                      À rendre au client
-                    </p>
-                    <p className="font-headings font-bold text-2xl text-ink tabular-nums">
-                      {formatMontant(carte.restituable)}{' '}
-                      <span className="text-sm font-body font-medium text-muted-foreground">
-                        FCFA
-                      </span>
-                    </p>
-                    <p className="text-xs font-body text-muted-foreground mt-1">
-                      {carte.misesEncaissees > 0
-                        ? `${carte.misesEncaissees} mises encaissées, moins la première, ${
-                            estCollaborateur
-                              ? 'qui revient à ton titulaire'
-                              : 'qui est ta commission'
-                          } (${formatMontant(carte.mise)} FCFA).`
-                        : 'Aucune mise encaissée : rien à rendre, rien à garder.'}
-                    </p>
-                  </div>
-
-                  {!enConfirmation ? (
-                    // Deux portes, et elles se valent : rendre l'argent, ou le
-                    // laisser et repartir sur une carte de plus. Le collecteur
-                    // est devant le client quand celui-ci choisit — la seconde
-                    // ne peut pas être deux écrans plus loin.
-                    //
-                    // La seconde n'apparaît que sur une carte terminée. Sur une
-                    // carte en cours, elle prélèverait une commission — la
-                    // première mise du nouveau cycle — que personne n'a demandée.
-                    <div className="flex flex-wrap gap-2">
-                      <Bouton
-                        variante="contour"
-                        disabled={retraitBloque !== null}
-                        onClick={() => setAConfirmer(carte)}
-                      >
-                        Faire le retrait
-                      </Bouton>
-                      {retraitBloque && (
-                        <p className="basis-full font-body text-xs text-muted-foreground m-0">
-                          {retraitBloque}
-                        </p>
-                      )}
-                      {carte.cycleComplet && (
-                        <ActiverCarte
-                          collecteurId={collecteurId}
-                          clientId={carte.clientId}
-                          misePreremplie={carte.mise}
-                          identifiant={`retrait-${carte.carteId}`}
-                          onOuverte={onEcriture}
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {/* Les deux faits, et pas un seul : ce qu'on rend, et ce
-                          que la carte devient. Un collecteur qui croit pouvoir
-                          rouvrir la carte après coup n'a pas eu la bonne
-                          information au bon moment. */}
-                      <p className="font-body text-sm text-ink bg-info-tint rounded-md p-3">
-                        Confirmer le retrait de{' '}
-                        <strong>{formatMontant(carte.restituable)} FCFA</strong> pour{' '}
-                        {carte.clientNom} ? La carte se clôture, c’est définitif.
-                      </p>
-                      <div className="flex gap-2">
-                        <Bouton onClick={confirmer} disabled={envoi || retraitBloque !== null}>
-                          {envoi ? 'Retrait…' : 'Oui, faire le retrait'}
-                        </Bouton>
-                        <Bouton variante="contour" onClick={() => setAConfirmer(null)} disabled={envoi}>
-                          Annuler
-                        </Bouton>
-                      </div>
-                      {retraitBloque && (
-                        <p className="font-body text-xs text-muted-foreground m-0">{retraitBloque}</p>
-                      )}
-                    </div>
+                    </h2>
                   )}
-                </Carte>
-              );
-              })}
-            </div>
+                  <ul className="divide-y divide-hairline overflow-hidden rounded-xl border border-hairline bg-surface">
+                    {membres.map((carte) => ligne(carte, affichees.indexOf(carte)))}
+                  </ul>
+                </section>
+              ),
+            )}
 
             {/* `-mx-4` : `Pagination` porte son propre retrait latéral, pensé
                 pour un écran sans marge comme Clients. Posée dans `CorpsEcran`,
                 qui a déjà le sien, elle se serait décalée de seize pixels de
                 plus que sur l’écran voisin. Montée seulement au-delà d’une
                 page : vide, son enveloppe ajouterait la marge de `space-y-4`
-                sous la dernière carte. */}
+                sous la dernière ligne. */}
             {pages > 1 && (
               <div className="-mx-4">
                 <Pagination page={page} pages={pages} total={totalFiltre} onAller={changerPage} />
