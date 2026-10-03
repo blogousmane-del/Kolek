@@ -43,6 +43,9 @@ describe('le décompte', () => {
     const { container } = rendre();
     const total = screen.getByText('À rendre').closest('div');
     expect(total?.className).toContain('border-double');
+    // Quatre pixels de haut : `border-double` ne se dessine en deux traits qu'à
+    // partir de trois. À 1 px le filet double retombe en un trait plein.
+    expect(total?.classList.contains('border-t-4')).toBe(true);
     expect(container.querySelectorAll('.border-double')).toHaveLength(1);
   });
 

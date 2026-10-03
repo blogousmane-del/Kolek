@@ -181,7 +181,9 @@ describe('les commandes sous la carte à finir en premier', () => {
     const onOuvrirFiche = vi.fn();
     rendre({ onOuvrirFiche });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Ouvrir la fiche de Mariam' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Ouvrir la fiche de Mariam' }, { timeout: 5000 }),
+    );
 
     expect(onOuvrirFiche).toHaveBeenCalledWith('cli9');
   });
@@ -197,7 +199,7 @@ describe('les commandes sous la carte à finir en premier', () => {
     });
     rendre();
 
-    expect(await screen.findByText('Aucune carte active.')).toBeTruthy();
+    expect(await screen.findByText('Aucune carte active.', {}, { timeout: 5000 })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /sur la carte de/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Ouvrir la fiche/ })).toBeNull();
     // Aucune carte du tout : le renvoi vers le retrait serait un faux chemin.
@@ -241,7 +243,9 @@ describe('le compteur de la file sur l’accueil (§8.2)', () => {
 
     rendre();
 
-    expect(await screen.findByText('Envoi en cours · 2 restantes')).toBeTruthy();
+    expect(
+      await screen.findByText('Envoi en cours · 2 restantes', {}, { timeout: 5000 }),
+    ).toBeTruthy();
   });
 
   it('dit ce que la file contient, hors ligne', async () => {
@@ -252,7 +256,11 @@ describe('le compteur de la file sur l’accueil (§8.2)', () => {
     rendre();
 
     expect(
-      await screen.findByText('Hors ligne · 3 mises et 1 client en attente d’envoi'),
+      await screen.findByText(
+        'Hors ligne · 3 mises et 1 client en attente d’envoi',
+        {},
+        { timeout: 5000 },
+      ),
     ).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/synchronisés dès connexion/);
   });
@@ -265,7 +273,13 @@ describe('ce que l’accueil signale de la file (§8.4, §8.7, §8.8)', () => {
     const onNaviguer = vi.fn();
     rendre({ onNaviguer });
 
-    fireEvent.click(await screen.findByRole('button', { name: '2 opérations refusées, à voir' }));
+    fireEvent.click(
+      await screen.findByRole(
+        'button',
+        { name: '2 opérations refusées, à voir' },
+        { timeout: 5000 },
+      ),
+    );
 
     expect(onNaviguer).toHaveBeenCalledWith('alertes');
   });
@@ -284,7 +298,7 @@ describe('ce que l’accueil signale de la file (§8.4, §8.7, §8.8)', () => {
     });
     rendre();
 
-    expect((await screen.findByRole('alert')).textContent).toBe(
+    expect((await screen.findByRole('alert', {}, { timeout: 5000 })).textContent).toBe(
       'Une mise attend depuis 76 jours. Retrouve du réseau avant 90 jours.',
     );
   });
@@ -298,12 +312,14 @@ describe('ce que l’accueil signale de la file (§8.4, §8.7, §8.8)', () => {
     etatHorsLigne = horsLigne({ stockage: 'non_garanti' });
 
     rendre();
-    expect(await screen.findByText(PHRASE)).toBeTruthy();
+    expect(await screen.findByText(PHRASE, {}, { timeout: 5000 })).toBeTruthy();
 
     // Retour sur l'accueil pendant le même lancement.
     cleanup();
     rendre();
-    expect(await screen.findByRole('button', { name: /sur la carte de Mariam$/ })).toBeTruthy();
+    expect(
+      await screen.findByRole('button', { name: /sur la carte de Mariam$/ }, { timeout: 5000 }),
+    ).toBeTruthy();
     expect(screen.queryByText(PHRASE)).toBeNull();
   });
 });

@@ -72,7 +72,6 @@ vi.mock('./ecrans/Avis', () => temoin('Avis'));
 vi.mock('./ecrans/Bilan', () => temoin('Bilan'));
 vi.mock('./ecrans/Plus', () => temoin('Plus'));
 vi.mock('./ecrans/Rapprochement', () => temoin('Rapprochement'));
-vi.mock('./ecrans/Recus', () => temoin('Recus'));
 vi.mock('./ecrans/RetourPaiement', () => ({
   RetourPaiement: () => <div>écran RetourPaiement</div>,
 }));
@@ -126,6 +125,17 @@ vi.mock('./ecrans/Encaisser', () => ({
         reçus de Ka
       </button>
     </>
+  ),
+}));
+
+// L'écran des reçus, bavard lui aussi : il dit la recherche que la coquille lui
+// donne. « Reçu » de l'encaissement n'a de sens que si le nom du client arrive
+// jusqu'au champ de recherche ; un témoin muet laissait passer une coquille qui
+// ouvre les reçus sans le nom. Absent de la liste des témoins muets ci-dessus,
+// pour la même raison qu'`Encaisser` : `vi.mock` garde la première inscription.
+vi.mock('./ecrans/Recus', () => ({
+  Recus: ({ rechercheInitiale = '' }: { rechercheInitiale?: string }) => (
+    <div>écran Recus{rechercheInitiale ? ` · ${rechercheInitiale}` : ''}</div>
   ),
 }));
 
@@ -340,7 +350,7 @@ describe('ce que la coquille fait de la carte encaissée', () => {
     fireEvent.click(within(barre).getByRole('button', { name: 'Encaisser' }));
     fireEvent.click(await screen.findByRole('button', { name: 'reçus de Ka' }));
 
-    expect(await screen.findByText('écran Recus')).toBeTruthy();
+    expect(await screen.findByText('écran Recus · Ka')).toBeTruthy();
   });
 });
 

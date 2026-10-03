@@ -1174,9 +1174,11 @@ describe('le décompte', () => {
     rendre();
     faireLeRetrait('Hj');
 
-    expect(
-      within(feuille()).getByRole('button', { name: /^Oui, rendre 30\s000 FCFA$/ }),
-    ).toBeTruthy();
+    const valider = within(feuille()).getByRole('button', { name: /^Oui, rendre 30\s000 FCFA$/ });
+    expect(valider).toBeTruthy();
+    // Rien ne bloque : il n'a pas de raison à désigner. Un `aria-describedby` qui
+    // resterait sur un bouton allumé ferait lire une phrase d'empêchement absente.
+    expect(valider.hasAttribute('aria-describedby')).toBe(false);
   });
 
   it('se referme par « Annuler » sans rien écrire', () => {

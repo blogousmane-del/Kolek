@@ -251,6 +251,9 @@ describe('temps 1, choisir la carte', () => {
   it('n’affirme rien tant que la tournée n’est pas lue', () => {
     rendre({ carte: null });
 
+    // L'ancre d'abord : l'écran est rendu, sa bande dit ce qu'on attend de lui.
+    // Sans elle, ces absences se prouveraient aussi bien d'un écran vide.
+    expect(screen.getByText('Choisis la carte du client.')).toBeTruthy();
     expect(screen.queryByRole('list', { name: 'Cartes à encaisser' })).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByText('Aucune carte à encaisser')).toBeNull();
@@ -475,6 +478,27 @@ describe('temps 3, encaissé', () => {
     expect(etats.filter((e) => e === 'neuve')).toHaveLength(1);
   });
 
+  it('pose la 31e mise : la dernière case se remplit, et plus rien ne s’encaisse', async () => {
+    // Trente mises faites, la trente et unième est la dernière du cycle. Sa case
+    // se remplit comme les autres et le tampon se pose ; il ne reste aucune
+    // commande d'encaissement, la carte est pleine et relève du retrait.
+    enregistrerMise.mockResolvedValue(ECRITE);
+    rendre({ carte: { ...CARTE, misesEncaissees: 30 } });
+
+    fireEvent.click(bouton());
+
+    expect(await lignesEtat()).toEqual([
+      `${formatMontant(1000)} FCFA pour Hj, case 31.`,
+      'Gardée sur ce téléphone, elle partira avec le réseau.',
+      'Reçu n° ABCDEF12',
+    ]);
+    const cases = [...document.querySelectorAll('[data-etat]')];
+    expect(cases).toHaveLength(31);
+    expect(cases[30]?.getAttribute('data-etat')).toBe('neuve');
+    expect(tampon()).toBe('Gardée');
+    expect(screen.queryByRole('button', { name: /^Encaisser/ })).toBeNull();
+  });
+
   it('passe à ENCAISSÉ quand la mise est partie', async () => {
     enregistrerMise.mockResolvedValue(ECRITE);
     const { rerender } = rendre();
@@ -579,6 +603,9 @@ describe('temps 3, encaissé', () => {
     const rangee = recuGarde.parentElement as HTMLElement;
     const rang = [...rangee.children].indexOf(recuGarde);
     expect(recuGarde.disabled).toBe(true);
+    // Éteint, il désigne la phrase qui dit pourquoi : le témoin du « plus de
+    // description » plus bas, qui ne vaut que si elle y était d'abord.
+    expect(recuGarde.hasAttribute('aria-describedby')).toBe(true);
 
     mettreEnvoyee();
     rerender(ecran({ onRecus }));
@@ -587,6 +614,9 @@ describe('temps 3, encaissé', () => {
     const recu = screen.getByRole('button', { name: 'Reçu' }) as HTMLButtonElement;
     expect(recu).toBe(recuGarde);
     expect(recu.disabled).toBe(false);
+    // Allumé, il n'a plus rien à expliquer : la phrase d'attente qui le décrivait
+    // n'est plus la sienne, et la lire encore avec lui dirait qu'il attend.
+    expect(recu.hasAttribute('aria-describedby')).toBe(false);
     expect([...rangee.children].indexOf(recu)).toBe(rang);
     expect((await lignesEtat())[2]).toBe('Reçu n° ABCDEF12');
     fireEvent.click(recu);

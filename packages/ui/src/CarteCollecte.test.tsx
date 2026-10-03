@@ -134,11 +134,16 @@ describe('CarteCollecte — le billet', () => {
 
   it('ne dit pas de cycle qu’on ne lui donne pas', () => {
     carte({ cycle: undefined });
+    // L'ancre d'abord : la carte est bien rendue. Sans elle, l'absence du cycle
+    // se prouverait aussi bien d'une carte qui ne rendrait rien.
+    expect(screen.getByText('Mariam')).toBeTruthy();
     expect(screen.queryByText(/^Cycle/)).toBeNull();
   });
 
   it('ne porte plus ni verre ni dégradé', () => {
     const { container } = carte();
+    // La même ancre : un rendu vide ne porterait, lui non plus, ni verre ni dégradé.
+    expect(screen.getByText('Mariam')).toBeTruthy();
     expect(container.innerHTML).not.toMatch(/backdrop-blur|degrade-carte|radial-gradient/);
   });
 
