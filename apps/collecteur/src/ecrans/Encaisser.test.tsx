@@ -62,13 +62,21 @@ const { Encaisser } = await import('./Encaisser');
 const CARTE = { carteId: 'k7', clientNom: 'Hj', mise: 1000, misesEncaissees: 17 };
 const ECRITE = { ok: true, miseId: 'abcdef1234', operationId: 'op-9' };
 
+// Le témoin de `window.scrollTo`, que jsdom n'implémente pas : sans lui, chaque
+// rendu écrit « Not implemented » dans la sortie, et rien ne dit si l'écran
+// remonte. Un neuf par épreuve.
+let scrollTo = vi.fn();
+
 beforeEach(() => {
   etatHorsLigne = horsLigne();
+  scrollTo = vi.fn();
+  vi.stubGlobal('scrollTo', scrollTo);
 });
 
 afterEach(() => {
   cleanup();
   enregistrerMise.mockReset();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -640,5 +648,33 @@ describe('temps 3, encaissé', () => {
     expect(document.querySelector('[data-tampon]')?.textContent).toContain(
       horodatageTampon(instant),
     );
+  });
+});
+
+describe('le défilement entre les temps', () => {
+  it('remonte en haut à chaque changement de temps : choisir la carte, puis revenir', () => {
+    // Le temps change, pas la page, et la coquille ne remonte qu'au changement de
+    // page. Sans ce geste, la carte choisie au bas d'une longue liste s'ouvre sur
+    // le bas du billet, et le retour à la liste retombe au milieu.
+    const { rerender } = rendre({ carte: null });
+    scrollTo.mockClear();
+
+    rerender(ecran({ carte: CARTE }));
+    expect(scrollTo.mock.calls).toEqual([[0, 0]]);
+
+    scrollTo.mockClear();
+    rerender(ecran({ carte: null }));
+    expect(scrollTo.mock.calls).toEqual([[0, 0]]);
+  });
+
+  it('ne remonte pas quand la même carte avance d’une case', () => {
+    // Après la mise, la coquille avance la carte d'une case : même carte, autre
+    // nombre de mises. Remonter alors ôterait la ligne d'état de sous les yeux.
+    const { rerender } = rendre();
+    scrollTo.mockClear();
+
+    rerender(ecran({ carte: { ...CARTE, misesEncaissees: CARTE.misesEncaissees + 1 } }));
+
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 });

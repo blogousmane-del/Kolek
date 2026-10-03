@@ -67,6 +67,17 @@ export function Encaisser({
 }) {
   const enLigne = useEnLigne();
   const horsLigne = useHorsLigne();
+
+  // Remonter en haut quand l'écran change de temps : choisir la carte, confirmer,
+  // revenir à la liste. Le temps change, pas la page, et la coquille ne remonte
+  // qu'au changement de page. Sans ce geste, la carte choisie au bas d'une longue
+  // liste s'ouvre sur le bas de l'écran. La dépendance est l'identifiant et non la
+  // carte : après la mise, la coquille avance la même carte d'une case, et la
+  // ligne d'état ne doit pas fuir de sous les yeux.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [carte?.carteId]);
+
   // Dans la bande sombre, comme sur l'accueil. Il se tait seul quand la file
   // est vide et le réseau là (§8.2).
   const bandeau = (
