@@ -38,9 +38,17 @@ const ouvrirCarte = vi.fn();
 const rafraichir = vi.fn();
 let donnees: unknown = null;
 let erreurLecture: string | null = null;
+/** Le profil que `useEstCollaborateur` lit sous la clé `profil`. `null` : un collecteur seul. */
+let profilLu: unknown = null;
 
+// Répond selon la clé, comme le vrai : la liste des cartes sous `cartes-cloturables`,
+// le profil sous `profil`. Un bouchon qui rendait les cartes pour les deux faisait
+// lire à `useEstCollaborateur` un tableau à la place d'un profil.
 vi.mock('../cache', () => ({
-  useDonnees: () => ({ donnees, erreur: erreurLecture, rafraichir }),
+  useDonnees: (cle: string) =>
+    cle === 'profil'
+      ? { donnees: profilLu, erreur: null, rafraichir }
+      : { donnees, erreur: erreurLecture, rafraichir },
 }));
 
 vi.mock('../ecritures-ecrans', () => ({
@@ -182,6 +190,7 @@ let scrollTo = vi.fn();
 beforeEach(() => {
   donnees = [CARTE_PLEINE_HJ, CARTE_EN_COURS_HJ, CARTE_PLEINE_KA];
   erreurLecture = null;
+  profilLu = null;
   cloturerCarte.mockResolvedValue({ ok: true, montantRestitue: 30000 });
   ouvrirCarte.mockResolvedValue({ ok: true, carteId: 'neuve' });
   scrollTo = vi.fn();
@@ -1035,7 +1044,7 @@ describe('le décompte', () => {
     return screen.getByRole('dialog', { name: /^Rendre 30\s000 FCFA\s\?$/ });
   }
 
-  it('compte les mises, retire la commission, et tombe sur le montant du serveur', () => {
+  it('compte les mises, retire la commission, et tombe sur le total à rendre', () => {
     rendre();
     faireLeRetrait('Hj');
 
@@ -1052,15 +1061,59 @@ describe('le décompte', () => {
     ]);
   });
 
-  it('ne montre que le total quand les lignes ne tombent pas juste', () => {
-    // Le serveur a le dernier mot sur le montant. Un décompte qui ne retombe
-    // pas sur lui, lu devant le client, serait pire que pas de décompte.
-    donnees = [{ ...CARTE_PLEINE_HJ, restituable: 29000 }];
+  it('compte une carte en cours : quatre mises de 5 000, la commission, 15 000 à rendre', () => {
+    // Une carte qui ne ressemble pas à 31 × 1 000 : les trois nombres de la
+    // feuille (20 000, 5 000, 15 000) sont distincts, et aucun n'est la mise ou
+    // le total d'une autre ligne. La ligne et son total viennent chacun de leur
+    // règle, ils ne se copient pas l'un sur l'autre.
+    rendre();
+    faireLeRetrait('Hj', 1);
+
+    const d = screen.getByRole('dialog', { name: /^Rendre 15\s000 FCFA\s\?$/ });
+    expect(within(d).getAllByRole('term').map((t) => t.textContent)).toEqual([
+      `4 mises × ${formatMontant(5000)}`,
+      'Ta commission, case 1',
+      'À rendre',
+    ]);
+    expect(within(d).getAllByRole('definition').map((x) => x.textContent)).toEqual([
+      formatMontant(20000),
+      `${MOINS}${formatMontant(5000)}`,
+      `${formatMontant(15000)} FCFA`,
+    ]);
+  });
+
+  it('compte une carte à une seule mise : la commission l’épuise, il n’y a rien à rendre', () => {
+    // La limite basse du retrait anticipé : une mise encaissée, et c'est la
+    // commission. Le décompte le montre, ligne à ligne, jusqu'à zéro.
+    donnees = [{ ...CARTE_PLEINE_HJ, misesEncaissees: 1, restituable: 0, cycleComplet: false }];
     rendre();
     faireLeRetrait('Hj');
 
-    const d = screen.getByRole('dialog', { name: /^Rendre 29\s000 FCFA\s\?$/ });
-    expect(within(d).getAllByRole('term').map((t) => t.textContent)).toEqual(['À rendre']);
+    const d = screen.getByRole('dialog', { name: /^Rendre 0 FCFA\s\?$/ });
+    expect(within(d).getAllByRole('term').map((t) => t.textContent)).toEqual([
+      `1 mise × ${formatMontant(1000)}`,
+      'Ta commission, case 1',
+      'À rendre',
+    ]);
+    expect(within(d).getAllByRole('definition').map((x) => x.textContent)).toEqual([
+      formatMontant(1000),
+      `${MOINS}${formatMontant(1000)}`,
+      `${formatMontant(0)} FCFA`,
+    ]);
+  });
+
+  it('nomme la part du titulaire, et non une commission, pour un collaborateur', () => {
+    // La première mise ne revient pas à celui qui encaisse : le décompte lu au
+    // client ne doit pas la lui promettre.
+    profilLu = { titulaireId: 'tit1' };
+    rendre();
+    faireLeRetrait('Hj');
+
+    expect(within(feuille()).getAllByRole('term').map((t) => t.textContent)).toEqual([
+      `31 mises × ${formatMontant(1000)}`,
+      'Part de ton titulaire, case 1',
+      'À rendre',
+    ]);
   });
 
   it('répète le montant sur le bouton : on sait ce qu’on confirme', () => {

@@ -1,4 +1,4 @@
-import { MISES_PAR_CYCLE, formatMontant } from '@kolek/core';
+import { MISES_PAR_CYCLE, commission, formatMontant } from '@kolek/core';
 import {
   Bouton,
   CarteCollecte,
@@ -44,13 +44,23 @@ const pluriel = (n: number) => (n > 1 ? 's' : '');
     par son code : une séquence d'échappement tapée se perd en route. */
 const FINE = String.fromCharCode(0x202f);
 
+/** Ce que dit une carte sans mise, à la place d'un décompte et d'une phrase de
+    commission : il n'y a rien à compter. */
+const RIEN_A_RENDRE = 'Aucune mise encaissée : rien à rendre, rien à garder.';
+
 /**
- * Le décompte d'un retrait, ligne à ligne, quand il se vérifie.
+ * Le décompte d'un retrait, ligne à ligne.
  *
- * Le montant à rendre vient du serveur (`restituable`). Les lignes, elles, se
- * calculent ici, et ne s'affichent que si elles retombent exactement sur ce
- * montant : un décompte qui ne tombe pas juste, lu devant le client, serait
- * pire que pas de décompte. Le total reste alors seul.
+ * Les lignes viennent du moteur : les mises encaissées (`n × mise`), puis la
+ * retenue de `commission`, la première mise de la carte. Le total est
+ * `carte.restituable`, que `chargerCartesCloturables` calcule sur le téléphone,
+ * à la lecture des cartes, par `soldeRestituable`. Les deux sortent de la même
+ * règle de `@kolek/core`, et concordent par construction : `n × mise` moins une
+ * mise, c'est `(n − 1) × mise`. Il n'y a donc pas de garde qui ne montrerait les
+ * lignes que si elles retombent sur le total : aucune donnée ne la déclenchait.
+ *
+ * Le chiffre du serveur est celui de la vue clôturée, une fois le retrait
+ * inscrit : c'est lui que le collecteur remet en main propre.
  */
 function DecompteRetrait({
   carte,
@@ -61,34 +71,29 @@ function DecompteRetrait({
 }) {
   const n = carte.misesEncaissees;
   if (n === 0) {
-    return (
-      <p className="font-body text-sm text-muted-foreground">
-        Aucune mise encaissée : rien à rendre, rien à garder.
-      </p>
-    );
+    return <p className="font-body text-sm text-muted-foreground">{RIEN_A_RENDRE}</p>;
   }
 
-  const brut = n * carte.mise;
-  const lignes =
-    brut - carte.mise === carte.restituable
-      ? [
-          {
-            libelle: (
-              <>
-                <span className="font-mono">{n}</span> mise{pluriel(n)} ×{' '}
-                <span className="font-mono">{formatMontant(carte.mise)}</span>
-              </>
-            ),
-            montant: brut,
-          },
-          {
-            libelle: estCollaborateur ? 'Part de ton titulaire, case 1' : 'Ta commission, case 1',
-            montant: -carte.mise,
-          },
-        ]
-      : [];
-
-  return <Decompte lignes={lignes} total={{ libelle: 'À rendre', montant: carte.restituable }} />;
+  return (
+    <Decompte
+      lignes={[
+        {
+          libelle: (
+            <>
+              <span className="font-mono">{n}</span> mise{pluriel(n)} ×{' '}
+              <span className="font-mono">{formatMontant(carte.mise)}</span>
+            </>
+          ),
+          montant: n * carte.mise,
+        },
+        {
+          libelle: estCollaborateur ? 'Part de ton titulaire, case 1' : 'Ta commission, case 1',
+          montant: -commission(n, carte.mise),
+        },
+      ]}
+      total={{ libelle: 'À rendre', montant: carte.restituable }}
+    />
+  );
 }
 
 /**
@@ -103,8 +108,9 @@ function DecompteRetrait({
  * dit le nom, l'avancement et le montant à rendre ; la toucher la déplie, une
  * seule à la fois, sur la règle de la commission et les deux gestes.
  *
- * **Le montant est affiché avant confirmation, et il vient du serveur.** Le
- * collecteur voit ce qu'il va rendre, en chiffres, avant de toucher au bouton.
+ * **Le montant est affiché avant confirmation, calculé par le moteur sur la
+ * carte lue au serveur.** Le collecteur voit ce qu'il va rendre, en chiffres,
+ * avant de toucher au bouton.
  * La règle — la première mise est sa commission — est rappelée dans le dépli,
  * parce que c'est là qu'un client peut la contester.
  *
@@ -431,7 +437,7 @@ export function Retrait({
   /** La règle de la commission, dite une fois, dans le dépli. */
   function phraseCommission(carte: CarteCloturable): string {
     const n = carte.misesEncaissees;
-    if (n === 0) return 'Aucune mise encaissée : rien à rendre, rien à garder.';
+    if (n === 0) return RIEN_A_RENDRE;
     return `${n} mise${pluriel(n)} encaissée${pluriel(n)}, moins la première, ${
       estCollaborateur ? 'qui revient à ton titulaire' : 'qui est ta commission'
     } (${formatMontant(carte.mise)} FCFA).`;
