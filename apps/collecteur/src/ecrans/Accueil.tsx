@@ -139,13 +139,15 @@ export function Accueil({
           <p className="min-w-0 truncate font-headings text-2xl font-bold tracking-tight text-white">
             {nom}
           </p>
+          {/* 44 px, la cible tactile minimale du Design System : le bouton prend la
+              taille de l'avatar qu'il enveloppe. */}
           <button
             type="button"
             onClick={() => onNaviguer('profil')}
             aria-label="Ouvrir mon profil"
             className="anim-pression shrink-0 cursor-pointer rounded-pill"
           >
-            <Avatar nom={nom} className="h-10 w-10 ring-2 ring-white/25" />
+            <Avatar nom={nom} className="h-11 w-11 ring-2 ring-white/25" />
           </button>
         </div>
 
@@ -210,6 +212,9 @@ export function Accueil({
             }
             action={
               <div className="flex gap-2">
+                {/* Le montant seul est en Plex Mono, comme tout nombre qu'on compte ;
+                    le mot reste en Instrument Sans. `font-medium` : seul le 500 de
+                    Plex Mono est livré, et le bouton est en semi-gras. */}
                 <Bouton
                   icone="banknote"
                   className="flex-1"
@@ -223,7 +228,8 @@ export function Accueil({
                     })
                   }
                 >
-                  Encaisser {formatMontant(carteDuJour.mise)}
+                  Encaisser{' '}
+                  <span className="font-mono font-medium">{formatMontant(carteDuJour.mise)}</span>
                 </Bouton>
                 <Bouton
                   variante="contour"

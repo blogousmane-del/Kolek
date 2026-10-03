@@ -2,15 +2,19 @@ import { formatMontant } from '@kolek/core';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { Page } from '../Coquille';
+
 /**
- * Les commandes posées sous la carte de l'accueil.
+ * L'accueil du collecteur : l'en-tête du billet, la carte à finir en premier et
+ * ses commandes, ce que la file demande, les outils.
  *
- * Elles renvoyaient vers des écrans : « Encaisser » ouvrait la liste des
- * clients, à charge pour le collecteur d'y retrouver à la main celui qu'il
- * venait de lire — dans une liste triée autrement que par avancement. Un bouton
- * posé sous une carte doit agir sur cette carte ; c'est ce que ces deux tests
- * vérifient, et c'est pour cela que `carteDuJour` porte désormais son
- * identifiant et celui de son client.
+ * Les commandes posées sous la carte ont une histoire. Elles renvoyaient vers
+ * des écrans : « Encaisser » ouvrait la liste des clients, à charge pour le
+ * collecteur d'y retrouver à la main celui qu'il venait de lire — dans une liste
+ * triée autrement que par avancement. Un bouton posé sous une carte doit agir
+ * sur cette carte ; c'est ce que vérifient « encaisse sur la carte affichée » et
+ * « ouvre la fiche du client de cette carte », et c'est pour cela que
+ * `carteDuJour` porte désormais son identifiant et celui de son client.
  */
 
 const chargerTableauCollecteur = vi.fn();
@@ -54,10 +58,12 @@ vi.mock('./commission', () => ({ useEstTitulaire: () => estTitulaire }));
 const { Accueil } = await import('./Accueil');
 const { viderCache } = await import('../cache');
 
+// Le total du jour (7 500) n'est pas la mise de la carte (5 000) : à valeurs
+// égales, afficher l'un à la place de l'autre passerait pour juste.
 const TABLEAU = {
   clients: 3,
   cartesActives: 2,
-  encaisseAujourdhui: 5000,
+  encaisseAujourdhui: 7500,
   misesAujourdhui: 1,
   encoursTotal: 120000,
   carteDuJour: {
@@ -100,6 +106,17 @@ function rendre(supplement: Record<string, unknown> = {}) {
   );
 }
 
+/**
+ * Attendre que le tableau soit lu : la carte et ses commandes en dépendent.
+ *
+ * Cinq secondes et non la seconde par défaut : la première requête de rôle d'un
+ * fichier se fait à froid dans jsdom, et sous charge elle a déjà dépassé la
+ * seconde (« encaisse sur la carte affichée » a expiré ainsi, une fois).
+ */
+async function tableauLu() {
+  await screen.findByRole('button', { name: /sur la carte de Mariam$/ }, { timeout: 5000 });
+}
+
 describe('les commandes sous la carte à finir en premier', () => {
   it('encaisse sur la carte affichée, et non sur une liste à parcourir', async () => {
     chargerTableauCollecteur.mockResolvedValue(TABLEAU);
@@ -109,10 +126,15 @@ describe('les commandes sous la carte à finir en premier', () => {
     // Le nom complet, montant compris : la barre du bas porte une touche
     // « Encaisser » qui ouvre la liste des cartes. Deux commandes homonymes sur
     // un écran, c'est un piège pour le test comme pour l'oreille.
+    //
+    // Cinq secondes, comme `tableauLu` (voir son commentaire) : c'est cette
+    // épreuve, la première du fichier, qui avait expiré à la seconde.
     fireEvent.click(
-      await screen.findByRole('button', {
-        name: /^Encaisser 5\s000 FCFA sur la carte de Mariam$/,
-      }),
+      await screen.findByRole(
+        'button',
+        { name: /^Encaisser 5\s000 FCFA sur la carte de Mariam$/ },
+        { timeout: 5000 },
+      ),
     );
 
     expect(onEncaisser).toHaveBeenCalledWith({
@@ -121,6 +143,25 @@ describe('les commandes sous la carte à finir en premier', () => {
       mise: 5000,
       misesEncaissees: 18,
     });
+  });
+
+  it('pose le montant de l’encaissement en chiffres de caisse', async () => {
+    // Plex Mono pour tout montant qu'on compte : le mot reste dans la police du
+    // texte, le nombre seul passe en mono. Le nom accessible ne change pas, il
+    // dit déjà le montant en toutes lettres.
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    rendre();
+    await tableauLu();
+
+    const bouton = screen.getByRole('button', {
+      name: /^Encaisser 5\s000 FCFA sur la carte de Mariam$/,
+    });
+    const montant = bouton.querySelector('span.font-mono');
+
+    expect(montant, 'le montant doit être dans un span en Plex Mono').not.toBeNull();
+    expect(montant?.textContent).toBe(formatMontant(5000));
+    // Le libellé visible reste « Encaisser » + le montant, séparés par une espace.
+    expect(bouton.textContent).toBe(`Encaisser ${formatMontant(5000)}`);
   });
 
   it('ouvre la fiche du client de cette carte', async () => {
@@ -219,18 +260,18 @@ describe('ce que l’accueil signale de la file (§8.4, §8.7, §8.8)', () => {
   });
 });
 
-/** Attendre que le tableau soit lu : la carte et ses commandes en dépendent. */
-async function tableauLu() {
-  await screen.findByRole('button', { name: /sur la carte de Mariam$/ });
-}
-
 describe('l’en-tête du billet', () => {
   it('dit le total du jour et le nombre de mises qui le font', async () => {
     chargerTableauCollecteur.mockResolvedValue({ ...TABLEAU, misesAujourdhui: 3 });
     rendre();
     await tableauLu();
-    expect(screen.getByText(/^Encaissé aujourd’hui/).textContent).toBe(
-      'Encaissé aujourd’hui · 3 mises',
+    const etiquette = screen.getByText(/^Encaissé aujourd’hui/);
+    expect(etiquette.textContent).toBe('Encaissé aujourd’hui · 3 mises');
+    // Le montant du titre suit son étiquette. Il vient du total du jour, et non
+    // de la mise de la carte : la fixture les distingue, et cette ligne le garde.
+    expect(TABLEAU.encaisseAujourdhui).not.toBe(TABLEAU.carteDuJour.mise);
+    expect(etiquette.nextElementSibling?.textContent).toBe(
+      `${formatMontant(TABLEAU.encaisseAujourdhui)} FCFA`,
     );
   });
 
@@ -322,32 +363,48 @@ describe('les outils', () => {
     expect(outils()).toEqual(['Souscrire', 'Retrait', 'Rapprochement', 'Reçus', 'Alertes', 'Avis', 'Plus']);
   });
 
+  /**
+   * Les huit outils d'un titulaire, dans l'ordre de l'écran, et ce que chacun
+   * déclenche, tel que `Accueil` le câble. « Souscrire » est le seul qui
+   * n'ouvre pas une page : il ouvre le formulaire d'inscription, par
+   * `onSouscrire` (la coquille y ajoute le passage par les clients).
+   */
+  const DESTINATIONS: Array<[libelle: string, page: Page | null]> = [
+    ['Souscrire', null],
+    ['Retrait', 'retrait'],
+    ['Rapprochement', 'rapprochement'],
+    ['Reçus', 'recus'],
+    ['Alertes', 'alertes'],
+    ['Avis', 'avis'],
+    ['Équipe', 'equipe'],
+    ['Plus', 'plus'],
+  ];
+
   it('ajoutent l’équipe pour le titulaire', async () => {
     estTitulaire = true;
     chargerTableauCollecteur.mockResolvedValue(TABLEAU);
     rendre();
     await tableauLu();
-    expect(outils()).toEqual([
-      'Souscrire',
-      'Retrait',
-      'Rapprochement',
-      'Reçus',
-      'Alertes',
-      'Avis',
-      'Équipe',
-      'Plus',
-    ]);
+    // La table ci-dessus fait foi : un neuvième outil fait rougir cette épreuve,
+    // et oblige à lui donner sa ligne, donc sa destination.
+    expect(outils()).toEqual(DESTINATIONS.map(([libelle]) => libelle));
   });
 
-  it('mènent où on les touche', async () => {
+  it.each(DESTINATIONS)('l’outil « %s » mène où il doit', async (libelle, page) => {
+    estTitulaire = true;
     chargerTableauCollecteur.mockResolvedValue(TABLEAU);
     const onNaviguer = vi.fn();
     const onSouscrire = vi.fn();
     rendre({ onNaviguer, onSouscrire });
     await tableauLu();
-    fireEvent.click(screen.getByRole('button', { name: 'Rapprochement' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Souscrire' }));
-    expect(onNaviguer).toHaveBeenCalledWith('rapprochement');
-    expect(onSouscrire).toHaveBeenCalledOnce();
+
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Outils' })).getByRole('button', { name: libelle }),
+    );
+
+    // Exactement un geste, vers la bonne page : ou, pour « Souscrire », aucune
+    // navigation et un appel à `onSouscrire`.
+    expect(onNaviguer.mock.calls).toEqual(page === null ? [] : [[page]]);
+    expect(onSouscrire).toHaveBeenCalledTimes(page === null ? 1 : 0);
   });
 });

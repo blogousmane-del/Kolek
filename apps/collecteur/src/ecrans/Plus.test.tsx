@@ -132,3 +132,19 @@ describe('ce que « Plus » dit du téléphone (spec J2b §8.7)', () => {
     expect(document.body.textContent).not.toMatch(/aucun encaissement ne peut être enregistré/);
   });
 });
+
+describe('la sortie du compte', () => {
+  it('appelle la déconnexion quand on touche « Se déconnecter »', async () => {
+    // L'accueil n'a plus son bouton de sortie : avec la liste des clients, « Plus »
+    // est le chemin du collecteur qui prête son téléphone. Sans cette mesure, un
+    // bouton branché sur rien passerait au vert : il serait bien là, et ne
+    // fermerait aucune session.
+    const onDeconnexion = vi.fn();
+    profil.mockResolvedValue(PROFIL);
+    render(<Plus onRetour={() => {}} onDeconnexion={onDeconnexion} onAbonnement={() => {}} />);
+
+    (await screen.findByRole('button', { name: 'Se déconnecter' })).click();
+
+    expect(onDeconnexion).toHaveBeenCalledTimes(1);
+  });
+});
