@@ -5525,6 +5525,10 @@ function DecompteRetrait({
   function ligne(carte: CarteCloturable, rang: number) {
     const deplie = ouverte === carte.carteId;
     const retraitBloque = retraitBloquePour(carte.carteId);
+    /** Le lien du bouton éteint à sa raison. Dérivé de la carte et non de
+        `useId` : cette fonction rend une ligne par carte, un crochet n'y a pas sa
+        place. Une seule ligne est dépliée à la fois, donc l'`id` est unique. */
+    const idRaison = `raison-${carte.carteId}`;
 
     return (
       <li
@@ -5533,9 +5537,14 @@ function DecompteRetrait({
         style={rangCascade(rang, premier)}
       >
         {/* Le trait d'un cycle terminé : la carte qu'on vient rendre se voit
-            avant qu'on lise son compteur. */}
+            avant qu'on lise son compteur. `pointer-events-none` : posé au-dessus
+            du bouton de la ligne, il avalerait le toucher qui visait ses quatre
+            premiers pixels. */}
         {carte.cycleComplet && (
-          <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-positive" />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-positive"
+          />
         )}
         <button
           type="button"
@@ -5582,9 +5591,23 @@ function DecompteRetrait({
                 en cours, elle prélèverait une commission — la première mise du
                 nouveau cycle — que personne n'a demandée. */}
             <div className="flex flex-wrap gap-2">
-              <Bouton disabled={retraitBloque !== null} onClick={() => setAConfirmer(carte)}>
+              <Bouton
+                disabled={retraitBloque !== null}
+                decritPar={retraitBloque ? idRaison : undefined}
+                onClick={() => setAConfirmer(carte)}
+              >
                 Faire le retrait
               </Bouton>
+              {/* La raison suit son bouton, avant la seconde porte : sur un
+                  téléphone étroit les deux portes passent à la ligne, et une
+                  raison lue sous « Activer une carte » serait prise pour la
+                  sienne. `decritPar` la relie au bouton éteint, qui ne prend
+                  pas le focus. */}
+              {retraitBloque && (
+                <p id={idRaison} className="m-0 basis-full font-body text-xs text-muted-foreground">
+                  {retraitBloque}
+                </p>
+              )}
               {carte.cycleComplet && (
                 <ActiverCarte
                   collecteurId={collecteurId}
@@ -5595,9 +5618,6 @@ function DecompteRetrait({
                 />
               )}
             </div>
-            {retraitBloque && (
-              <p className="m-0 font-body text-xs text-muted-foreground">{retraitBloque}</p>
-            )}
           </div>
         )}
       </li>
@@ -5703,7 +5723,12 @@ par :
             La carte se clôture. C’est définitif : le retrait ne pourra pas être défait.
           </p>
           {bloqueConfirmation && (
-            <p className="m-0 font-body text-xs text-muted-foreground">{bloqueConfirmation}</p>
+            <p
+              id={`raison-feuille-${aConfirmer.carteId}`}
+              className="m-0 font-body text-xs text-muted-foreground"
+            >
+              {bloqueConfirmation}
+            </p>
           )}
           <div className="space-y-2">
             <Bouton
@@ -5711,6 +5736,7 @@ par :
               grand
               onClick={confirmer}
               disabled={envoi || bloqueConfirmation !== null}
+              decritPar={bloqueConfirmation ? `raison-feuille-${aConfirmer.carteId}` : undefined}
             >
               {/* Un seul span : `Bouton` est un conteneur flex, et des morceaux
                   frères y deviendraient des éléments séparés, insécables. */}
