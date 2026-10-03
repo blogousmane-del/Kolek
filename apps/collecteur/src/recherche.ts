@@ -44,6 +44,10 @@ function chiffres(texte: string): string {
  * fiche et se tape « 0708 » dans la recherche, d'où la comparaison des
  * chiffres aux chiffres. Le marché est ce qui organise la tournée.
  *
+ * Le terme est rogné d'abord : le clavier d'un téléphone laisse une espace
+ * derrière le mot qu'il vient de proposer, et « awa » suivi de cette espace ne
+ * trouverait plus « Awa ». Des espaces seules valent une saisie vide.
+ *
  * Écrite dans `Clients.tsx` ; déplacée ici le 2026-10-02 pour servir aussi à
  * l'onglet « Encaisser ».
  */
@@ -51,15 +55,16 @@ export function correspondClient(
   client: { nom: string; marche: string | null; telephone: string | null },
   terme: string,
 ): boolean {
-  if (!terme) return true;
-  const cherche = nu(terme);
+  const t = terme.trim();
+  if (!t) return true;
+  const cherche = nu(t);
 
   if (nu(client.nom).includes(cherche)) return true;
   if (client.marche !== null && nu(client.marche).includes(cherche)) return true;
 
   if (client.telephone !== null) {
     if (nu(client.telephone).includes(cherche)) return true;
-    const chiffresCherches = chiffres(terme);
+    const chiffresCherches = chiffres(t);
     if (chiffresCherches && chiffres(client.telephone).includes(chiffresCherches)) return true;
   }
 

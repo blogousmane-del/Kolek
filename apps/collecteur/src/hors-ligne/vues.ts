@@ -457,13 +457,19 @@ export type EtatEnvoiMise = 'gardee' | 'envoyee' | 'refusee';
 /**
  * Où en est une mise qu'on vient d'écrire : c'est ce que dit le tampon.
  *
- * Une mise en attente est **déjà** dans la tournée du téléphone (`appliquer`
- * l'y ajoute) : la tournée seule ne distingue donc pas l'envoyée de la
- * gardée. C'est la file qui tranche. L'opération y est : elle attend, ou elle
- * a été refusée. Elle n'y est plus et la mise est dans la tournée : elle est
- * partie, et l'instantané l'a reçue. Elle n'y est plus et la mise n'est pas
- * dans la tournée : l'écran n'a pas encore relu le téléphone depuis
- * l'écriture, et le doute penche vers GARDÉE, l'état qui ne promet rien.
+ * Une mise en attente est **déjà** dans la tournée que l'écran lit :
+ * `lireTournee` réapplique la file sur l'instantané (`reappliquer`). La
+ * tournée seule ne distingue donc pas l'envoyée de la gardée. C'est la file
+ * qui tranche. L'opération y est : elle attend, ou elle a été refusée. Elle
+ * n'y est plus mais sa copie est dans `refus` : refusée, et consignée. Elle
+ * n'y est plus, rien dans `refus`, et la mise est dans la tournée : elle est
+ * partie, et `retirerAcceptee` l'a faite entrer dans l'instantané
+ * (`appliquer`). Elle n'y est plus et la mise n'est pas dans la tournée :
+ * l'écran n'a pas encore relu le téléphone depuis l'écriture, et le doute
+ * penche vers GARDÉE, l'état qui ne promet rien.
+ *
+ * Le même doute vaut pour un état de file que cette version ne connaît pas :
+ * seule « refusée à consigner » dit REFUSÉE, tout le reste reste GARDÉE.
  */
 export function etatEnvoiMise(
   mise: { miseId: string; operationId: string },
@@ -474,7 +480,7 @@ export function etatEnvoiMise(
   }: { operations: readonly Operation[]; refus: readonly RefusLocal[]; tournee: Tournee | null },
 ): EtatEnvoiMise {
   const operation = operations.find((o) => o.id === mise.operationId);
-  if (operation) return operation.etat === 'en_attente' ? 'gardee' : 'refusee';
+  if (operation) return operation.etat === 'refusee_a_consigner' ? 'refusee' : 'gardee';
   if (refus.some((r) => r.id === mise.operationId)) return 'refusee';
   if (tournee?.mises.some((m) => m.id === mise.miseId)) return 'envoyee';
   return 'gardee';

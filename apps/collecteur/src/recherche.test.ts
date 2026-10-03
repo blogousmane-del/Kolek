@@ -66,6 +66,14 @@ describe('correspondClient', () => {
     expect(correspondClient(AWA, '')).toBe(true);
   });
 
+  it('laisse passer tout le monde sur un terme fait d’espaces', () => {
+    expect(correspondClient({ nom: 'Ka', marche: null, telephone: null }, '   ')).toBe(true);
+  });
+
+  it('ne tient pas compte de l’espace laissée après le terme', () => {
+    expect(correspondClient({ nom: 'Awa', marche: null, telephone: null }, 'awa ')).toBe(true);
+  });
+
   it('écarte ce qui ne correspond à rien', () => {
     expect(correspondClient(AWA, 'bintou')).toBe(false);
   });

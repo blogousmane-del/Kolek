@@ -637,6 +637,17 @@ describe('les cartes de l’onglet « Encaisser »', () => {
     expect(cartesAEncaisser(t).map((c) => c.carteId)).toEqual(['k1']);
   });
 
+  it('garde la carte à 30 mises, dont la dernière case reste à payer, et écarte celle à 31', () => {
+    const t = tournee({
+      clients: [client('c1', 'Awa'), client('c2', 'Bintou')],
+      cartes: [
+        carte('k1', 'c1', { misesEncaissees: 30 }),
+        carte('k2', 'c2', { misesEncaissees: 31 }),
+      ],
+    });
+    expect(cartesAEncaisser(t).map((c) => c.carteId)).toEqual(['k1']);
+  });
+
   it('joint le nom, le marché et le numéro du client', () => {
     const t = tournee({
       clients: [{ ...client('c1', 'Awa'), marche: 'Adjamé', telephone: '0700' }],
@@ -666,6 +677,17 @@ describe('les cartes de l’onglet « Encaisser »', () => {
     });
     expect(cartesAEncaisser(t).map((c) => c.clientNom)).toEqual(['Émile', 'Awa', 'Zoé']);
   });
+
+  it('range « Émile » avant « Zoé » à avancement égal : l’ordre d’un carnet, pas celui des octets', () => {
+    const t = tournee({
+      clients: [client('c1', 'Zoé'), client('c2', 'Émile')],
+      cartes: [
+        carte('k1', 'c1', { misesEncaissees: 20 }),
+        carte('k2', 'c2', { misesEncaissees: 20 }),
+      ],
+    });
+    expect(cartesAEncaisser(t).map((c) => c.clientNom)).toEqual(['Émile', 'Zoé']);
+  });
 });
 
 /**
@@ -678,16 +700,28 @@ describe('les cartes de l’onglet « Encaisser »', () => {
 describe('l’état d’envoi d’une mise qu’on vient d’écrire', () => {
   const ECRITE = { miseId: 'mise-1', operationId: 'op-1' };
 
+  // En production, la file est réappliquée à l'instantané à chaque lecture
+  // (`lireTournee`) : la mise d'une opération qui attend est déjà dans la
+  // tournée que l'écran reçoit. Les épreuves qui suivent la lui donnent. Sans
+  // elle, l'ordre des contrôles, seul objet de la fonction, ne serait pas tenu :
+  // `gardee` viendrait du repli final, et une tournée consultée avant la file
+  // passerait comme elle.
+  const TOURNEE_AVEC_LA_MISE = tournee({ mises: [mise('mise-1', 'k1', INSTANT)] });
+
   it('est gardée tant que l’opération attend dans la file', () => {
     const operations = [operationMise(1, { carteId: 'k1' })];
-    expect(etatEnvoiMise(ECRITE, { operations, refus: [], tournee: tournee() })).toBe('gardee');
+    expect(
+      etatEnvoiMise(ECRITE, { operations, refus: [], tournee: TOURNEE_AVEC_LA_MISE }),
+    ).toBe('gardee');
   });
 
   it('est refusée quand le serveur l’a refusée, à consigner ou consignée', () => {
+    // Un DOUBLON dit la mise déjà enregistrée au serveur : la tournée relue peut
+    // la contenir, et le tampon ne doit pas s'y fier pour une écriture refusée.
     const aConsigner = [operationMise(1, { carteId: 'k1' }, { etat: 'refusee_a_consigner' })];
-    expect(etatEnvoiMise(ECRITE, { operations: aConsigner, refus: [], tournee: tournee() })).toBe(
-      'refusee',
-    );
+    expect(
+      etatEnvoiMise(ECRITE, { operations: aConsigner, refus: [], tournee: TOURNEE_AVEC_LA_MISE }),
+    ).toBe('refusee');
 
     const refus: RefusLocal[] = [
       {
@@ -697,16 +731,28 @@ describe('l’état d’envoi d’une mise qu’on vient d’écrire', () => {
         creeLe: INSTANT,
       },
     ];
-    expect(etatEnvoiMise(ECRITE, { operations: [], refus, tournee: tournee() })).toBe('refusee');
+    expect(
+      etatEnvoiMise(ECRITE, { operations: [], refus, tournee: TOURNEE_AVEC_LA_MISE }),
+    ).toBe('refusee');
   });
 
   it('est envoyée quand l’opération a quitté la file et que la mise est dans la tournée', () => {
-    const t = tournee({ mises: [mise('mise-1', 'k1', INSTANT)] });
-    expect(etatEnvoiMise(ECRITE, { operations: [], refus: [], tournee: t })).toBe('envoyee');
+    expect(
+      etatEnvoiMise(ECRITE, { operations: [], refus: [], tournee: TOURNEE_AVEC_LA_MISE }),
+    ).toBe('envoyee');
   });
 
   it('reste gardée tant que l’écran n’a pas relu la file après l’écriture', () => {
     expect(etatEnvoiMise(ECRITE, { operations: [], refus: [], tournee: tournee() })).toBe('gardee');
     expect(etatEnvoiMise(ECRITE, { operations: [], refus: [], tournee: null })).toBe('gardee');
+  });
+
+  it('reste gardée devant un état de file que cette version ne connaît pas', () => {
+    // Seule « refusée à consigner » dit REFUSÉE. Tout autre état, un état à venir
+    // compris, penche vers GARDÉE : le doute ne promet rien et n'accuse personne.
+    const operations = [operationMise(1, { carteId: 'k1' }, { etat: 'a-venir' as never })];
+    expect(
+      etatEnvoiMise(ECRITE, { operations, refus: [], tournee: TOURNEE_AVEC_LA_MISE }),
+    ).toBe('gardee');
   });
 });
