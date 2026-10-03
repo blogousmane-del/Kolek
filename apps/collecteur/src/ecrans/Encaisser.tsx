@@ -532,9 +532,12 @@ function Confirmation({
               clavier, et pas quand il l'avait été d'un clic ou d'un toucher :
               c'est voulu. */}
           <div ref={etatRef} role="status" tabIndex={-1} className="space-y-1 outline-none">
+            {/* Les chiffres sont en Plex Mono, et `font-medium` : la phrase est en
+                semi-gras, seul le 500 de Plex Mono est livré. */}
             <p className="font-body text-base font-semibold text-ink">
-              <span className="font-mono">{formatMontant(carte.mise)}</span> FCFA pour{' '}
-              {carte.clientNom}, case <span className="font-mono">{ecrite.numeroCase}</span>.
+              <span className="font-mono font-medium">{formatMontant(carte.mise)}</span> FCFA pour{' '}
+              {carte.clientNom}, case{' '}
+              <span className="font-mono font-medium">{ecrite.numeroCase}</span>.
             </p>
             {etat && (
               <p id={idPhrase} className={`font-body text-sm font-medium ${TEINTE_ENVOI[etat]}`}>

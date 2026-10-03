@@ -400,6 +400,24 @@ describe('temps 3, encaissé', () => {
     expect(tampon()).toBe('Gardée');
   });
 
+  it('pose les chiffres de la première phrase en Plex Mono 500 : la phrase est en semi-gras', async () => {
+    // La phrase est en `font-semibold` et seul le 500 de Plex Mono est livré : un
+    // span mono sans `font-medium` y demande un 600, que le navigateur fabrique
+    // en épaississant le 500 — le faux gras que le Design System proscrit.
+    enregistrerMise.mockResolvedValue(ECRITE);
+    rendre();
+
+    fireEvent.click(bouton());
+    const phrase = (await screen.findByRole('status')).querySelector('p') as HTMLElement;
+    const chiffres = [...phrase.querySelectorAll('span.font-mono')];
+
+    expect(phrase.classList.contains('font-semibold'), 'la phrase est en semi-gras').toBe(true);
+    expect(chiffres.map((c) => c.textContent)).toEqual([formatMontant(1000), '18']);
+    for (const chiffre of chiffres) {
+      expect(chiffre.classList.contains('font-medium'), chiffre.textContent ?? '').toBe(true);
+    }
+  });
+
   it('remplit la case écrite, et elle seule', async () => {
     enregistrerMise.mockResolvedValue(ECRITE);
     rendre();
