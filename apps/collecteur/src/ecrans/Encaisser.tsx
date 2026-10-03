@@ -256,7 +256,7 @@ function Selecteur({
           </div>
 
           <div className="mx-4 mt-5 flex items-baseline justify-between gap-3">
-            <h2 className="font-headings text-lg font-bold text-ink">Cartes actives</h2>
+            <h2 className="font-headings text-lg font-bold text-ink">Cartes en cours</h2>
             <p className="font-body text-xs text-muted-foreground">
               <span className="font-mono">{toutes.length}</span>, les plus avancées d’abord
             </p>

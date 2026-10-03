@@ -95,7 +95,9 @@ export function Accueil({
   const premier = usePremierRendu();
   const nom = nomCollecteur ?? 'Collecteur';
   const chiffre = (valeur: number | undefined) => (tableau ? formatMontant(valeur ?? 0) : '—');
-  const actives = tableau?.cartesActives ?? 0;
+  // Les cartes qui ont encore une case à payer : le « en cours » du retrait.
+  // Les pleines n'y sont pas, comme elles ne sont pas dans la carte à finir.
+  const enCours = tableau?.cartesEnCours ?? 0;
   const s = (n: number) => (n > 1 ? 's' : '');
 
   const outils: Outil[] = [
@@ -197,9 +199,13 @@ export function Accueil({
             solde={formatMontant(carteDuJour.solde)}
             surtitre={
               <div className="flex items-baseline justify-between gap-3">
+                {/* Le compte est en Plex Mono comme tout nombre qu'on compte ;
+                    `font-medium` parce que la phrase est en semi-gras et que seul
+                    le 500 de Plex Mono est livré. */}
                 <p className="min-w-0 font-body text-xs font-semibold text-muted-foreground">
-                  À finir en premier · la plus avancée de tes {actives} carte{s(actives)} active
-                  {s(actives)}
+                  À finir en premier · la plus avancée de tes{' '}
+                  <span className="font-mono font-medium">{enCours}</span> carte{s(enCours)} en
+                  cours
                 </p>
                 <button
                   type="button"
@@ -256,6 +262,26 @@ export function Accueil({
               <Squelette hauteur="h-6" largeur="w-32" />
               <Squelette hauteur="h-4" largeur="w-16" />
             </div>
+          </Carte>
+        ) : tableau.cartesActives > 0 ? (
+          // Des cartes actives, mais aucune avec une case à payer : toutes sont
+          // pleines. « Aucune carte active » serait faux, il reste de l'argent à
+          // rendre ; la place dit où aller.
+          <Carte className="p-4">
+            <p className="m-0 font-body text-base text-ink">
+              Toutes tes cartes actives sont pleines.
+            </p>
+            <p className="mt-1 font-body text-sm text-muted-foreground">
+              Rends leur solde par le retrait, ou ouvre une carte de plus.
+            </p>
+            <Bouton
+              variante="contour"
+              icone="arrow-up-right"
+              className="mt-3"
+              onClick={() => onNaviguer('retrait')}
+            >
+              Aller au retrait
+            </Bouton>
           </Carte>
         ) : (
           <Carte className="p-4">

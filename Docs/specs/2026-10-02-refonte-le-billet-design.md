@@ -272,8 +272,13 @@ chantier l'emploie sur Retrait, les autres le reçoivent sans autre changement.
 - `BandeauHorsLigne` reste dans l'en-tête.
 - **La carte à finir** vient se poser sur l'en-tête (48 px de recouvrement).
   Elle garde son titre, posé dans la carte au-dessus du nom : « À finir en
-  premier · la plus avancée de tes 38 cartes actives », et le lien « Toutes les
-  cartes » (le `surtitre` de la carte). Dans sa fente, deux `Bouton` :
+  premier · la plus avancée de tes 35 cartes en cours », et le lien « Toutes les
+  cartes » (le `surtitre` de la carte). C'est la première de `cartesAEncaisser`,
+  dans l'ordre du premier temps d'Encaisser, donc jamais une carte pleine :
+  « en cours » compte les cartes actives qui ont encore une case à payer
+  (`cartesEnCours`), le mot du segment de Retrait. Quand toutes les cartes
+  actives sont pleines, la place renvoie au retrait (« Toutes tes cartes actives
+  sont pleines. », bouton « Aller au retrait »). Dans sa fente, deux `Bouton` :
   « Encaisser 2 000 » (nom accessible « Encaisser 2 000 FCFA sur la carte de
   Mariam Traoré ») et « Fiche » (« Ouvrir la fiche de Mariam Traoré »).
   `ActionsCarte` et ses pastilles rondes ne servent plus qu'au carrousel de la

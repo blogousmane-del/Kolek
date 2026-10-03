@@ -79,25 +79,29 @@ export function tableauDepuis(t: Tournee, maintenant: number): TableauCollecteur
   const encaisseAujourdhui = duJour.reduce((somme, m) => somme + m.montant, 0);
 
   const actives = t.cartes.filter((k) => k.statut === 'active');
-  // La plus avancée : c'est celle dont le cycle se termine en premier.
-  const plusAvancee = [...actives].sort(
-    (a, b) => b.misesEncaissees - a.misesEncaissees || parId(a, b),
-  )[0];
+  // Les cartes « en cours » : actives, et avec encore une case à payer. La carte à
+  // finir en premier est la première de la liste d'« Encaisser », dans son ordre :
+  // la plus avancée, c'est celle dont le cycle se termine en premier. Jamais une
+  // carte pleine : elle n'a plus de mise à recevoir, et l'accueil lui proposerait
+  // un « Encaisser » qui mène à un bouton éteint. Elle relève du retrait.
+  const enCours = cartesAEncaisser(t);
+  const aFinir = enCours[0];
 
   return {
     clients: t.clients.length,
     cartesActives: actives.length,
+    cartesEnCours: enCours.length,
     encaisseAujourdhui,
     misesAujourdhui: duJour.length,
     encoursTotal: actives.reduce((somme, k) => somme + soldeRestituable(k.misesEncaissees, k.mise), 0),
-    carteDuJour: plusAvancee
+    carteDuJour: aFinir
       ? {
-          carteId: plusAvancee.id,
-          clientId: plusAvancee.clientId,
-          nom: noms.get(plusAvancee.clientId) ?? 'Client',
-          mise: plusAvancee.mise,
-          misesEncaissees: plusAvancee.misesEncaissees,
-          solde: soldeRestituable(plusAvancee.misesEncaissees, plusAvancee.mise),
+          carteId: aFinir.carteId,
+          clientId: aFinir.clientId,
+          nom: aFinir.clientNom,
+          mise: aFinir.mise,
+          misesEncaissees: aFinir.misesEncaissees,
+          solde: soldeRestituable(aFinir.misesEncaissees, aFinir.mise),
         }
       : null,
     dernieres: [...versements]
@@ -184,6 +188,10 @@ export interface CarteAEncaisser {
  * Une carte pleine n'y figure pas : elle n'a plus de case à payer, elle
  * relève du retrait. À égalité d'avancement, l'ordre est celui des noms, à la
  * française, puis des identifiants : il ne change pas d'un rendu à l'autre.
+ *
+ * L'accueil en prend la première (`tableauDepuis`, `carteDuJour`) et en compte
+ * la longueur (`cartesEnCours`) : un seul ordre, pour que « à finir en premier »
+ * désigne la même carte sur les deux écrans.
  */
 export function cartesAEncaisser(t: Tournee): CarteAEncaisser[] {
   const clients = new Map(t.clients.map((c) => [c.id, c]));

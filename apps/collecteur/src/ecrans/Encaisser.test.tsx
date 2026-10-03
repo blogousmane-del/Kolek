@@ -154,6 +154,10 @@ describe('temps 1, choisir la carte', () => {
     rendre({ carte: null });
 
     expect(screen.getByText('Choisis la carte du client.')).toBeTruthy();
+    // « En cours », le mot de l'accueil et du segment du retrait : les pleines n'y
+    // sont pas, « actives » en dirait trop.
+    expect(screen.getByRole('heading', { name: 'Cartes en cours' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Cartes actives' })).toBeNull();
     const l = lignes();
     expect(l).toHaveLength(2);
     expect(l[0]).toMatch(/^Mariam Traoré/);

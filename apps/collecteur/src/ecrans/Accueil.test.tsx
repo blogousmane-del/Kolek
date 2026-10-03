@@ -63,6 +63,7 @@ const { viderCache } = await import('../cache');
 const TABLEAU = {
   clients: 3,
   cartesActives: 2,
+  cartesEnCours: 2,
   encaisseAujourdhui: 7500,
   misesAujourdhui: 1,
   encoursTotal: 120000,
@@ -188,12 +189,48 @@ describe('les commandes sous la carte à finir en premier', () => {
   it('ne propose aucune commande quand il n’y a pas de carte', async () => {
     // Sans carte, deux pastilles grises sous un bloc « Aucune carte active »
     // se liraient comme une application en panne.
-    chargerTableauCollecteur.mockResolvedValue({ ...TABLEAU, carteDuJour: null, cartesActives: 0 });
+    chargerTableauCollecteur.mockResolvedValue({
+      ...TABLEAU,
+      carteDuJour: null,
+      cartesActives: 0,
+      cartesEnCours: 0,
+    });
     rendre();
 
     expect(await screen.findByText('Aucune carte active.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /sur la carte de/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Ouvrir la fiche/ })).toBeNull();
+    // Aucune carte du tout : le renvoi vers le retrait serait un faux chemin.
+    expect(screen.queryByRole('button', { name: 'Aller au retrait' })).toBeNull();
+  });
+
+  it('renvoie au retrait quand toutes les cartes actives sont pleines', async () => {
+    // Trois cartes actives, aucune avec une case à payer : il n'y a pas de carte
+    // à finir, et « Aucune carte active. » serait faux — de l'argent reste à
+    // rendre. La place dit où aller.
+    chargerTableauCollecteur.mockResolvedValue({
+      ...TABLEAU,
+      carteDuJour: null,
+      cartesActives: 3,
+      cartesEnCours: 0,
+    });
+    const onNaviguer = vi.fn();
+    rendre({ onNaviguer });
+
+    expect(
+      await screen.findByText('Toutes tes cartes actives sont pleines.', {}, { timeout: 5000 }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('Rends leur solde par le retrait, ou ouvre une carte de plus.'),
+    ).toBeTruthy();
+    expect(screen.queryByText('Aucune carte active.')).toBeNull();
+    // Rien à encaisser sur une carte pleine : aucune commande de carte.
+    expect(screen.queryByRole('button', { name: /sur la carte de/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Ouvrir la fiche/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aller au retrait' }));
+
+    expect(onNaviguer.mock.calls).toEqual([['retrait']]);
   });
 });
 
@@ -338,8 +375,34 @@ describe('la carte à finir en premier', () => {
     chargerTableauCollecteur.mockResolvedValue(TABLEAU);
     rendre();
     await tableauLu();
+    const titre = screen.getByText(/^À finir en premier/);
+    expect(titre.textContent).toBe('À finir en premier · la plus avancée de tes 2 cartes en cours');
+    // Le compte est un nombre qu'on compte : Plex Mono. Le titre est en semi-gras
+    // et seul le 500 de Plex est livré, d'où `font-medium` (sans lui, le
+    // navigateur fabrique un faux gras).
+    expect(titre.querySelector('span.font-mono.font-medium')?.textContent).toBe('2');
+  });
+
+  it('compte les cartes en cours, et non les cartes actives : les pleines n’y sont pas', async () => {
+    // Cinq cartes actives dont deux pleines : trois sont en cours. Le relevé garde
+    // les cinq (« Cartes actives »), le titre en dit trois.
+    chargerTableauCollecteur.mockResolvedValue({ ...TABLEAU, cartesActives: 5, cartesEnCours: 3 });
+    rendre();
+    await tableauLu();
+
     expect(screen.getByText(/^À finir en premier/).textContent).toBe(
-      'À finir en premier · la plus avancée de tes 2 cartes actives',
+      'À finir en premier · la plus avancée de tes 3 cartes en cours',
+    );
+    expect(screen.getAllByRole('definition')[1]?.textContent).toBe('5');
+  });
+
+  it('accorde « carte en cours » au singulier', async () => {
+    chargerTableauCollecteur.mockResolvedValue({ ...TABLEAU, cartesActives: 4, cartesEnCours: 1 });
+    rendre();
+    await tableauLu();
+
+    expect(screen.getByText(/^À finir en premier/).textContent).toBe(
+      'À finir en premier · la plus avancée de tes 1 carte en cours',
     );
   });
 

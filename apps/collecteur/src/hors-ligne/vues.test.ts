@@ -74,6 +74,8 @@ describe('l’accueil, calculé sur la tournée', () => {
     expect(tableauDepuis(T, MAINTENANT)).toMatchObject({
       clients: 2,
       cartesActives: 2,
+      // Deux cartes actives, aucune pleine : toutes deux ont encore une case à payer.
+      cartesEnCours: 2,
       encaisseAujourdhui: 1500,
       encoursTotal: soldeRestituable(5, 1000) + soldeRestituable(30, 500),
     });
@@ -120,6 +122,62 @@ describe('l’accueil, calculé sur la tournée', () => {
 
   it('n’a pas de carte du jour sans carte active', () => {
     expect(tableauDepuis(tournee({ clients: [client('c1')] }), MAINTENANT).carteDuJour).toBeNull();
+  });
+
+  it('n’offre jamais une carte pleine à finir : elle relève du retrait, pas de la mise', () => {
+    // `k1` est active et complète (31/31) : la plus avancée au sens du nombre de
+    // mises, et la seule sans case à payer. L'accueil y proposait « Encaisser »,
+    // qui menait à un bouton éteint. `k2` (29/31) est la vraie carte à finir.
+    const t = tournee({
+      clients: [client('c1', 'Awa'), client('c2', 'Bintou')],
+      cartes: [
+        carte('k1', 'c1', { misesEncaissees: 31 }),
+        carte('k2', 'c2', { misesEncaissees: 29 }),
+      ],
+    });
+
+    const tableau = tableauDepuis(t, MAINTENANT);
+
+    expect(tableau.carteDuJour?.carteId).toBe('k2');
+    // Pleine comprise : c'est le compte du relevé. « En cours » l'exclut : c'est le
+    // compte du titre de la carte, le même mot que le segment du retrait.
+    expect(tableau.cartesActives).toBe(2);
+    expect(tableau.cartesEnCours).toBe(1);
+  });
+
+  it('suit l’ordre d’Encaisser : à égalité de mises, le nom, et non l’identifiant', () => {
+    // Les noms vont à l'envers des identifiants : « Zoé » tient `ka`, « Awa »
+    // `kb`. Départagées par identifiant seul, l'accueil et la liste d'Encaisser
+    // ne choisiraient pas la même carte.
+    const egales = tournee({
+      clients: [client('c1', 'Zoé'), client('c2', 'Awa')],
+      cartes: [
+        carte('ka', 'c1', { misesEncaissees: 7 }),
+        carte('kb', 'c2', { misesEncaissees: 7 }),
+      ],
+    });
+
+    const aFinir = tableauDepuis(egales, MAINTENANT).carteDuJour;
+
+    expect(aFinir?.carteId).toBe(cartesAEncaisser(egales)[0]?.carteId);
+    // Et non l'égalité de deux `undefined` : la carte est bien celle d'« Awa ».
+    expect(aFinir?.carteId).toBe('kb');
+  });
+
+  it('n’a pas de carte du jour, ni de carte en cours, quand toutes les cartes actives sont pleines', () => {
+    const pleines = tournee({
+      clients: [client('c1', 'Awa'), client('c2', 'Bintou')],
+      cartes: [
+        carte('k1', 'c1', { misesEncaissees: 31 }),
+        carte('k2', 'c2', { misesEncaissees: 31 }),
+      ],
+    });
+
+    expect(tableauDepuis(pleines, MAINTENANT)).toMatchObject({
+      carteDuJour: null,
+      cartesActives: 2,
+      cartesEnCours: 0,
+    });
   });
 });
 
