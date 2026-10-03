@@ -877,6 +877,23 @@ describe('la liste en lignes', () => {
     expect(nomsDesLignes()).toEqual(['Hj', 'Ka', 'Hj']);
   });
 
+  it('dessine l’anneau de focus de chaque ligne dans la ligne, au-dessus du trait vert', () => {
+    // La liste est `overflow-hidden` pour arrondir ses coins : un anneau à
+    // l'extérieur serait coupé net, il se dessine en dedans (`-outline-offset-2`).
+    // Le `!` est nécessaire parce que la règle `:focus-visible` de `base.css` est
+    // hors de toute couche, donc plus forte qu'une classe d'utilité. Et le trait
+    // vert d'un cycle terminé est positionné : sans `relative` et `z-10`, il
+    // recouvrirait le bord gauche de l'anneau.
+    rendre();
+
+    expect(lignes()).toHaveLength(3);
+    for (const ligne of lignes()) {
+      for (const classe of ['relative', 'focus-visible:z-10', 'focus-visible:-outline-offset-2!']) {
+        expect(ligne.classList.contains(classe), `${ligne.textContent} : ${classe}`).toBe(true);
+      }
+    }
+  });
+
   it('montre le montant à rendre sur la ligne, et la commission seulement dépliée', () => {
     rendre();
 

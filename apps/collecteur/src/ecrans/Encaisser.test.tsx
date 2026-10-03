@@ -172,6 +172,27 @@ describe('temps 1, choisir la carte', () => {
     expect(l[1]).toMatch(/^Aya Koffi/);
   });
 
+  it('dessine l’anneau de focus de chaque ligne dans la ligne : la liste coupe pour ses coins', () => {
+    // La liste est `overflow-hidden` pour arrondir ses coins : un anneau à
+    // l'extérieur de la ligne serait coupé net. Il se dessine donc en dedans
+    // (`-outline-offset-2`), et le `!` est nécessaire parce que la règle
+    // `:focus-visible` de `base.css` est hors de toute couche, donc plus forte
+    // qu'une classe d'utilité.
+    etatHorsLigne = horsLigne({ tournee: TOURNEE });
+    rendre({ carte: null });
+
+    const boutons = within(screen.getByRole('list', { name: 'Cartes à encaisser' })).getAllByRole(
+      'button',
+    );
+    expect(boutons).toHaveLength(2);
+    for (const bouton of boutons) {
+      expect(
+        bouton.classList.contains('focus-visible:-outline-offset-2!'),
+        bouton.textContent ?? '',
+      ).toBe(true);
+    }
+  });
+
   it('choisit une carte d’un seul geste', () => {
     etatHorsLigne = horsLigne({ tournee: TOURNEE });
     const onChoisir = vi.fn();

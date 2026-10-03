@@ -483,21 +483,26 @@ export function Retrait({
         style={rangCascade(rang, premier)}
       >
         {/* Le trait d'un cycle terminé : la carte qu'on vient rendre se voit
-            avant qu'on lise son compteur. `pointer-events-none` : posé au-dessus
-            du bouton de la ligne, il avalerait le toucher qui visait ses quatre
-            premiers pixels. */}
+            avant qu'on lise son compteur. `pointer-events-none` : positionné, il
+            peut passer devant le bouton de la ligne et avalerait le toucher qui
+            visait ses quatre premiers pixels. */}
         {carte.cycleComplet && (
           <span
             aria-hidden
             className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-positive"
           />
         )}
+        {/* L'anneau de focus se dessine dans la ligne (`-outline-offset-2`) : la
+            liste coupe (`overflow-hidden`) pour ses coins arrondis. Le `!` est
+            nécessaire, la règle `:focus-visible` de `base.css` étant hors de toute
+            couche, donc plus forte qu'une classe d'utilité. `relative` et `z-10`
+            passent l'anneau au-dessus du trait vert, qui est positionné. */}
         <button
           type="button"
           aria-expanded={deplie}
           aria-controls={deplie ? `depli-${carte.carteId}` : undefined}
           onClick={() => basculer(carte.carteId)}
-          className="anim-pression flex w-full cursor-pointer items-center gap-3 py-3 pl-4 pr-3 text-left"
+          className="anim-pression relative flex w-full cursor-pointer items-center gap-3 py-3 pl-4 pr-3 text-left focus-visible:z-10 focus-visible:-outline-offset-2!"
         >
           <span className="min-w-0 flex-1">
             <span className="block truncate font-body text-base font-semibold text-ink">

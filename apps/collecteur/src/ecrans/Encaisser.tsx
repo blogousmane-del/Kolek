@@ -287,6 +287,10 @@ function Selecteur({
             >
               {visibles.map((c) => (
                 <li key={c.carteId}>
+                  {/* L'anneau de focus se dessine dans la ligne (`-outline-offset-2`) :
+                      la liste coupe (`overflow-hidden`) pour ses coins arrondis. Le `!`
+                      est nécessaire, la règle `:focus-visible` de `base.css` étant hors
+                      de toute couche, donc plus forte qu'une classe d'utilité. */}
                   <button
                     type="button"
                     onClick={() =>
@@ -297,7 +301,7 @@ function Selecteur({
                         misesEncaissees: c.misesEncaissees,
                       })
                     }
-                    className="anim-pression flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+                    className="anim-pression flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left focus-visible:-outline-offset-2!"
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-body text-base font-semibold text-ink">
