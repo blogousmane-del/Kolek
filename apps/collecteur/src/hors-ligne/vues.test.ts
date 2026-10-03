@@ -760,8 +760,8 @@ describe('l’état d’envoi d’une mise qu’on vient d’écrire', () => {
 
   // En production, la file est réappliquée à l'instantané à chaque lecture
   // (`lireTournee`) : la mise d'une opération qui attend est déjà dans la
-  // tournée que l'écran reçoit. Les épreuves qui suivent la lui donnent. Sans
-  // elle, l'ordre des contrôles, seul objet de la fonction, ne serait pas tenu :
+  // tournée que l'écran reçoit. Les épreuves de file la lui donnent. Sans elle,
+  // l'ordre des contrôles, seul objet de la fonction, ne serait pas tenu :
   // `gardee` viendrait du repli final, et une tournée consultée avant la file
   // passerait comme elle.
   const TOURNEE_AVEC_LA_MISE = tournee({ mises: [mise('mise-1', 'k1', INSTANT)] });
@@ -774,8 +774,9 @@ describe('l’état d’envoi d’une mise qu’on vient d’écrire', () => {
   });
 
   it('est refusée quand le serveur l’a refusée, à consigner ou consignée', () => {
-    // Un DOUBLON dit la mise déjà enregistrée au serveur : la tournée relue peut
-    // la contenir, et le tampon ne doit pas s'y fier pour une écriture refusée.
+    // Le cas refusé est DOUBLON_INVERIFIABLE : une ligne de même identifiant
+    // qu'on ne peut prouver nôtre. La tournée relue peut la contenir, et le
+    // tampon ne doit pas s'y fier pour une écriture refusée.
     const aConsigner = [operationMise(1, { carteId: 'k1' }, { etat: 'refusee_a_consigner' })];
     expect(
       etatEnvoiMise(ECRITE, { operations: aConsigner, refus: [], tournee: TOURNEE_AVEC_LA_MISE }),
@@ -784,7 +785,7 @@ describe('l’état d’envoi d’une mise qu’on vient d’écrire', () => {
     const refus: RefusLocal[] = [
       {
         id: 'op-1',
-        motif: 'DOUBLON',
+        motif: 'DOUBLON_INVERIFIABLE',
         chargeUtile: chargeUtileDe(operationMise(1, { carteId: 'k1' })),
         creeLe: INSTANT,
       },
