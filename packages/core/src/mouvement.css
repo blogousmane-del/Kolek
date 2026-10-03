@@ -119,7 +119,8 @@
 @utility anim-pression {
   transition: transform var(--duree-toucher) var(--courbe-sortie);
 
-  &:active {
+  /* Jamais sur un bouton éteint : il ne répond pas, il ne doit pas le laisser croire. */
+  &:active:not(:disabled) {
     transform: scale(0.97);
   }
 }
