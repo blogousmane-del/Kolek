@@ -22,7 +22,7 @@ import { TourneeAbsente, identifiantsEnAttente } from '../hors-ligne/vues';
 import { chargerListeClients } from '../lectures';
 import { LIGNES_AFFICHEES_PAR_PAGE } from '../pagination';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
-import { nu } from '../recherche';
+import { correspondClient } from '../recherche';
 import { ChoixMise } from './ChoixMise';
 import { useEstCollaborateur } from './commission';
 import { FicheClient } from './FicheClient';
@@ -77,44 +77,6 @@ interface Ligne {
 
 const FILTRES = ['Tous', 'Avec carte', 'Clôturées', 'Sans carte'] as const;
 type Filtre = (typeof FILTRES)[number];
-
-/**
- * Les trois clefs d'un client, dans l'ordre où le collecteur s'en sert.
- *
- * Le nom seul ne suffisait pas, et c'est le nom qui est la plus mauvaise des
- * trois : il s'écrit de plusieurs façons, il se prononce autrement qu'il ne
- * s'écrit, et deux clients d'un même marché le partagent. Le numéro est exact.
- * Le marché est ce qui organise la tournée — et il est déjà affiché sous le
- * nom, ce qui en fait une clef que le collecteur essaie forcément un jour.
- *
- * Les deux sont déjà chargés par la requête : cette recherche n'ajoute aucun
- * aller-retour.
- */
-function correspond(client: Client, terme: string): boolean {
-  if (!terme) return true;
-  const cherche = nu(terme);
-
-  if (nu(client.nom).includes(cherche)) return true;
-  if (client.marche !== null && nu(client.marche).includes(cherche)) return true;
-
-  if (client.telephone !== null) {
-    if (nu(client.telephone).includes(cherche)) return true;
-    // Le numéro s'écrit « 07 08 09 10 11 » dans la fiche et se tape « 0708 »
-    // dans la recherche. Comparer les deux chaînes telles quelles ne rapproche
-    // jamais rien : on compare les chiffres aux chiffres.
-    const chiffresCherches = chiffres(terme);
-    if (chiffresCherches && chiffres(client.telephone).includes(chiffresCherches)) return true;
-  }
-
-  return false;
-}
-
-/* `nu` vit dans `../recherche` : trois écrans cherchent un client par nom. */
-
-/** Les chiffres seuls, séparateurs et indicatifs de mise en forme retirés. */
-function chiffres(texte: string): string {
-  return texte.replace(/\D/g, '');
-}
 
 /**
  * La maquette proposait « À jour / En retard / Non visités ». Ces trois
@@ -258,12 +220,12 @@ export function Clients({
         }))
         .filter((l) => {
           if (l.cartes.length === 0) return false;
-          return correspond(l.client, terme);
+          return correspondClient(l.client, terme);
         });
     }
 
     return lignes.filter((l) => {
-      if (!correspond(l.client, terme)) return false;
+      if (!correspondClient(l.client, terme)) return false;
       if (filtre === 'Avec carte') return l.cartes.length > 0;
       // `Sans carte` valait « aucune carte, jamais ». Il vaut désormais « aucune
       // carte active » : c'est le filtre du geste à faire, ouvrir une carte.
@@ -346,7 +308,7 @@ export function Clients({
   const correspondants = useMemo(() => {
     const terme = recherche.trim().toLowerCase();
     if (!lignes || !terme) return 0;
-    return lignes.filter((l) => correspond(l.client, terme)).length;
+    return lignes.filter((l) => correspondClient(l.client, terme)).length;
   }, [lignes, recherche]);
 
   const masques = Math.max(0, correspondants - visibles.length);

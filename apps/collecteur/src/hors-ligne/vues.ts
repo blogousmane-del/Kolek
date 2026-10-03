@@ -1,4 +1,11 @@
-import { argentTenu, formatMontant, mouvementsDepuis, soldeRestituable, versementsDe } from '@kolek/core';
+import {
+  MISES_PAR_CYCLE,
+  argentTenu,
+  formatMontant,
+  mouvementsDepuis,
+  soldeRestituable,
+  versementsDe,
+} from '@kolek/core';
 
 import type { TableauCollecteur } from '../lectures';
 import type { FicheClient, Profil, Rapprochement } from '../lectures-ecrans';
@@ -68,9 +75,8 @@ export function tableauDepuis(t: Tournee, maintenant: number): TableauCollecteur
   const minuit = new Date(maintenant);
   minuit.setHours(0, 0, 0, 0);
   const versements = versementsDe(registreDe(t));
-  const encaisseAujourdhui = versements
-    .filter((m) => Date.parse(m.survenuLe) >= minuit.getTime())
-    .reduce((somme, m) => somme + m.montant, 0);
+  const duJour = versements.filter((m) => Date.parse(m.survenuLe) >= minuit.getTime());
+  const encaisseAujourdhui = duJour.reduce((somme, m) => somme + m.montant, 0);
 
   const actives = t.cartes.filter((k) => k.statut === 'active');
   // La plus avancée : c'est celle dont le cycle se termine en premier.
@@ -82,6 +88,7 @@ export function tableauDepuis(t: Tournee, maintenant: number): TableauCollecteur
     clients: t.clients.length,
     cartesActives: actives.length,
     encaisseAujourdhui,
+    misesAujourdhui: duJour.length,
     encoursTotal: actives.reduce((somme, k) => somme + soldeRestituable(k.misesEncaissees, k.mise), 0),
     carteDuJour: plusAvancee
       ? {
@@ -152,6 +159,54 @@ export function listeDepuis(t: Tournee): ListeClients {
       ouverte_le: k.ouverteLe,
     })),
   };
+}
+
+/** Une carte que l'onglet « Encaisser » propose, avec ce qu'il faut pour la reconnaître. */
+export interface CarteAEncaisser {
+  carteId: string;
+  clientId: string;
+  clientNom: string;
+  marche: string | null;
+  telephone: string | null;
+  mise: number;
+  misesEncaissees: number;
+}
+
+/**
+ * Les cartes de l'onglet « Encaisser », la plus avancée d'abord.
+ *
+ * Jusqu'au 2026-10-02, l'onglet ouvert sans carte disait « Aucune carte
+ * choisie » et renvoyait vers Clients : une impasse sur le geste que le
+ * collecteur fait trente fois par jour. Il propose maintenant les cartes
+ * elles-mêmes, tirées de la tournée du téléphone : la liste marche hors ligne,
+ * sans lecture nouvelle.
+ *
+ * Une carte pleine n'y figure pas : elle n'a plus de case à payer, elle
+ * relève du retrait. À égalité d'avancement, l'ordre est celui des noms, à la
+ * française, puis des identifiants : il ne change pas d'un rendu à l'autre.
+ */
+export function cartesAEncaisser(t: Tournee): CarteAEncaisser[] {
+  const clients = new Map(t.clients.map((c) => [c.id, c]));
+  return t.cartes
+    .filter((k) => k.statut === 'active' && k.misesEncaissees < MISES_PAR_CYCLE)
+    .map((k) => {
+      const client = clients.get(k.clientId);
+      return {
+        carteId: k.id,
+        clientId: k.clientId,
+        clientNom: client?.nom ?? 'Client',
+        marche: client?.marche ?? null,
+        telephone: client?.telephone ?? null,
+        mise: k.mise,
+        misesEncaissees: k.misesEncaissees,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.misesEncaissees - a.misesEncaissees ||
+        a.clientNom.localeCompare(b.clientNom, 'fr') ||
+        parId({ id: a.carteId }, { id: b.carteId }),
+    );
 }
 
 /** Les versements montrés sur la fiche : la borne de la lecture réseau qu'elle remplace. */
@@ -395,6 +450,34 @@ export function phraseAttenteCarte(attente: AttenteCarte): string | null {
   if (attente.mises === 0) return null;
   const s = attente.mises > 1 ? 's' : '';
   return `${attente.mises} mise${s} de cette carte pas encore envoyée${s}.`;
+}
+
+export type EtatEnvoiMise = 'gardee' | 'envoyee' | 'refusee';
+
+/**
+ * Où en est une mise qu'on vient d'écrire : c'est ce que dit le tampon.
+ *
+ * Une mise en attente est **déjà** dans la tournée du téléphone (`appliquer`
+ * l'y ajoute) : la tournée seule ne distingue donc pas l'envoyée de la
+ * gardée. C'est la file qui tranche. L'opération y est : elle attend, ou elle
+ * a été refusée. Elle n'y est plus et la mise est dans la tournée : elle est
+ * partie, et l'instantané l'a reçue. Elle n'y est plus et la mise n'est pas
+ * dans la tournée : l'écran n'a pas encore relu le téléphone depuis
+ * l'écriture, et le doute penche vers GARDÉE, l'état qui ne promet rien.
+ */
+export function etatEnvoiMise(
+  mise: { miseId: string; operationId: string },
+  {
+    operations,
+    refus,
+    tournee,
+  }: { operations: readonly Operation[]; refus: readonly RefusLocal[]; tournee: Tournee | null },
+): EtatEnvoiMise {
+  const operation = operations.find((o) => o.id === mise.operationId);
+  if (operation) return operation.etat === 'en_attente' ? 'gardee' : 'refusee';
+  if (refus.some((r) => r.id === mise.operationId)) return 'refusee';
+  if (tournee?.mises.some((m) => m.id === mise.miseId)) return 'envoyee';
+  return 'gardee';
 }
 
 /** Un refus, tel que l'écran des alertes le montre (spec J2b §8.4). */

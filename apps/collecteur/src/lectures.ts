@@ -35,6 +35,8 @@ export interface TableauCollecteur {
   clients: number;
   cartesActives: number;
   encaisseAujourdhui: number;
+  /** Les mises qui font ce montant : le « 23 mises » de l'en-tête. */
+  misesAujourdhui: number;
   /** Ce que le collecteur doit encore à ses clients, toutes cartes actives. */
   encoursTotal: number;
   /**
