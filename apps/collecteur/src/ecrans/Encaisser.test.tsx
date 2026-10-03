@@ -28,11 +28,13 @@ import { LIGNES_AFFICHEES_PAR_PAGE } from '../pagination';
  * GARDÉE tant qu'elle attend sur le téléphone, ENCAISSÉ une fois partie, rien
  * du tout si le serveur l'a refusée.
  *
- * Et ce que la revue du 2026-10-03 a fait dire à l'écran : « Reçu » n'est
- * offert qu'une fois la mise partie (l'écran des reçus ne lit que le journal
- * du serveur, il ne connaît pas encore une mise gardée) ; la ligne d'état
- * prend le focus que le bouton emporte avec lui ; les blocs du geste sont
- * collants, pour rester au-dessus de la barre du bas sur un petit téléphone.
+ * Et ce que la revue du 2026-10-03 a fait dire à l'écran : « Reçu » ne
+ * s'allume qu'une fois la mise partie (l'écran des reçus ne lit que le journal
+ * du serveur, il ne connaît pas encore une mise gardée), mais il tient sa place
+ * dès la mise gardée, pour que « Client suivant » ne bouge pas sous le pouce au
+ * moment de l'envoi ; la ligne d'état prend le focus que le bouton emporte avec
+ * lui ; les blocs du geste sont collants, pour rester au-dessus de la barre du
+ * bas sur un petit téléphone.
  */
 
 const enregistrerMise = vi.fn();
@@ -477,33 +479,79 @@ describe('temps 3, encaissé', () => {
     expect(onRecus).toHaveBeenCalledWith('Hj');
   });
 
-  it('n’offre pas « Reçu » tant que la mise attend : l’écran des reçus ne la connaît pas encore', async () => {
+  it('garde la place de « Reçu » tant que la mise attend, éteint : l’écran des reçus ne la connaît pas encore', async () => {
     // `Recus` ne lit que le journal du serveur. Sur une mise gardée il dirait
     // « Cet écran demande le réseau. », ou montrerait une liste sans ce reçu.
+    // Le bouton est donc là, mais éteint, et dit pourquoi.
     enregistrerMise.mockResolvedValue(ECRITE);
-    rendre();
+    const onRecus = vi.fn();
+    rendre({ onRecus });
 
     fireEvent.click(bouton());
 
     // Le numéro, lui, existe déjà : c'est celui de la mise.
     expect((await lignesEtat())[2]).toBe('Reçu n° ABCDEF12');
     expect(tampon()).toBe('Gardée');
-    expect(screen.queryByRole('button', { name: 'Reçu' })).toBeNull();
+    const recu = screen.getByRole('button', { name: 'Reçu' }) as HTMLButtonElement;
+    expect(recu.disabled).toBe(true);
+    // Éteint, mais pas muet : la phrase qui dit pourquoi le décrit.
+    const phrase = document.getElementById(recu.getAttribute('aria-describedby') ?? '');
+    expect(phrase?.textContent).toBe('Gardée sur ce téléphone, elle partira avec le réseau.');
+    expect(phrase?.closest('[role="status"]'), 'la phrase est dans la ligne d’état').toBeTruthy();
+    // Et il ne mène nulle part.
+    fireEvent.click(recu);
+    expect(onRecus).not.toHaveBeenCalled();
   });
 
-  it('offre « Reçu » dès que la mise est partie, sur le même écran', async () => {
+  it('rallume « Reçu » dès que la mise est partie, à la même place', async () => {
+    enregistrerMise.mockResolvedValue(ECRITE);
+    const onRecus = vi.fn();
+    const { rerender } = rendre({ onRecus });
+
+    fireEvent.click(bouton());
+    await screen.findByRole('status');
+    const recuGarde = screen.getByRole('button', { name: 'Reçu' }) as HTMLButtonElement;
+    const rangee = recuGarde.parentElement as HTMLElement;
+    const rang = [...rangee.children].indexOf(recuGarde);
+    expect(recuGarde.disabled).toBe(true);
+
+    mettreEnvoyee();
+    rerender(ecran({ onRecus }));
+
+    // Le même bouton, rallumé, au même rang de la même rangée.
+    const recu = screen.getByRole('button', { name: 'Reçu' }) as HTMLButtonElement;
+    expect(recu).toBe(recuGarde);
+    expect(recu.disabled).toBe(false);
+    expect([...rangee.children].indexOf(recu)).toBe(rang);
+    expect((await lignesEtat())[2]).toBe('Reçu n° ABCDEF12');
+    fireEvent.click(recu);
+    expect(onRecus).toHaveBeenCalledWith('Hj');
+  });
+
+  it('ne déplace rien sous le pouce quand la mise passe de gardée à envoyée', async () => {
+    // L'envoi arrive un aller-retour après l'appui, c'est-à-dire quand le pouce
+    // vise « Client suivant ». Si « Reçu » n'apparaissait qu'alors, « Client
+    // suivant » se rétrécirait d'un tiers, et un appui dans la zone qui bouge
+    // ouvrirait les reçus, dont le retour mène à l'accueil et non à la liste.
     enregistrerMise.mockResolvedValue(ECRITE);
     const { rerender } = rendre();
 
     fireEvent.click(bouton());
-    await screen.findByRole('status');
-    expect(screen.queryByRole('button', { name: 'Reçu' })).toBeNull();
+    const suivant = await screen.findByRole('button', { name: 'Client suivant' });
+    const rangee = suivant.parentElement as HTMLElement;
+    const enfants = [...rangee.children];
+    const classeAvant = suivant.className;
 
     mettreEnvoyee();
     rerender(ecran());
 
-    expect(screen.getByRole('button', { name: 'Reçu' })).toBeTruthy();
-    expect((await lignesEtat())[2]).toBe('Reçu n° ABCDEF12');
+    expect(screen.getByRole('button', { name: 'Client suivant' })).toBe(suivant);
+    expect(suivant.className, 'les classes de « Client suivant » ne changent pas').toBe(classeAvant);
+    const apres = [...rangee.children];
+    expect(apres).toHaveLength(enfants.length);
+    apres.forEach((enfant, i) => expect(enfant, `l’enfant ${i} est le même nœud`).toBe(enfants[i]));
+    // Deux commandes dans la rangée dès la mise gardée : « Client suivant », puis « Reçu ».
+    expect(enfants.map((e) => e.textContent)).toEqual(['Client suivant', 'Reçu']);
   });
 
   it('donne le focus à la ligne d’état : le bouton qui l’avait vient de disparaître', async () => {
@@ -532,6 +580,11 @@ describe('temps 3, encaissé', () => {
     for (const classe of BLOC_COLLANT) {
       expect(bloc.classList.contains(classe), classe).toBe(true);
     }
+    // Son air est dedans (`pt-4`), dans la boîte opaque, et non dehors (`mt-4`) :
+    // collé, le bloc coupe le billet net, et la ligne d'état ne doit pas
+    // toucher la coupe.
+    expect(bloc.classList.contains('pt-4'), 'l’air est dans la boîte').toBe(true);
+    expect(bloc.classList.contains('mt-4'), 'et non en marge').toBe(false);
     // Le bloc porte la ligne d'état ET les commandes : elles restent ensemble.
     expect(within(bloc).getByRole('button', { name: 'Client suivant' })).toBeTruthy();
   });

@@ -115,9 +115,16 @@
  * Un chiffre écrit ici plutôt qu'une mesure au rendu : lire la hauteur en
  * JavaScript pour la reporter en marge ferait sauter la page à chaque
  * changement d'orientation.
+ *
+ * Écrite une seule fois, ici, et lue par `pb-nav` et par `bottom-nav` : deux
+ * copies du même chiffre ne tenaient ensemble que par un commentaire.
  */
+:root {
+  --reserve-nav: calc(env(safe-area-inset-bottom, 0px) + 5.25rem);
+}
+
 @utility pb-nav {
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5.25rem);
+  padding-bottom: var(--reserve-nav);
 }
 
 /* La même réserve que `pb-nav`, lue comme la distance où un bloc collant
@@ -130,12 +137,9 @@
  * (≈ 6 px d'air : 5.25rem de réserve contre ≈ 77,7 px de barre) et le reste de
  * l'écran défile derrière. Sur un écran assez haut son emplacement naturel est
  * déjà au-dessus du seuil : rien ne bouge.
- *
- * `pb-nav` et `bottom-nav` vont ensemble : changer l'un sans l'autre, c'est
- * chevaucher la barre ou laisser un trou entre elle et le bloc.
  */
 @utility bottom-nav {
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 5.25rem);
+  bottom: var(--reserve-nav);
 }
 
 /* La barre de défilement d'un carrousel.

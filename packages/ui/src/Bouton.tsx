@@ -31,6 +31,14 @@ interface Props {
    * qui commande à la voix ne retrouve pas le bouton qu'il voit.
    */
   nomAccessible?: string;
+  /**
+   * L'identifiant de la phrase qui décrit le bouton (`aria-describedby`).
+   *
+   * Un bouton éteint ne dit pas pourquoi, et un bouton `disabled` ne prend pas
+   * le focus : « Reçu » grisé se lit comme un bouton cassé. La phrase qui
+   * l'explique est déjà à l'écran ; ce lien la fait lire avec lui.
+   */
+  decritPar?: string;
   /** Le bouton du geste principal d'un écran : 56 px au lieu de 44. */
   grand?: boolean;
 }
@@ -56,6 +64,7 @@ export function Bouton({
   onClick,
   className = '',
   nomAccessible,
+  decritPar,
   grand = false,
 }: Props) {
   return (
@@ -65,6 +74,7 @@ export function Bouton({
       title={title}
       onClick={onClick}
       aria-label={nomAccessible}
+      aria-describedby={decritPar}
       // Deux tailles écrites en entier, et jamais l'une ajoutée par-dessus
       // l'autre : deux `min-h-*` dans une même classe, c'est l'ordre de la
       // feuille de style qui tranche, pas l'intention.

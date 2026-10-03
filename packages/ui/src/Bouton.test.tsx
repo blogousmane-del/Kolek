@@ -23,6 +23,29 @@ describe('Bouton', () => {
     expect(screen.getByRole('button', { name: 'Fiche' }).hasAttribute('aria-label')).toBe(false);
   });
 
+  it('se laisse décrire par la phrase qui dit pourquoi il est éteint', () => {
+    render(
+      <>
+        <p id="pourquoi">Gardée sur ce téléphone, elle partira avec le réseau.</p>
+        <Bouton disabled decritPar="pourquoi">
+          Reçu
+        </Bouton>
+      </>,
+    );
+    const bouton = screen.getByRole('button', { name: 'Reçu' }) as HTMLButtonElement;
+    // Le nom reste le libellé : la description s'ajoute, elle ne le remplace pas.
+    expect(bouton.disabled).toBe(true);
+    const description = document.getElementById(bouton.getAttribute('aria-describedby') ?? '');
+    expect(description?.textContent).toBe('Gardée sur ce téléphone, elle partira avec le réseau.');
+  });
+
+  it('ne pose pas de description quand on ne lui en donne pas', () => {
+    render(<Bouton>Fiche</Bouton>);
+    expect(screen.getByRole('button', { name: 'Fiche' }).hasAttribute('aria-describedby')).toBe(
+      false,
+    );
+  });
+
   it('grandit sans que deux hauteurs se disputent la classe', () => {
     render(<Bouton grand>Encaisser</Bouton>);
     const classes = screen.getByRole('button', { name: 'Encaisser' }).className;

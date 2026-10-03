@@ -12,7 +12,7 @@ import {
   usePagination,
   type CleNavCollecteur,
 } from '@kolek/ui';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import type { CarteChoisie } from '../Coquille';
 import { enregistrerMise } from '../ecritures';
@@ -388,6 +388,8 @@ function Confirmation({
   const [erreur, setErreur] = useState<string | null>(null);
   const [ecrite, setEcrite] = useState<MiseEcrite | null>(null);
   const etatRef = useRef<HTMLDivElement>(null);
+  // La phrase d'envoi : « Reçu », tant qu'il est éteint, la prend pour description.
+  const idPhrase = useId();
 
   // Au succès le bouton « Encaisser » disparaît, et le focus qu'il avait avec
   // lui : il tomberait sur <body>, et la ligne d'état, insérée déjà remplie,
@@ -515,21 +517,27 @@ function Confirmation({
       ) : (
         // Collant comme le bloc de caisse, pour la même raison : « Client suivant »
         // est le geste qui suit, il ne doit pas passer sous la barre. La ligne
-        // d'état reste avec ses commandes.
-        <div className="sticky bottom-nav z-10 mx-4 mt-4 flex flex-1 flex-col bg-canvas lg:static">
+        // d'état reste avec ses commandes. L'air du haut est dedans (`pt-4`) et
+        // non en marge : collé, le bloc coupe le billet net, et la ligne d'état
+        // ne doit pas toucher la coupe.
+        <div className="sticky bottom-nav z-10 mx-4 flex flex-1 flex-col bg-canvas pt-4 lg:static">
           {/* Le tampon est `aria-hidden` : cette ligne dit la même chose aux
               lecteurs d'écran. Une mise refusée n'a ni tampon ni reçu.
 
-              `tabIndex={-1}` et `outline-none` : elle prend le focus par
-              programme (voir l'effet plus haut), sans entrer dans l'ordre de
-              tabulation ni dessiner un cadre autour d'un texte. */}
+              `tabIndex={-1}` : elle prend le focus par programme (voir l'effet
+              plus haut), sans entrer dans l'ordre de tabulation. `outline-none`
+              n'éteint pas son anneau : la règle `:focus-visible` de `base.css`
+              est hors de toute couche, donc plus forte que lui. Mesuré dans
+              Chrome, l'anneau se dessine quand le bouton avait été activé au
+              clavier, et pas quand il l'avait été d'un clic ou d'un toucher :
+              c'est voulu. */}
           <div ref={etatRef} role="status" tabIndex={-1} className="space-y-1 outline-none">
             <p className="font-body text-base font-semibold text-ink">
               <span className="font-mono">{formatMontant(carte.mise)}</span> FCFA pour{' '}
               {carte.clientNom}, case <span className="font-mono">{ecrite.numeroCase}</span>.
             </p>
             {etat && (
-              <p className={`font-body text-sm font-medium ${TEINTE_ENVOI[etat]}`}>
+              <p id={idPhrase} className={`font-body text-sm font-medium ${TEINTE_ENVOI[etat]}`}>
                 {PHRASE_ENVOI[etat]}
               </p>
             )}
@@ -544,13 +552,21 @@ function Confirmation({
             <Bouton className="flex-1" onClick={onRetour}>
               Client suivant
             </Bouton>
-            {/* « Reçu » attend que la mise soit partie : l'écran des reçus ne lit
-                que le journal du serveur, qui ne connaît pas encore une mise
-                gardée. Le numéro, lui, est déjà dit plus haut. */}
-            {etat === 'envoyee' && (
+            {/* « Reçu » garde sa place de la mise gardée à la mise envoyée : éteint
+                tant qu'elle attend (l'écran des reçus ne lit que le journal du
+                serveur, qui ne la connaît pas encore), allumé une fois partie.
+                Il ne doit jamais apparaître sous le pouce : l'envoi arrive un
+                aller-retour après l'appui, quand le pouce vise « Client
+                suivant », et un bouton qui prendrait alors son tiers de la
+                rangée ouvrirait les reçus, dont le retour mène à l'accueil et
+                non à la liste. Sur un refus il disparaît (pas de reçu d'une mise
+                refusée) : la rangée s'agrandit, ce qui ne détourne aucun appui. */}
+            {remplie && (
               <Bouton
                 variante="contour"
                 icone="receipt-text"
+                disabled={etat !== 'envoyee'}
+                decritPar={etat === 'gardee' ? idPhrase : undefined}
                 onClick={() => onRecus(carte.clientNom)}
               >
                 Reçu

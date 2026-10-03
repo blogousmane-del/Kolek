@@ -82,6 +82,12 @@ export function Feuille({
         className="anim-voile absolute inset-0 bg-black/50 cursor-default"
       />
 
+      {/* `tabIndex={-1}` : le panneau prend le focus à l'ouverture sans entrer
+          dans l'ordre de tabulation. `outline-none` n'éteint pas son anneau : la
+          règle `:focus-visible` de `base.css` est hors de toute couche, donc
+          plus forte que lui. L'anneau se dessine quand la feuille s'ouvre au
+          clavier, et pas quand elle s'ouvre d'un clic ou d'un toucher : c'est
+          voulu. */}
       <div
         ref={panneau}
         role="dialog"
