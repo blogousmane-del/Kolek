@@ -358,6 +358,10 @@ export function Retrait({
     const deplie = ouverte === carte.carteId;
     const retraitBloque = retraitBloquePour(carte.carteId);
     const enConfirmation = aConfirmer?.carteId === carte.carteId;
+    /** Le lien du bouton éteint à sa raison. Dérivé de la carte et non de
+        `useId` : cette fonction rend une ligne par carte, un crochet n'y a pas sa
+        place. Une seule ligne est dépliée à la fois, donc l'`id` est unique. */
+    const idRaison = `raison-${carte.carteId}`;
 
     return (
       <li
@@ -366,9 +370,14 @@ export function Retrait({
         style={rangCascade(rang, premier)}
       >
         {/* Le trait d'un cycle terminé : la carte qu'on vient rendre se voit
-            avant qu'on lise son compteur. */}
+            avant qu'on lise son compteur. `pointer-events-none` : posé au-dessus
+            du bouton de la ligne, il avalerait le toucher qui visait ses quatre
+            premiers pixels. */}
         {carte.cycleComplet && (
-          <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-positive" />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-positive"
+          />
         )}
         <button
           type="button"
@@ -407,7 +416,7 @@ export function Retrait({
             <p className="font-body text-sm text-muted-foreground">{phraseCommission(carte)}</p>
 
             {!enConfirmation ? (
-              <>
+              <div className="flex flex-wrap gap-2">
                 {/* Deux portes, et elles se valent : rendre l'argent, ou le
                     laisser et repartir sur une carte de plus. Le collecteur est
                     devant le client quand celui-ci choisit — la seconde ne peut
@@ -416,24 +425,36 @@ export function Retrait({
                     La seconde n'apparaît que sur une carte terminée. Sur une
                     carte en cours, elle prélèverait une commission — la
                     première mise du nouveau cycle — que personne n'a demandée. */}
-                <div className="flex flex-wrap gap-2">
-                  <Bouton disabled={retraitBloque !== null} onClick={() => setAConfirmer(carte)}>
-                    Faire le retrait
-                  </Bouton>
-                  {carte.cycleComplet && (
-                    <ActiverCarte
-                      collecteurId={collecteurId}
-                      clientId={carte.clientId}
-                      misePreremplie={carte.mise}
-                      identifiant={`retrait-${carte.carteId}`}
-                      onOuverte={onEcriture}
-                    />
-                  )}
-                </div>
+                <Bouton
+                  disabled={retraitBloque !== null}
+                  decritPar={retraitBloque ? idRaison : undefined}
+                  onClick={() => setAConfirmer(carte)}
+                >
+                  Faire le retrait
+                </Bouton>
+                {/* La raison suit son bouton, avant la seconde porte : sur un
+                    téléphone étroit les deux portes passent à la ligne, et une
+                    raison lue sous « Activer une carte » serait prise pour la
+                    sienne. `decritPar` la relie au bouton éteint, qui ne prend
+                    pas le focus. */}
                 {retraitBloque && (
-                  <p className="m-0 font-body text-xs text-muted-foreground">{retraitBloque}</p>
+                  <p
+                    id={idRaison}
+                    className="m-0 basis-full font-body text-xs text-muted-foreground"
+                  >
+                    {retraitBloque}
+                  </p>
                 )}
-              </>
+                {carte.cycleComplet && (
+                  <ActiverCarte
+                    collecteurId={collecteurId}
+                    clientId={carte.clientId}
+                    misePreremplie={carte.mise}
+                    identifiant={`retrait-${carte.carteId}`}
+                    onOuverte={onEcriture}
+                  />
+                )}
+              </div>
             ) : (
               <div className="space-y-2">
                 {/* Les deux faits, et pas un seul : ce qu'on rend, et ce que la
@@ -443,7 +464,11 @@ export function Retrait({
                   pour {carte.clientNom} ? La carte se clôture, c’est définitif.
                 </p>
                 <div className="flex gap-2">
-                  <Bouton onClick={confirmer} disabled={envoi || retraitBloque !== null}>
+                  <Bouton
+                    onClick={confirmer}
+                    disabled={envoi || retraitBloque !== null}
+                    decritPar={retraitBloque ? idRaison : undefined}
+                  >
                     {envoi ? 'Retrait…' : 'Oui, faire le retrait'}
                   </Bouton>
                   <Bouton variante="contour" onClick={() => setAConfirmer(null)} disabled={envoi}>
@@ -451,7 +476,9 @@ export function Retrait({
                   </Bouton>
                 </div>
                 {retraitBloque && (
-                  <p className="m-0 font-body text-xs text-muted-foreground">{retraitBloque}</p>
+                  <p id={idRaison} className="m-0 font-body text-xs text-muted-foreground">
+                    {retraitBloque}
+                  </p>
                 )}
               </div>
             )}

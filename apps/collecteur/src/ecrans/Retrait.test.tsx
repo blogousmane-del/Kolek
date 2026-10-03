@@ -153,9 +153,11 @@ function rendre(supplement: Record<string, unknown> = {}) {
   );
 }
 
-/** Les lignes de la liste : une par carte, chacune un bouton qui se déplie. */
+/** Les lignes de la liste : une par carte, chacune un bouton qui se déplie.
+    Le bouton est l'enfant direct du `<li>` : un `aria-expanded` posé plus bas, dans
+    le dépli (la commande d'`ActiverCarte`, un jour), n'en ferait pas une ligne. */
 function lignes() {
-  return screen.queryAllByRole('button').filter((b) => b.hasAttribute('aria-expanded'));
+  return screen.queryAllByRole('button').filter((b) => b.matches('li > button[aria-expanded]'));
 }
 
 /** Déplie la ligne d'un client. `rang` choisit parmi ses cartes, dans l'ordre de l'écran. */
@@ -374,6 +376,39 @@ describe('le retrait attend la file et le réseau (§7)', () => {
       ).toBe(true);
       expect(screen.getByText('Opérations du téléphone pas encore vérifiées.')).toBeTruthy();
     }
+  });
+
+  it('relie la raison d’un retrait bloqué à son bouton, juste en dessous de lui', () => {
+    operationsEnFile = [operationMise(1, { carteId: 'k1' })];
+    rendre();
+    ouvrir('Hj');
+
+    // Un bouton éteint ne prend pas le focus : sans ce lien, le lecteur d'écran
+    // ne dit pas pourquoi il est éteint.
+    const bouton = screen.getByRole('button', { name: 'Faire le retrait' });
+    const raison = document.getElementById(bouton.getAttribute('aria-describedby') ?? '');
+    expect(raison?.textContent).toBe('1 mise de cette carte pas encore envoyée.');
+    // Sur un téléphone étroit « Activer une carte » passe à la ligne : la raison
+    // reste collée à son bouton, et ne se lit pas sous l'autre.
+    expect(bouton.nextElementSibling).toBe(raison);
+
+    // Les autres cartes n'attendent rien : leur bouton ne renvoie vers aucune raison.
+    ouvrir('Ka');
+    expect(
+      screen.getByRole('button', { name: 'Faire le retrait' }).hasAttribute('aria-describedby'),
+    ).toBe(false);
+  });
+
+  it('relie aussi la raison à la confirmation quand une mise de la carte entre en file', () => {
+    const { rerender } = rendre();
+    faireLeRetrait('Hj');
+
+    operationsEnFile = [operationMise(1, { carteId: 'k1' })];
+    rerender(<Retrait revision={0} collecteurId="col1" onRetour={vi.fn()} onEcriture={vi.fn()} />);
+
+    const valider = screen.getByRole('button', { name: 'Oui, faire le retrait' });
+    const raison = document.getElementById(valider.getAttribute('aria-describedby') ?? '');
+    expect(raison?.textContent).toBe('1 mise de cette carte pas encore envoyée.');
   });
 });
 
@@ -803,6 +838,12 @@ describe('la liste en lignes', () => {
     return lignes().filter((l) => l.getAttribute('aria-expanded') === 'true');
   }
 
+  function comptes() {
+    return ['Toutes', 'Cycle terminé', 'En cours'].map(
+      (nom) => screen.getByRole('button', { name: nom }).textContent,
+    );
+  }
+
   it('range les cycles terminés devant, sous deux titres comptés', () => {
     rendre();
 
@@ -844,10 +885,6 @@ describe('la liste en lignes', () => {
 
   it('compte chaque segment sur ce que la recherche a trouvé', () => {
     rendre();
-    const comptes = () =>
-      ['Toutes', 'Cycle terminé', 'En cours'].map(
-        (nom) => screen.getByRole('button', { name: nom }).textContent,
-      );
 
     expect(comptes()).toEqual(['Toutes3', 'Cycle terminé2', 'En cours1']);
 
@@ -870,10 +907,97 @@ describe('la liste en lignes', () => {
   it('replie la ligne quand la liste change', () => {
     rendre();
     ouvrir('Hj');
+    expect(depliees()).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'En cours' }));
     fireEvent.click(screen.getByRole('button', { name: 'Toutes' }));
 
+    // Les trois lignes sont revenues : une liste vide ne prouverait pas le repli.
+    expect(lignes()).toHaveLength(3);
     expect(depliees()).toHaveLength(0);
+  });
+
+  it('referme la confirmation en changeant de ligne : elle ne reparaît pas au retour', () => {
+    rendre();
+    faireLeRetrait('Hj');
+
+    ouvrir('Ka');
+    ouvrir('Hj');
+
+    // Un geste qui ne se défait pas ne se rouvre pas tout seul : revenir sur la
+    // ligne rend la première porte, jamais la confirmation d'avant.
+    expect(screen.getByRole('button', { name: 'Faire le retrait' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Oui, faire le retrait' })).toBeNull();
+  });
+
+  it('referme le dépli quand la recherche change', () => {
+    rendre();
+    ouvrir('Hj');
+    expect(depliees()).toHaveLength(1);
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Rechercher un client' }), {
+      target: { value: 'hj' },
+    });
+
+    // Les deux lignes de Hj sont toujours là : c'est bien le dépli qui s'est refermé.
+    expect(lignes()).toHaveLength(2);
+    expect(depliees()).toHaveLength(0);
+  });
+
+  it('range les cycles terminés devant avant de couper en pages', () => {
+    // Vingt-cinq cartes, les cinq terminées en dernier : sans le tri, la page 1
+    // n'en montrerait aucune, et le collecteur irait chercher à rendre en page 2.
+    donnees = Array.from({ length: 25 }, (_, i) => ({
+      carteId: `t${i}`,
+      clientId: `c${i}`,
+      clientNom: `Client ${String(i + 1).padStart(2, '0')}`,
+      mise: 1000,
+      misesEncaissees: i >= 20 ? 31 : 5,
+      restituable: i >= 20 ? 30000 : 4000,
+      cycleComplet: i >= 20,
+    }));
+    rendre();
+
+    expect(lignes()).toHaveLength(20);
+    expect(titres()).toEqual(['Cycle terminé 5', 'En cours 20']);
+    expect(lignes()[0]?.textContent).toMatch(/^Client 21/);
+  });
+
+  it('compte les segments après la recherche et avant le filtre', () => {
+    rendre();
+
+    fireEvent.click(screen.getByRole('button', { name: 'En cours' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Rechercher un client' }), {
+      target: { value: 'hj' },
+    });
+
+    // Chaque segment dit ce qu'il montrerait si on le choisissait : « En cours »
+    // choisi, « Cycle terminé » ne tombe pas à zéro pour autant.
+    expect(comptes()).toEqual(['Toutes2', 'Cycle terminé1', 'En cours1']);
+  });
+
+  it('nomme chaque titre de groupe par son libellé seul : le compte est muet', () => {
+    rendre();
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Cycle terminé' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'En cours' })).toBeTruthy();
+  });
+
+  it('accorde la phrase de la commission au singulier pour une seule mise', () => {
+    donnees = [{ ...CARTE_EN_COURS_HJ, misesEncaissees: 1, restituable: 0 }];
+    rendre();
+    ouvrir('Hj');
+
+    expect(
+      screen.getByText(/^1 mise encaissée, moins la première, qui est ta commission/),
+    ).toBeTruthy();
+  });
+
+  it('dit qu’il n’y a rien à rendre ni à garder quand aucune mise n’est encaissée', () => {
+    donnees = [{ ...CARTE_EN_COURS_HJ, misesEncaissees: 0, restituable: 0 }];
+    rendre();
+    ouvrir('Hj');
+
+    expect(screen.getByText('Aucune mise encaissée : rien à rendre, rien à garder.')).toBeTruthy();
   });
 });
