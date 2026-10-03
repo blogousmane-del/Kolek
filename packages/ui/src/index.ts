@@ -18,6 +18,7 @@ export { CarrouselCartes, type CarteItem } from './CarrouselCartes';
 export { CarteStat } from './CarteStat';
 export { CarteZone } from './CarteZone';
 export { CourbeEvolution, type PointCourbe } from './CourbeEvolution';
+export { Decompte, type LigneDecompte } from './Decompte';
 export { Champ } from './Champ';
 export { Pagination, TAILLE_PAGE, usePagination } from './Pagination';
 export {
@@ -41,5 +42,8 @@ export { LigneTransaction, type TypeMontant } from './LigneTransaction';
 export { Logo, Marque } from './Logo';
 export { NavBureau, type CleNavBureau } from './NavBureau';
 export { NavMobile, type CleNavCollecteur } from './NavMobile';
+export { Outils, type Outil } from './Outils';
 export { Repli } from './Repli';
+export { Segments, type Segment } from './Segments';
 export { Squelette, SqueletteKPI, SqueletteLigne } from './Squelette';
+export { Tampon, horodatageTampon, type MotTampon } from './Tampon';

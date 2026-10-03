@@ -18,10 +18,45 @@ interface Props {
   pleineLargeur?: boolean;
   disabled?: boolean;
   /** Infobulle. Sert surtout à dire pourquoi un bouton est désactivé — un
-      bouton éteint sans explication se lit comme un bouton cassé. */
+      bouton éteint sans explication se lit comme un bouton cassé. Elle ne se voit
+      qu'au survol, donc jamais au toucher : quand cette raison est déjà une
+      phrase à l'écran, c'est `decritPar` qui la relie au bouton. */
   title?: string;
   onClick?: () => void;
   className?: string;
+  /**
+   * Le nom que lit un lecteur d'écran, quand le libellé ne suffit pas.
+   *
+   * « Encaisser 2 000 » sous une carte dit le geste, pas la carte. Le nom
+   * accessible le dit : « Encaisser 2 000 FCFA sur la carte de Mariam ». Il
+   * doit **contenir** le libellé visible (WCAG 2.5.3), sans quoi un utilisateur
+   * qui commande à la voix ne retrouve pas le bouton qu'il voit.
+   */
+  nomAccessible?: string;
+  /**
+   * L'identifiant de la phrase qui décrit le bouton (`aria-describedby`).
+   *
+   * Un bouton éteint ne dit pas pourquoi, et un bouton `disabled` ne prend pas
+   * le focus : « Reçu » grisé se lit comme un bouton cassé. La phrase qui
+   * l'explique est déjà à l'écran ; ce lien la fait lire avec lui. Quand la
+   * raison n'est pas une phrase de la page, `title` est l'infobulle qui la porte.
+   */
+  decritPar?: string;
+  /**
+   * Le bouton ouvre et ferme un panneau : `true` quand ce panneau est déplié
+   * (`aria-expanded`). Sans cette propriété le bouton n'annonce rien, comme
+   * tout bouton ordinaire ; avec elle il dit toujours son état, « replié »
+   * compris.
+   */
+  deplie?: boolean;
+  /**
+   * L'identifiant du panneau que le bouton ouvre (`aria-controls`). À donner
+   * tant que ce panneau est dans la page : une référence vers un élément absent
+   * ne mène nulle part.
+   */
+  panneau?: string;
+  /** Le bouton du geste principal d'un écran : 56 px au lieu de 44. */
+  grand?: boolean;
 }
 
 /**
@@ -44,6 +79,11 @@ export function Bouton({
   title,
   onClick,
   className = '',
+  nomAccessible,
+  decritPar,
+  deplie,
+  panneau,
+  grand = false,
 }: Props) {
   return (
     <button
@@ -51,7 +91,14 @@ export function Bouton({
       disabled={disabled}
       title={title}
       onClick={onClick}
-      className={`anim-pression min-h-11 px-5 rounded-md font-body font-semibold text-base flex items-center justify-center gap-2 ${
+      aria-label={nomAccessible}
+      aria-describedby={decritPar}
+      aria-expanded={deplie}
+      aria-controls={panneau}
+      // Deux tailles écrites en entier, et jamais l'une ajoutée par-dessus
+      // l'autre : deux `min-h-*` dans une même classe, c'est l'ordre de la
+      // feuille de style qui tranche, pas l'intention.
+      className={`anim-pression ${grand ? 'min-h-14 text-lg' : 'min-h-11 text-base'} px-5 rounded-md font-body font-semibold flex items-center justify-center gap-2 ${
         VARIANTES[variante]
       } ${pleineLargeur ? 'w-full' : ''} ${
         disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'

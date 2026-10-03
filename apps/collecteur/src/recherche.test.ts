@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { nu } from './recherche';
+import { correspondClient, nu } from './recherche';
 
 /**
  * Le repli commun aux trois recherches par nom.
@@ -38,5 +38,47 @@ describe('le repli de recherche', () => {
 
   it('laisse une chaîne vide vide', () => {
     expect(nu('')).toBe('');
+  });
+});
+
+/**
+ * La règle de l'écran Clients, déplacée ici le 2026-10-02 : l'onglet
+ * « Encaisser » cherche une carte par les mêmes trois clefs. Deux règles
+ * voisines finiraient par diverger, et le collecteur ne retrouverait pas au
+ * même endroit le même client.
+ */
+describe('correspondClient', () => {
+  const AWA = { nom: 'Awa Traoré', marche: 'Adjamé', telephone: '+225 07 08 09 10 11' };
+
+  it('trouve par le nom, sans accent ni majuscule', () => {
+    expect(correspondClient(AWA, 'traore')).toBe(true);
+  });
+
+  it('trouve par le marché', () => {
+    expect(correspondClient(AWA, 'adjame')).toBe(true);
+  });
+
+  it('trouve par les chiffres du numéro, quelle que soit leur mise en forme', () => {
+    expect(correspondClient(AWA, '0708')).toBe(true);
+  });
+
+  it('laisse passer tout le monde sur un terme vide', () => {
+    expect(correspondClient(AWA, '')).toBe(true);
+  });
+
+  it('laisse passer tout le monde sur un terme fait d’espaces', () => {
+    expect(correspondClient({ nom: 'Ka', marche: null, telephone: null }, '   ')).toBe(true);
+  });
+
+  it('ne tient pas compte de l’espace laissée après le terme', () => {
+    expect(correspondClient({ nom: 'Awa', marche: null, telephone: null }, 'awa ')).toBe(true);
+  });
+
+  it('écarte ce qui ne correspond à rien', () => {
+    expect(correspondClient(AWA, 'bintou')).toBe(false);
+  });
+
+  it('tient un client sans marché ni numéro', () => {
+    expect(correspondClient({ nom: 'Ka', marche: null, telephone: null }, '07')).toBe(false);
   });
 });

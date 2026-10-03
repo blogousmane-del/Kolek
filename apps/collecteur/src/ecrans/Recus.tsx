@@ -12,6 +12,7 @@ import {
 } from '../lectures-ecrans';
 import { rangCascade, usePremierRendu } from '../premier-rendu';
 import { nu } from '../recherche';
+import { numeroDeRecu } from '../recu';
 import { CorpsEcran, EnTeteEcran, RienAMontrer } from './EnTeteEcran';
 import { useEstCollaborateur } from './commission';
 
@@ -503,8 +504,8 @@ function LigneJournal({
 
             {!estCloture && (
               <Detail terme="Numéro de reçu">
-                <span className="font-mono font-semibold">
-                  {evenement.id.slice(0, 8).toUpperCase()}
+                <span className="font-mono font-medium">
+                  {numeroDeRecu(evenement.id)}
                 </span>
               </Detail>
             )}

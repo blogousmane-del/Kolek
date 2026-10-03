@@ -7,12 +7,15 @@
    aucune feuille de style et la page sortirait sans mise en forme. */
 @source '../../../packages/ui/src';
 
-/* Les deux voix propres à la vitrine. Elles ne rentrent pas dans `tokens.ts` :
-   les applications n'ont ni emphase dramatique ni flux monospace, et les y
-   mettre inviterait à s'en servir. */
+/* La voix propre à la vitrine. Elle ne rentre pas dans `tokens.ts` : les
+   applications n'ont pas d'emphase dramatique, et l'y mettre inviterait à s'en
+   servir. La chasse fixe, elle, y est entrée le 2026-10-02 : les applications
+   comptent en IBM Plex Mono, et `--font-mono` vient désormais de `theme.css`.
+   Même famille en tête ; seul le repli s'allonge (la liste mono de Tailwind),
+   et la vitrine, qui charge Plex, ne le voit que le temps que Plex arrive
+   (`font-display: swap`), ou si la police échoue. */
 @theme {
   --font-drama: 'Bodoni Moda', 'Times New Roman', Georgia, serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
 /* Le fond du sur-défilement : la vitrine ouvre sombre (hero) et ferme sombre

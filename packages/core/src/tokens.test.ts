@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { couleurs, genererCssTheme, grille, mesures, rayons, taillesTexte } from './tokens';
+import {
+  couleurs,
+  degrades,
+  genererCssTheme,
+  grille,
+  mesures,
+  polices,
+  rayons,
+  taillesTexte,
+} from './tokens';
 
 describe('tokens du Design System', () => {
   it("porte la couleur d'action de la marque", () => {
@@ -224,9 +233,11 @@ describe("le marqueur d'état actif", () => {
   });
 
   it("n'est pas un or déguisé", () => {
-    // La barre latérale est une surface d'application, et le Design System §1
-    // y interdit l'or. Le marqueur est un vert : sa composante bleue le tient
-    // loin d'un jaune, où elle s'effondre.
+    // La barre latérale est une surface d'application, et son marqueur dit un
+    // état, la page ouverte : le Design System §1 n'admet l'or que pour la
+    // pièce du logo et la gravure sur fond sombre, jamais sur un état. Le
+    // marqueur est un vert : sa composante bleue le tient loin d'un jaune, où
+    // elle s'effondre.
     const bleu = Number.parseInt(couleurs.marqueurActif.slice(5, 7), 16);
     const bleuOr = Number.parseInt(couleurs.or.slice(5, 7), 16);
 
@@ -296,11 +307,85 @@ describe('les quatre aplats de tuile', () => {
   });
 
   it('n’est pas un or déguisé', () => {
-    // `or` est une couleur de marque, interdite sur les surfaces qui manipulent
-    // l'argent. L'encre de gestion est fonctionnelle et beaucoup plus sombre :
-    // elle ne peut pas être confondue avec la pièce du logo.
+    // `or` est une couleur de marque, que le Design System §1 n'admet que pour
+    // la pièce du logo et la gravure sur fond sombre, jamais sur un montant ni
+    // sur un état. L'encre de gestion est fonctionnelle et beaucoup plus
+    // sombre : elle ne peut pas être confondue avec la pièce du logo.
     expect(contraste(couleurs.tuileGestionEncre, couleurs.surface)).toBeGreaterThan(
       contraste(couleurs.or, couleurs.surface),
+    );
+  });
+});
+
+/**
+ * Les jetons du billet, posés le 2026-10-02.
+ *
+ * `trait` délimite ce qu'on touche, et c'est un seuil d'objet graphique qui
+ * s'applique : 3:1, WCAG 1.4.11. Il doit le tenir sur les deux fonds où vit
+ * un contrôle, et rester plus clair que le texte muet — il délimite, il ne se
+ * lit pas.
+ */
+describe('le billet, jetons du 2026-10-02', () => {
+  it('porte la police des chiffres de caisse', () => {
+    expect(polices.mono).toBe(
+      "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+    );
+    expect(genererCssTheme()).toContain(
+      "--font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;",
+    );
+  });
+
+  it('porte le cran du total du jour, au-dessus de 4xl', () => {
+    expect(taillesTexte.total).toBe('44px');
+    expect(Number.parseFloat(taillesTexte.total)).toBeGreaterThan(
+      Number.parseFloat(taillesTexte['4xl']),
+    );
+    expect(genererCssTheme()).toContain('--text-total: 44px;');
+  });
+
+  it('tient 3:1 pour la limite d’un contrôle, sur la surface', () => {
+    expect(contraste(couleurs.trait, couleurs.surface)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('tient 3:1 pour la limite d’un contrôle, sur le canevas', () => {
+    expect(contraste(couleurs.trait, couleurs.canvas)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('reste plus clair que le texte muet', () => {
+    expect(contraste(couleurs.trait, couleurs.surface)).toBeLessThan(
+      contraste(couleurs.mutedForeground, couleurs.surface),
+    );
+  });
+
+  it('arrive jusqu’à Tailwind sous le nom `border-trait`', () => {
+    expect(genererCssTheme()).toContain('--color-trait: #858B81;');
+  });
+});
+
+/**
+ * Le dégradé de la carte de collecte est parti le 2026-10-02 avec le billet :
+ * la carte est papier, filet et gravure. Il vivait dans `degrades`, sous la clé
+ * `degradeCarte`, d'où la variable `--degrade-carte`.
+ *
+ * Les deux épreuves d'absence ont un témoin, la troisième : sans lui, un
+ * `degrades` vidé ou un générateur cassé les laisserait vertes.
+ */
+describe('les dégradés, sans celui de la carte de collecte', () => {
+  it('ne garde plus la clé `degradeCarte`', () => {
+    expect(Object.keys(degrades)).not.toContain('degradeCarte');
+  });
+
+  it('n’émet plus `--degrade-carte` dans le thème', () => {
+    expect(genererCssTheme()).not.toContain('--degrade-carte');
+  });
+
+  it('garde ceux qui servent encore : le hero et les quatre zones', () => {
+    const css = genererCssTheme();
+    for (const nom of ['hero', 'zone-0', 'zone-1', 'zone-2', 'zone-3']) {
+      expect(css).toContain(`--degrade-${nom}:`);
+    }
+    expect(Object.keys(degrades)).toEqual(
+      expect.arrayContaining(['degradeHero', 'degradeZone0', 'degradeZone1', 'degradeZone2', 'degradeZone3']),
     );
   });
 });

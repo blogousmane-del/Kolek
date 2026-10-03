@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le billet · retrait</title>
+<style>
+:root{--text-primary:#171A17;--text-secondary:#5B6058;--bg-secondary:#FFFFFF;--border:#E3E5E0;--selected-border:#14402C}
+*{box-sizing:border-box}
+body{margin:0;padding:32px 24px 48px;background:#F7F8F6;color:var(--text-primary);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;line-height:1.5}
+h2{font-size:1.5rem;font-weight:600;margin:0 0 .5rem}
+h3{font-size:1.1rem;font-weight:600;margin:0 0 .25rem}
+.subtitle{color:var(--text-secondary);margin:0 0 1.5rem;max-width:72ch}
+.card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.note-maquette{font-size:.8rem;color:var(--text-secondary);margin:0 0 1.5rem}
+</style>
+</head>
+<body>
+<p class="note-maquette">Maquette validée le 2026-10-02 dans le compagnon visuel. Référence de conception, pas du code de production : les polices viennent ici de Google Fonts, l'application les sert elle-même.</p>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400..800&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400..700&display=swap" rel="stylesheet"><style>
+.kb{--coffre:#14402C;--nuit:#0E2E1F;--ink:#171A17;--muet:#666B64;--toile:#F4F5F2;--papier:#FFFFFF;--filet:#E3E5E0;--trait:#D5D8D1;--pointille:#C3C8C0;--or:#D2B24C;--marqueur:#8ED9B0;--positif:#1C7A4B;--negatif:#A8452F;--info:#3D6E8E}
+.kb .rangee{display:flex!important;flex-wrap:wrap;gap:28px;align-items:flex-start;margin-top:8px}
+.kb .card.choix{width:396px;padding:18px;cursor:pointer}
+.kb .card.choix:hover{transform:none}
+.kb .tel,.kb .tel *{box-sizing:border-box;margin:0;padding:0}
+.kb .tel{width:360px;height:760px;border-radius:34px;background:var(--toile);box-shadow:0 0 0 1px rgba(23,26,23,.16),0 26px 50px -26px rgba(14,46,31,.55);overflow:hidden;display:flex;flex-direction:column;font-family:'Instrument Sans',system-ui,sans-serif;color:var(--ink);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased;margin:0 auto;position:relative;text-align:left}
+.kb .statut{height:30px;flex-shrink:0;display:flex;justify-content:space-between;align-items:center;padding:0 24px;font-weight:600;font-size:12.5px;color:var(--ink);background:var(--toile)}
+.kb .statut.sombre{background:var(--nuit);color:#fff}
+.kb .statut.blanc{background:var(--papier)}
+.kb .statut-ic{display:flex;gap:5px;align-items:center}
+.kb .statut-ic svg{fill:currentColor}
+.kb .ecran{flex:1;overflow-y:auto;scrollbar-width:none;padding-bottom:20px}
+.kb .ecran::-webkit-scrollbar{display:none}
+.kb svg.ic{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;width:20px;height:20px;flex-shrink:0}
+.kb svg.gravure{display:block}
+.kb svg.gravure ellipse,.kb svg.gravure circle,.kb svg.gravure path{fill:none;stroke:currentColor;stroke-width:.5;vector-effect:non-scaling-stroke}
+.kb .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.kb .piece{width:26px;height:26px;display:block;flex-shrink:0}
+.kb .avatar{width:34px;height:34px;border-radius:999px;background:var(--coffre);color:#fff;font-weight:600;font-size:12.5px;display:flex;align-items:center;justify-content:center;letter-spacing:.03em;flex-shrink:0}
+.kb .nav{flex-shrink:0;height:66px;padding:0 4px;background:var(--papier);border-top:1px solid var(--filet);display:grid;grid-template-columns:repeat(5,1fr);align-items:stretch}
+.kb .onglet{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:var(--muet);position:relative}
+.kb .onglet svg.ic{width:22px;height:22px}
+.kb .onglet.actif{color:var(--coffre);font-weight:600}
+.kb .onglet.actif::before{content:'';position:absolute;top:0;left:50%;width:22px;margin-left:-11px;height:2px;border-radius:0 0 2px 2px;background:var(--coffre)}
+.kb .touche{align-self:center;justify-self:center;width:66px;height:50px;border-radius:10px;background:var(--coffre);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10.5px;font-weight:600;box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 6px 14px -8px rgba(14,46,31,.8)}
+.kb .touche svg.ic{width:20px;height:20px}
+.kb .h1{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:26px;line-height:1.1;letter-spacing:-.02em}
+.kb .h2{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:18px;line-height:1.2;letter-spacing:-.01em}
+.kb .date{font-size:13px;color:var(--muet)}
+.kb .section{padding:24px 16px 0}
+.kb .section-tete{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.kb .lien{font-size:13px;font-weight:600;color:var(--coffre);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;white-space:nowrap}
+.kb .aide{font-size:13px;color:var(--muet);margin-top:3px}
+/* Le coupon : le total du jour. */
+.kb .coupon{position:relative;margin:16px 16px 0;padding:18px 18px 38px;border-radius:12px;background:linear-gradient(160deg,var(--nuit) 0%,var(--coffre) 100%);color:#fff;overflow:hidden}
+.kb .coupon::after{content:'';position:absolute;inset:6px;border:1px solid rgba(210,178,76,.3);border-radius:8px;pointer-events:none}
+.kb .coupon .rosace{position:absolute;right:-78px;top:-64px;width:236px;color:rgba(210,178,76,.17)}
+.kb .coupon .onde{position:absolute;left:7px;right:7px;bottom:10px;height:24px;width:calc(100% - 14px);color:rgba(210,178,76,.34)}
+.kb .coupon-haut{position:relative;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:rgba(255,255,255,.74)}
+.kb .envoi{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.kb .envoi i{width:7px;height:7px;border-radius:999px;background:var(--marqueur)}
+.kb .montant{position:relative;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:46px;line-height:1;letter-spacing:-.03em;margin-top:12px;font-variant-numeric:tabular-nums}
+.kb .montant small{font-family:'Instrument Sans',sans-serif;font-size:15px;font-weight:500;letter-spacing:0;color:rgba(255,255,255,.74);margin-left:6px}
+.kb .coupon-detail{position:relative;margin-top:10px;font-size:12px;color:rgba(255,255,255,.64)}
+/* La carte de collecte, en billet. */
+.kb .billet{position:relative;margin-top:12px;background:var(--papier);border:1px solid var(--filet);border-radius:12px;padding:18px 16px 16px;overflow:hidden}
+.kb .billet .onde-fine{position:absolute;left:0;top:0;height:9px;width:100%;color:rgba(20,64,44,.3)}
+.kb .billet-tete{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.kb .nom{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:19px;letter-spacing:-.01em;line-height:1.15}
+.kb .mise{font-size:12.5px;color:var(--muet);margin-top:4px}
+.kb .mise .mono{color:var(--ink);font-weight:500}
+.kb .serie{font-size:11px;color:var(--muet);border:1px solid var(--filet);border-radius:999px;padding:3px 9px;white-space:nowrap}
+.kb .cases{display:grid;grid-template-columns:repeat(16,1fr);gap:3px;margin-top:16px}
+.kb .case{height:18px;border-radius:3px;border:1px solid var(--trait);background:var(--toile)}
+.kb .case.payee{background:var(--coffre);border-color:var(--coffre)}
+.kb .case.prochaine{background:var(--papier);border:2px solid var(--coffre)}
+.kb .billet-pied{display:flex;justify-content:space-between;align-items:flex-end;margin-top:16px}
+.kb .etiquette{font-size:12px;color:var(--muet)}
+.kb .solde{font-size:23px;font-weight:600;margin-top:3px;line-height:1}
+.kb .solde small{font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:500;color:var(--muet);letter-spacing:0;margin-left:5px}
+.kb .compte{font-size:15px;font-weight:600}
+.kb .compte span{color:var(--muet);font-weight:400}
+.kb .actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:16px}
+.kb .btn{height:46px;border-radius:6px;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 18px;border:1px solid transparent;white-space:nowrap}
+.kb .btn svg.ic{width:18px;height:18px}
+.kb .btn-plein{background:var(--coffre);color:#fff}
+.kb .btn-filet{background:var(--papier);color:var(--ink);border-color:var(--trait)}
+/* Le relevé : chiffres de référence, en points de conduite. */
+.kb .releve{margin-top:8px}
+.kb .ligne{display:flex;align-items:baseline;padding:7px 0}
+.kb .ligne dt{font-size:14px;color:var(--muet)}
+.kb .ligne .points{flex:1;border-bottom:1.5px dotted var(--pointille);margin:0 8px;transform:translateY(-4px)}
+.kb .ligne dd{font-size:15px;font-weight:500}
+.kb .ligne dd small{font-family:'Instrument Sans',sans-serif;font-size:12px;color:var(--muet);margin-left:4px}
+/* Le registre : ce qu'on ouvre depuis l'accueil. */
+.kb .groupe{font-size:12.5px;font-weight:600;color:var(--muet);margin:18px 0 8px}
+.kb .groupe:first-of-type{margin-top:10px}
+.kb .liste{list-style:none;background:var(--papier);border:1px solid var(--filet);border-radius:10px;overflow:hidden}
+.kb .liste li{display:flex;align-items:center;gap:12px;padding:11px 12px;position:relative}
+.kb .liste li+li::before{content:'';position:absolute;top:0;left:58px;right:0;height:1px;background:var(--filet)}
+.kb .tampon{width:34px;height:34px;flex-shrink:0;border-radius:6px;border:1px solid var(--filet);display:flex;align-items:center;justify-content:center;color:var(--coffre);background:var(--toile)}
+.kb .tampon svg.ic{width:18px;height:18px}
+.kb .liste .txt{flex:1;min-width:0}
+.kb .liste b{display:block;font-size:15px;font-weight:600}
+.kb .liste .txt span{display:block;font-size:12.5px;color:var(--muet);margin-top:1px}
+.kb .chev{width:16px!important;height:16px!important;color:#9DA39A}
+/* Variante B */
+.kb .b-tete{position:relative;background:linear-gradient(170deg,var(--nuit) 0%,var(--coffre) 100%);color:#fff;padding:12px 16px 62px;overflow:hidden}
+.kb .b-tete .rosace{position:absolute;right:-96px;top:-36px;width:290px;color:rgba(210,178,76,.15)}
+.kb .b-tete .onde{position:absolute;left:0;bottom:36px;height:24px;width:100%;color:rgba(210,178,76,.26)}
+.kb .b-rang{position:relative;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.kb .b-nom{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:22px;letter-spacing:-.02em}
+.kb .avatar.clair{background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px rgba(255,255,255,.24)}
+.kb .b-etiq{position:relative;margin-top:22px;font-size:13px;color:rgba(255,255,255,.74)}
+.kb .b-chiffres{position:relative;display:flex;margin-top:18px;padding-top:12px;border-top:1px solid rgba(255,255,255,.16)}
+.kb .b-chiffres div{padding-right:14px;margin-right:14px;border-right:1px solid rgba(255,255,255,.16)}
+.kb .b-chiffres div:last-child{border-right:0;margin-right:0;padding-right:0}
+.kb .b-chiffres b{display:block;font-size:16px;font-weight:500}
+.kb .b-chiffres span{display:block;font-size:11.5px;color:rgba(255,255,255,.64);margin-top:2px}
+.kb .b-carte{position:relative;z-index:2;margin:-46px 16px 0}
+.kb .b-carte .billet{margin-top:0;box-shadow:0 14px 30px -18px rgba(14,46,31,.45)}
+.kb .grille{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.kb .outil{display:flex;align-items:center;gap:10px;height:52px;padding:0 12px;background:var(--papier);border:1px solid var(--filet);border-radius:10px;font-size:14px;font-weight:600}
+.kb .outil svg.ic{width:18px;height:18px;color:var(--coffre)}
+/* Variante C */
+.kb .c-tete{display:flex;align-items:center;gap:10px;padding:10px 16px 0}
+.kb .c-tete .qui{flex:1;font-weight:600;font-size:15px}
+.kb .c-jour{position:relative;padding:20px 16px 22px}
+.kb .c-total{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:40px;letter-spacing:-.03em;line-height:1;margin-top:8px;font-variant-numeric:tabular-nums}
+.kb .c-total small{font-family:'Instrument Sans',sans-serif;font-size:15px;font-weight:500;letter-spacing:0;color:var(--muet);margin-left:6px}
+.kb .c-sous{font-size:12px;color:var(--muet);margin-top:9px;display:flex;gap:6px;align-items:center}
+.kb .c-sous i{width:7px;height:7px;border-radius:999px;background:var(--positif)}
+.kb .c-jour .onde{position:absolute;left:16px;bottom:0;height:14px;width:calc(100% - 32px);color:rgba(20,64,44,.32)}
+.kb .recherche{margin:16px 16px 0;height:50px;display:flex;align-items:center;gap:10px;padding:0 14px;background:var(--papier);border:1px solid var(--trait);border-radius:6px;color:var(--muet);font-size:16px}
+.kb .c-liste{list-style:none;margin-top:8px}
+.kb .c-liste li{display:grid;grid-template-columns:1fr auto;align-items:center;gap:5px 12px;padding:12px 0;border-bottom:1px solid var(--filet)}
+.kb .c-nom{font-size:15px;font-weight:600}
+.kb .c-info{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muet)}
+.kb .c-info .mono{color:var(--ink)}
+.kb .jauge{display:inline-flex;gap:1px}
+.kb .jauge i{width:2px;height:10px;background:var(--trait);border-radius:1px}
+.kb .jauge i.p{background:var(--coffre)}
+.kb .btn-mini{grid-row:1 / span 2;grid-column:2;height:38px;padding:0 14px;border-radius:6px;border:1px solid var(--coffre);color:var(--coffre);font-size:13.5px;font-weight:600;display:flex;align-items:center;background:var(--papier)}
+/* Bande d'en-tête des écrans secondaires sombres (encaisser) */
+.kb .bande{position:relative;background:linear-gradient(170deg,var(--nuit) 0%,var(--coffre) 100%);color:#fff;padding:10px 16px 26px;overflow:hidden}
+.kb .bande.recouvre{padding-bottom:70px}
+.kb .bande .onde{position:absolute;left:0;bottom:6px;height:18px;width:100%;color:rgba(210,178,76,.28)}
+.kb .bande.recouvre .onde{bottom:44px}
+.kb .bande-rang{position:relative;display:flex;align-items:center;gap:12px}
+.kb .rond{width:38px;height:38px;border-radius:999px;background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.kb .rond svg.ic{width:18px;height:18px}
+.kb .bande-titre{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:21px;letter-spacing:-.02em}
+.kb .bande-sous{position:relative;font-size:13px;color:rgba(255,255,255,.74);margin-top:12px}
+.kb .recouvre-carte{position:relative;z-index:2;margin:-58px 16px 0}
+.kb .recouvre-carte .billet{margin-top:0;box-shadow:0 14px 30px -18px rgba(14,46,31,.45)}
+.kb .case.neuve{background:var(--positif);border-color:var(--positif);box-shadow:0 0 0 2px rgba(28,122,75,.25)}
+/* Le sélecteur de carte */
+.kb .choix-liste{list-style:none;margin:8px 16px 0;background:var(--papier);border:1px solid var(--filet);border-radius:10px;overflow:hidden}
+.kb .choix-liste li{display:grid;grid-template-columns:1fr auto;align-items:center;gap:5px 10px;padding:12px 12px 12px 14px;position:relative}
+.kb .choix-liste li+li::before{content:'';position:absolute;top:0;left:14px;right:0;height:1px;background:var(--filet)}
+.kb .choix-liste .chev{grid-row:1 / span 2;grid-column:2}
+.kb .marche{color:var(--muet)}
+/* La caisse : montant, bouton sous le pouce */
+.kb .caisse{margin:14px 16px 0;padding:16px;background:var(--papier);border:1px solid var(--filet);border-radius:12px}
+.kb .caisse-haut{display:flex;justify-content:space-between;align-items:flex-end;gap:12px}
+.kb .caisse-montant{font-size:32px;font-weight:600;line-height:1;margin-top:6px}
+.kb .caisse-montant small{font-family:'Instrument Sans',sans-serif;font-size:14px;font-weight:500;color:var(--muet);margin-left:6px;letter-spacing:0}
+.kb .caisse-apres{font-size:12.5px;color:var(--muet);text-align:right;line-height:1.35}
+.kb .caisse-apres .mono{color:var(--ink);font-weight:500}
+.kb .btn-geant{height:56px;font-size:17px;margin-top:16px;width:100%;border-radius:6px}
+.kb .btn-geant svg.ic{width:20px;height:20px}
+.kb .note{font-size:12px;color:var(--muet);margin-top:10px;text-align:center}
+/* Le tampon « Encaissé » */
+.kb .tampon-encaisse{position:absolute;z-index:3;right:10px;top:14px;transform:rotate(-6deg);border:2px solid var(--positif);color:var(--positif);border-radius:6px;padding:6px 11px 5px;text-align:center;background:rgba(255,255,255,.9);box-shadow:inset 0 0 0 2px #fff,inset 0 0 0 3px var(--positif)}
+.kb .tampon-encaisse b{display:block;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:15px;letter-spacing:.1em;text-transform:uppercase;line-height:1.1}
+.kb .tampon-encaisse span{display:block;font-family:'IBM Plex Mono',monospace;font-size:10.5px;margin-top:2px}
+.kb .tampon-encaisse.garde{border-color:var(--info);color:var(--info);box-shadow:inset 0 0 0 2px #fff,inset 0 0 0 3px var(--info)}
+.kb .succes{display:flex;gap:10px;align-items:flex-start;margin:14px 16px 0;font-size:14px;line-height:1.4}
+.kb .succes .ok{width:22px;height:22px;border-radius:999px;background:var(--positif);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.kb .succes .ok svg.ic{width:14px;height:14px;stroke-width:2.5}
+.kb .succes span.sous{display:block;color:var(--muet);font-size:12.5px;margin-top:2px}
+.kb .duo{display:grid;grid-template-columns:1fr auto;gap:8px;margin:16px 16px 0}
+.kb .tampon-seul{position:static;display:inline-block;transform:rotate(-4deg);margin:6px 0 2px}
+/* En-tête clair des écrans secondaires */
+.kb .entete{display:flex;align-items:center;gap:12px;padding:8px 16px 4px}
+.kb .rond.clair{background:var(--papier);box-shadow:inset 0 0 0 1px var(--trait);color:var(--ink)}
+.kb .entete-titre{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:22px;letter-spacing:-.02em;line-height:1.1}
+.kb .entete-sous{font-size:12.5px;color:var(--muet);margin-top:2px}
+/* Segments de filtre */
+.kb .segments{display:grid;grid-template-columns:repeat(3,1fr);margin:12px 16px 0;padding:3px;background:#E8EAE5;border-radius:10px}
+.kb .segments span{height:36px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:13.5px;font-weight:600;color:var(--muet);border-radius:6px;white-space:nowrap}
+.kb .segments span.actif{background:var(--papier);color:var(--ink);box-shadow:0 1px 2px rgba(23,26,23,.14)}
+.kb .segments .mono{font-weight:500;font-size:12px}
+/* Liste de retrait, compacte */
+.kb .r-groupe{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;font-weight:600;color:var(--muet);margin:18px 16px 8px}
+.kb .r-liste{list-style:none;margin:0 16px;background:var(--papier);border:1px solid var(--filet);border-radius:10px;overflow:hidden}
+.kb .r-liste li{padding:12px 14px;position:relative}
+.kb .r-liste li+li{border-top:1px solid var(--filet)}
+.kb .r-liste li.fini::before{content:'';position:absolute;left:0;top:12px;height:20px;width:3px;border-radius:0 2px 2px 0;background:var(--positif)}
+.kb .r-ligne{display:grid;grid-template-columns:1fr auto;gap:3px 12px;align-items:baseline}
+.kb .r-nom{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kb .r-montant{font-size:16px;font-weight:600;text-align:right;white-space:nowrap}
+.kb .r-montant small{font-family:'Instrument Sans',sans-serif;font-size:11.5px;color:var(--muet);font-weight:500;margin-left:4px}
+.kb .r-info{font-size:12px;color:var(--muet)}
+.kb .r-info .mono{color:var(--ink)}
+.kb .r-etiq{font-size:11.5px;color:var(--muet);text-align:right}
+.kb .r-ouvert{background:#FBFCFA}
+.kb .r-detail{margin-top:10px;padding-top:10px;border-top:1px dashed var(--trait);font-size:12.5px;color:var(--muet);line-height:1.45}
+.kb .r-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px}
+.kb .btn-moyen{height:42px;font-size:14px;padding:0 14px}
+/* Feuille de confirmation */
+.kb .voile{position:absolute;inset:30px 0 0 0;background:rgba(6,20,14,.48);z-index:5}
+.kb .feuille{position:absolute;left:0;right:0;bottom:0;z-index:6;background:var(--papier);border-radius:12px 12px 0 0;padding:10px 16px 18px;box-shadow:0 -12px 30px -12px rgba(6,20,14,.45);font-family:'Instrument Sans',sans-serif;color:var(--ink)}
+.kb .poignee{width:40px;height:4px;border-radius:2px;background:var(--trait);margin:0 auto 16px}
+.kb .feuille-titre{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:21px;letter-spacing:-.02em;line-height:1.2}
+.kb .decompte{margin-top:14px}
+.kb .decompte .ligne{padding:6px 0}
+.kb .decompte .total{border-top:3px double var(--ink);margin-top:8px;padding-top:10px}
+.kb .decompte .total dt{color:var(--ink);font-weight:600;font-size:15px}
+.kb .decompte .total dd{font-size:21px;font-weight:600}
+.kb .avertir{font-size:13px;line-height:1.45;color:var(--ink);background:var(--toile);border-radius:6px;padding:10px 12px;margin-top:14px}
+.kb .pile-boutons{display:grid;gap:8px;margin-top:14px}
+.kb .remise{margin:16px 16px 0}
+.kb .remise-titre{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:21px;letter-spacing:-.02em;line-height:1.25}
+.kb .remise-titre .mono{font-family:'IBM Plex Mono',monospace;font-weight:600}
+.kb .remise p.sous{font-size:13px;color:var(--muet);margin-top:8px;line-height:1.45}
+/* Légendes et planche commune */
+.kb .legende{margin-top:18px;color:var(--text-primary)}
+.kb .legende .lettre{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-secondary);font-weight:600}
+.kb .legende .lettre.reco{color:#1C7A4B}
+.kb .legende h3{font-size:1.15rem;margin:.2rem 0 .5rem}
+.kb .legende p,.kb .legende li{font-size:.86rem;color:var(--text-secondary);line-height:1.5}
+.kb .legende ul{margin:.4rem 0 0 1.1rem}
+.kb .legende .prix{margin-top:.6rem}
+.kb .legende .prix b{color:var(--text-primary)}
+.kb .planche{margin-top:36px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.kb .planche>div{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:18px}
+.kb .planche h3{font-size:1rem;margin-bottom:.75rem}
+.kb .pastilles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.kb .pastille i{display:block;height:40px;border-radius:6px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.kb .pastille b{display:block;font-size:.74rem;margin-top:5px;color:var(--text-primary)}
+.kb .pastille span{display:block;font-size:.68rem;color:var(--text-secondary);font-family:'IBM Plex Mono',monospace}
+.kb .specimen p{color:var(--text-primary);line-height:1.25}
+.kb .specimen .role{font-size:.72rem;color:var(--text-secondary);margin:2px 0 12px;font-family:system-ui,sans-serif}
+.kb .planche ul{margin-left:1.1rem}
+.kb .planche li{font-size:.86rem;color:var(--text-secondary);line-height:1.6}
+</style><style>
+.kb .pile{min-height:100%;display:flex;flex-direction:column}
+.kb .pile .pousse{flex:1;min-height:16px}
+</style>
+<div class="kb">
+  <h2>Retrait : rendre le solde, sans se tromper</h2>
+  <p class="subtitle">Ta capture montrait des cartes de 240 px, la même phrase répétée sur chacune, et des cartes à 0 FCFA aussi grosses que celles à rendre. Ici : une ligne par carte, le détail quand on le demande, et un décompte avant le geste qui ne se défait pas.</p>
+
+  <div class="cards rangee">
+    <div class="card choix" data-choice="1-liste"><div class="tel"><div class="statut"><span>14:05</span><span class="statut-ic"><svg viewBox="0 0 18 12" width="17" height="11"><rect x="0" y="8" width="3" height="4" rx=".6"/><rect x="5" y="5.5" width="3" height="6.5" rx=".6"/><rect x="10" y="3" width="3" height="9" rx=".6"/><rect x="15" y="0" width="3" height="12" rx=".6"/></svg><svg viewBox="0 0 26 12" width="24" height="11"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="15" height="8" rx="1.6"/><rect x="23.5" y="4" width="2" height="4" rx="1" opacity=".45"/></svg></span></div><div class="ecran">
+  <header class="entete"><span class="rond clair"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></span><div><p class="entete-titre">Retrait</p><p class="entete-sous">Clôturer une carte et rendre le solde</p></div></header>
+  <label class="recherche" style="margin-top:12px"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Nom du client…</label>
+  <div class="segments"><span class="actif">Toutes <span class="mono">38</span></span><span>Terminées <span class="mono">3</span></span><span>En cours <span class="mono">35</span></span></div>
+  <p class="r-groupe"><span>Cycle terminé</span><span class="mono" style="font-weight:500">3</span></p>
+  <ul class="r-liste">
+  <li class="fini r-ouvert">
+    <div class="r-ligne">
+      <span class="r-nom">Rokia Sangaré</span>
+      <span class="r-montant mono">30 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">31/31</span> · <span class="mono">1 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    <div class="r-detail">31 mises encaissées, moins la première, qui est ta commission (<span class="mono">1 000</span> FCFA).</div>
+    <div class="r-actions"><span class="btn btn-plein btn-moyen">Faire le retrait</span><span class="btn btn-filet btn-moyen">Nouvelle carte</span></div>
+  </li>
+  <li class="fini">
+    <div class="r-ligne">
+      <span class="r-nom">Awa Bamba</span>
+      <span class="r-montant mono">60 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">31/31</span> · <span class="mono">2 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="fini">
+    <div class="r-ligne">
+      <span class="r-nom">Kadiatou Cissé</span>
+      <span class="r-montant mono">15 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">31/31</span> · <span class="mono">500</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li></ul>
+  <p class="r-groupe"><span>En cours</span><span class="mono" style="font-weight:500">35</span></p>
+  <ul class="r-liste">
+  <li class="">
+    <div class="r-ligne">
+      <span class="r-nom">Mariam Traoré</span>
+      <span class="r-montant mono">56 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">29/31</span> · <span class="mono">2 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="">
+    <div class="r-ligne">
+      <span class="r-nom">Aya Koffi</span>
+      <span class="r-montant mono">26 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">27/31</span> · <span class="mono">1 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="">
+    <div class="r-ligne">
+      <span class="r-nom">Adjoua N’Guessan</span>
+      <span class="r-montant mono">115 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">24/31</span> · <span class="mono">5 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="">
+    <div class="r-ligne">
+      <span class="r-nom">Fatou Diabaté</span>
+      <span class="r-montant mono">10 500<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">22/31</span> · <span class="mono">500</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="">
+    <div class="r-ligne">
+      <span class="r-nom">Salimata Ouattara</span>
+      <span class="r-montant mono">36 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">19/31</span> · <span class="mono">2 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="">
+    <div class="r-ligne">
+      <span class="r-nom">Bintou Coulibaly</span>
+      <span class="r-montant mono">16 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">17/31</span> · <span class="mono">1 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li></ul></div><nav class="nav"><span class="onglet actif"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Accueil</span></span><span class="onglet"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Clients</span></span><span class="touche"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg><span>Encaisser</span></span><span class="onglet"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg><span>Bilans</span></span><span class="onglet"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Profil</span></span></nav></div>
+      
+  <div class="legende">
+    <p class="lettre">Temps 1</p>
+    <h3>La liste</h3>
+    <p>Une ligne par carte : nom, avancement, mise, et le montant à rendre aligné à droite. Neuf cartes à l’écran au lieu de trois.</p>
+    <ul><li>Les cycles terminés passent devant, marqués d’un trait vert.</li><li>Les filtres deviennent trois segments qui disent leur compte.</li><li>Toucher une ligne la déplie : l’explication de la commission et les deux gestes.</li></ul>
+  </div>
+    </div>
+    <div class="card choix" data-choice="2-decompte"><div class="tel"><div class="statut"><span>14:05</span><span class="statut-ic"><svg viewBox="0 0 18 12" width="17" height="11"><rect x="0" y="8" width="3" height="4" rx=".6"/><rect x="5" y="5.5" width="3" height="6.5" rx=".6"/><rect x="10" y="3" width="3" height="9" rx=".6"/><rect x="15" y="0" width="3" height="12" rx=".6"/></svg><svg viewBox="0 0 26 12" width="24" height="11"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="15" height="8" rx="1.6"/><rect x="23.5" y="4" width="2" height="4" rx="1" opacity=".45"/></svg></span></div><div class="ecran">
+  <header class="entete"><span class="rond clair"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></span><div><p class="entete-titre">Retrait</p><p class="entete-sous">Clôturer une carte et rendre le solde</p></div></header>
+  <label class="recherche" style="margin-top:12px"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>Nom du client…</label>
+  <div class="segments"><span class="actif">Toutes <span class="mono">38</span></span><span>Terminées <span class="mono">3</span></span><span>En cours <span class="mono">35</span></span></div>
+  <p class="r-groupe"><span>Cycle terminé</span><span class="mono" style="font-weight:500">3</span></p>
+  <ul class="r-liste">
+  <li class="fini">
+    <div class="r-ligne">
+      <span class="r-nom">Rokia Sangaré</span>
+      <span class="r-montant mono">30 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">31/31</span> · <span class="mono">1 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="fini">
+    <div class="r-ligne">
+      <span class="r-nom">Awa Bamba</span>
+      <span class="r-montant mono">60 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">31/31</span> · <span class="mono">2 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="fini">
+    <div class="r-ligne">
+      <span class="r-nom">Kadiatou Cissé</span>
+      <span class="r-montant mono">15 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">31/31</span> · <span class="mono">500</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li></ul>
+  <p class="r-groupe"><span>En cours</span><span class="mono" style="font-weight:500">35</span></p>
+  <ul class="r-liste">
+  <li class="">
+    <div class="r-ligne">
+      <span class="r-nom">Mariam Traoré</span>
+      <span class="r-montant mono">56 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">29/31</span> · <span class="mono">2 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="">
+    <div class="r-ligne">
+      <span class="r-nom">Aya Koffi</span>
+      <span class="r-montant mono">26 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">27/31</span> · <span class="mono">1 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="">
+    <div class="r-ligne">
+      <span class="r-nom">Adjoua N’Guessan</span>
+      <span class="r-montant mono">115 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">24/31</span> · <span class="mono">5 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="">
+    <div class="r-ligne">
+      <span class="r-nom">Fatou Diabaté</span>
+      <span class="r-montant mono">10 500<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">22/31</span> · <span class="mono">500</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="">
+    <div class="r-ligne">
+      <span class="r-nom">Salimata Ouattara</span>
+      <span class="r-montant mono">36 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">19/31</span> · <span class="mono">2 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li>
+  <li class="">
+    <div class="r-ligne">
+      <span class="r-nom">Bintou Coulibaly</span>
+      <span class="r-montant mono">16 000<small>FCFA</small></span>
+      <span class="r-info"><span class="mono">17/31</span> · <span class="mono">1 000</span>/j</span>
+      <span class="r-etiq">à rendre</span>
+    </div>
+    
+  </li></ul></div><nav class="nav"><span class="onglet actif"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Accueil</span></span><span class="onglet"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Clients</span></span><span class="touche"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg><span>Encaisser</span></span><span class="onglet"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg><span>Bilans</span></span><span class="onglet"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Profil</span></span></nav><div class="voile"></div>
+  <div class="feuille">
+    <div class="poignee"></div>
+    <p class="feuille-titre">Rendre <span class="mono" style="font-weight:600">30 000</span> FCFA à Rokia Sangaré&#8239;?</p>
+    <dl class="releve decompte">
+      <div class="ligne"><dt><span class="mono">31</span> mises × <span class="mono">1 000</span></dt><span class="points"></span><dd class="mono">31 000</dd></div>
+      <div class="ligne"><dt>Ta commission, case 1</dt><span class="points"></span><dd class="mono">− 1 000</dd></div>
+      <div class="ligne total"><dt>À rendre</dt><span class="points" style="border:0"></span><dd class="mono">30 000<small>FCFA</small></dd></div>
+    </dl>
+    <p class="avertir">La carte se clôture. C’est définitif : le retrait ne pourra pas être défait.</p>
+    <div class="pile-boutons"><span class="btn btn-plein btn-geant" style="margin-top:0">Oui, rendre <span class="mono">30 000</span> FCFA</span><span class="btn btn-filet">Annuler</span></div>
+  </div></div>
+      
+  <div class="legende">
+    <p class="lettre">Temps 2</p>
+    <h3>Le décompte</h3>
+    <p>La confirmation devient un vrai décompte de caisse : les mises, la commission, le total sous un double trait. Le collecteur peut le lire au client avant de payer.</p>
+    <ul><li>Le bouton répète le montant : on sait ce qu’on confirme.</li><li>Hors ligne, rien ne change ici : le retrait demande toujours le réseau.</li></ul>
+  </div>
+    </div>
+    <div class="card choix" data-choice="3-cloturee"><div class="tel"><div class="statut"><span>14:05</span><span class="statut-ic"><svg viewBox="0 0 18 12" width="17" height="11"><rect x="0" y="8" width="3" height="4" rx=".6"/><rect x="5" y="5.5" width="3" height="6.5" rx=".6"/><rect x="10" y="3" width="3" height="9" rx=".6"/><rect x="15" y="0" width="3" height="12" rx=".6"/></svg><svg viewBox="0 0 26 12" width="24" height="11"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="15" height="8" rx="1.6"/><rect x="23.5" y="4" width="2" height="4" rx="1" opacity=".45"/></svg></span></div><div class="ecran"><div class="pile">
+  <header class="entete"><span class="rond clair"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></span><div><p class="entete-titre">Retrait</p><p class="entete-sous">Carte clôturée</p></div></header>
+  <div style="margin:12px 16px 0"><article class="billet"><svg class="gravure onde-fine" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0.0,50.0 L12.5,52.5 L25.0,54.9 L37.5,57.0 L50.0,58.9 L62.5,60.4 L75.0,61.4 L87.5,61.9 L100.0,61.9 L112.5,61.4 L125.0,60.5 L137.5,59.0 L150.0,57.2 L162.5,55.0 L175.0,52.7 L187.5,50.2 L200.0,47.7 L212.5,45.3 L225.0,43.1 L237.5,41.3 L250.0,39.7 L262.5,38.7 L275.0,38.1 L287.5,38.0 L300.0,38.5 L312.5,39.4 L325.0,40.9 L337.5,42.7 L350.0,44.8 L362.5,47.1 L375.0,49.6 L387.5,52.1 L400.0,54.5 L412.5,56.7 L425.0,58.6 L437.5,60.2 L450.0,61.3 L462.5,61.9 L475.0,62.0 L487.5,61.6 L500.0,60.6 L512.5,59.3 L525.0,57.5 L537.5,55.4 L550.0,53.1 L562.5,50.6 L575.0,48.1 L587.5,45.7 L600.0,43.5 L612.5,41.5 L625.0,40.0 L637.5,38.8 L650.0,38.2 L662.5,38.0 L675.0,38.4 L687.5,39.3 L700.0,40.6 L712.5,42.3 L725.0,44.4 L737.5,46.7 L750.0,49.2 L762.5,51.7 L775.0,54.1 L787.5,56.4 L800.0,58.3 L812.5,59.9 L825.0,61.1 L837.5,61.8 L850.0,62.0 L862.5,61.7 L875.0,60.8 L887.5,59.5 L900.0,57.8 L912.5,55.7 L925.0,53.4 L937.5,51.0 L950.0,48.5 L962.5,46.1 L975.0,43.8 L987.5,41.8 L1000.0,40.2"/><path d="M0.0,62.8 L12.5,64.6 L25.0,65.8 L37.5,66.3 L50.0,66.1 L62.5,65.2 L75.0,63.7 L87.5,61.6 L100.0,58.9 L112.5,55.9 L125.0,52.6 L137.5,49.2 L150.0,45.9 L162.5,42.7 L175.0,39.8 L187.5,37.4 L200.0,35.5 L212.5,34.3 L225.0,33.7 L237.5,33.8 L250.0,34.7 L262.5,36.2 L275.0,38.3 L287.5,40.9 L300.0,43.9 L312.5,47.1 L325.0,50.5 L337.5,53.9 L350.0,57.1 L362.5,60.0 L375.0,62.4 L387.5,64.4 L400.0,65.7 L412.5,66.3 L425.0,66.2 L437.5,65.4 L450.0,64.0 L462.5,61.9 L475.0,59.4 L487.5,56.4 L500.0,53.1 L512.5,49.8 L525.0,46.4 L537.5,43.2 L550.0,40.2 L562.5,37.7 L575.0,35.8 L587.5,34.4 L600.0,33.7 L612.5,33.8 L625.0,34.5 L637.5,35.9 L650.0,37.9 L662.5,40.4 L675.0,43.4 L687.5,46.6 L700.0,50.0 L712.5,53.3 L725.0,56.6 L737.5,59.5 L750.0,62.1 L762.5,64.1 L775.0,65.5 L787.5,66.2 L800.0,66.3 L812.5,65.6 L825.0,64.3 L837.5,62.3 L850.0,59.8 L862.5,56.9 L875.0,53.7 L887.5,50.3 L900.0,46.9 L912.5,43.7 L925.0,40.7 L937.5,38.1 L950.0,36.1 L962.5,34.6 L975.0,33.8 L987.5,33.7 L1000.0,34.3"/><path d="M0.0,69.3 L12.5,68.0 L25.0,65.9 L37.5,63.1 L50.0,59.7 L62.5,55.9 L75.0,51.9 L87.5,47.8 L100.0,43.8 L112.5,40.0 L125.0,36.7 L137.5,33.9 L150.0,31.9 L162.5,30.6 L175.0,30.2 L187.5,30.6 L200.0,31.9 L212.5,33.9 L225.0,36.7 L237.5,40.0 L250.0,43.7 L262.5,47.8 L275.0,51.9 L287.5,55.9 L300.0,59.7 L312.5,63.1 L325.0,65.9 L337.5,68.0 L350.0,69.3 L362.5,69.8 L375.0,69.5 L387.5,68.3 L400.0,66.3 L412.5,63.6 L425.0,60.3 L437.5,56.6 L450.0,52.6 L462.5,48.4 L475.0,44.4 L487.5,40.6 L500.0,37.2 L512.5,34.3 L525.0,32.2 L537.5,30.8 L550.0,30.2 L562.5,30.5 L575.0,31.6 L587.5,33.5 L600.0,36.2 L612.5,39.4 L625.0,43.1 L637.5,47.1 L650.0,51.2 L662.5,55.3 L675.0,59.1 L687.5,62.6 L700.0,65.5 L712.5,67.7 L725.0,69.2 L737.5,69.8 L750.0,69.6 L762.5,68.5 L775.0,66.6 L787.5,64.0 L800.0,60.9 L812.5,57.2 L825.0,53.2 L837.5,49.1 L850.0,45.0 L862.5,41.2 L875.0,37.7 L887.5,34.7 L900.0,32.5 L912.5,30.9 L925.0,30.2 L937.5,30.4 L950.0,31.4 L962.5,33.2 L975.0,35.7 L987.5,38.9 L1000.0,42.5"/><path d="M0.0,59.4 L12.5,55.2 L25.0,50.7 L37.5,46.2 L50.0,41.8 L62.5,37.8 L75.0,34.4 L87.5,31.6 L100.0,29.6 L112.5,28.5 L125.0,28.3 L137.5,29.1 L150.0,30.7 L162.5,33.2 L175.0,36.4 L187.5,40.2 L200.0,44.5 L212.5,48.9 L225.0,53.5 L237.5,57.8 L250.0,61.9 L262.5,65.4 L275.0,68.2 L287.5,70.3 L300.0,71.5 L312.5,71.7 L325.0,71.0 L337.5,69.5 L350.0,67.0 L362.5,63.8 L375.0,60.1 L387.5,55.9 L400.0,51.4 L412.5,46.9 L425.0,42.5 L437.5,38.5 L450.0,34.9 L462.5,32.0 L475.0,29.9 L487.5,28.6 L500.0,28.3 L512.5,28.9 L525.0,30.4 L537.5,32.8 L550.0,35.9 L562.5,39.6 L575.0,43.8 L587.5,48.2 L600.0,52.7 L612.5,57.1 L625.0,61.2 L637.5,64.8 L650.0,67.8 L662.5,70.0 L675.0,71.3 L687.5,71.7 L700.0,71.2 L712.5,69.8 L725.0,67.5 L737.5,64.4 L750.0,60.7 L762.5,56.6 L775.0,52.1 L787.5,47.6 L800.0,43.2 L812.5,39.1 L825.0,35.4 L837.5,32.4 L850.0,30.1 L862.5,28.7 L875.0,28.3 L887.5,28.7 L900.0,30.1 L912.5,32.3 L925.0,35.3 L937.5,39.0 L950.0,43.1 L962.5,47.5 L975.0,52.0 L987.5,56.5 L1000.0,60.6"/><path d="M0.0,40.6 L12.5,36.7 L25.0,33.4 L37.5,30.9 L50.0,29.2 L62.5,28.3 L75.0,28.4 L87.5,29.5 L100.0,31.4 L112.5,34.1 L125.0,37.6 L137.5,41.5 L150.0,45.8 L162.5,50.3 L175.0,54.8 L187.5,59.1 L200.0,63.0 L212.5,66.3 L225.0,68.9 L237.5,70.7 L250.0,71.6 L262.5,71.6 L275.0,70.6 L287.5,68.8 L300.0,66.1 L312.5,62.7 L325.0,58.8 L337.5,54.5 L350.0,50.0 L362.5,45.5 L375.0,41.2 L387.5,37.3 L400.0,33.9 L412.5,31.2 L425.0,29.4 L437.5,28.4 L450.0,28.3 L462.5,29.2 L475.0,31.0 L487.5,33.6 L500.0,37.0 L512.5,40.8 L525.0,45.1 L537.5,49.6 L550.0,54.1 L562.5,58.4 L575.0,62.4 L587.5,65.8 L600.0,68.6 L612.5,70.5 L625.0,71.6 L637.5,71.7 L650.0,70.9 L662.5,69.1 L675.0,66.6 L687.5,63.3 L700.0,59.5 L712.5,55.2 L725.0,50.7 L737.5,46.2 L750.0,41.9 L762.5,37.9 L775.0,34.4 L787.5,31.6 L800.0,29.6 L812.5,28.5 L825.0,28.3 L837.5,29.0 L850.0,30.7 L862.5,33.2 L875.0,36.4 L887.5,40.2 L900.0,44.4 L912.5,48.9 L925.0,53.4 L937.5,57.8 L950.0,61.8 L962.5,65.3 L975.0,68.2 L987.5,70.3 L1000.0,71.5"/><path d="M0.0,30.7 L12.5,30.2 L25.0,30.5 L37.5,31.8 L50.0,33.7 L62.5,36.4 L75.0,39.7 L87.5,43.4 L100.0,47.5 L112.5,51.6 L125.0,55.6 L137.5,59.4 L150.0,62.8 L162.5,65.7 L175.0,67.9 L187.5,69.2 L200.0,69.8 L212.5,69.5 L225.0,68.4 L237.5,66.4 L250.0,63.8 L262.5,60.6 L275.0,56.9 L287.5,52.9 L300.0,48.7 L312.5,44.7 L325.0,40.9 L337.5,37.4 L350.0,34.5 L362.5,32.3 L375.0,30.8 L387.5,30.2 L400.0,30.4 L412.5,31.5 L425.0,33.4 L437.5,36.0 L450.0,39.2 L462.5,42.8 L475.0,46.8 L487.5,50.9 L500.0,55.0 L512.5,58.9 L525.0,62.3 L537.5,65.3 L550.0,67.6 L562.5,69.1 L575.0,69.8 L587.5,69.6 L600.0,68.6 L612.5,66.8 L625.0,64.3 L637.5,61.1 L650.0,57.5 L662.5,53.5 L675.0,49.4 L687.5,45.3 L700.0,41.4 L712.5,37.9 L725.0,34.9 L737.5,32.6 L750.0,31.0 L762.5,30.2 L775.0,30.3 L787.5,31.3 L800.0,33.0 L812.5,35.5 L825.0,38.6 L837.5,42.2 L850.0,46.2 L862.5,50.3 L875.0,54.4 L887.5,58.3 L900.0,61.8 L912.5,64.8 L925.0,67.2 L937.5,68.9 L950.0,69.7 L962.5,69.7 L975.0,68.8 L987.5,67.1 L1000.0,64.7"/><path d="M0.0,37.2 L12.5,39.6 L25.0,42.4 L37.5,45.6 L50.0,49.0 L62.5,52.3 L75.0,55.6 L87.5,58.7 L100.0,61.4 L112.5,63.5 L125.0,65.1 L137.5,66.1 L150.0,66.3 L162.5,65.9 L175.0,64.7 L187.5,62.9 L200.0,60.6 L212.5,57.8 L225.0,54.7 L237.5,51.3 L250.0,47.9 L262.5,44.6 L275.0,41.5 L287.5,38.8 L300.0,36.6 L312.5,35.0 L325.0,34.0 L337.5,33.7 L350.0,34.1 L362.5,35.2 L375.0,36.9 L387.5,39.2 L400.0,42.0 L412.5,45.1 L425.0,48.4 L437.5,51.8 L450.0,55.1 L462.5,58.2 L475.0,61.0 L487.5,63.2 L500.0,64.9 L512.5,66.0 L525.0,66.3 L537.5,66.0 L550.0,65.0 L562.5,63.3 L575.0,61.0 L587.5,58.3 L600.0,55.2 L612.5,51.9 L625.0,48.5 L637.5,45.1 L650.0,42.0 L662.5,39.2 L675.0,36.9 L687.5,35.2 L700.0,34.1 L712.5,33.7 L725.0,34.0 L737.5,34.9 L750.0,36.6 L762.5,38.8 L775.0,41.5 L787.5,44.6 L800.0,47.9 L812.5,51.3 L825.0,54.6 L837.5,57.8 L850.0,60.6 L862.5,62.9 L875.0,64.7 L887.5,65.9 L900.0,66.3 L912.5,66.1 L925.0,65.2 L937.5,63.6 L950.0,61.4 L962.5,58.7 L975.0,55.7 L987.5,52.4 L1000.0,49.0"/></svg><div class="tampon-encaisse"><b>Clôturée</b><span>02.10 · 14:05</span></div>
+    <div class="billet-tete"><div><p class="nom">Rokia Sangaré</p><p class="mise"><span class="mono">1 000</span> FCFA par jour</p></div><span class="serie">Cycle 1</span></div>
+    <div class="cases"><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span><span class="case payee"></span></div>
+    <div class="billet-pied"><div><p class="etiquette">Rendu au client</p><p class="solde mono">30 000<small>FCFA</small></p></div><p class="compte mono">31<span>/31</span></p></div>
+    
+  </article></div>
+  <div class="remise">
+    <p class="remise-titre">Remets <span class="mono">30 000</span> FCFA à Rokia Sangaré, en main propre.</p>
+    <p class="sous">Le retrait est inscrit au journal. Il ne peut plus être défait.</p>
+  </div>
+  <div class="pousse"></div>
+  <div class="duo"><span class="btn btn-plein">Retour aux cartes</span><span class="btn btn-filet">Nouvelle carte</span></div></div></div><nav class="nav"><span class="onglet actif"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Accueil</span></span><span class="onglet"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Clients</span></span><span class="touche"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg><span>Encaisser</span></span><span class="onglet"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></svg><span>Bilans</span></span><span class="onglet"><svg class="ic " viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Profil</span></span></nav></div>
+      
+  <div class="legende">
+    <p class="lettre">Temps 3</p>
+    <h3>Clôturée</h3>
+    <p>Le même tampon que l’encaissement, « Clôturée », sur la carte pleine. La phrase dit ce qu’il reste à faire de la main : remettre l’argent.</p>
+    <ul><li>« Nouvelle carte » rouvre un cycle pour le même client, mise reprise : aujourd’hui ce bouton n’existe qu’avant le retrait.</li></ul>
+  </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

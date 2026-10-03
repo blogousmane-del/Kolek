@@ -45,6 +45,15 @@ export const couleurs = {
   mutedForeground: '#666B64',
   hairline: '#E6E3DA',
   border: '#E6E3DA',
+  // La limite de ce qu'on touche, posée le 2026-10-02 avec le billet.
+  //
+  // `hairline` sépare deux surfaces ; il ne délimite pas un contrôle. Un champ
+  // de recherche bordé de `hairline` ne tient que 1,28:1 contre le papier,
+  // quand WCAG 1.4.11 en demande 3 pour la limite d'un composant. `trait`
+  // tient 3,5:1 sur `surface` et 3,2:1 sur `canvas` : assez sombre pour
+  // délimiter, et pas davantage. Les maquettes le montraient plus clair
+  // (`#D5D8D1`, 1,4:1) ; c'est l'écart que la spec assume.
+  trait: '#858B81',
   canvas: '#F4F5F2',
   background: '#F4F5F2',
   surface: '#FFFFFF',
@@ -100,8 +109,9 @@ export const couleurs = {
   // qui a changé avec la forme — l'aplat est la tuile, le texte vit dedans.
   //
   // `tuileGestionEncre` n'est pas l'or, et le test le tient : `or` est une
-  // couleur de marque que le Design System §1 interdit sur les surfaces qui
-  // manipulent l'argent.
+  // couleur de marque que le Design System §1 n'admet, dans les applications,
+  // que pour la pièce du logo et la gravure sur fond sombre. Jamais sur un
+  // montant ni sur un état.
   tuileArgent: '#CBE5D4',
   tuileArgentEncre: '#14563A',
   tuileClient: '#F0DCE4',
@@ -240,8 +250,10 @@ export const couleurs = {
  *   à l'intérieur). Ce n'est pas une surface d'interface, c'est un objet
  *   représenté ; le ranger dans l'échelle le ferait cesser de ressembler à un
  *   téléphone.
- * - Les 31 cases de la carte de collecte miniature font 8 px de haut. À 4 px,
- *   `sm` les arrondirait en stade ; elles gardent 2 px.
+ * - Les 31 cases de la carte de collecte miniature de la vitrine
+ *   (`Fonctionnalites.tsx`) font 8 px de haut. À 4 px, `sm` les arrondirait en
+ *   stade ; elles gardent 2 px. Les cases de `CarteCollecte` n'en sont pas une :
+ *   elles prennent `rounded-xs`, le cran de Tailwind sous `sm`.
  *
  * `2xl` et `3xl` écrasent les valeurs par défaut de Tailwind (16 px et 24 px).
  * C'est voulu : les deux noms restent disponibles, avec les valeurs du produit.
@@ -305,6 +317,16 @@ export const taillesTexte = {
   '4xl': '36px',
 
   /**
+   * Le total du jour, sur l'en-tête de l'accueil, et lui seul.
+   *
+   * C'est l'affiche de l'écran, en Bricolage, au-dessus de `4xl`. Il ne
+   * s'applique qu'à partir de `xs` (390 px) : dessous, l'écran repasse en
+   * `text-4xl`, selon la règle que `ruptures.xs` documente pour les montants
+   * à sept chiffres.
+   */
+  total: '44px',
+
+  /**
    * Les tailles d'affiche — la vitrine, et elle seule.
    *
    * Elles sont **fluides**, et c'est une correction du 2026-08-23. L'échelle
@@ -330,7 +352,9 @@ export const taillesTexte = {
 } as const;
 
 /**
- * Les deux familles du produit, **changées le 2026-09-17**.
+ * Les familles du produit. Les deux familles de texte sont
+ * **changées le 2026-09-17** ; la chasse fixe des chiffres de caisse (`mono`)
+ * s'y ajoute le 2026-10-02.
  *
  * ## Ce qui part, et pourquoi
  *
@@ -364,7 +388,8 @@ export const taillesTexte = {
  * requêtes économisées, une graisse continue de 200 à 800 au lieu de quatre
  * crans figés, contre douze pour cent de téléchargement en plus au premier
  * chargement. Sur la 3G d'Abidjan, un sixième de seconde, une seule fois : le
- * service worker garde les fichiers ensuite.
+ * cache HTTP garde ensuite les fichiers, servis `immutable` ; le service
+ * worker, lui, ne précharge aucune police.
  *
  * Les jeux `opsz` et `wdth` de Bricolage — taille optique et largeur — ne sont
  * **pas** pris : le fichier tous axes pèse 131 ko à lui seul, soit plus que les
@@ -381,6 +406,22 @@ export const taillesTexte = {
 export const polices = {
   body: "'Instrument Sans Variable', system-ui, sans-serif",
   headings: "'Bricolage Grotesque Variable', 'Instrument Sans Variable', system-ui, sans-serif",
+  /**
+   * Les chiffres de caisse, entrés dans les applications le 2026-10-02.
+   *
+   * Tout montant qu'on compte s'écrit en chasse fixe : soldes, mises, relevés,
+   * décomptes, reçus, compteurs et heures. Jamais une phrase. Le total du jour
+   * reste en Bricolage : c'est l'affiche, pas une ligne de caisse.
+   *
+   * La vitrine déclarait déjà cette famille dans sa propre feuille ; elle la
+   * reçoit désormais d'ici. Le collecteur n'en charge que la graisse 500 :
+   * 14 888 octets en latin, que garde le cache HTTP (`immutable`). Le service
+   * worker ne précharge aucune police : si le navigateur a vidé ce cache, un
+   * lancement hors ligne retombe sur le repli. L'administration ne charge pas
+   * Plex : la liste de repli est celle de Tailwind, recopiée telle quelle,
+   * pour que ses écrans ne changent pas.
+   */
+  mono: "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
 } as const;
 
 /**
@@ -425,20 +466,16 @@ export const elevations = {
 /**
  * Dégradés. Ils ne rentrent dans aucun espace de noms Tailwind, donc aucune
  * classe n'en sort : ils sont exposés en variables libres et consommés par
- * `bg-[image:var(--degrade-carte)]`. Les garder ici plutôt qu'en dur dans
- * trois composants est ce qui empêche la carte de collecte et la carte de zone
- * de diverger silencieusement.
+ * `bg-[image:var(--degrade-zone-0)]` ou `bg-[image:var(--degrade-hero)]`.
  *
- * `degradeCarte` a été saturé le 2026-08-20 et ne partage donc plus ses teintes
- * avec les dégradés de zone. La divergence est voulue, et elle est écrite ici
- * pour qu'elle ne soit pas silencieuse : la carte de collecte se lit dehors, en
- * plein soleil, sur un téléphone d'entrée de gamme. Les cartes de zone se
- * lisent au bureau, sur un écran d'administration. Ce ne sont pas les mêmes
- * conditions, donc pas le même contraste. L'encre de la carte est passée de
- * `--color-sidebar` à `--color-ink` pour la même raison.
+ * `degradeCarte`, le vert-bleu-violet de la carte de collecte, est parti le
+ * 2026-10-02 avec le billet : la carte est désormais papier, filet et
+ * gravure, et ne porte plus aucun dégradé. Les dégradés de zone servent
+ * l'administration ; `degradeHero` sert la vitrine (le hero et l'`Inscription`),
+ * l'en-tête de l'accueil du collecteur, la bande de l'encaissement et les trois
+ * écrans de connexion (`EcranConnexion`, `MotDePasseOublie`, `NouveauMotDePasse`).
  */
 export const degrades = {
-  degradeCarte: 'linear-gradient(135deg, #8FC79E 0%, #6FA3C9 60%, #8A96C4 100%)',
   // Réalignés le 2026-09-04 sur la nouvelle échelle `chart*`. Ils en étaient
   // tirés à l'origine ; les laisser sur les anciennes valeurs aurait fait
   // diverger la carte de zone de la liste « Top zones » qui décrit les mêmes

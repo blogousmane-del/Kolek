@@ -29,6 +29,11 @@ import { ChoixMise } from './ChoixMise';
  * confirmation : ouvrir une carte engage une commission — la première mise du
  * nouveau cycle — et cela ne se déclenche pas d'un doigt qui glisse.
  *
+ * Le bouton qui l'ouvre reste à l'écran, déplié ou non (2026-10-03) : c'est un
+ * dépli, et il dit son état et son panneau. Quand le panneau prenait sa place,
+ * le bouton disparaissait avec le focus qu'il portait, et rien n'annonçait ce
+ * qui venait de s'ouvrir.
+ *
  * Un fichier à part pour deux appelants : la fiche du client et l'écran de
  * retrait. Écrit deux fois, il divergerait à la première correction.
  */
@@ -37,6 +42,7 @@ export function ActiverCarte({
   clientId,
   misePreremplie,
   identifiant,
+  explication = "Celle-ci s'ajoute. Ce qui est déjà ouvert ne bouge pas, et son solde reste dû au client.",
   onOuverte,
 }: {
   /**
@@ -52,8 +58,14 @@ export function ActiverCarte({
   clientId: string;
   /** Le montant de la carte qui vient d'être remplie. Proposé, pas imposé. */
   misePreremplie: number;
-  /** Préfixe des `id` du choix de mise : deux blocs peuvent coexister. */
+  /** Préfixe des `id` du bloc (choix de mise, panneau) : deux blocs peuvent coexister. */
   identifiant: string;
+  /**
+   * La phrase du bloc déplié. Par défaut, celle qui reste vraie à 12/31 comme
+   * à 31/31 : rien de ce qui est ouvert ne bouge. L'écran de retrait, une fois
+   * la carte rendue, passe la sienne : il n'y a plus de solde dû.
+   */
+  explication?: string;
   onOuverte: () => void;
 }) {
   const [deplie, setDeplie] = useState(false);
@@ -95,53 +107,66 @@ export function ActiverCarte({
     onOuverte();
   }
 
-  if (!deplie) {
-    return (
-      <Bouton variante="contour" icone="plus" onClick={() => setDeplie(true)}>
-        Activer une carte
-      </Bouton>
-    );
-  }
+  /** L'`id` du panneau, dérivé de `identifiant` : c'est lui qui distingue déjà
+      les blocs entre eux, et le champ du choix de mise en prend le préfixe. */
+  const idPanneau = `${identifiant}-panneau`;
 
   return (
-    <div className="border border-hairline rounded-md p-3 space-y-3">
-      {/* Aucune mention de « carte pleine » : ce bloc paraît aussi en milieu de
-          cycle depuis le 2026-09-01. La phrase doit rester vraie à 12/31 comme
-          à 31/31 — et dans les deux cas, ce qu'elle rassure est le même : rien
-          de ce qui est déjà ouvert ne bouge. */}
-      <p className="font-body text-sm text-ink m-0">
-        Celle-ci s'ajoute. Ce qui est déjà ouvert ne bouge pas, et son solde reste dû au client.
-      </p>
+    <div>
+      {/* Le bouton reste là une fois le panneau ouvert : c'est un dépli, et il en
+          dit l'état. Replié, il ne renvoie vers rien, son panneau n'étant pas
+          dans la page. Éteint pendant l'envoi, comme « Annuler » juste dessous :
+          le replier ici, c'est perdre l'alerte de refus. */}
+      <Bouton
+        variante="contour"
+        icone="plus"
+        deplie={deplie}
+        panneau={deplie ? idPanneau : undefined}
+        disabled={envoi}
+        onClick={() => setDeplie((d) => !d)}
+      >
+        Activer une carte
+      </Bouton>
 
-      <ChoixMise
-        mise={mise}
-        onChoisir={(montant) => {
-          setMise(montant);
-          // Changer de montant est une correction : laisser le refus précédent
-          // à l'écran le ferait passer pour un second refus, sur une saisie que
-          // le serveur n'a jamais vue.
-          setErreur(null);
-        }}
-        identifiant={identifiant}
-      />
+      {deplie && (
+        <div id={idPanneau} className="mt-2 border border-hairline rounded-md p-3 space-y-3">
+          {/* Aucune mention de « carte pleine » : ce bloc paraît aussi en milieu de
+              cycle depuis le 2026-09-01. La phrase doit rester vraie à 12/31 comme
+              à 31/31 — et dans les deux cas, ce qu'elle rassure est le même : rien
+              de ce qui est déjà ouvert ne bouge. */}
+          <p className="font-body text-sm text-ink m-0">{explication}</p>
 
-      {erreur && (
-        <p role="alert" className="font-body text-sm text-negative m-0">
-          {erreur}
-        </p>
+          <ChoixMise
+            mise={mise}
+            onChoisir={(montant) => {
+              setMise(montant);
+              // Changer de montant est une correction : laisser le refus précédent
+              // à l'écran le ferait passer pour un second refus, sur une saisie que
+              // le serveur n'a jamais vue.
+              setErreur(null);
+            }}
+            identifiant={identifiant}
+          />
+
+          {erreur && (
+            <p role="alert" className="font-body text-sm text-negative m-0">
+              {erreur}
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <Bouton onClick={ouvrir} disabled={envoi || collecteurId === null || mise === null}>
+              {envoi ? 'Ouverture…' : 'Ouvrir la carte'}
+            </Bouton>
+            <Bouton variante="contour" onClick={() => setDeplie(false)} disabled={envoi}>
+              {/* Tant que l'écriture est en vol, on ne quitte pas le bloc qui en
+                  montrera le résultat : replier ici, c'est perdre l'alerte de
+                  refus et laisser croire qu'aucun appel n'est parti. */}
+              Annuler
+            </Bouton>
+          </div>
+        </div>
       )}
-
-      <div className="flex gap-2">
-        <Bouton onClick={ouvrir} disabled={envoi || collecteurId === null || mise === null}>
-          {envoi ? 'Ouverture…' : 'Ouvrir la carte'}
-        </Bouton>
-        <Bouton variante="contour" onClick={() => setDeplie(false)} disabled={envoi}>
-          {/* Tant que l'écriture est en vol, on ne quitte pas le bloc qui en
-              montrera le résultat : replier ici, c'est perdre l'alerte de
-              refus et laisser croire qu'aucun appel n'est parti. */}
-          Annuler
-        </Bouton>
-      </div>
     </div>
   );
 }

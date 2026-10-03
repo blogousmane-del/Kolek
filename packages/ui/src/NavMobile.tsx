@@ -7,8 +7,16 @@ interface Onglet {
   icone: NomIcone;
   libelle: string;
   disponible: boolean;
-  /** L'encaissement est le geste du métier : il sort de la barre. */
-  saillant?: boolean;
+  /**
+   * L'encaissement est le geste du métier : il reste distinct, dans la barre.
+   *
+   * Jusqu'au 2026-10-02 il en sortait, rond de 56 px posé à cheval sur le
+   * bord (`-mt-5`). C'était la signature la plus reconnaissable des gabarits
+   * dont l'application est partie. Il devient une touche pleine, rectangle
+   * vert coffre, dans l'alignement des autres : une touche de caisse, pas un
+   * bouton flottant.
+   */
+  touche?: boolean;
 }
 
 const ONGLETS: Onglet[] = [
@@ -16,10 +24,11 @@ const ONGLETS: Onglet[] = [
   { cle: 'clients', icone: 'users', libelle: 'Clients', disponible: true },
   {
     cle: 'encaisser',
-    icone: 'circle-dollar-sign',
+    // Un billet, plus un « $ » : on compte en FCFA.
+    icone: 'banknote',
     libelle: 'Encaisser',
     disponible: true,
-    saillant: true,
+    touche: true,
   },
   // Les deux derniers ont été éteints tant qu'aucun écran ne vivait derrière.
   // Ils sont branchés depuis le 2026-08-20 : `bilans` mène au bilan, `profil` à
@@ -79,18 +88,19 @@ export function NavMobile({ actif, onNaviguer, className = '' }: Props) {
       {ONGLETS.map((onglet) => {
         const estActif = onglet.cle === actif;
 
-        if (onglet.saillant) {
+        if (onglet.touche) {
           return (
             <button
               key={onglet.cle}
               type="button"
               onClick={() => onNaviguer(onglet.cle)}
-              className="anim-pression flex flex-col items-center gap-1 -mt-5 px-2 cursor-pointer"
+              aria-current={estActif ? 'page' : undefined}
+              className={`anim-pression flex h-12 w-16 flex-col items-center justify-center gap-0.5 rounded-lg bg-primary text-primary-foreground shadow-action cursor-pointer ${
+                estActif ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface' : ''
+              }`}
             >
-              <div className="w-14 h-14 rounded-pill bg-primary flex items-center justify-center shadow-action">
-                <Icone nom={onglet.icone} taille={24} className="text-primary-foreground" />
-              </div>
-              <span className="text-xs font-body font-semibold text-primary">{onglet.libelle}</span>
+              <Icone nom={onglet.icone} taille={20} />
+              <span className="text-xs font-body font-semibold leading-none">{onglet.libelle}</span>
             </button>
           );
         }
@@ -107,13 +117,29 @@ export function NavMobile({ actif, onNaviguer, className = '' }: Props) {
             type="button"
             disabled={!onglet.disponible}
             onClick={() => onNaviguer(onglet.cle)}
+            aria-current={estActif ? 'page' : undefined}
             // `min-w-14 py-1.5` : icône 22 px plus libellé 11 px donnaient une
             // cible de 37 px de haut, sous le minimum tactile de 44 px. Sur un
             // téléphone tenu d'une main, dans un marché, on rate l'onglet.
-            className={`anim-pression flex flex-col items-center gap-1 px-2 py-1.5 min-w-14 ${
+            className={`anim-pression relative flex flex-col items-center gap-1 px-2 py-1.5 min-w-14 ${
               onglet.disponible ? 'cursor-pointer' : 'cursor-default'
             }`}
           >
+            {/* Le filet de l'onglet ouvert, collé sous le bord de la barre comme
+                sur la maquette (`Docs/maquettes/le-billet/source/commun.mjs`).
+                Hors du flux : il ne compte dans aucune hauteur, donc il n'est
+                rendu que sur l'onglet ouvert, et la barre garde la même hauteur
+                d'un écran à l'autre. `-top-3` remonte du haut de l'onglet
+                jusqu'au bord, et vaut le `pt-3` de la barre : les onglets sont
+                les plus hauts de la rangée, leur haut est le bas de ce
+                remplissage. Sur 2 px de haut, `rounded-b-pill` se borne à 2 px
+                en bas et laisse le haut franc, comme `0 0 2px 2px`. */}
+            {estActif && (
+              <span
+                aria-hidden="true"
+                className="absolute -top-3 left-1/2 h-0.5 w-5.5 -translate-x-1/2 rounded-b-pill bg-primary"
+              />
+            )}
             <Icone nom={onglet.icone} taille={22} className={teinte} />
             <span className={`text-xs font-body font-medium ${teinte}`}>{onglet.libelle}</span>
           </button>

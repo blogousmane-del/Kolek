@@ -28,3 +28,45 @@ export function nu(texte: string): string {
       .toLocaleLowerCase('fr')
   );
 }
+
+/** Les chiffres seuls, séparateurs et indicatifs de mise en forme retirés. */
+function chiffres(texte: string): string {
+  return texte.replace(/\D/g, '');
+}
+
+/**
+ * Les trois clefs d'un client, dans l'ordre où le collecteur s'en sert : le
+ * nom, le marché, le numéro.
+ *
+ * Le nom seul ne suffisait pas : il s'écrit de plusieurs façons, il se
+ * prononce autrement qu'il ne s'écrit, et deux clients d'un même marché le
+ * partagent. Le numéro, lui, est exact ; il s'écrit « 07 08 09 10 11 » dans la
+ * fiche et se tape « 0708 » dans la recherche, d'où la comparaison des
+ * chiffres aux chiffres. Le marché est ce qui organise la tournée.
+ *
+ * Le terme est rogné d'abord : le clavier d'un téléphone laisse une espace
+ * derrière le mot qu'il vient de proposer, et « awa » suivi de cette espace ne
+ * trouverait plus « Awa ». Des espaces seules valent une saisie vide.
+ *
+ * Écrite dans `Clients.tsx` ; déplacée ici le 2026-10-02 pour servir aussi à
+ * l'onglet « Encaisser ».
+ */
+export function correspondClient(
+  client: { nom: string; marche: string | null; telephone: string | null },
+  terme: string,
+): boolean {
+  const t = terme.trim();
+  if (!t) return true;
+  const cherche = nu(t);
+
+  if (nu(client.nom).includes(cherche)) return true;
+  if (client.marche !== null && nu(client.marche).includes(cherche)) return true;
+
+  if (client.telephone !== null) {
+    if (nu(client.telephone).includes(cherche)) return true;
+    const chiffresCherches = chiffres(t);
+    if (chiffresCherches && chiffres(client.telephone).includes(chiffresCherches)) return true;
+  }
+
+  return false;
+}

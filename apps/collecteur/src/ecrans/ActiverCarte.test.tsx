@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -144,6 +144,10 @@ describe('activer une carte de plus', () => {
 
     const annuler = screen.getByRole('button', { name: 'Annuler' });
     expect((annuler as HTMLButtonElement).disabled).toBe(true);
+    // Le bouton du dépli reste à l'écran depuis qu'il dit son état : le toucher
+    // pendant l'envoi replierait le bloc de la même façon.
+    const depli = screen.getByRole('button', { name: 'Activer une carte' });
+    expect((depli as HTMLButtonElement).disabled).toBe(true);
 
     resoudre!({ ok: true, carteId: 'c1' });
     await vi.waitFor(() => expect(onOuverte).toHaveBeenCalledTimes(1));
@@ -192,5 +196,75 @@ describe('activer une carte de plus', () => {
       false,
     );
     expect(onOuverte).not.toHaveBeenCalled();
+  });
+
+  it('dit ce qui reste vrai après un retrait, quand l’écran le lui donne', () => {
+    render(
+      <ActiverCarte
+        collecteurId={COLLECTEUR}
+        clientId={CLIENT}
+        misePreremplie={5000}
+        identifiant="essai"
+        explication="La carte précédente est close. La nouvelle repart de la case 1."
+        onOuverte={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+
+    expect(
+      screen.getByText('La carte précédente est close. La nouvelle repart de la case 1.'),
+    ).toBeTruthy();
+    // « son solde reste dû au client » : faux une fois l'argent rendu.
+    expect(screen.queryByText(/son solde reste dû/)).toBeNull();
+  });
+
+  it('garde sa phrase, vraie en milieu comme en fin de cycle, quand on ne lui en donne pas', () => {
+    render(
+      <ActiverCarte
+        collecteurId={COLLECTEUR}
+        clientId={CLIENT}
+        misePreremplie={5000}
+        identifiant="essai"
+        onOuverte={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+
+    expect(screen.getByText(/son solde reste dû au client/)).toBeTruthy();
+  });
+
+  it('se dit replié, puis déplié en désignant son panneau, puis replié de nouveau', () => {
+    render(
+      <ActiverCarte
+        collecteurId={COLLECTEUR}
+        clientId={CLIENT}
+        misePreremplie={5000}
+        identifiant="essai"
+        onOuverte={vi.fn()}
+      />,
+    );
+
+    // C'est un dépli : le bouton reste là, déplié ou non, et le dit. Replié, il
+    // ne renvoie vers rien : son panneau n'est pas dans la page.
+    const bouton = screen.getByRole('button', { name: 'Activer une carte' });
+    expect(bouton.getAttribute('aria-expanded')).toBe('false');
+    expect(bouton.hasAttribute('aria-controls')).toBe(false);
+
+    fireEvent.click(bouton);
+
+    expect(bouton.getAttribute('aria-expanded')).toBe('true');
+    const panneau = document.getElementById(bouton.getAttribute('aria-controls') ?? '');
+    expect(panneau).not.toBeNull();
+    expect(
+      within(panneau as HTMLElement).getByRole('button', { name: /Ouvrir la carte/ }),
+    ).toBeTruthy();
+
+    // Un second toucher le replie.
+    fireEvent.click(bouton);
+
+    expect(bouton.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('button', { name: /Ouvrir la carte/ })).toBeNull();
   });
 });

@@ -88,14 +88,14 @@ export function EnTeteEcran({
           type="button"
           onClick={onRetour}
           aria-label={libelleRetour}
-          className="anim-pression w-10 h-10 rounded-pill bg-surface border border-hairline flex items-center justify-center cursor-pointer shrink-0"
+          className="anim-pression w-10 h-10 rounded-pill bg-surface border border-trait flex items-center justify-center cursor-pointer shrink-0"
         >
           <Icone nom="arrow-left" className="text-ink" taille={18} />
         </button>
         <div className="min-w-0">
           <p className="font-headings font-bold text-xl text-ink tracking-tight truncate">{titre}</p>
           {sousTitre && (
-            <p className="text-xs font-body text-muted-foreground truncate mt-0.5">{sousTitre}</p>
+            <p className="text-sm font-body text-muted-foreground truncate mt-0.5">{sousTitre}</p>
           )}
         </div>
       </div>

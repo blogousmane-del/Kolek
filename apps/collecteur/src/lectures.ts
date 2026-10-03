@@ -34,11 +34,24 @@ export interface MiseRecente {
 export interface TableauCollecteur {
   clients: number;
   cartesActives: number;
+  /**
+   * Les cartes actives qui ont encore une case à payer : `cartesActives` moins
+   * les cartes pleines, qui relèvent du retrait. C'est le « en cours » du titre
+   * de la carte à finir, et du segment de l'écran Retrait.
+   */
+  cartesEnCours: number;
   encaisseAujourdhui: number;
+  /** Les mises qui font ce montant : le « 23 mises » de l'en-tête. */
+  misesAujourdhui: number;
   /** Ce que le collecteur doit encore à ses clients, toutes cartes actives. */
   encoursTotal: number;
   /**
-   * La carte active la plus avancée : celle qu'on finit avant les autres.
+   * La carte qu'on finit avant les autres : la première de `cartesAEncaisser`, la
+   * plus avancée des cartes en cours, dans l'ordre de l'écran Encaisser. Jamais
+   * une carte pleine (31 mises) : elle n'a plus de case à payer, et un « Encaisser »
+   * posé dessous mènerait à un bouton éteint. `null` quand aucune carte n'a de
+   * case à payer, que le collecteur n'ait aucune carte active ou que toutes soient
+   * pleines (`cartesActives` les distingue).
    *
    * `carteId` et `clientId` l'accompagnent depuis le 2026-08-25 : sans eux, les
    * commandes posées sous la carte de l'accueil ne pouvaient que renvoyer vers

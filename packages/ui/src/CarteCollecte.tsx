@@ -1,13 +1,25 @@
 import { MISES_PAR_CYCLE } from '@kolek/core';
 import type { ReactNode } from 'react';
 
+import { Onde } from './Guilloche';
+
 interface Props {
   nomClient: string;
   misePar: string;
+  /**
+   * Les mises encaissées. Les cases 1 à `jourCourant` sont payées, la
+   * suivante est la prochaine. Le nom est d'avant le billet ; la vitrine, la
+   * fiche et l'accueil le passent, il reste.
+   */
   jourCourant: number;
   totalJours?: number;
   solde: string;
-  cycle: string;
+  /**
+   * Le numéro de cycle, quand l'écran le connaît. Sans lui, pas de pastille :
+   * l'accueil et l'encaissement écrivaient « Cycle 1 » en dur, et c'était faux
+   * pour un client à sa deuxième carte.
+   */
+  cycle?: string;
   /**
    * Ce que la carte porte en pied quand elle est la carte choisie.
    *
@@ -15,35 +27,77 @@ interface Props {
    * écritures. Elle réserve une place, l'écran décide ce qui s'y met.
    */
   action?: ReactNode;
+  /**
+   * La case qu'on vient de payer, en vert de réussite le temps du geste.
+   *
+   * Toujours une case déjà payée : `neuve <= jourCourant`. Au-delà, `etatDe`
+   * lui donne le pas sur les autres états et elle cacherait le cercle de la
+   * prochaine case.
+   */
+  neuve?: number;
+  /**
+   * Ce qui se pose sur la carte, en haut à droite : le tampon d'un geste.
+   *
+   * Le bloc du nom lui réserve sa largeur tant qu'il est là (`pr-30`) : le
+   * tampon ne pousse rien, il se pose par-dessus.
+   */
+  tampon?: ReactNode;
+  /** Ce qui coiffe la carte au-dessus du nom : son rôle à l'écran. */
+  surtitre?: ReactNode;
+  /** « Solde restituable » ; « Rendu au client » une fois la carte close. */
+  etiquetteSolde?: string;
+  /**
+   * La carte est close : aucune case n'attend plus de mise. Un retrait
+   * anticipé clôt une carte à 4/31, et cercler sa cinquième case dirait
+   * qu'elle attend encore quelque chose.
+   */
+  close?: boolean;
 }
 
+type EtatCase = 'payee' | 'neuve' | 'prochaine' | 'a-venir';
+
+function etatDe(numero: number, jourCourant: number, neuve: number | undefined, close: boolean): EtatCase {
+  if (numero === neuve) return 'neuve';
+  if (numero <= jourCourant) return 'payee';
+  if (numero === jourCourant + 1 && !close) return 'prochaine';
+  return 'a-venir';
+}
+
+/** Chaque état porte sa bordure entière : deux largeurs dans une même classe
+    laisseraient l'ordre de la feuille de style trancher. */
+const CASES: Record<EtatCase, string> = {
+  payee: 'border border-primary bg-primary',
+  neuve: 'border border-positive bg-positive ring-2 ring-positive/25',
+  prochaine: 'border-2 border-primary bg-surface',
+  'a-venir': 'border border-trait/40 bg-canvas',
+};
+
 /**
- * La carte de collecte est l'objet central du métier : le carnet papier que
- * Kolek remplace. Le nombre de cases n'est donc pas une valeur de maquette mais
- * la règle du produit, tenue par le moteur de calcul — d'où l'import plutôt
- * qu'un 31 écrit ici.
+ * La carte de collecte : le carnet papier que Kolek remplace, dessiné en billet.
  *
- * ## Pourquoi elle se mesure elle-même, le 2026-08-31
+ * ## Ce qui a changé le 2026-10-02
  *
- * Depuis que le carrousel sait réduire ses cartes pour en montrer deux ou
- * quatre ensemble, la même carte est rendue tantôt à 160 px, tantôt à toute la
- * largeur de l'écran. Les valeurs d'origine — 31 cases sur 16 colonnes, un
- * solde en `text-2xl` — sont justes à pleine largeur et illisibles à 160.
+ * Elle portait le dégradé vert-bleu-violet du gabarit d'origine, deux cercles
+ * décoratifs et des pastilles de verre dépoli. Rien de tout cela ne disait
+ * l'argent ; tout cela disait « maquette ». Elle devient un billet : du papier,
+ * un filet, une bande guillochée sur le bord haut — la gravure de la vitrine,
+ * en vert coffre — et des chiffres de caisse.
  *
- * La taille aurait pu arriver par propriété. Elle arrive par **requête de
- * conteneur** : une propriété obligerait chaque appelant à savoir de quelle
- * taille il a besoin, alors que la seule chose qui compte est la largeur que la
- * carte reçoit réellement. Ici elle la lit.
+ * Le nombre de cases n'est pas une valeur de maquette mais la règle du
+ * produit, tenue par le moteur de calcul : d'où l'import de `MISES_PAR_CYCLE`.
  *
- * ### Le sens de la règle n'est pas indifférent
+ * ## Pourquoi elle se mesure elle-même
  *
- * Les valeurs de base sont celles de la pleine largeur, et c'est le format
- * réduit qui s'écrit en `@max-[240px]:`. L'inverse était plus court à écrire et
- * aurait été un piège : les requêtes de conteneur demandent Chrome 105, et le
- * collecteur travaille sur des téléphones d'entrée de gamme dont le WebView est
- * parfois plus vieux. Une règle ignorée doit laisser l'écran tel qu'il était —
- * ici l'accueil, l'encaissement et le carrousel agrandi gardent exactement leur
- * rendu d'avant, et seul le mode réduit, qui est neuf, s'y affiche serré.
+ * Le carrousel de la fiche la rend tantôt à 160 px, tantôt à toute la largeur.
+ * La taille arrive par **requête de conteneur** : la seule chose qui compte est
+ * la largeur que la carte reçoit. Les valeurs de base sont celles de la pleine
+ * largeur, et c'est le format réduit qui s'écrit en `@max-[240px]:` : une
+ * règle ignorée par un vieux WebView doit laisser la carte telle qu'en grand.
+ *
+ * ## Ce que la vitrine en montre
+ *
+ * `Telephone.tsx` la rend telle quelle dans le téléphone du hero. Le jour où
+ * elle change, la vitrine change avec elle : c'est voulu.
  */
 export function CarteCollecte({
   nomClient,
@@ -53,111 +107,93 @@ export function CarteCollecte({
   solde,
   cycle,
   action,
+  neuve,
+  tampon,
+  surtitre,
+  etiquetteSolde = 'Solde restituable',
+  close = false,
 }: Props) {
   const cases = Array.from({ length: totalJours }, (_, i) => i + 1);
-  const pourcentage = Math.round((jourCourant / totalJours) * 100);
 
   return (
     <div
-      /*
-        Pas de `backdrop-filter` ici. Il y en avait un jusqu'au 2026-09-17, et
-        il ne floutait rien : la carte porte son propre fond `degradeCarte`,
-        qui est opaque, donc le filtre traitait une zone que la carte recouvre
-        entièrement. Ce qu'il coûtait, en revanche, était réel — une couche de
-        composition par carte, et il y a une carte par client dans une liste
-        qui défile. Mesuré sur six cartes : six filtres sans aucun effet.
-      */
-      className="@container rounded-xl overflow-hidden relative shadow-lg min-h-50 @max-[240px]:min-h-40 bg-[image:var(--degrade-carte)] border border-white/30"
+      data-carte-collecte=""
+      className="@container relative overflow-hidden rounded-xl border border-hairline bg-surface"
     >
-      {/* Cercles et reflets décoratifs */}
-      <div className="pointer-events-none absolute top-0 right-0 w-48 h-48 rounded-pill opacity-25 translate-x-[20%] -translate-y-[30%] bg-[radial-gradient(circle,#ffffff_0%,transparent_70%)]" />
-      <div className="pointer-events-none absolute bottom-0 left-0 w-36 h-36 rounded-pill opacity-20 -translate-x-[20%] translate-y-[30%] bg-[radial-gradient(circle,var(--color-primary)_0%,transparent_70%)]" />
+      <Onde
+        lignes={7}
+        traitFixe
+        className="pointer-events-none absolute inset-x-0 top-0 h-2.5 w-full text-primary/30"
+      />
+      {tampon && <div className="absolute right-3 top-3.5 z-10">{tampon}</div>}
 
-      <div className="relative p-5 @max-[240px]:p-3">
+      <div className="relative px-4 pb-4 pt-5 @max-[240px]:px-3 @max-[240px]:pb-3 @max-[240px]:pt-4">
+        {surtitre && <div className="mb-2.5">{surtitre}</div>}
+
         {/* En-tête. Côte à côte tant qu'il y a la place ; l'un sous l'autre
             quand la carte est réduite, où deux colonnes ne laisseraient au nom
-            du client que quelques caractères. */}
-        <div className="flex items-start justify-between mb-4 @max-[240px]:flex-col @max-[240px]:gap-2 @max-[240px]:mb-3">
-          <div>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-pill bg-white/25 backdrop-blur-md border border-white/40 text-[10px] font-body font-bold uppercase tracking-widest text-ink/80 mb-1.5 shadow-xs @max-[240px]:px-2 @max-[240px]:text-[9px] @max-[240px]:mb-1">
-              Cycle {cycle}
-            </span>
-            <p className="font-headings font-bold text-xl text-ink leading-snug @max-[240px]:text-base">
+            que quelques caractères. */}
+        <div className="flex items-start justify-between gap-3 @max-[240px]:flex-col @max-[240px]:gap-1.5">
+          {/* Avec un tampon, le bloc du nom lui laisse sa place. Le tampon est
+              posé en absolu : il ne pousse rien, et la fin d'un nom de plus
+              d'une quinzaine de lettres passait dessous. Mesuré en navigateur,
+              polices chargées : ENCAISSÉ 112 px, GARDÉE 110, CLÔTURÉE 113 de
+              large, penchés de 6 degrés (boîte englobante de 116,3, 114,1 et
+              117,6 px), posés à 12 px du bord (`right-3`) alors que le contenu
+              commence à 16 (`px-4`) : jusqu'à 111,5 px du nom passent sous le
+              plus large. `pr-30` (120 px) lui laisse 8,5 px d'air. Sans tampon
+              rien ne change : la carte garde toute sa largeur. */}
+          <div className={`min-w-0 ${tampon ? 'pr-30' : ''}`}>
+            <p className="font-headings text-xl font-bold leading-tight text-ink @max-[240px]:text-base">
               {nomClient}
             </p>
-          </div>
-          <div className="bg-white/30 backdrop-blur-md rounded-xl border border-white/40 px-3 py-1.5 text-right shadow-xs @max-[240px]:px-2 @max-[240px]:py-1 @max-[240px]:text-left">
-            <p className="text-[11px] font-body font-medium text-ink/75 @max-[240px]:text-[10px]">
-              Mise / jour
-            </p>
-            <p className="font-body font-bold text-base text-ink tabular-nums @max-[240px]:text-sm">
-              {misePar} <span className="text-xs font-normal">FCFA</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Les 31 cases du cycle. Sur huit colonnes quand la carte est réduite :
-            seize cases sur 136 px de large donneraient des traits de 6 px, où
-            l'on ne distingue plus la case payée de la case à payer. */}
-        <div className="grid grid-cols-16 gap-1 mb-4 p-1.5 rounded-lg bg-black/5 backdrop-blur-xs border border-white/10 @max-[240px]:grid-cols-8 @max-[240px]:gap-0.5 @max-[240px]:mb-3 @max-[240px]:p-1">
-          {cases.map((numero) => (
-            <div
-              key={numero}
-              className={`h-5 rounded-xs flex items-center justify-center transition-all @max-[240px]:h-3 ${
-                numero < jourCourant
-                  ? 'bg-ink/75 text-white'
-                  : numero === jourCourant
-                    ? 'bg-sidebar shadow-xs ring-1 ring-white/60'
-                    : 'bg-white/45'
-              }`}
-            >
-              {numero === jourCourant && (
-                <div
-                  /*
-                    Ni `animate-pulse` ni `chart-mint`, depuis le 2026-09-17.
-                    L'animation ne s'arrêtait jamais et il y en avait une par
-                    carte, dans une liste qui défile, sur le téléphone d'entrée
-                    de gamme qui est l'appareil de référence — pour répéter en
-                    bougeant ce que la case dit déjà par son fond `sidebar` et
-                    son anneau blanc.
-                  */
-                  className="w-1.5 h-1.5 rounded-pill bg-primary-foreground"
-                />
-              )}
+            <div className="mt-1 flex items-baseline gap-1.5 text-xs">
+              <p className="font-body text-muted-foreground">Mise / jour</p>
+              <p className="font-mono font-medium text-ink tabular-nums">
+                {misePar} <span className="font-body font-normal text-muted-foreground">FCFA</span>
+              </p>
             </div>
-          ))}
+          </div>
+          {cycle !== undefined && (
+            <span className="shrink-0 rounded-pill border border-hairline px-2.5 py-0.5 font-body text-xs text-muted-foreground">
+              Cycle {cycle}
+            </span>
+          )}
         </div>
 
-        {/* Pied */}
-        <div className="flex items-end justify-between pt-1 @max-[240px]:flex-col @max-[240px]:items-start @max-[240px]:gap-1.5">
+        {/* Les cases du cycle. Huit colonnes en format réduit : seize cases
+            sur 136 px donneraient des traits de 6 px, où l'on ne distingue plus
+            la case payée de la case à payer. */}
+        <div className="mt-4 grid grid-cols-16 gap-1 @max-[240px]:mt-3 @max-[240px]:grid-cols-8 @max-[240px]:gap-0.5">
+          {cases.map((numero) => {
+            const etat = etatDe(numero, jourCourant, neuve, close);
+            return (
+              <span
+                key={numero}
+                data-etat={etat}
+                className={`h-4.5 rounded-xs @max-[240px]:h-3 ${CASES[etat]}`}
+              />
+            );
+          })}
+        </div>
+
+        <div className="mt-4 flex items-end justify-between gap-3 @max-[240px]:mt-3 @max-[240px]:flex-col @max-[240px]:items-start @max-[240px]:gap-1">
           <div>
-            {/* Encre pleine, et non `/70` : à 70 % sur `degradeCarte`, ce
-                libellé donnait 3,63:1 sur la borne violette et 3,81 sur la
-                bleue, qui occupent la plus grande part de la carte. Les
-                trois autres libellés atténués vivent sur un panneau blanc
-                translucide et passent entre 5,10 et 6,74 : celui-ci était
-                le seul à nu sur le dégradé. */}
-            <p className="text-xs font-body font-medium text-ink mb-0.5 @max-[240px]:text-[10px]">
-              Solde restituable
-            </p>
-            <p className="font-headings font-bold text-2xl text-ink tabular-nums leading-none @max-[240px]:text-lg">
+            <p className="font-body text-xs text-muted-foreground">{etiquetteSolde}</p>
+            <p className="mt-1 font-mono text-2xl font-medium leading-none text-ink tabular-nums @max-[240px]:text-lg">
               {solde}{' '}
-              <span className="text-sm font-body font-medium text-ink/80 @max-[240px]:text-xs">
-                FCFA
-              </span>
+              <span className="font-body text-sm font-medium text-muted-foreground">FCFA</span>
             </p>
           </div>
-          <div className="text-right @max-[240px]:text-left">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-pill bg-white/20 backdrop-blur-xs text-xs font-body font-semibold text-ink/80 border border-white/20 @max-[240px]:text-[10px]">
-              {jourCourant}/{totalJours} j · {pourcentage} %
-            </span>
-          </div>
+          <p className="font-mono text-base font-medium text-ink tabular-nums @max-[240px]:text-sm">
+            {jourCourant}/{totalJours}
+          </p>
         </div>
 
         {/* La fente. Dans le flux, et non en calque : le solde est ce qu'on
-            regarde avant d'encaisser, et un bouton posé par-dessus le
-            masquerait au moment précis où il compte. La carte grandit. */}
-        {action && <div className="mt-3 @max-[240px]:mt-2">{action}</div>}
+            regarde avant d'agir, et un bouton posé par-dessus le masquerait au
+            moment précis où il compte. La carte grandit. */}
+        {action && <div className="mt-4 @max-[240px]:mt-2">{action}</div>}
       </div>
     </div>
   );
