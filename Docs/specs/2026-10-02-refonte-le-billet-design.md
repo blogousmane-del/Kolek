@@ -281,8 +281,8 @@ chantier l'emploie sur Retrait, les autres le reçoivent sans autre changement.
   sont pleines. », bouton « Aller au retrait »). Dans sa fente, deux `Bouton` :
   « Encaisser 2 000 » (nom accessible « Encaisser 2 000 FCFA sur la carte de
   Mariam Traoré ») et « Fiche » (« Ouvrir la fiche de Mariam Traoré »).
-  `ActionsCarte` et ses pastilles rondes ne servent plus qu'au carrousel de la
-  fiche, jusqu'au chantier 2.
+  `ActionsCarte` et ses pastilles rondes n'ont plus de consommateur : le
+  composant reste exporté, jusqu'à ce que le chantier 2 tranche.
 - Les messages de la file (attente longue, refus, stockage) gardent leur
   place, entre la carte et les outils.
 - **Outils** : Souscrire, Retrait, Rapprochement, Reçus, Alertes, Avis,
@@ -412,7 +412,7 @@ précédente est close. La nouvelle repart de la case 1. »
   migration, aucune fonction, aucune lecture réseau nouvelle.
 - Les textes d'erreur, les gardes du retrait, les règles du cycle de 31 mises.
 - La vitrine, hormis la carte dans son téléphone.
-- L'administration, hormis les deux icônes ajoutées au registre.
+- L'administration, hormis les trois icônes ajoutées au registre.
 - Les noms des propriétés de `CarteCollecte` (`jourCourant` compris : la
   vitrine et le carrousel les passent).
 

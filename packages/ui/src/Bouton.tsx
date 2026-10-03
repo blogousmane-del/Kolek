@@ -18,7 +18,9 @@ interface Props {
   pleineLargeur?: boolean;
   disabled?: boolean;
   /** Infobulle. Sert surtout à dire pourquoi un bouton est désactivé — un
-      bouton éteint sans explication se lit comme un bouton cassé. */
+      bouton éteint sans explication se lit comme un bouton cassé. Elle ne se voit
+      qu'au survol, donc jamais au toucher : quand cette raison est déjà une
+      phrase à l'écran, c'est `decritPar` qui la relie au bouton. */
   title?: string;
   onClick?: () => void;
   className?: string;
@@ -36,7 +38,8 @@ interface Props {
    *
    * Un bouton éteint ne dit pas pourquoi, et un bouton `disabled` ne prend pas
    * le focus : « Reçu » grisé se lit comme un bouton cassé. La phrase qui
-   * l'explique est déjà à l'écran ; ce lien la fait lire avec lui.
+   * l'explique est déjà à l'écran ; ce lien la fait lire avec lui. Quand la
+   * raison n'est pas une phrase de la page, `title` est l'infobulle qui la porte.
    */
   decritPar?: string;
   /**

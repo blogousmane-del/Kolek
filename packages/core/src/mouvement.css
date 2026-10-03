@@ -204,7 +204,9 @@
 /* Le tampon se plaque : il arrive un peu plus grand, et frappe. Pas de rebond,
  * un tampon ne rebondit pas. La durée est celle du toucher : c'est la réponse
  * à un appui. La rotation de six degrés vit sur l'enveloppe du composant, pas
- * ici, sans quoi cette animation l'écraserait. */
+ * ici : Tailwind v4 l'écrit dans la propriété `rotate`, qu'une animation de
+ * `transform` n'écrase pas, mais le découpage garde l'angle hors de portée de
+ * cette animation, quoi que Tailwind compile un jour pour la rotation. */
 @keyframes kolek-tampon {
   from {
     opacity: 0;

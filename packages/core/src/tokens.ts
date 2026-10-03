@@ -109,8 +109,9 @@ export const couleurs = {
   // qui a changé avec la forme — l'aplat est la tuile, le texte vit dedans.
   //
   // `tuileGestionEncre` n'est pas l'or, et le test le tient : `or` est une
-  // couleur de marque que le Design System §1 interdit sur les surfaces qui
-  // manipulent l'argent.
+  // couleur de marque que le Design System §1 n'admet, dans les applications,
+  // que pour la pièce du logo et la gravure sur fond sombre. Jamais sur un
+  // montant ni sur un état.
   tuileArgent: '#CBE5D4',
   tuileArgentEncre: '#14563A',
   tuileClient: '#F0DCE4',
@@ -249,8 +250,10 @@ export const couleurs = {
  *   à l'intérieur). Ce n'est pas une surface d'interface, c'est un objet
  *   représenté ; le ranger dans l'échelle le ferait cesser de ressembler à un
  *   téléphone.
- * - Les 31 cases de la carte de collecte miniature font 8 px de haut. À 4 px,
- *   `sm` les arrondirait en stade ; elles gardent 2 px.
+ * - Les 31 cases de la carte de collecte miniature de la vitrine
+ *   (`Fonctionnalites.tsx`) font 8 px de haut. À 4 px, `sm` les arrondirait en
+ *   stade ; elles gardent 2 px. Les cases de `CarteCollecte` n'en sont pas une :
+ *   elles prennent `rounded-xs`, le cran de Tailwind sous `sm`.
  *
  * `2xl` et `3xl` écrasent les valeurs par défaut de Tailwind (16 px et 24 px).
  * C'est voulu : les deux noms restent disponibles, avec les valeurs du produit.
@@ -468,8 +471,9 @@ export const elevations = {
  * `degradeCarte`, le vert-bleu-violet de la carte de collecte, est parti le
  * 2026-10-02 avec le billet : la carte est désormais papier, filet et
  * gravure, et ne porte plus aucun dégradé. Les dégradés de zone servent
- * l'administration ; `degradeHero` sert la vitrine, l'en-tête de l'accueil du
- * collecteur et la bande de l'encaissement.
+ * l'administration ; `degradeHero` sert la vitrine (le hero et l'`Inscription`),
+ * l'en-tête de l'accueil du collecteur, la bande de l'encaissement et les trois
+ * écrans de connexion (`EcranConnexion`, `MotDePasseOublie`, `NouveauMotDePasse`).
  */
 export const degrades = {
   // Réalignés le 2026-09-04 sur la nouvelle échelle `chart*`. Ils en étaient

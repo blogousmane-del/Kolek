@@ -233,9 +233,11 @@ describe("le marqueur d'état actif", () => {
   });
 
   it("n'est pas un or déguisé", () => {
-    // La barre latérale est une surface d'application, et le Design System §1
-    // y interdit l'or. Le marqueur est un vert : sa composante bleue le tient
-    // loin d'un jaune, où elle s'effondre.
+    // La barre latérale est une surface d'application, et son marqueur dit un
+    // état, la page ouverte : le Design System §1 n'admet l'or que pour la
+    // pièce du logo et la gravure sur fond sombre, jamais sur un état. Le
+    // marqueur est un vert : sa composante bleue le tient loin d'un jaune, où
+    // elle s'effondre.
     const bleu = Number.parseInt(couleurs.marqueurActif.slice(5, 7), 16);
     const bleuOr = Number.parseInt(couleurs.or.slice(5, 7), 16);
 
@@ -305,9 +307,10 @@ describe('les quatre aplats de tuile', () => {
   });
 
   it('n’est pas un or déguisé', () => {
-    // `or` est une couleur de marque, interdite sur les surfaces qui manipulent
-    // l'argent. L'encre de gestion est fonctionnelle et beaucoup plus sombre :
-    // elle ne peut pas être confondue avec la pièce du logo.
+    // `or` est une couleur de marque, que le Design System §1 n'admet que pour
+    // la pièce du logo et la gravure sur fond sombre, jamais sur un montant ni
+    // sur un état. L'encre de gestion est fonctionnelle et beaucoup plus
+    // sombre : elle ne peut pas être confondue avec la pièce du logo.
     expect(contraste(couleurs.tuileGestionEncre, couleurs.surface)).toBeGreaterThan(
       contraste(couleurs.or, couleurs.surface),
     );

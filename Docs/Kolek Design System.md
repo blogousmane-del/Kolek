@@ -347,7 +347,7 @@ Fond `surface`, filet `hairline`, `rounded-xl`, et une `Onde` fine en vert coffr
 | **Primaire** | Rectangle plein `primary`, `rounded-md`, texte blanc, icône optionnelle. |
 | **Contour** | Rectangle `rounded-md`, contour `primary`, fond blanc, texte vert. |
 | **Fantôme** | Texte vert sans fond. |
-| **Icône** | Rond, contour `hairline`, icône `muted-foreground`. |
+| **Icône** | Rond. Sur fond clair : fond `surface`, bord `trait`, icône `ink` (le retour d'`EnTeteEcran`). Sur la bande sombre : fond `bg-white/10`, bord `white/25`, icône blanche (le retour de la bande d'Encaisser). |
 
 Hauteur minimale **44 px** partout, admin compris. Le collecteur tape debout, à une main, sur un téléphone d'entrée de gamme, parfois sous le soleil d'un marché ; c'est une cible tactile, pas une préférence esthétique.
 

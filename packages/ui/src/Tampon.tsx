@@ -15,8 +15,11 @@
  * `aria-hidden` : le tampon répète ce que la ligne d'état dit déjà en
  * `role="status"`. L'annoncer deux fois, c'est faire attendre deux fois.
  *
- * La rotation vit sur l'enveloppe, l'animation sur le corps : une animation
- * de `transform` sur le même élément écraserait la rotation.
+ * La rotation vit sur l'enveloppe, l'animation sur le corps. Ce n'est pas que
+ * l'une écraserait l'autre : Tailwind v4 écrit `-rotate-6` dans la propriété
+ * `rotate`, qu'une animation de `transform` n'écrase pas, et les deux se
+ * composeraient sur un seul élément. Le découpage garde l'angle hors de portée
+ * de l'animation, quoi que Tailwind compile un jour pour la rotation.
  */
 export type MotTampon = 'Encaissé' | 'Gardée' | 'Clôturée';
 

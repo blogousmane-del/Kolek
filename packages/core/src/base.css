@@ -111,7 +111,10 @@
  * commande.
  *
  * 5.25rem = la hauteur mesurée de la barre (≈ 77,7 px : marge haute, cible
- * tactile de 44 px minimum, libellé) plus le repos de la barre de geste iOS.
+ * tactile de 44 px minimum, libellé) plus ≈ 6 px d'air. Le repos de la barre
+ * de geste iOS n'y est pas : il vient de `env(safe-area-inset-bottom)`, ajouté
+ * devant.
+ *
  * Un chiffre écrit ici plutôt qu'une mesure au rendu : lire la hauteur en
  * JavaScript pour la reporter en marge ferait sauter la page à chaque
  * changement d'orientation.
