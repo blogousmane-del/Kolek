@@ -12,7 +12,7 @@ import {
   useEnLigne,
   usePagination,
 } from '@kolek/ui';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ClientCible } from '../Coquille';
 import { useDonnees } from '../cache';
@@ -167,6 +167,18 @@ export function Retrait({
     montant: number;
     quand: Date;
   } | null>(null);
+  /** La région d'état de la vue clôturée : elle prend le focus à l'arrivée de la
+      vue (voir l'effet plus bas). */
+  const etatClotureRef = useRef<HTMLDivElement>(null);
+  /**
+   * Une carte de plus vient d'être ouverte depuis la vue clôturée.
+   *
+   * Hors de `fait`, exprès : l'effet de la vue dépend de `fait`, et en changer
+   * pour dire « ouverte » le rejouerait — remontée en haut, focus repris — à
+   * l'instant où le collecteur lit la confirmation.
+   */
+  const [carteOuverteApres, setCarteOuverteApres] = useState(false);
+  const nouvelleCarteRef = useRef<HTMLParagraphElement>(null);
   /** Chaque clôture fait avancer la révision, ce qui périme la liste gardée.
       Après un retrait, la carte clôturée doit disparaître : un affichage
       instantané de l'ancienne liste inviterait à la clôturer deux fois. C'est
@@ -408,6 +420,8 @@ export function Retrait({
       return;
     }
 
+    // La carte ouverte après le retrait précédent ne parle pas de celui-ci.
+    setCarteOuverteApres(false);
     setFait({ carte: aConfirmer, montant: resultat.montantRestitue, quand: new Date() });
     fermer();
     setTourLocal((t) => t + 1);
@@ -529,6 +543,25 @@ export function Retrait({
       mise a pu entrer dans la file, ou le réseau tomber. */
   const bloqueConfirmation = aConfirmer ? retraitBloquePour(aConfirmer.carteId) : null;
 
+  // À l'arrivée de la vue clôturée, remonter en haut et donner le focus à ce qu'il
+  // reste à faire de la main. La vue remplace la liste sans changer de page : la
+  // coquille ne remonte pas, et un retrait confirmé au bas d'une longue liste se
+  // lisait de son milieu. Le bouton « Oui, rendre » avait le focus, et il vient de
+  // disparaître avec la feuille : il tomberait sur <body>, et la région d'état,
+  // montée déjà remplie, resterait muette pour un lecteur d'écran. `preventScroll` :
+  // on vient de remonter, le focus ne doit pas redescendre la page.
+  useEffect(() => {
+    if (!fait) return;
+    window.scrollTo(0, 0);
+    etatClotureRef.current?.focus({ preventScroll: true });
+  }, [fait]);
+
+  // La phrase qui confirme la carte ouverte prend la place du bloc qui portait le
+  // focus. Sans ce geste il tomberait sur <body>, et la confirmation resterait muette.
+  useEffect(() => {
+    if (carteOuverteApres) nouvelleCarteRef.current?.focus();
+  }, [carteOuverteApres]);
+
   if (fait) {
     return (
       <div className="flex flex-1 flex-col">
@@ -549,8 +582,21 @@ export function Retrait({
                 tampon={<Tampon mot="Clôturée" quand={fait.quand} />}
               />
 
-              {/* Ce qu'il reste à faire de la main : remettre l'argent. */}
-              <div role="status" className="space-y-1">
+              {/* Ce qu'il reste à faire de la main : remettre l'argent.
+
+                  `tabIndex={-1}` : le bloc prend le focus par programme (voir
+                  l'effet plus haut), sans entrer dans l'ordre de tabulation.
+                  `outline-none` n'éteint pas son anneau : la règle `:focus-visible`
+                  de `base.css` est hors de toute couche, donc plus forte que lui.
+                  Même dispositif, même raison que la ligne d'état d'`Encaisser` :
+                  l'anneau se dessine quand « Oui, rendre » avait été activé au
+                  clavier, et pas d'un clic ou d'un toucher — c'est voulu. */}
+              <div
+                ref={etatClotureRef}
+                role="status"
+                tabIndex={-1}
+                className="space-y-1 outline-none"
+              >
                 <p className="font-headings text-xl font-bold text-ink">
                   Remets <span className="font-mono font-medium">{formatMontant(fait.montant)}</span>{' '}
                   FCFA à {fait.carte.clientNom}, en main propre.
@@ -561,23 +607,48 @@ export function Retrait({
               </div>
 
               <div className="space-y-3">
-                <Bouton pleineLargeur onClick={() => setFait(null)}>
+                <Bouton
+                  pleineLargeur
+                  onClick={() => {
+                    setFait(null);
+                    setCarteOuverteApres(false);
+                  }}
+                >
                   Retour aux cartes
                 </Bouton>
                 {/* Le cycle était complet : le client peut repartir sur une
                     carte de plus, tout de suite. La phrase par défaut du bloc
                     (« son solde reste dû au client ») serait fausse ici : il
-                    vient d'être rendu. */}
-                {fait.carte.cycleComplet && (
-                  <ActiverCarte
-                    collecteurId={collecteurId}
-                    clientId={fait.carte.clientId}
-                    misePreremplie={fait.carte.mise}
-                    identifiant={`cloturee-${fait.carte.carteId}`}
-                    explication="La carte précédente est close. La nouvelle repart de la case 1."
-                    onOuverte={onEcriture}
-                  />
-                )}
+                    vient d'être rendu.
+
+                    Une fois la carte ouverte, le bloc cède la place à une phrase
+                    qui le dit. Replié sans un mot, il laissait « Activer une
+                    carte » à sa place : un second appui ouvrait une seconde carte,
+                    donc une seconde commission. La phrase prend le focus, comme
+                    la région d'état plus haut (`tabIndex={-1}`, `outline-none`). */}
+                {fait.carte.cycleComplet &&
+                  (carteOuverteApres ? (
+                    <p
+                      ref={nouvelleCarteRef}
+                      role="status"
+                      tabIndex={-1}
+                      className="m-0 font-body text-sm font-medium text-positive outline-none"
+                    >
+                      Nouvelle carte ouverte. Elle repart de la case 1.
+                    </p>
+                  ) : (
+                    <ActiverCarte
+                      collecteurId={collecteurId}
+                      clientId={fait.carte.clientId}
+                      misePreremplie={fait.carte.mise}
+                      identifiant={`cloturee-${fait.carte.carteId}`}
+                      explication="La carte précédente est close. La nouvelle repart de la case 1."
+                      onOuverte={() => {
+                        setCarteOuverteApres(true);
+                        onEcriture();
+                      }}
+                    />
+                  ))}
               </div>
             </>
           }

@@ -1,5 +1,5 @@
 import { formatMontant } from '@kolek/core';
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { operationMise } from '../hors-ligne/fabriques';
@@ -174,11 +174,18 @@ function faireLeRetrait(nom: string, rang = 0) {
   fireEvent.click(screen.getByRole('button', { name: 'Faire le retrait' }));
 }
 
+// Le témoin de `window.scrollTo`, que jsdom n'implémente pas : sans lui, la vue
+// clôturée écrit « Not implemented » dans la sortie, et rien ne dit si l'écran
+// remonte. Un neuf par épreuve.
+let scrollTo = vi.fn();
+
 beforeEach(() => {
   donnees = [CARTE_PLEINE_HJ, CARTE_EN_COURS_HJ, CARTE_PLEINE_KA];
   erreurLecture = null;
   cloturerCarte.mockResolvedValue({ ok: true, montantRestitue: 30000 });
   ouvrirCarte.mockResolvedValue({ ok: true, carteId: 'neuve' });
+  scrollTo = vi.fn();
+  vi.stubGlobal('scrollTo', scrollTo);
 });
 
 afterEach(() => {
@@ -188,6 +195,7 @@ afterEach(() => {
   rafraichir.mockReset();
   operationsEnFile = [];
   fileLue = FILE_LUE;
+  vi.unstubAllGlobals();
   delete (window.navigator as unknown as { onLine?: boolean }).onLine;
 });
 
@@ -1149,5 +1157,65 @@ describe('la carte clôturée', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retour aux cartes' }));
 
     expect(lignes()).toHaveLength(3);
+  });
+
+  it('remonte en haut et donne le focus à ce qu’il reste à faire de la main', async () => {
+    // La vue clôturée remplace la liste sans changer de page : la coquille ne
+    // remonte pas, et un collecteur qui venait de toucher « Oui, rendre » au bas
+    // d'une longue liste la lisait de son milieu. Et le bouton qui avait le focus
+    // vient de disparaître avec la feuille : sans ce geste, il tomberait sur
+    // <body>, et le `role="status"`, monté déjà rempli, resterait muet.
+    rendre();
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    const remets = await retirer('Hj');
+    const etat = remets.closest('[role="status"]');
+
+    expect(etat, 'les mots « Remets… » sont dans la région d’état').toBeTruthy();
+    expect(scrollTo.mock.calls).toEqual([[0, 0]]);
+    // `waitFor` : l'effet suit l'insertion de la vue.
+    await waitFor(() => expect(document.activeElement).toBe(etat));
+  });
+
+  it('confirme la carte ouverte après le retrait, et ne propose plus de l’ouvrir', async () => {
+    // Avant : l'ouverture réussie repliait le bloc, sans un mot, et laissait le
+    // bouton « Activer une carte » à sa place — un second appui ouvrait une
+    // seconde carte, donc une seconde commission.
+    const onEcriture = vi.fn();
+    rendre({ onEcriture });
+    await retirer('Hj');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ouvrir la carte' }));
+
+    const phrase = await screen.findByText('Nouvelle carte ouverte. Elle repart de la case 1.');
+    expect(phrase.getAttribute('role')).toBe('status');
+    expect(screen.queryByRole('button', { name: 'Activer une carte' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ouvrir la carte' })).toBeNull();
+    // Une seule ouverture, à la mise de la carte rendue ; deux écritures en tout,
+    // la clôture puis l'ouverture, dont la liste doit se relire.
+    expect(ouvrirCarte.mock.calls).toEqual([['col1', 'cli1', 1000]]);
+    expect(onEcriture).toHaveBeenCalledTimes(2);
+    // Le bloc qui portait le focus a disparu : la phrase le reçoit, pour être lue.
+    await waitFor(() => expect(document.activeElement).toBe(phrase));
+    // Et le focus de la vue clôturée ne se rejoue pas : `scrollTo` n'est appelé
+    // qu'une fois, à l'arrivée de la vue.
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+  });
+
+  it('propose de nouveau d’ouvrir une carte sur le retrait suivant', async () => {
+    // « Retour aux cartes » remet la confirmation à zéro : la carte ouverte
+    // après le retrait de Hj ne parle pas de celui de Ka.
+    rendre();
+    await retirer('Hj');
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ouvrir la carte' }));
+    await screen.findByText('Nouvelle carte ouverte. Elle repart de la case 1.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retour aux cartes' }));
+    await retirer('Ka');
+
+    expect(screen.queryByText('Nouvelle carte ouverte. Elle repart de la case 1.')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Activer une carte' })).toBeTruthy();
   });
 });
