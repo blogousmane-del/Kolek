@@ -5712,7 +5712,17 @@ par :
               onClick={confirmer}
               disabled={envoi || bloqueConfirmation !== null}
             >
-              {envoi ? 'Retrait…' : `Oui, rendre ${formatMontant(aConfirmer.restituable)} FCFA`}
+              {envoi ? (
+                'Retrait…'
+              ) : (
+                <>
+                  Oui, rendre{' '}
+                  <span className="font-mono font-medium">
+                    {formatMontant(aConfirmer.restituable)}
+                  </span>{' '}
+                  FCFA
+                </>
+              )}
             </Bouton>
             <Bouton pleineLargeur variante="contour" onClick={fermerDecompte} disabled={envoi}>
               Annuler
