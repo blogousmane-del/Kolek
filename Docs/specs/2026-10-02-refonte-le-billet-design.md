@@ -153,7 +153,7 @@ L'échelle des rayons ne change pas. Ce chantier en fixe l'emploi :
 
 | Rayon | Emploi |
 |---|---|
-| `xs` 2 px | Case de la carte de collecte, l'exception que `tokens.ts` documente déjà |
+| `xs` 2 px | Case de la carte de collecte : `rounded-xs`, le cran de Tailwind sous `sm`. Ce n'est pas l'exception que `tokens.ts` documente (la miniature de la vitrine, `rounded-[2px]`) |
 | `md` 6 px | Bouton, champ, segment actif |
 | `lg` 10 px | Liste, outil, piste des segments, touche « Encaisser » |
 | `xl` 12 px | Carte de collecte, bloc de caisse, haut de la feuille |
@@ -228,7 +228,9 @@ Jakarta Sans et Sora, remplacées le 2026-09-17 ; Plex Mono et la règle des
 montants), §3.5 et §3.6 (l'ombre d'action, les icônes sans « $ »), §4 (le
 billet, la touche de la barre, les outils, les segments, `grand` et
 `nomAccessible`), et trois sections nouvelles : le tampon, le décompte, la
-gravure.
+gravure. La relecture y a ajouté ce que le billet rendait faux ailleurs : §1
+et §2 (la place de l'or), §3.4 (les cases de la carte), la ligne `NavBureau`
+de l'inventaire, §5 (les outils), §8.1 (l'état des écrans).
 
 ## Les composants partagés
 
@@ -323,11 +325,10 @@ est partie, et disparaît si le serveur la refuse. Il ne surgit jamais sous le
 pouce : sa place est prise d'avance, car l'envoi arrive un aller-retour après
 l'appui, quand le pouce vise « Client suivant ». Les deux commandes sont dans
 un bloc collant au-dessus de la barre, comme le bloc de caisse. Après le
-succès, le bouton
-« Encaisser » n'est plus rendu du tout : le serveur accepte deux mises le même
-jour sur une carte, et l'écran ne doit pas en offrir une seconde. Le focus
-qu'avait le bouton passe à la ligne d'état. Les erreurs gardent leur forme et
-leur texte. Une mise que le serveur refuse ne remplit pas sa case et n'a ni
+succès, le bouton « Encaisser » n'est plus rendu du tout : le serveur accepte
+deux mises le même jour sur une carte, et l'écran ne doit pas en offrir une
+seconde. Le focus qu'avait le bouton passe à la ligne d'état. Les erreurs
+gardent leur forme et leur texte. Une mise que le serveur refuse ne remplit pas sa case et n'a ni
 tampon, ni numéro de reçu, ni commande « Reçu » : il n'y a pas de reçu d'une
 mise refusée. Reste « Client suivant ».
 

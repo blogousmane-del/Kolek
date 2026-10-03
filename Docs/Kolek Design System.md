@@ -6,7 +6,7 @@
 >
 > **v2 — 2026-08-16.** Les six écrans dessinés dans Banani (flow *Kolek Design System*) sont implémentés. Les tokens ne sont plus injectés à l'exécution : ils engendrent le thème Tailwind au build. Les noms ont changé en conséquence — voir §3 et la table de correspondance §8.2.
 >
-> **Le billet — 2026-10-02.** Le collecteur prend le langage de la vitrine : vert coffre, gravure discrète, montants en chiffres de caisse. Accueil, Encaisser et Retrait d'abord ; les autres écrans suivent, puis l'administration. Conception : `Docs/specs/2026-10-02-refonte-le-billet-design.md`.
+> **Le billet — 2026-10-02.** Le collecteur prend le langage de la vitrine : vert coffre, gravure discrète, montants en chiffres de caisse. Accueil, Encaisser et Retrait d'abord ; les autres écrans suivent, puis l'administration. Conception : `Docs/specs/2026-10-02-refonte-le-billet-design.md`. Dans ce document, **chantier 1** désigne les fondations et ces trois écrans, **chantier 2** les seize autres écrans du collecteur (dont les trois écrans de connexion), **chantier 3** l'administration.
 
 ---
 
@@ -45,7 +45,7 @@ L'image fournie est la **maquette de représentation de notre Dashboard Admin** 
 - Le **`$` devient FCFA** (et on retire les centimes — le franc CFA n'a pas de sous-unité).
 - Contenu réel : **nos données** (collecteurs, clients, cartes, mises) et **le français**, à la place des noms, marques et montants de démonstration.
 - **Dans les applications, l'or est la pièce du logo et la gravure sur fond sombre, rien d'autre.** L'admin et le collecteur collent pour le reste strictement à la maquette (vert profond, neutres, vert/corail sémantiques, pastels de graphique). Jamais sur un montant, jamais sur un état. L'histoire de la règle reste lisible : « Aucun or dans l'interface » était une décision actée, reprise par la v2 (2026-08-16) ; elle a été précisée le 2026-09-02 en « aucun or dans les applications » (l'or est de la marque, pas de l'interface), puis amendée par *Le billet* le 2026-10-02, qui donne à l'or une place : la gravure (§4.18).
-- **L'or est une couleur de marque, pas une couleur d'interface.** `--color-or` et `--color-or-doux` servent le logo, le favicon, l'image Open Graph et la vitrine — les surfaces qui *vendent* Kolek — et, depuis *Le billet*, la gravure des applications : sur fond sombre, entre 15 et 30 % d'opacité (§4.18). Ni un montant ni un état n'en portent la moindre trace. La distinction n'est pas cosmétique : posé sur un montant ou sur un état, l'or désignerait une valeur, et aucune valeur de ce produit n'est or.
+- **L'or est une couleur de marque, pas une couleur d'interface.** `--color-or` et `--color-or-doux` servent le logo, le favicon, l'image Open Graph et la vitrine — les surfaces qui *vendent* Kolek — et, depuis *Le billet*, la gravure des applications : sur fond sombre, entre 15 et 30 % d'opacité (§4.18). Ni un montant ni un état n'en portent la moindre trace. La distinction n'est pas cosmétique : posé sur un montant ou sur un état, l'or désignerait une valeur, et aucune valeur de ce produit n'est or. **Restes connus**, antérieurs à la règle et à retirer aux chantiers 2 et 3 : sur les écrans de connexion, le focus des champs sombres (`Champ.tsx`), les liens et les encadrés de message (`EcranConnexion.tsx`, `MotDePasseOublie.tsx`, `NouveauMotDePasse.tsx`) ; dans l'administration, le bouton de démonstration de la connexion (`Connexion.tsx`), le bandeau de démonstration (`Coquille.tsx`) et l'état « Attention » de la santé du système (`Sante.tsx`).
 - **Les quatre aplats de tuile ne sont pas de l'or, et voici où passe la
   frontière.** `tuileGestion` (`#F1E4C9`) et son encre (`#6A5218`) sont des
   jaunes : la question se pose donc pour de bon. Ce qui les sépare de l'or n'est
@@ -163,10 +163,12 @@ Deux conséquences pratiques.
 
 | Token | Hex | Usage |
 |---|---|---|
-| `--color-chart-blue` | `#9FC2DA` | 1re série. |
-| `--color-chart-teal` | `#7FB6A6` | 2e série. |
-| `--color-chart-mint` | `#B7D9BE` | 3e série ; indicateur actif sur fond sombre. |
-| `--color-chart-slate` | `#AEB7D6` | 4e série (ex. part « commission »). |
+| `--color-chart-blue` | `#82ACCC` | 1re série. |
+| `--color-chart-teal` | `#9ACDBE` | 2e série. |
+| `--color-chart-mint` | `#D1E8D4` | 3e série ; vert de réussite sur fond sombre. L'état actif des barres latérales est passé le 2026-09-17 à `--color-marqueur-actif` (`#8ED9B0`). |
+| `--color-chart-slate` | `#8D8AC0` | 4e série (ex. part « commission »). |
+
+Refondues le 2026-09-04 : espacées d'environ 10 unités de L*, lisibles en niveaux de gris ; elles servent aussi de fond aux pastilles d'`Avatar`, toutes à 4,5:1 au moins contre `sidebar`.
 
 **Dégradés.** Ils ne tombent dans aucun espace de noms Tailwind : aucune classe n'en sort, et on les consomme par `bg-[image:var(--degrade-hero)]`. Les garder dans `tokens.ts` est ce qui empêche la vitrine et l'application de diverger.
 
@@ -233,7 +235,7 @@ pour trancher. Les valeurs ci-dessous sont celles du code, vérifiées.
 
 | Token | Classe | Valeur | Rôle |
 |---|---|---|---|
-| `--radius-sm` | `rounded-sm` | 4 px | Segment de jauge, case de progression. |
+| `--radius-sm` | `rounded-sm` | 4 px | Pastille de légende d'un graphique (`BarreEmpilee`). |
 | `--radius-md` | `rounded-md` | 6 px | **Tous les boutons rectangulaires**, champs, lignes de tableau. |
 | `--radius-lg` | `rounded-lg` | 10 px | Carte d'application : `Carte`, `CarteStat`, `CarteZone`, `EcranMessage`. |
 | `--radius-xl` | `rounded-xl` | 12 px | Carte mise en avant, carte de collecte, élément d'un panneau. |
@@ -256,13 +258,17 @@ C'est voulu : les noms restent disponibles, avec les valeurs du produit.
 1. `Telephone.tsx` dessine un châssis d'appareil — 44 px à l'extérieur, 36 px à
    l'intérieur. Ce n'est pas une surface d'interface mais un objet représenté ;
    le ranger dans l'échelle le ferait cesser de ressembler à un téléphone.
-2. Les 31 cases de la carte de collecte font 18 px de haut, 12 px dans le format
-   réduit sous 240 px (`h-4.5` et `@max-[240px]:h-3`, dans `CarteCollecte.tsx`).
-   Elles prennent `rounded-xs`, 2 px : le cran de Tailwind sous `sm`, que
-   l'échelle du produit ne redéfinit pas.
+2. Les 31 cases de la carte de collecte miniature de la vitrine
+   (`Fonctionnalites.tsx`) font 8 px de haut. À 4 px, `sm` les arrondirait en
+   stade ; elles gardent 2 px (`rounded-[2px]`).
 
 Toute autre valeur arbitraire est un défaut. Si un rôle nouveau apparaît, il
 prend un jeton, pas un `rounded-[…]`.
+
+Les cases de `CarteCollecte` ne sont pas une exception : 18 px de haut, 12 px
+dans le format réduit sous 240 px (`h-4.5` et `@max-[240px]:h-3`), elles
+prennent `rounded-xs`, 2 px, le cran de Tailwind sous `sm`, que l'échelle du
+produit ne redéfinit pas.
 
 ### 3.5 Élévation
 
@@ -281,7 +287,7 @@ Bordure standard des cartes : `border border-hairline` **+** `shadow-sm`. Discre
 
 - Jeu unique **Lucide**, style outline, trait **1.75 px**, extrémités arrondies. Le composant `Icone` fixe le trait ; aucun écran ne le règle.
 - Le registre d'icônes est **explicite** : `packages/ui/src/Icone.tsx` déclare nommément celles que le produit dessine. Une icône non déclarée est une erreur de compilation. Un composant qui résoudrait le nom à l'exécution embarquerait le jeu Lucide entier dans un paquet destiné à un téléphone en 3G.
-- Icônes d'action dans un cercle, contour `primary` sur fond blanc : l'administration seulement, jusqu'à sa refonte. Le collecteur pose l'icône nue, en `primary`, à gauche du libellé (`Outils`, §4.9).
+- Icônes d'action sur une tuile pastel de leur famille (`ActionsRapides`) : l'administration seulement, jusqu'à sa refonte. Le collecteur pose l'icône nue, en `primary`, à gauche du libellé (`Outils`, §4.9).
 - **Une icône dit le geste, pas la monnaie.** `banknote` pour encaisser, `scale` pour le rapprochement, `receipt-text` pour les reçus : `circle-dollar-sign` et `receipt` portaient un « $ » dans un produit en FCFA. Ils restent au registre pour les écrans qui ne sont pas encore passés au billet.
 - Taille par défaut 18 px ; 20–24 px pour les cibles tactiles du terrain ; 11–15 px pour les puces et méta.
 
@@ -311,7 +317,7 @@ Tous vivent dans **`packages/ui/src`** et sont partagés par les deux applicatio
 | `BarreHaute` | `BarreHaute.tsx` | Fil d'Ariane + titre + actions en pilules. |
 | `NavMobile` | `NavMobile.tsx` | Barre du bas ; « Encaisser » en touche dans la barre (§4.2). |
 | `NavBureau` | `NavBureau.tsx` | Barre latérale du collecteur à partir de `lg`, à côté de `NavMobile` ; « Encaisser » y est un bouton plein, ombre `shadow-action` (§3.5). |
-| `ActionsRapides` | `ActionsRapides.tsx` | Grille d'icônes rondes, variante compacte. Administration seulement (§4.9). |
+| `ActionsRapides` | `ActionsRapides.tsx` | Grille de tuiles pastel par famille, variante compacte. Administration seulement (§4.9). |
 | `BandeauHorsLigne`, `useEnLigne` | `Bandeaux.tsx` | État réseau. |
 | `EcranConnexion` | `EcranConnexion.tsx` | Formulaire de connexion partagé. |
 | `EcranMessage` | `EcranMessage.tsx` | Écran de blocage : filet, portillon, indisponibilité. |
@@ -349,7 +355,7 @@ Hauteur minimale **44 px** partout, admin compris. Le collecteur tape debout, à
 
 **`decritPar`** : l'identifiant de la phrase qui dit pourquoi le bouton est éteint (`aria-describedby`), quand cette phrase est déjà à l'écran. Un bouton `disabled` ne prend pas le focus : sans ce lien, « Reçu » grisé se lit comme un bouton cassé. `title` reste le canal de l'infobulle. **`deplie`** et **`panneau`** : pour un bouton qui ouvre un panneau, `aria-expanded` (toujours dit, « replié » compris) et `aria-controls` (à donner tant que le panneau est dans la page). Sans `deplie`, le bouton n'annonce aucun état.
 
-**Un libellé mêlé tient dans un seul `<span>`.** `Bouton` est un conteneur flex (`gap-2`) : dans « Encaisser 2 000 », où le montant est en Plex Mono, des morceaux frères deviendraient des éléments séparés : le montant, insécable, ne passerait plus à la ligne, le bouton ne se resserrerait plus et, à 320 px, « Fiche » sortirait de la carte.
+**Un libellé mêlé tient dans un seul `<span>`.** `Bouton` est un conteneur flex (`gap-2`) : dans « Encaisser 2 000 », où le montant est en Plex Mono, des morceaux frères deviendraient des éléments séparés : le montant, insécable, ne passerait plus à la ligne, le bouton ne se resserrerait plus et, à 320 px, « Fiche », son voisin sur la carte de l'accueil, sortirait de la carte.
 
 ### 4.6 Pilules de filtre et segments
 Fond blanc, contour `hairline`, texte `ink`, chevron `muted-foreground`. Actif = fond `primary`, texte blanc.
@@ -365,7 +371,7 @@ Fond blanc, contour `hairline`, texte `ink`, chevron `muted-foreground`. Actif =
 ### 4.9 Outils et actions rapides
 **Collecteur, `Outils`.** Deux colonnes, quatre avec la barre latérale seulement (`lg`), de boutons neutres : fond `surface`, filet `hairline`, rayon `lg`, 52 px de haut, icône `primary` à gauche, libellé `text-sm` gras. Pas de couleur par famille : c'est la liste des autres écrans, pas un tableau de bord. « Encaisser » et « Bilan » n'y sont pas, la barre du bas les porte. Un nombre impair d'outils étire le dernier sur deux colonnes : une case vide à sa droite se lirait comme une grille arrêtée en chemin. Le libellé se coupe sur deux lignes au plus (`break-words hyphens-auto line-clamp-2`) au lieu de déborder ou d'être tronqué : à 320 px, « Rapprochement » ne tient pas sur une ligne et passe sur deux.
 
-**Administration, `ActionsRapides`.** Icônes rondes à contour vert et label court, variante `compact` (48 px), jusqu'à la refonte de l'administration.
+**Administration, `ActionsRapides`.** Tuiles en aplat de la couleur de leur famille (jetons `tuile*`), sans bordure ni ombre, icône en haut à gauche et libellé court en bas à droite ; 96 px de haut, 128 px dès `sm`, 80 px en variante `compact`. Jusqu'à la refonte de l'administration.
 
 ### 4.10 Ligne de liste (mises / transactions)
 Avatar → nom (`font-semibold`) + méta (`text-sm` gris) → **montant coloré** aligné à droite : `positive` pour un dépôt, `negative` pour une sortie, `ink` pour une commission. Séparateur hairline sauf sur la dernière ligne.
