@@ -1009,14 +1009,51 @@ describe('la liste en lignes', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'En cours' })).toBeTruthy();
   });
 
+  /** La phrase de la règle, dans le dépli de la carte `k2` (Hj, 5 000 par jour). On
+      la lit par `textContent` : les nombres sont dans leurs propres spans, et
+      `getByText` ne lit que les nœuds texte directs d'un élément. */
+  function phraseDuDepli() {
+    return (document.getElementById('depli-k2') as HTMLElement).querySelector('p') as HTMLElement;
+  }
+
   it('accorde la phrase de la commission au singulier pour une seule mise', () => {
     donnees = [{ ...CARTE_EN_COURS_HJ, misesEncaissees: 1, restituable: 0 }];
     rendre();
     ouvrir('Hj');
 
-    expect(
-      screen.getByText(/^1 mise encaissée, moins la première, qui est ta commission/),
-    ).toBeTruthy();
+    expect(phraseDuDepli().textContent).toBe(
+      `1 mise encaissée, moins la première, qui est ta commission (${formatMontant(5000)} FCFA).`,
+    );
+  });
+
+  it('pose les nombres de la phrase en Plex Mono : le compte de mises et la mise, pas la phrase', () => {
+    // Plex Mono pour tout nombre qu'on compte, jamais pour une phrase entière : le
+    // compte et la mise sont dans leur span, le reste est en Instrument Sans.
+    donnees = [CARTE_EN_COURS_HJ];
+    rendre();
+    ouvrir('Hj');
+
+    const phrase = phraseDuDepli();
+    expect(phrase.textContent).toBe(
+      `4 mises encaissées, moins la première, qui est ta commission (${formatMontant(5000)} FCFA).`,
+    );
+    const nombres = [...phrase.querySelectorAll('span.font-mono')];
+    expect(nombres.map((s) => s.textContent)).toEqual(['4', formatMontant(5000)]);
+    // L'unité reste dehors, dans la police du texte, comme partout dans l'écran.
+    expect(phrase.classList.contains('font-mono')).toBe(false);
+    expect(phrase.textContent).toContain(`${formatMontant(5000)} FCFA`);
+    expect(nombres.some((s) => s.textContent?.includes('FCFA'))).toBe(false);
+  });
+
+  it('dit que la première mise revient au titulaire, pour un collaborateur', () => {
+    profilLu = { titulaireId: 'tit1' };
+    donnees = [CARTE_EN_COURS_HJ];
+    rendre();
+    ouvrir('Hj');
+
+    expect(phraseDuDepli().textContent).toBe(
+      `4 mises encaissées, moins la première, qui revient à ton titulaire (${formatMontant(5000)} FCFA).`,
+    );
   });
 
   it('dit qu’il n’y a rien à rendre ni à garder quand aucune mise n’est encaissée', () => {

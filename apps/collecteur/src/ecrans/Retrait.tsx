@@ -12,7 +12,7 @@ import {
   useEnLigne,
   usePagination,
 } from '@kolek/ui';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import type { ClientCible } from '../Coquille';
 import { useDonnees } from '../cache';
@@ -434,13 +434,19 @@ export function Retrait({
     onEcriture();
   }
 
-  /** La règle de la commission, dite une fois, dans le dépli. */
-  function phraseCommission(carte: CarteCloturable): string {
+  /** La règle de la commission, dite une fois, dans le dépli. Les nombres qu'on
+      compte, le compte de mises et la mise, sont en Plex Mono ; la phrase reste
+      dans la police du texte, et l'unité aussi. */
+  function phraseCommission(carte: CarteCloturable): ReactNode {
     const n = carte.misesEncaissees;
     if (n === 0) return RIEN_A_RENDRE;
-    return `${n} mise${pluriel(n)} encaissée${pluriel(n)}, moins la première, ${
-      estCollaborateur ? 'qui revient à ton titulaire' : 'qui est ta commission'
-    } (${formatMontant(carte.mise)} FCFA).`;
+    return (
+      <>
+        <span className="font-mono">{n}</span> mise{pluriel(n)} encaissée{pluriel(n)}, moins la{' '}
+        première, {estCollaborateur ? 'qui revient à ton titulaire' : 'qui est ta commission'}{' '}
+        (<span className="font-mono">{formatMontant(carte.mise)}</span> FCFA).
+      </>
+    );
   }
 
   function ligne(carte: CarteCloturable, rang: number) {
