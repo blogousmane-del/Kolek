@@ -185,6 +185,8 @@ export function Retrait({
    */
   const [carteOuverteApres, setCarteOuverteApres] = useState(false);
   const nouvelleCarteRef = useRef<HTMLParagraphElement>(null);
+  /** L'alerte d'une écriture refusée : elle prend le focus (voir l'effet plus bas). */
+  const alerteRef = useRef<HTMLParagraphElement>(null);
   /** Chaque clôture fait avancer la révision, ce qui périme la liste gardée.
       Après un retrait, la carte clôturée doit disparaître : un affichage
       instantané de l'ancienne liste inviterait à la clôturer deux fois. C'est
@@ -414,9 +416,26 @@ export function Retrait({
     setEnvoi(true);
     setErreurEcriture(null);
 
-    const resultat = await cloturerCarte(aConfirmer.carteId);
+    let resultat;
+    try {
+      resultat = await cloturerCarte(aConfirmer.carteId);
+    } catch {
+      // Un rejet plutôt qu'un `{ ok: false }` : il ne dit pas si le retrait a été
+      // inscrit avant. La feuille refuse de se fermer tant que `envoi` est vrai,
+      // d'où le `finally` : sans lui, un rejet la laisserait verrouillée, et le
+      // collecteur sans rien à lire ni à toucher. Le message dit de relire avant de
+      // recommencer, parce que recommencer sur un retrait inscrit rendrait
+      // l'argent deux fois.
+      setErreurEcriture(
+        'Le retrait n’a pas pu être confirmé sur ce téléphone. Relis la liste avant de recommencer : il a pu être inscrit.',
+      );
+      setAConfirmer(null);
+      rafraichir();
+      return;
+    } finally {
+      setEnvoi(false);
+    }
 
-    setEnvoi(false);
     if (!resultat.ok) {
       setErreurEcriture(resultat.echec.message);
       setAConfirmer(null);
@@ -574,6 +593,15 @@ export function Retrait({
     if (carteOuverteApres) nouvelleCarteRef.current?.focus();
   }, [carteOuverteApres]);
 
+  // Une écriture refusée, ou sans réponse : l'alerte est le premier enfant de la
+  // page, et la feuille qui tenait le regard vient de disparaître. Plus bas dans
+  // une longue liste, le collecteur ne la verrait pas, et croirait le retrait fait.
+  // Le focus l'amène à l'écran, et un lecteur d'écran la lit. L'erreur d'écriture
+  // seulement : celle d'une lecture est là dès l'arrivée, en haut de l'écran.
+  useEffect(() => {
+    if (erreurEcriture) alerteRef.current?.focus();
+  }, [erreurEcriture]);
+
   if (fait) {
     return (
       <div className="flex flex-1 flex-col">
@@ -684,8 +712,18 @@ export function Retrait({
       <CorpsEcran
         enfants={
           <>
+            {/* `tabIndex={-1}` : l'alerte d'une écriture prend le focus par
+                programme (voir l'effet plus haut), sans entrer dans l'ordre de
+                tabulation. `outline-none` pour la même raison que la région d'état
+                de la vue clôturée : la règle `:focus-visible` de `base.css` est hors
+                de toute couche, l'anneau ne se dessine que pour un geste au clavier. */}
             {erreur && (
-              <p role="alert" className="rounded-md bg-negative-tint p-3 font-body text-sm text-negative">
+              <p
+                ref={alerteRef}
+                role="alert"
+                tabIndex={-1}
+                className="rounded-md bg-negative-tint p-3 font-body text-sm text-negative outline-none"
+              >
                 {erreur}
               </p>
             )}

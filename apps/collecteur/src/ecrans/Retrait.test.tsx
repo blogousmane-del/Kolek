@@ -1186,6 +1186,59 @@ describe('le décompte', () => {
     expect(screen.getByRole('dialog')).toBeTruthy();
     await act(async () => repondre({ ok: true, montantRestitue: 30000 }));
   });
+
+  it('referme la feuille sur un refus, montre sa raison, et lui donne le focus', async () => {
+    // Un refus peut dire que la carte a été clôturée ailleurs entre-temps : rien
+    // n'a été rendu ici. La feuille ne reste pas ouverte sur un geste refusé, la
+    // raison est dite, et la liste se relit pour ne plus proposer cette carte.
+    cloturerCarte.mockResolvedValue({
+      ok: false,
+      echec: { code: 'CARTE_CLOTUREE', message: 'Cette carte vient d’être clôturée.' },
+    });
+    const onEcriture = vi.fn();
+    rendre({ onEcriture });
+    faireLeRetrait('Hj');
+
+    fireEvent.click(within(feuille()).getByRole('button', { name: /^Oui, rendre/ }));
+
+    const alerte = await screen.findByRole('alert');
+    expect(alerte.textContent).toBe('Cette carte vient d’être clôturée.');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(rafraichir).toHaveBeenCalledTimes(1);
+    // Rien n'est écrit, rien n'est à remettre : ni vue clôturée, ni liste à relire
+    // par la coquille.
+    expect(onEcriture).not.toHaveBeenCalled();
+    expect(screen.queryByText(/^Remets/)).toBeNull();
+    // L'alerte est le premier enfant de la page, la feuille vient de disparaître :
+    // le focus l'amène à l'écran, et un lecteur d'écran la lit. `waitFor` : l'effet
+    // suit l'insertion.
+    await waitFor(() => expect(document.activeElement).toBe(alerte));
+  });
+
+  it('referme la feuille, prévient, et ne reste pas verrouillée quand la clôture est sans réponse', async () => {
+    // Un rejet ne dit pas si le retrait a été écrit avant : le message le dit, et
+    // dit de relire. Surtout, la feuille refuse de se fermer tant qu'un envoi est
+    // en vol — sans `finally`, un rejet laissait « Oui, rendre » éteint pour de bon.
+    cloturerCarte.mockRejectedValue(new Error('panne'));
+    const onEcriture = vi.fn();
+    rendre({ onEcriture });
+    faireLeRetrait('Hj');
+
+    fireEvent.click(within(feuille()).getByRole('button', { name: /^Oui, rendre/ }));
+
+    const alerte = await screen.findByRole('alert');
+    expect(alerte.textContent).toMatch(/pas pu être confirmé/);
+    expect(alerte.textContent).toMatch(/il a pu être inscrit/);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(rafraichir).toHaveBeenCalledTimes(1);
+    expect(onEcriture).not.toHaveBeenCalled();
+    expect(screen.queryByText(/^Remets/)).toBeNull();
+
+    // Le verrou est levé : la feuille se rouvre, son bouton est allumé.
+    fireEvent.click(screen.getByRole('button', { name: 'Faire le retrait' }));
+    const valider = within(feuille()).getByRole('button', { name: /^Oui, rendre/ });
+    expect((valider as HTMLButtonElement).disabled).toBe(false);
+  });
 });
 
 /** Clôturée : le tampon, et ce qu'il reste à faire de la main. */
