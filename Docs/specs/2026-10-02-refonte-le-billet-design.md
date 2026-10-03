@@ -194,7 +194,9 @@ Le geste qui ne se défait pas laisse une marque, comme au guichet. Un
 composant `Tampon` : cadre double, capitales espacées en Bricolage 800, date
 et heure de l'encaissement en Plex Mono (`02.10 · 11:47`), incliné de six
 degrés, posé en haut à droite de la carte, par-dessus la pastille du cycle :
-il ne cache ni les cases ni le solde.
+il ne cache ni les cases ni le solde. Le bloc du nom lui réserve sa largeur
+(`pr-30`, 120 px) tant qu'il est là : le tampon se pose par-dessus sans rien
+pousser, et un nom long ne passe pas dessous.
 
 | Mot | Couleur | Quand |
 |---|---|---|
@@ -232,7 +234,7 @@ gravure.
 | `NavMobile` | Cinq entrées à plat. « Encaisser » devient une **touche** dans la barre (rectangle `primary`, rayon `lg`, icône `banknote`), plus un rond qui flotte. Onglet actif : encre `primary` et filet de 2 px au-dessus, `aria-current="page"`. | Aucun |
 | `NavBureau` | Icône `banknote` | Aucun |
 | **`Outils`** (nouveau) | La grille des outils de l'accueil : deux colonnes de boutons neutres (`surface`, `hairline`, rayon `lg`, 52 px), icône `primary` à gauche, libellé. Remplace `ActionsRapides` sur l'accueil du collecteur ; `ActionsRapides` ne bouge pas, l'administration s'en sert. | Aucun |
-| `Bouton` | Deux propriétés facultatives. `nomAccessible` (posée en `aria-label`) : le bouton « Encaisser 2 000 » de la carte doit dire sur quelle carte il agit. `grand` (56 px, `text-lg`) : le geste d'un écran qui fait bouger l'argent ; une hauteur passée par `className` se disputerait avec `min-h-11`. Variantes inchangées. | Aucun (rien ne les passe) |
+| `Bouton` | Cinq propriétés facultatives. `nomAccessible` (posée en `aria-label`, et qui contient le libellé visible) : le bouton « Encaisser 2 000 » de la carte doit dire sur quelle carte il agit. `grand` (56 px, `text-lg`) : le geste d'un écran qui fait bouger l'argent ; une hauteur passée par `className` se disputerait avec `min-h-11`. `decritPar` (posée en `aria-describedby`) : la raison d'un bouton éteint, quand cette phrase est déjà à l'écran (« Reçu » tant que la mise n'est que gardée) ; `title` reste l'infobulle. `deplie` et `panneau` (posées en `aria-expanded` et `aria-controls`) : un bouton qui ouvre un panneau dit son état et le désigne, comme « Activer une carte ». `Bouton` est un conteneur flex (`gap-2`) : un libellé qui mêle du texte et un montant en Plex Mono tient dans un seul `<span>`, sans quoi ses morceaux deviennent des éléments insécables qui débordent à 320 px. Variantes inchangées. | Aucun (rien ne les passe) |
 | `Icone` | `banknote`, `scale`, `receipt-text` | Les trois fronts : quelques centaines d'octets |
 | `Feuille` | Rayon `xl` en haut, poignée, voile `darkCanvas` à 48 %. Elle sert désormais au décompte du retrait. | Aucun |
 | **`Tampon`** (nouveau) | Voir plus haut | Aucun |
@@ -295,7 +297,8 @@ temps 1. La carte (sans commandes), sa prochaine case cerclée. En bas, sous
 le pouce, le bloc de caisse : « Mise du jour, case 30 », le montant en Plex
 Mono `text-3xl`, « Solde après 58 000 FCFA » (`soldeRestituable` du moteur),
 le bouton « Encaisser » de 56 px de haut, et « Montant fixé à l'ouverture de
-la carte. »
+la carte. » Sur un téléphone court, ce bloc est collant au-dessus de la barre
+(`sticky bottom-nav`, `lg:static`) : le geste n'est jamais sous elle.
 Cycle complet : bouton désactivé et phrase actuelle, inchangée.
 
 **Temps 3, encaissé.** La case 30 se remplit en `positive`, le tampon se pose
@@ -309,10 +312,17 @@ l'encaissement : la file ne garde pas l'heure de l'envoi, et la maquette qui
 `numeroDeRecu(miseId)`, extrait de `Recus.tsx:507` pour servir aux deux
 écrans. Deux commandes : **« Client suivant »** (retour au temps 1, recherche
 vidée) et **« Reçu »** (les reçus de ce client, par le chemin `allerAuxRecus`
-qui existe). Après le succès, le bouton « Encaisser » n'est plus rendu du
-tout : le serveur accepte deux mises le même jour sur une carte, et l'écran
-ne doit pas en offrir une seconde. Les erreurs gardent leur forme et leur
-texte. Une mise que le serveur refuse ne remplit pas sa case et n'a ni
+qui existe). « Reçu » est là dès que la mise est écrite, mais éteint tant
+qu'elle n'est que gardée sur le téléphone : l'écran des reçus ne lit que le
+journal du serveur, qui ne la connaît pas encore. Il s'allume quand la mise
+est partie, et disparaît si le serveur la refuse. Sa place n'apparaît jamais
+sous le pouce : l'envoi arrive un aller-retour après l'appui, quand le pouce
+vise « Client suivant ». Les deux commandes sont dans un bloc collant
+au-dessus de la barre, comme le bloc de caisse. Après le succès, le bouton
+« Encaisser » n'est plus rendu du tout : le serveur accepte deux mises le même
+jour sur une carte, et l'écran ne doit pas en offrir une seconde. Le focus
+qu'avait le bouton passe à la ligne d'état. Les erreurs gardent leur forme et
+leur texte. Une mise que le serveur refuse ne remplit pas sa case et n'a ni
 tampon, ni numéro de reçu, ni commande « Reçu » : il n'y a pas de reçu d'une
 mise refusée. Reste « Client suivant ».
 
@@ -336,7 +346,8 @@ nom, `31/31 · 1 000/j`, et à droite le montant à rendre en Plex Mono avec
 **Le dépli.** Toucher une ligne la déplie (`aria-expanded`), une seule à la
 fois : la phrase de la commission, dite une fois et plus sur chaque carte,
 puis « Faire le retrait » et, pour un cycle terminé, « Activer une carte »
-(`ActiverCarte` tel qu'il est, mise reprise). Le message de blocage (`retraitBloquePour`)
+(`ActiverCarte`, mise reprise ; c'est un dépli : son bouton reste et le
+panneau s'ouvre dessous). Le message de blocage (`retraitBloquePour`)
 s'y lit. Changer de recherche, de filtre ou de page referme le dépli et la
 confirmation, comme le code le fait aujourd'hui pour la confirmation.
 
