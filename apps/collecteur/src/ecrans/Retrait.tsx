@@ -483,9 +483,10 @@ export function Retrait({
         style={rangCascade(rang, premier)}
       >
         {/* Le trait d'un cycle terminé : la carte qu'on vient rendre se voit
-            avant qu'on lise son compteur. `pointer-events-none` : positionné, il
-            peut passer devant le bouton de la ligne et avalerait le toucher qui
-            visait ses quatre premiers pixels. */}
+            avant qu'on lise son compteur. Le bouton de la ligne, positionné et
+            plus loin dans l'arbre, se peint par-dessus ; `pointer-events-none`
+            reste une garde : si cet ordre change, le trait n'avalera pas le
+            toucher qui visait les quatre premiers pixels du bouton. */}
         {carte.cycleComplet && (
           <span
             aria-hidden

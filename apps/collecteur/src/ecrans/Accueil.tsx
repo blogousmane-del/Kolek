@@ -201,11 +201,18 @@ export function Accueil({
               <div className="flex items-baseline justify-between gap-3">
                 {/* Le compte est en Plex Mono comme tout nombre qu'on compte ;
                     `font-medium` parce que la phrase est en semi-gras et que seul
-                    le 500 de Plex Mono est livré. */}
+                    le 500 de Plex Mono est livré. Seule, la carte n'a personne à
+                    devancer : « la plus avancée de tes 1 carte » ne se dit pas. */}
                 <p className="min-w-0 font-body text-xs font-semibold text-muted-foreground">
-                  À finir en premier · la plus avancée de tes{' '}
-                  <span className="font-mono font-medium">{enCours}</span> carte{s(enCours)} en
-                  cours
+                  À finir en premier ·{' '}
+                  {enCours > 1 ? (
+                    <>
+                      la plus avancée de tes{' '}
+                      <span className="font-mono font-medium">{enCours}</span> cartes en cours
+                    </>
+                  ) : (
+                    'ta seule carte en cours'
+                  )}
                 </p>
                 <button
                   type="button"

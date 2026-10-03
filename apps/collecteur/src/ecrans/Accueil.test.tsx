@@ -412,13 +412,15 @@ describe('la carte à finir en premier', () => {
     expect(screen.getAllByRole('definition')[1]?.textContent).toBe('5');
   });
 
-  it('accorde « carte en cours » au singulier', async () => {
+  it('dit « ta seule carte en cours » quand il n’y en a qu’une', async () => {
+    // « la plus avancée de tes 1 carte » ne se dit pas : seule, elle n'a
+    // personne à devancer.
     chargerTableauCollecteur.mockResolvedValue({ ...TABLEAU, cartesActives: 4, cartesEnCours: 1 });
     rendre();
     await tableauLu();
 
     expect(screen.getByText(/^À finir en premier/).textContent).toBe(
-      'À finir en premier · la plus avancée de tes 1 carte en cours',
+      'À finir en premier · ta seule carte en cours',
     );
   });
 
