@@ -1,29 +1,43 @@
 import { formatMontant, MISES_PAR_CYCLE, soldeRestituable } from '@kolek/core';
 import {
-  Avatar,
   BandeauHorsLigne,
   Bouton,
-  Carte,
   CarteCollecte,
   Icone,
+  Onde,
+  Pagination,
+  Squelette,
+  Tampon,
   useEnLigne,
+  usePagination,
   type CleNavCollecteur,
 } from '@kolek/ui';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import type { CarteChoisie } from '../Coquille';
 import { enregistrerMise } from '../ecritures';
-import { useHorsLigne } from '../hors-ligne/useHorsLigne';
+import type { Tournee } from '../hors-ligne/modele';
+import { useHorsLigne, type EtatHorsLigne } from '../hors-ligne/useHorsLigne';
+import {
+  TourneeAbsente,
+  cartesAEncaisser,
+  etatEnvoiMise,
+  type EtatEnvoiMise,
+} from '../hors-ligne/vues';
+import { LIGNES_AFFICHEES_PAR_PAGE } from '../pagination';
+import { correspondClient } from '../recherche';
+import { numeroDeRecu } from '../recu';
 
 /**
- * Encaissement d'une mise.
+ * Encaissement d'une mise, en trois temps depuis le 2026-10-02 : choisir la
+ * carte, confirmer, encaissé.
  *
- * Cet écran a longtemps porté un bouton désactivé et un avertissement : « un
- * bouton *Confirmer* qui n'écrit rien en base est le pire mensonge que puisse
- * faire cette application — le collecteur repart en pensant la mise encaissée ».
- * Le bouton écrit maintenant.
+ * L'onglet ouvert sans carte disait « Aucune carte choisie » et renvoyait vers
+ * Clients : une impasse sur le geste que le collecteur fait trente fois par
+ * jour. Il propose maintenant les cartes elles-mêmes, tirées de la tournée du
+ * téléphone, donc hors ligne aussi.
  *
- * Deux choix qui en découlent.
+ * Deux choix d'avant, qui tiennent toujours.
  *
  * **Le montant n'est pas libre.** Il est celui de la carte, et rien d'autre :
  * le déclencheur `mises_avant_insert` refuse toute mise dont le montant diffère
@@ -31,199 +45,477 @@ import { useHorsLigne } from '../hors-ligne/useHorsLigne';
  * carte à 1 000, pour se voir refuser après coup. Le montant s'affiche, il ne
  * se saisit pas.
  *
- * **Le champ « Note » a disparu.** `mises` n'a pas de colonne pour le recevoir.
- * Un champ qui accepte du texte et le jette est de la même famille que le
- * bouton qui n'écrivait rien.
+ * **Pas de champ « Note ».** `mises` n'a pas de colonne pour le recevoir. Un
+ * champ qui accepte du texte et le jette ment comme un bouton qui n'écrit rien.
  */
 export function Encaisser({
   collecteurId,
   carte,
+  onChoisir,
   onNaviguer,
   onEncaisse,
+  onRecus,
 }: {
   collecteurId: string | null;
   carte: CarteChoisie | null;
+  /** Choisir une carte dans la liste, ou y revenir (`null`). */
+  onChoisir: (carte: CarteChoisie | null) => void;
   onNaviguer: (cle: CleNavCollecteur) => void;
   onEncaisse: () => void;
+  /** Les reçus du client qu'on vient d'encaisser. */
+  onRecus: (clientNom: string) => void;
+}) {
+  const enLigne = useEnLigne();
+  const horsLigne = useHorsLigne();
+  // Dans la bande sombre, comme sur l'accueil. Il se tait seul quand la file
+  // est vide et le réseau là (§8.2).
+  const bandeau = (
+    <BandeauHorsLigne enLigne={enLigne} compte={horsLigne.file} className="relative z-10 mt-4" />
+  );
+
+  return (
+    <div className="anim-entree flex flex-1 flex-col lg:mx-auto lg:w-full lg:max-w-liste">
+      {carte ? (
+        // La clé remet l'écran à zéro d'une carte à l'autre : l'état
+        // « encaissé » d'une cliente ne doit pas survivre sur la suivante.
+        <Confirmation
+          key={carte.carteId}
+          collecteurId={collecteurId}
+          carte={carte}
+          horsLigne={horsLigne}
+          bandeau={bandeau}
+          onRetour={() => onChoisir(null)}
+          onEncaisse={onEncaisse}
+          onRecus={onRecus}
+        />
+      ) : (
+        <Selecteur
+          tournee={horsLigne.tournee}
+          bandeau={bandeau}
+          onChoisir={onChoisir}
+          onNaviguer={onNaviguer}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * La bande sombre. Avec l'en-tête de l'accueil, la seule du produit : la
+ * journée qui s'ouvre, et le geste qui la paie.
+ */
+function Bande({
+  titre,
+  sousTitre,
+  onRetour,
+  children,
+}: {
+  titre: string;
+  sousTitre?: string;
+  onRetour?: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <header className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pb-5 pt-entete lg:rounded-xl lg:pt-6">
+      <Onde
+        lignes={8}
+        traitFixe
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-5 w-full text-or/30"
+      />
+      <div className="relative z-10 flex items-center gap-3">
+        {onRetour && (
+          <button
+            type="button"
+            onClick={onRetour}
+            aria-label="Revenir à la liste des cartes"
+            className="anim-pression flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-pill border border-white/25 bg-white/10"
+          >
+            <Icone nom="arrow-left" taille={18} className="text-white" />
+          </button>
+        )}
+        <div className="min-w-0">
+          <p className="truncate font-headings text-xl font-bold tracking-tight text-white">
+            {titre}
+          </p>
+          {sousTitre && <p className="truncate font-body text-sm text-white/70">{sousTitre}</p>}
+        </div>
+      </div>
+      {children}
+    </header>
+  );
+}
+
+/** Trente et un traits : l'avancement se lit d'un regard, avant le chiffre. */
+function Jauge({ faites }: { faites: number }) {
+  return (
+    <span aria-hidden className="mt-2 flex gap-px">
+      {Array.from({ length: MISES_PAR_CYCLE }, (_, i) => (
+        <span key={i} className={`h-2.5 w-0.5 ${i < faites ? 'bg-primary' : 'bg-trait/40'}`} />
+      ))}
+    </span>
+  );
+}
+
+/**
+ * Temps 1 : la carte du client.
+ *
+ * Les plus avancées d'abord : ce sont celles qu'il faut finir, et c'est l'ordre
+ * de l'accueil, qui montre la première. Une carte pleine n'y est pas : elle
+ * n'a plus de case à payer, elle relève du retrait.
+ */
+function Selecteur({
+  tournee,
+  bandeau,
+  onChoisir,
+  onNaviguer,
+}: {
+  tournee: Tournee | null;
+  bandeau: ReactNode;
+  onChoisir: (carte: CarteChoisie) => void;
+  onNaviguer: (cle: CleNavCollecteur) => void;
+}) {
+  const [recherche, setRecherche] = useState('');
+  const toutes = tournee && tournee.lueLe !== null ? cartesAEncaisser(tournee) : [];
+  const terme = recherche.trim();
+  const trouvees = toutes.filter((c) =>
+    correspondClient({ nom: c.clientNom, marche: c.marche, telephone: c.telephone }, terme),
+  );
+  const { page, pages, total, visibles, allerA } = usePagination(
+    trouvees,
+    LIGNES_AFFICHEES_PAR_PAGE,
+  );
+
+  // Une recherche nouvelle repart de la page 1 : voir `Clients`.
+  const changerRecherche = (valeur: string) => {
+    setRecherche(valeur);
+    allerA(1);
+  };
+
+  return (
+    <>
+      <Bande titre="Encaisser" sousTitre="Choisis la carte du client.">
+        {bandeau}
+      </Bande>
+
+      {tournee === null ? (
+        <div aria-hidden className="mx-4 mt-4 space-y-2">
+          <Squelette hauteur="h-12" largeur="w-full" />
+          <Squelette hauteur="h-16" largeur="w-full" />
+          <Squelette hauteur="h-16" largeur="w-full" />
+        </div>
+      ) : tournee.lueLe === null ? (
+        <p role="alert" className="mx-4 mt-4 font-body text-sm text-negative">
+          {new TourneeAbsente().message}
+        </p>
+      ) : toutes.length === 0 ? (
+        <div className="mx-4 mt-6 rounded-xl border border-hairline bg-surface p-5">
+          <p className="font-headings text-lg font-bold text-ink">Aucune carte à encaisser</p>
+          <p className="mt-1 font-body text-sm text-muted-foreground">
+            Les cartes actives de ta tournée viennent ici. Une carte pleine se rend par le retrait.
+          </p>
+          <Bouton pleineLargeur className="mt-4" onClick={() => onNaviguer('clients')}>
+            Voir mes clients
+          </Bouton>
+        </div>
+      ) : (
+        <>
+          <div className="relative mx-4 mt-4">
+            <Icone
+              nom="search"
+              taille={16}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            {/* Les mêmes réglages que la recherche de `Clients`, et pour les
+                mêmes raisons : `text` et non `search`, ni correcteur ni
+                majuscule automatique. */}
+            <input
+              type="text"
+              value={recherche}
+              onChange={(e) => changerRecherche(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') changerRecherche('');
+              }}
+              placeholder="Nom, numéro ou marché…"
+              aria-label="Chercher une carte"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="search"
+              className="min-h-12 w-full rounded-md border border-trait bg-surface pl-10 pr-12 font-body text-champ text-ink placeholder:text-muted-foreground focus:border-primary"
+            />
+            {recherche && (
+              <button
+                type="button"
+                onClick={() => changerRecherche('')}
+                aria-label="Effacer la recherche"
+                className="absolute right-1 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-pill text-muted-foreground hover:text-ink"
+              >
+                <Icone nom="x" taille={16} />
+              </button>
+            )}
+          </div>
+
+          <div className="mx-4 mt-5 flex items-baseline justify-between gap-3">
+            <h2 className="font-headings text-lg font-bold text-ink">Cartes actives</h2>
+            <p className="font-body text-xs text-muted-foreground">
+              <span className="font-mono">{toutes.length}</span>, les plus avancées d’abord
+            </p>
+          </div>
+
+          {trouvees.length === 0 ? (
+            <div className="mx-4 mt-2 rounded-xl border border-hairline bg-surface p-4">
+              <p className="font-body text-base text-ink">Aucune carte ne correspond.</p>
+              <p className="mt-1 font-body text-sm text-muted-foreground">
+                Vérifie l’orthographe, ou efface la recherche.
+              </p>
+            </div>
+          ) : (
+            <ul
+              aria-label="Cartes à encaisser"
+              className="mx-4 mt-2 divide-y divide-hairline overflow-hidden rounded-xl border border-hairline bg-surface"
+            >
+              {visibles.map((c) => (
+                <li key={c.carteId}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onChoisir({
+                        carteId: c.carteId,
+                        clientNom: c.clientNom,
+                        mise: c.mise,
+                        misesEncaissees: c.misesEncaissees,
+                      })
+                    }
+                    className="anim-pression flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-body text-base font-semibold text-ink">
+                        {c.clientNom}
+                      </span>
+                      <span className="mt-0.5 block truncate font-body text-xs text-muted-foreground">
+                        {c.marche && `${c.marche} · `}
+                        <span className="font-mono">{formatMontant(c.mise)}</span>/j
+                      </span>
+                      <Jauge faites={c.misesEncaissees} />
+                    </span>
+                    <span className="shrink-0 font-mono text-sm text-ink tabular-nums">
+                      {c.misesEncaissees}/{MISES_PAR_CYCLE}
+                    </span>
+                    <Icone
+                      nom="chevron-right"
+                      taille={16}
+                      className="shrink-0 text-muted-foreground"
+                    />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <Pagination page={page} pages={pages} total={total} onAller={allerA} />
+        </>
+      )}
+
+      <div className="min-h-6 flex-1" />
+    </>
+  );
+}
+
+/** Ce qu'il faut garder d'une mise écrite pour dire où elle en est. */
+interface MiseEcrite {
+  miseId: string;
+  operationId: string;
+  /** L'heure de l'encaissement : celle que porte le tampon. */
+  quand: Date;
+  numeroCase: number;
+}
+
+const PHRASE_ENVOI: Record<EtatEnvoiMise, string> = {
+  envoyee: 'Envoyée.',
+  gardee: 'Gardée sur ce téléphone, elle partira avec le réseau.',
+  refusee: 'Le serveur a refusé cette mise. Le détail est dans les alertes.',
+};
+
+const TEINTE_ENVOI: Record<EtatEnvoiMise, string> = {
+  envoyee: 'text-positive',
+  gardee: 'text-info',
+  refusee: 'text-negative',
+};
+
+/**
+ * Temps 2 et 3 : confirmer, puis encaissé.
+ *
+ * Après le succès, le bouton « Encaisser » n'est plus rendu du tout : le
+ * serveur accepte deux mises le même jour sur une carte, et l'écran ne doit
+ * pas en offrir une seconde. Le geste suivant est « Client suivant ».
+ */
+function Confirmation({
+  collecteurId,
+  carte,
+  horsLigne,
+  bandeau,
+  onRetour,
+  onEncaisse,
+  onRecus,
+}: {
+  collecteurId: string | null;
+  carte: CarteChoisie;
+  horsLigne: EtatHorsLigne;
+  bandeau: ReactNode;
+  onRetour: () => void;
+  onEncaisse: () => void;
+  onRecus: (clientNom: string) => void;
 }) {
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [succes, setSucces] = useState<string | null>(null);
-  const enLigne = useEnLigne();
-  const { file } = useHorsLigne();
+  const [ecrite, setEcrite] = useState<MiseEcrite | null>(null);
+
+  const complet = carte.misesEncaissees >= MISES_PAR_CYCLE;
+  const numeroCase = carte.misesEncaissees + 1;
+  const etat = ecrite ? etatEnvoiMise(ecrite, horsLigne) : null;
+  // Une mise refusée ne remplit pas sa case : la carte la montrerait payée.
+  const remplie = ecrite !== null && etat !== 'refusee';
+  // Après le succès, la coquille avance la carte d'une case. L'écran lit donc
+  // la case écrite, et non celle de la carte, pour ne pas compter deux fois.
+  const jour = ecrite
+    ? remplie
+      ? ecrite.numeroCase
+      : ecrite.numeroCase - 1
+    : carte.misesEncaissees;
 
   async function confirmer() {
-    if (!carte || !collecteurId || envoi) return;
+    if (!collecteurId || envoi || ecrite || complet) return;
     setEnvoi(true);
     setErreur(null);
-    setSucces(null);
 
-    const resultat = await enregistrerMise(collecteurId, carte.carteId, carte.mise);
+    const quand = new Date();
+    const resultat = await enregistrerMise(collecteurId, carte.carteId, carte.mise, quand);
 
     setEnvoi(false);
     if (!resultat.ok) {
       setErreur(resultat.echec.message);
       return;
     }
-    setSucces(`Mise de ${formatMontant(carte.mise)} FCFA enregistrée pour ${carte.clientNom}.`);
+    setEcrite({ miseId: resultat.miseId, operationId: resultat.operationId, quand, numeroCase });
     onEncaisse();
   }
 
   return (
-    <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-liste">
-      {/* En-tête avec dégradé subtil */}
-      <div className="bg-[image:var(--degrade-hero)] px-marge pt-entete pb-5 lg:rounded-xl lg:pt-6 shadow-md">
-        <div className="flex items-center justify-between mb-1">
-          <button
-            type="button"
-            onClick={() => onNaviguer('clients')}
-            aria-label="Revenir aux clients"
-            className="anim-pression w-10 h-10 rounded-pill bg-white/10 border border-white/15 flex items-center justify-center cursor-pointer"
-          >
-            <Icone nom="arrow-left" className="text-white" taille={18} />
-          </button>
-          <p className="font-headings font-bold text-white text-lg tracking-tight">Encaisser une mise</p>
-          <div className="w-10" />
-        </div>
+    <>
+      <Bande titre="Encaisser une mise" onRetour={onRetour}>
+        {bandeau}
+      </Bande>
+
+      <div className="mx-4 mt-4">
+        <CarteCollecte
+          nomClient={carte.clientNom}
+          misePar={formatMontant(carte.mise)}
+          jourCourant={jour}
+          solde={formatMontant(soldeRestituable(jour, carte.mise))}
+          neuve={ecrite && remplie ? ecrite.numeroCase : undefined}
+          tampon={
+            ecrite && remplie ? (
+              <Tampon mot={etat === 'envoyee' ? 'Encaissé' : 'Gardée'} quand={ecrite.quand} />
+            ) : undefined
+          }
+        />
       </div>
 
-      <BandeauHorsLigne enLigne={enLigne} compte={file} className="mx-4 mt-3" />
-
-      {!carte ? (
-        // On arrive ici par l'onglet du bas, sans être passé par la liste. Dire
-        // quoi faire plutôt que d'afficher un formulaire sans destinataire.
-        <Carte className="mx-4 mt-6 p-6 text-center shadow-md">
-          <div className="w-14 h-14 rounded-pill bg-secondary mx-auto mb-3 flex items-center justify-center text-primary">
-            <Icone nom="circle-dollar-sign" taille={26} />
-          </div>
-          <p className="font-headings font-bold text-lg text-ink m-0">Aucune carte choisie</p>
-          <p className="text-sm font-body text-muted-foreground mt-1 mb-5 max-w-xs mx-auto">
-            Ouvre la liste de tes clients et touche « Encaisser » sur la carte concernée.
-          </p>
-          <Bouton pleineLargeur onClick={() => onNaviguer('clients')}>
-            Voir mes clients
-          </Bouton>
-        </Carte>
-      ) : (
-        <>
-          {/* Client */}
-          <div className="mx-4 mt-4 bg-surface rounded-lg border border-hairline/80 p-4 flex items-center gap-3.5 shadow-sm">
-            <Avatar nom={carte.clientNom} className="w-12 h-12 ring-2 ring-hairline" />
-            <div className="flex-1 min-w-0">
-              <p className="font-headings font-bold text-lg text-ink truncate leading-tight">
-                {carte.clientNom}
-              </p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs font-body font-medium text-muted-foreground">
-                  Jour {carte.misesEncaissees}/{MISES_PAR_CYCLE}
-                </span>
-                <span className="text-xs font-body font-semibold text-accent">
-                  Cycle 1
-                </span>
+      {ecrite === null ? (
+        // Sous le pouce : le bloc de caisse descend en bas de l'écran.
+        <section aria-label="Caisse" className="mx-4 mt-auto pb-5 pt-6">
+          <div className="rounded-xl border border-hairline bg-surface p-4">
+            {!complet && (
+              <div className="mb-4">
+                <p className="font-body text-sm text-muted-foreground">
+                  Mise du jour, case <span className="font-mono">{numeroCase}</span>
+                </p>
+                <p className="mt-1 font-mono text-3xl font-medium tracking-tight text-ink tabular-nums">
+                  {formatMontant(carte.mise)}{' '}
+                  <span className="font-body text-base font-medium tracking-normal text-muted-foreground">
+                    FCFA
+                  </span>
+                </p>
+                <p className="mt-1 font-body text-sm text-muted-foreground">
+                  Solde après{' '}
+                  <span className="font-mono">
+                    {formatMontant(soldeRestituable(numeroCase, carte.mise))}
+                  </span>{' '}
+                  FCFA
+                </p>
               </div>
-            </div>
-          </div>
+            )}
 
-          <div className="mx-4 mt-3.5">
-            <CarteCollecte
-              nomClient={carte.clientNom}
-              misePar={formatMontant(carte.mise)}
-              jourCourant={carte.misesEncaissees}
-              solde={formatMontant(soldeRestituable(carte.misesEncaissees, carte.mise))}
-              cycle="1"
-            />
-          </div>
-
-          {/* Montant — imposé par la carte */}
-          <div className="mx-4 mt-4">
-            <p className="text-xs font-body font-semibold text-muted-foreground mb-1.5 px-0.5">
-              Montant de la mise
-            </p>
-            <div className="flex items-baseline justify-between bg-surface border border-hairline/80 rounded-xl px-5 py-3.5 shadow-xs">
-              <span className="font-headings font-bold text-3xl xs:text-4xl text-ink tabular-nums tracking-tight">
-                {formatMontant(carte.mise)}
-              </span>
-              <span className="text-sm font-body font-bold text-accent px-2.5 py-1 rounded-md bg-secondary">
-                FCFA
-              </span>
-            </div>
-            <p className="text-xs font-body text-muted-foreground mt-1.5 px-0.5">
-              Fixé à l’ouverture du carnet. Ne peut être altéré.
-            </p>
-          </div>
-
-          <div className="flex-1 min-h-6" />
-
-          {erreur && (
-            <p role="alert" className="mx-4 mb-3 rounded-xl bg-negative-tint/80 border border-negative/20 p-3.5 text-sm font-body font-medium text-negative">
-              {erreur}
-            </p>
-          )}
-
-          {/* Le moment signature du produit */}
-          {succes && (
-            <div
-              role="status"
-              className="anim-reussite mx-4 mb-4 rounded-lg bg-positive-tint border border-positive/30 p-4 flex items-center gap-3 shadow-md"
-            >
-              <div className="w-10 h-10 rounded-pill bg-positive text-white flex items-center justify-center shrink-0 shadow-xs">
-                <Icone nom="check-circle" taille={22} />
-              </div>
-              <p className="text-sm font-body font-semibold text-positive flex-1">
-                {succes}
+            {erreur && (
+              <p
+                role="alert"
+                className="mb-3 rounded-md bg-negative-tint p-3 font-body text-sm font-medium text-negative"
+              >
+                {erreur}
               </p>
-            </div>
-          )}
+            )}
 
-          {/* Bouton de confirmation signature */}
-          <div className="mx-4 mb-5">
-            <button
-              type="button"
-              onClick={confirmer}
-              disabled={
-                envoi ||
-                succes !== null ||
-                collecteurId === null ||
-                carte.misesEncaissees >= MISES_PAR_CYCLE
+            {/* `shadow-action` : la seule ombre teintée du Design System
+                (§3.5), réservée au geste qui fait vivre Kolek. */}
+            <Bouton
+              pleineLargeur
+              grand
+              icone="banknote"
+              className="shadow-action"
+              nomAccessible={
+                envoi
+                  ? undefined
+                  : `Encaisser ${formatMontant(carte.mise)} FCFA sur la carte de ${carte.clientNom}`
               }
-              /*
-                Aplat, depuis le 2026-09-17.
-
-                Il portait un dégradé horizontal qui permutait ses deux bornes
-                au survol. Sur le téléphone où ce bouton est pressé trente fois
-                par jour, le survol n'arrive jamais ; sur le bureau, il donnait
-                un clignotement de couleur qui n'apprenait rien. C'est le geste
-                qui fait vivre Kolek, et il portait le tic visuel le plus daté
-                du produit.
-
-                Ce qui le distingue de tous les autres boutons reste, et il est
-                mieux choisi : `shadow-action`, la seule ombre teintée de vert
-                du Design System §3.5, réservée à cette surface-là. La bordure
-                blanche translucide part avec le dégradé — elle dessinait un
-                liseré sur du vert, sans rien séparer.
-
-                L'icône n'est plus en `chart-mint` : les jetons `chart-*`
-                encodent des séries de données, et les emprunter pour un
-                ornement brouille la lecture des graphiques qui s'en servent
-                vraiment. Elle prend l'encre du bouton.
-              */
-              className="anim-pression w-full rounded-md bg-primary text-primary-foreground font-headings font-bold text-base xs:text-lg py-4 flex items-center justify-center gap-2.5 cursor-pointer shadow-action disabled:opacity-50 disabled:cursor-default"
+              disabled={envoi || collecteurId === null || complet}
+              onClick={confirmer}
             >
-              <Icone nom="check-circle" taille={22} />
-              <span>
-                {envoi
-                  ? 'Enregistrement…'
-                  : `Confirmer la mise de ${formatMontant(carte.mise)} FCFA`}
-              </span>
-            </button>
-            {carte.misesEncaissees >= MISES_PAR_CYCLE && (
-              <p className="text-xs text-center text-muted-foreground font-body mt-2.5">
-                Le cycle de {MISES_PAR_CYCLE} mises est complet. La carte doit être clôturée.
+              {envoi ? 'Enregistrement…' : 'Encaisser'}
+            </Bouton>
+            <p className="mt-2 text-center font-body text-xs text-muted-foreground">
+              {complet
+                ? `Le cycle de ${MISES_PAR_CYCLE} mises est complet. La carte doit être clôturée.`
+                : 'Montant fixé à l’ouverture de la carte.'}
+            </p>
+          </div>
+        </section>
+      ) : (
+        <div className="mx-4 mt-4 flex flex-1 flex-col">
+          {/* Le tampon est `aria-hidden` : cette ligne dit la même chose aux
+              lecteurs d'écran. Une mise refusée n'a ni tampon ni reçu. */}
+          <div role="status" className="space-y-1">
+            <p className="font-body text-base font-semibold text-ink">
+              <span className="font-mono">{formatMontant(carte.mise)}</span> FCFA pour{' '}
+              {carte.clientNom}, case <span className="font-mono">{ecrite.numeroCase}</span>.
+            </p>
+            {etat && (
+              <p className={`font-body text-sm font-medium ${TEINTE_ENVOI[etat]}`}>
+                {PHRASE_ENVOI[etat]}
+              </p>
+            )}
+            {remplie && (
+              <p className="font-body text-sm text-muted-foreground">
+                Reçu n° <span className="font-mono">{numeroDeRecu(ecrite.miseId)}</span>
               </p>
             )}
           </div>
-        </>
+
+          <div className="mt-auto flex gap-2 pb-5 pt-6">
+            <Bouton className="flex-1" onClick={onRetour}>
+              Client suivant
+            </Bouton>
+            {remplie && (
+              <Bouton
+                variante="contour"
+                icone="receipt-text"
+                onClick={() => onRecus(carte.clientNom)}
+              >
+                Reçu
+              </Bouton>
+            )}
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 }

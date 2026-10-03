@@ -62,8 +62,8 @@ export interface ClientCible {
 }
 
 /** La carte choisie pour l'encaissement, portée par la coquille : l'écran
-    « Encaisser » a besoin de savoir sur quelle carte il écrit, et c'est la
-    liste des clients qui le décide. */
+    « Encaisser » a besoin de savoir sur quelle carte il écrit. Elle se choisit
+    sur l'accueil (la carte à finir en premier) ou dans la liste de l'onglet. */
 export interface CarteChoisie {
   carteId: string;
   clientNom: string;
@@ -358,6 +358,8 @@ export function Coquille({
         <Encaisser
           collecteurId={collecteurId}
           carte={carteChoisie}
+          onChoisir={setCarteChoisie}
+          onRecus={allerAuxRecus}
           onNaviguer={naviguer}
           onEncaisse={() => {
             setRevision((r) => r + 1);

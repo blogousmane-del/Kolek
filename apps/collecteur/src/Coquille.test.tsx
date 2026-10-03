@@ -90,12 +90,18 @@ vi.mock('./ecrans/RetourPaiement', () => ({
 vi.mock('./ecrans/Encaisser', () => ({
   Encaisser: ({
     carte,
+    onChoisir,
     onEncaisse,
     onNaviguer,
+    onRecus,
   }: {
     carte: { carteId: string; misesEncaissees: number } | null;
+    onChoisir: (
+      carte: { carteId: string; clientNom: string; mise: number; misesEncaissees: number } | null,
+    ) => void;
     onEncaisse: () => void;
     onNaviguer: (cle: string) => void;
+    onRecus: (clientNom: string) => void;
   }) => (
     <>
       <div>écran Encaisser</div>
@@ -104,11 +110,20 @@ vi.mock('./ecrans/Encaisser', () => ({
       ) : (
         <div>Aucune carte choisie.</div>
       )}
+      <button
+        type="button"
+        onClick={() => onChoisir({ carteId: 'k9', clientNom: 'Ka', mise: 500, misesEncaissees: 4 })}
+      >
+        choisir k9
+      </button>
       <button type="button" onClick={onEncaisse}>
         confirmer
       </button>
       <button type="button" onClick={() => onNaviguer('clients')}>
         revenir aux clients
+      </button>
+      <button type="button" onClick={() => onRecus('Ka')}>
+        reçus de Ka
       </button>
     </>
   ),
@@ -306,6 +321,26 @@ describe('ce que la coquille fait de la carte encaissée', () => {
     fireEvent.click(within(barre).getByRole('button', { name: 'Encaisser' }));
 
     expect(await screen.findByText('Aucune carte choisie.')).toBeTruthy();
+  });
+
+  it('pose la carte choisie dans la liste de l’onglet, sans passer par Clients', async () => {
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
+
+    const barre = screen.getByRole('navigation', { name: 'Navigation principale' });
+    fireEvent.click(within(barre).getByRole('button', { name: 'Encaisser' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'choisir k9' }));
+
+    expect(await screen.findByText('carte k9 · jour 4')).toBeTruthy();
+  });
+
+  it('mène aux reçus du client qu’on vient d’encaisser', async () => {
+    render(<Coquille collecteurId="collecteur-1" onDeconnexion={vi.fn()} />);
+
+    const barre = screen.getByRole('navigation', { name: 'Navigation principale' });
+    fireEvent.click(within(barre).getByRole('button', { name: 'Encaisser' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'reçus de Ka' }));
+
+    expect(await screen.findByText('écran Recus')).toBeTruthy();
   });
 });
 
