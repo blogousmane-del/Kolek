@@ -2701,6 +2701,7 @@ export function Accueil({
         />
         <Onde
           lignes={10}
+          traitFixe
           className="pointer-events-none absolute inset-x-0 bottom-10 h-6 w-full text-or/25"
         />
 
@@ -3446,6 +3447,7 @@ function Bande({
     <header className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pb-5 pt-entete lg:rounded-xl lg:pt-6">
       <Onde
         lignes={8}
+        traitFixe
         className="pointer-events-none absolute inset-x-0 bottom-0 h-5 w-full text-or/30"
       />
       <div className="relative z-10 flex items-center gap-3">
@@ -5874,7 +5876,7 @@ par :
 | `Decompte` | `Decompte.tsx` | Décompte de caisse, total sous un double filet (§4.17). |
 | `Tampon` | `Tampon.tsx` | La marque d'un geste qui ne se défait pas (§4.16). |
 | `Feuille` | `Feuille.tsx` | Panneau flottant : feuille sur téléphone, boîte sur écran large. Voile `dark-canvas` à 48 %. |
-| `Onde`, `Rosace` | `Guilloche.tsx` | La gravure (§4.18). |
+| `Onde`, `Rosace` | `Guilloche.tsx` | La gravure (§4.18). `Onde traitFixe` pour une bande basse. |
 ```
 
 2. Dans §4.2, remplacer
@@ -5964,6 +5966,8 @@ La signature, et elle se mérite : trois places, pas une de plus.
 1. L'en-tête de l'accueil du collecteur : `Rosace` en filigrane (22 pétales, excentricité 0,38) et `Onde` en pied, or à 15 et 25 %. La rosace ne tourne plus.
 2. La bande de l'encaissement : `Onde` seule, or à 30 %.
 3. Le bord haut de chaque carte de collecte : `Onde` fine (10 px), vert coffre à 30 %.
+
+Les trois ondes passent `traitFixe` : le trait garde un demi-pixel à l'écran. Sans lui, une bande de 10 à 24 px écrase le trait du `viewBox` entre 0,06 et 0,14 px, et la gravure s'efface.
 
 L'or ne dit jamais un montant ni un état. Les écrans secondaires ne portent pas de gravure.
 ```
