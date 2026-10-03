@@ -41,7 +41,9 @@ export function Feuille({
   onFermer,
   children,
 }: {
+  /** Une ligne, tronquée au-delà : il porte l'essentiel, le montant d'un retrait. */
   titre: string;
+  /** Passe à la ligne : il porte souvent un nom, que le collecteur doit lire en entier. */
   sousTitre?: string;
   ouverte: boolean;
   onFermer: () => void;
@@ -106,7 +108,7 @@ export function Feuille({
           <div className="min-w-0">
             <h2 className="font-headings font-bold text-xl text-ink truncate m-0">{titre}</h2>
             {sousTitre && (
-              <p className="font-body text-sm text-muted-foreground truncate mt-0.5">{sousTitre}</p>
+              <p className="font-body text-sm text-muted-foreground break-words mt-0.5">{sousTitre}</p>
             )}
           </div>
           <button

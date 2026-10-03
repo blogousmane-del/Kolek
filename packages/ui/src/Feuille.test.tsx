@@ -33,4 +33,22 @@ describe('la feuille', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onFermer).toHaveBeenCalledOnce();
   });
+
+  it('laisse le sous-titre passer à la ligne : un nom long ne se coupe pas d’une ellipse', () => {
+    // Le montant tient dans le titre, qui reste sur une ligne. Le sous-titre porte
+    // le nom du client, qui peut être long : coupé, le collecteur confirmerait un
+    // retrait sans lire pour qui. Il passe donc à la ligne, et casse un mot trop
+    // long pour la largeur plutôt que de déborder.
+    const NOM = 'à Awa Traoré Koné, marché de gros de la zone industrielle de Yopougon Sud';
+    render(
+      <Feuille titre="Rendre 30 000 FCFA ?" sousTitre={NOM} ouverte onFermer={vi.fn()}>
+        <p>contenu</p>
+      </Feuille>,
+    );
+
+    const sousTitre = screen.getByText(NOM);
+
+    expect(sousTitre.classList.contains('truncate')).toBe(false);
+    expect(sousTitre.classList.contains('break-words')).toBe(true);
+  });
 });
