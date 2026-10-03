@@ -295,8 +295,9 @@ chantier l'emploie sur Retrait, les autres le reçoivent sans autre changement.
 « Encaisser », sous-titre « Choisis la carte du client. » Champ de recherche
 (nom, numéro ou marché : la règle `correspond` de `Clients.tsx`, déplacée
 dans `recherche.ts` sous le nom `correspondClient` pour servir aux deux), puis
-les cartes actives, **les plus avancées d'abord** (à égalité, par nom). Une
-carte à 31 mises n'y figure pas : elle relève du retrait. Chaque ligne est un
+les cartes en cours, sous le titre « Cartes en cours », **les plus avancées
+d'abord** (à égalité, par nom). Une carte à 31 mises n'y figure pas : elle
+relève du retrait. Chaque ligne est un
 bouton entier : nom, marché, mise par jour, jauge de 31 traits, `29/31`. La
 liste vient d'une vue pure, `cartesAEncaisser(tournee)`, à côté de
 `listeDepuis` : cartes au statut `active` sous 31 mises. Au-delà d'une page,
