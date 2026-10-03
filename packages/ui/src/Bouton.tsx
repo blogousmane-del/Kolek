@@ -39,6 +39,19 @@ interface Props {
    * l'explique est déjà à l'écran ; ce lien la fait lire avec lui.
    */
   decritPar?: string;
+  /**
+   * Le bouton ouvre et ferme un panneau : `true` quand ce panneau est déplié
+   * (`aria-expanded`). Sans cette propriété le bouton n'annonce rien, comme
+   * tout bouton ordinaire ; avec elle il dit toujours son état, « replié »
+   * compris.
+   */
+  deplie?: boolean;
+  /**
+   * L'identifiant du panneau que le bouton ouvre (`aria-controls`). À donner
+   * tant que ce panneau est dans la page : une référence vers un élément absent
+   * ne mène nulle part.
+   */
+  panneau?: string;
   /** Le bouton du geste principal d'un écran : 56 px au lieu de 44. */
   grand?: boolean;
 }
@@ -65,6 +78,8 @@ export function Bouton({
   className = '',
   nomAccessible,
   decritPar,
+  deplie,
+  panneau,
   grand = false,
 }: Props) {
   return (
@@ -75,6 +90,8 @@ export function Bouton({
       onClick={onClick}
       aria-label={nomAccessible}
       aria-describedby={decritPar}
+      aria-expanded={deplie}
+      aria-controls={panneau}
       // Deux tailles écrites en entier, et jamais l'une ajoutée par-dessus
       // l'autre : deux `min-h-*` dans une même classe, c'est l'ordre de la
       // feuille de style qui tranche, pas l'intention.

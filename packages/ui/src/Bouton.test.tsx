@@ -63,4 +63,36 @@ describe('Bouton', () => {
     expect(classes).not.toContain('min-h-14');
     expect(classes).not.toContain('text-lg');
   });
+
+  it('dit s’il commande un panneau replié ou déplié', () => {
+    const { rerender } = render(<Bouton deplie={false}>Détail</Bouton>);
+    const bouton = screen.getByRole('button', { name: 'Détail' });
+    expect(bouton.getAttribute('aria-expanded')).toBe('false');
+
+    rerender(<Bouton deplie>Détail</Bouton>);
+    expect(bouton.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('désigne le panneau qu’il commande', () => {
+    render(
+      <>
+        <Bouton deplie panneau="detail">
+          Détail
+        </Bouton>
+        <div id="detail">Le détail.</div>
+      </>,
+    );
+    const bouton = screen.getByRole('button', { name: 'Détail' });
+    const panneau = document.getElementById(bouton.getAttribute('aria-controls') ?? '');
+    expect(panneau?.textContent).toBe('Le détail.');
+  });
+
+  it('n’annonce ni état ni panneau quand on ne lui en donne pas', () => {
+    render(<Bouton>Fiche</Bouton>);
+    const bouton = screen.getByRole('button', { name: 'Fiche' });
+    // Un bouton ordinaire ne se dit pas « replié » : l'état n'a de sens que pour
+    // celui qui ouvre quelque chose.
+    expect(bouton.hasAttribute('aria-expanded')).toBe(false);
+    expect(bouton.hasAttribute('aria-controls')).toBe(false);
+  });
 });
