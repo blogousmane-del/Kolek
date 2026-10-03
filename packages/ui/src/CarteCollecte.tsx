@@ -35,7 +35,12 @@ interface Props {
    * prochaine case.
    */
   neuve?: number;
-  /** Ce qui se pose sur la carte, en haut à droite : le tampon d'un geste. */
+  /**
+   * Ce qui se pose sur la carte, en haut à droite : le tampon d'un geste.
+   *
+   * Le bloc du nom lui réserve sa largeur tant qu'il est là (`pr-30`) : le
+   * tampon ne pousse rien, il se pose par-dessus.
+   */
   tampon?: ReactNode;
   /** Ce qui coiffe la carte au-dessus du nom : son rôle à l'écran. */
   surtitre?: ReactNode;
@@ -129,7 +134,16 @@ export function CarteCollecte({
             quand la carte est réduite, où deux colonnes ne laisseraient au nom
             que quelques caractères. */}
         <div className="flex items-start justify-between gap-3 @max-[240px]:flex-col @max-[240px]:gap-1.5">
-          <div className="min-w-0">
+          {/* Avec un tampon, le bloc du nom lui laisse sa place. Le tampon est
+              posé en absolu : il ne pousse rien, et la fin d'un nom de plus
+              d'une quinzaine de lettres passait dessous. Mesuré en navigateur,
+              polices chargées : ENCAISSÉ 112 px, GARDÉE 110, CLÔTURÉE 113 de
+              large, penchés de 6 degrés (boîte englobante de 116,3, 114,1 et
+              117,6 px), posés à 12 px du bord (`right-3`) alors que le contenu
+              commence à 16 (`px-4`) : jusqu'à 111,5 px du nom passent sous le
+              plus large. `pr-30` (120 px) lui laisse 8,5 px d'air. Sans tampon
+              rien ne change : la carte garde toute sa largeur. */}
+          <div className={`min-w-0 ${tampon ? 'pr-30' : ''}`}>
             <p className="font-headings text-xl font-bold leading-tight text-ink @max-[240px]:text-base">
               {nomClient}
             </p>

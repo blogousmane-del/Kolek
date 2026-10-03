@@ -98,6 +98,24 @@ describe('CarteCollecte — le billet', () => {
     expect(screen.getByText('À finir en premier')).toBeTruthy();
   });
 
+  it('réserve la place du tampon sur le bloc du nom, et seulement quand il y en a un', () => {
+    // Le tampon est posé en absolu, en haut à droite, et ne pousse rien : mesuré
+    // en navigateur il couvre jusqu'à 117,6 px (CLÔTURÉE), à 12 px du bord. Sans
+    // réserve, la fin d'un nom de plus d'une quinzaine de lettres passait
+    // dessous. Une carte sans tampon, elle, garde toute sa largeur.
+    const sans = carte();
+    const blocSans = screen.getByText('Mariam').parentElement as HTMLElement;
+    expect(blocSans.classList.contains('pr-30')).toBe(false);
+    expect(document.querySelectorAll('.pr-30')).toHaveLength(0);
+    sans.unmount();
+
+    carte({ tampon: <span>tampon posé</span> });
+    const blocAvec = screen.getByText('Mariam').parentElement as HTMLElement;
+    expect(blocAvec.classList.contains('pr-30')).toBe(true);
+    // Le bloc du nom seul : ni la carte ni son pied n'en reçoivent.
+    expect(document.querySelectorAll('.pr-30')).toHaveLength(1);
+  });
+
   it('change le libellé du solde une fois la carte close', () => {
     carte({ etiquetteSolde: 'Rendu au client' });
     expect(screen.getByText('Rendu au client')).toBeTruthy();

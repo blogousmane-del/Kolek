@@ -12,7 +12,7 @@ import {
   usePagination,
   type CleNavCollecteur,
 } from '@kolek/ui';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import type { CarteChoisie } from '../Coquille';
 import { enregistrerMise } from '../ecritures';
@@ -292,9 +292,21 @@ function Selecteur({
                       <span className="block truncate font-body text-base font-semibold text-ink">
                         {c.clientNom}
                       </span>
-                      <span className="mt-0.5 block truncate font-body text-xs text-muted-foreground">
-                        {c.marche && `${c.marche} · `}
-                        <span className="font-mono">{formatMontant(c.mise)}</span>/j
+                      {/* Le marché se coupe, la mise jamais : elle est en fin de
+                          ligne, et dans un seul texte tronqué un marché de
+                          soixante lettres la cachait. */}
+                      <span className="mt-0.5 flex font-body text-xs text-muted-foreground">
+                        {c.marche && (
+                          <>
+                            <span className="truncate">{c.marche}</span>
+                            <span aria-hidden className="shrink-0 px-1">
+                              ·
+                            </span>
+                          </>
+                        )}
+                        <span className="shrink-0">
+                          <span className="font-mono">{formatMontant(c.mise)}</span>/j
+                        </span>
                       </span>
                       <Jauge faites={c.misesEncaissees} />
                     </span>
@@ -348,6 +360,12 @@ const TEINTE_ENVOI: Record<EtatEnvoiMise, string> = {
  * Après le succès, le bouton « Encaisser » n'est plus rendu du tout : le
  * serveur accepte deux mises le même jour sur une carte, et l'écran ne doit
  * pas en offrir une seconde. Le geste suivant est « Client suivant ».
+ *
+ * Le bloc du geste, avant comme après, est collant au-dessus de la barre du bas
+ * (`sticky bottom-nav`). Posé au bas du flux, il passait à moitié dessous sur un
+ * téléphone de 568 px de haut : le bouton le plus important du produit se
+ * trouvait sous un autre. Sur un écran assez haut son emplacement naturel est
+ * déjà au-dessus du seuil, et rien ne change.
  */
 function Confirmation({
   collecteurId,
@@ -369,6 +387,15 @@ function Confirmation({
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [ecrite, setEcrite] = useState<MiseEcrite | null>(null);
+  const etatRef = useRef<HTMLDivElement>(null);
+
+  // Au succès le bouton « Encaisser » disparaît, et le focus qu'il avait avec
+  // lui : il tomberait sur <body>, et la ligne d'état, insérée déjà remplie,
+  // resterait muette pour un lecteur d'écran. Elle le reçoit donc, comme le
+  // panneau de `Feuille` à son ouverture.
+  useEffect(() => {
+    if (ecrite !== null) etatRef.current?.focus();
+  }, [ecrite]);
 
   const complet = carte.misesEncaissees >= MISES_PAR_CYCLE;
   const numeroCase = carte.misesEncaissees + 1;
@@ -422,8 +449,14 @@ function Confirmation({
       </div>
 
       {ecrite === null ? (
-        // Sous le pouce : le bloc de caisse descend en bas de l'écran.
-        <section aria-label="Caisse" className="mx-4 mt-auto pb-5 pt-6">
+        // Sous le pouce : le bloc de caisse descend en bas de l'écran, et s'arrête
+        // au-dessus de la barre (`sticky bottom-nav`) quand l'écran est court.
+        // Le billet défile derrière lui, d'où le fond opaque ; sur bureau, sans
+        // barre, il reprend sa place dans le flux (`lg:static`).
+        <section
+          aria-label="Caisse"
+          className="sticky bottom-nav z-10 mx-4 mt-auto bg-canvas pb-5 pt-6 lg:static"
+        >
           <div className="rounded-xl border border-hairline bg-surface p-4">
             {!complet && (
               <div className="mb-4">
@@ -480,10 +513,17 @@ function Confirmation({
           </div>
         </section>
       ) : (
-        <div className="mx-4 mt-4 flex flex-1 flex-col">
+        // Collant comme le bloc de caisse, pour la même raison : « Client suivant »
+        // est le geste qui suit, il ne doit pas passer sous la barre. La ligne
+        // d'état reste avec ses commandes.
+        <div className="sticky bottom-nav z-10 mx-4 mt-4 flex flex-1 flex-col bg-canvas lg:static">
           {/* Le tampon est `aria-hidden` : cette ligne dit la même chose aux
-              lecteurs d'écran. Une mise refusée n'a ni tampon ni reçu. */}
-          <div role="status" className="space-y-1">
+              lecteurs d'écran. Une mise refusée n'a ni tampon ni reçu.
+
+              `tabIndex={-1}` et `outline-none` : elle prend le focus par
+              programme (voir l'effet plus haut), sans entrer dans l'ordre de
+              tabulation ni dessiner un cadre autour d'un texte. */}
+          <div ref={etatRef} role="status" tabIndex={-1} className="space-y-1 outline-none">
             <p className="font-body text-base font-semibold text-ink">
               <span className="font-mono">{formatMontant(carte.mise)}</span> FCFA pour{' '}
               {carte.clientNom}, case <span className="font-mono">{ecrite.numeroCase}</span>.
@@ -504,7 +544,10 @@ function Confirmation({
             <Bouton className="flex-1" onClick={onRetour}>
               Client suivant
             </Bouton>
-            {remplie && (
+            {/* « Reçu » attend que la mise soit partie : l'écran des reçus ne lit
+                que le journal du serveur, qui ne connaît pas encore une mise
+                gardée. Le numéro, lui, est déjà dit plus haut. */}
+            {etat === 'envoyee' && (
               <Bouton
                 variante="contour"
                 icone="receipt-text"

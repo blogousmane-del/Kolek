@@ -1,5 +1,6 @@
 import { formatMontant, soldeRestituable } from '@kolek/core';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { horodatageTampon } from '@kolek/ui';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -12,6 +13,7 @@ import {
 } from '../hors-ligne/fabriques';
 import type { MiseLocale } from '../hors-ligne/modele';
 import { TourneeAbsente } from '../hors-ligne/vues';
+import { LIGNES_AFFICHEES_PAR_PAGE } from '../pagination';
 
 /**
  * L'encaissement, en trois temps : choisir la carte, confirmer, encaissé.
@@ -25,6 +27,12 @@ import { TourneeAbsente } from '../hors-ligne/vues';
  * Ce qu'elles ajoutent : le tampon dit où en est la mise, et il ne ment pas.
  * GARDÉE tant qu'elle attend sur le téléphone, ENCAISSÉ une fois partie, rien
  * du tout si le serveur l'a refusée.
+ *
+ * Et ce que la revue du 2026-10-03 a fait dire à l'écran : « Reçu » n'est
+ * offert qu'une fois la mise partie (l'écran des reçus ne lit que le journal
+ * du serveur, il ne connaît pas encore une mise gardée) ; la ligne d'état
+ * prend le focus que le bouton emporte avec lui ; les blocs du geste sont
+ * collants, pour rester au-dessus de la barre du bas sur un petit téléphone.
  */
 
 const enregistrerMise = vi.fn();
@@ -59,6 +67,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   enregistrerMise.mockReset();
+  vi.useRealTimers();
 });
 
 function ecran(supplement: Record<string, unknown> = {}) {
@@ -93,6 +102,24 @@ async function lignesEtat() {
 function tampon() {
   return document.querySelector('[data-tampon]')?.getAttribute('data-tampon') ?? null;
 }
+
+/** La mise de `ECRITE`, telle que la tournée la porte une fois partie. */
+const PARTIE: MiseLocale = {
+  id: 'abcdef1234',
+  carteId: 'k7',
+  montant: 1000,
+  encaisseLe: INSTANT,
+  encaissePar: COLLECTEUR,
+  estCommission: false,
+};
+
+/** L'opération a quitté la file : la mise est dans la tournée relue. */
+function mettreEnvoyee() {
+  etatHorsLigne = horsLigne({ tournee: tournee({ mises: [PARTIE] }) });
+}
+
+/** Les classes d'un bloc collant au-dessus de la barre du bas, chacune une à une. */
+const BLOC_COLLANT = ['sticky', 'bottom-nav', 'z-10', 'bg-canvas', 'lg:static'];
 
 describe('temps 1, choisir la carte', () => {
   const TOURNEE = tournee({
@@ -193,6 +220,71 @@ describe('temps 1, choisir la carte', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByText('Aucune carte à encaisser')).toBeNull();
   });
+
+  // Vingt-cinq cartes de 1 à 25 mises : le nombre de mises décide de l'ordre, la
+  // plus avancée d'abord, donc « Client 25 » ouvre la liste.
+  function vingtCinqCartes() {
+    const clients = Array.from({ length: 25 }, (_, i) =>
+      client(`c${i + 1}`, `Client ${String(i + 1).padStart(2, '0')}`),
+    );
+    const cartes = clients.map((c, i) => carteLocale(`k${i + 1}`, c.id, { misesEncaissees: i + 1 }));
+    return tournee({ clients, cartes });
+  }
+
+  it('découpe la liste comme celle des clients : une page pleine, puis le reste', () => {
+    etatHorsLigne = horsLigne({ tournee: vingtCinqCartes() });
+    rendre({ carte: null });
+
+    expect(lignes()).toHaveLength(LIGNES_AFFICHEES_PAR_PAGE);
+    expect(lignes()[0]).toMatch(/^Client 25/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+
+    expect(lignes()).toHaveLength(25 - LIGNES_AFFICHEES_PAR_PAGE);
+    expect(lignes()[0]).toMatch(/^Client 05/);
+  });
+
+  it('repart de la première page à chaque recherche nouvelle', () => {
+    etatHorsLigne = horsLigne({ tournee: vingtCinqCartes() });
+    rendre({ carte: null });
+    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+    expect(lignes()).toHaveLength(25 - LIGNES_AFFICHEES_PAR_PAGE);
+
+    // « client » les retient toutes : vingt-cinq résultats, donc encore deux
+    // pages. Sans retour à la première, la seconde resterait affichée, avec ses
+    // cinq lignes, et le collecteur croirait n'avoir trouvé que cinq clients.
+    chercher('client');
+
+    expect(lignes()).toHaveLength(LIGNES_AFFICHEES_PAR_PAGE);
+    expect(lignes()[0]).toMatch(/^Client 25/);
+  });
+
+  it('garde la mise lisible sous un marché très long : seul le marché se tronque', () => {
+    const MARCHE = 'Grand marché de gros de la zone industrielle de Yopougon Sud';
+    expect(MARCHE).toHaveLength(60);
+    etatHorsLigne = horsLigne({
+      tournee: tournee({
+        clients: [{ ...client('c1', 'Mariam Traoré'), marche: MARCHE }],
+        cartes: [carteLocale('k1', 'c1', { mise: 2000, misesEncaissees: 12 })],
+      }),
+    });
+    rendre({ carte: null });
+
+    const ligne = within(screen.getByRole('list', { name: 'Cartes à encaisser' })).getByRole(
+      'button',
+    );
+    const elements = [...ligne.querySelectorAll('span')];
+    const mise = elements.find((e) => e.textContent === formatMontant(2000)) as HTMLElement;
+    const marche = elements.find((e) => e.textContent === MARCHE) as HTMLElement;
+
+    // Chacun son élément : la mise ne partage plus la ligne coupée du marché.
+    expect(mise, 'la mise a son propre élément').toBeTruthy();
+    expect(marche, 'le marché a son propre élément').toBeTruthy();
+    expect(mise.classList.contains('font-mono')).toBe(true);
+    expect(mise.closest('.shrink-0'), 'la mise ne rétrécit pas').toBeTruthy();
+    expect(mise.closest('.truncate'), 'la mise n’est pas dans une ligne tronquée').toBeNull();
+    expect(marche.classList.contains('truncate')).toBe(true);
+  });
 });
 
 describe('temps 2, confirmer', () => {
@@ -272,6 +364,19 @@ describe('temps 2, confirmer', () => {
     // réessayer sans quitter l'écran.
     expect(bouton().disabled).toBe(false);
   });
+
+  it('pose le bloc de caisse au-dessus de la barre du bas, collant, sur un petit téléphone', () => {
+    // Sur 568 px de haut, le bouton du geste passait à moitié sous la barre. Le
+    // bloc rend sa place dans le flux sur bureau (`lg:static`), où il n'y a pas
+    // de barre, et reste opaque : le billet défile dessous.
+    rendre();
+
+    const bloc = screen.getByRole('region', { name: 'Caisse' });
+    for (const classe of BLOC_COLLANT) {
+      expect(bloc.classList.contains(classe), classe).toBe(true);
+    }
+    expect(within(bloc).getByRole('button', { name: /sur la carte de Hj$/ })).toBeTruthy();
+  });
 });
 
 describe('temps 3, encaissé', () => {
@@ -311,15 +416,7 @@ describe('temps 3, encaissé', () => {
     await screen.findByRole('status');
 
     // L'opération a quitté la file ; la mise est dans la tournée relue.
-    const partie: MiseLocale = {
-      id: 'abcdef1234',
-      carteId: 'k7',
-      montant: 1000,
-      encaisseLe: INSTANT,
-      encaissePar: COLLECTEUR,
-      estCommission: false,
-    };
-    etatHorsLigne = horsLigne({ tournee: tournee({ mises: [partie] }) });
+    mettreEnvoyee();
     rerender(ecran());
 
     expect(tampon()).toBe('Encaissé');
@@ -344,6 +441,8 @@ describe('temps 3, encaissé', () => {
     expect(document.querySelectorAll('[data-etat]')).toHaveLength(31);
     expect(document.querySelector('[data-etat="neuve"]')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reçu' })).toBeNull();
+    // Il reste une sortie : sans elle, l'écran se refermerait sur un refus.
+    expect(screen.getByRole('button', { name: 'Client suivant' })).toBeTruthy();
   });
 
   it('ne laisse plus de bouton Encaisser : un second appui écrirait une seconde mise', async () => {
@@ -362,7 +461,7 @@ describe('temps 3, encaissé', () => {
     const onEncaisse = vi.fn();
     const onChoisir = vi.fn();
     const onRecus = vi.fn();
-    rendre({ onEncaisse, onChoisir, onRecus });
+    const { rerender } = rendre({ onEncaisse, onChoisir, onRecus });
 
     fireEvent.click(bouton());
     await screen.findByRole('status');
@@ -370,7 +469,87 @@ describe('temps 3, encaissé', () => {
     expect(onEncaisse).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Client suivant' }));
     expect(onChoisir).toHaveBeenCalledWith(null);
+
+    // Les reçus ne s'ouvrent qu'une fois la mise partie : voir plus bas.
+    mettreEnvoyee();
+    rerender(ecran({ onEncaisse, onChoisir, onRecus }));
     fireEvent.click(screen.getByRole('button', { name: 'Reçu' }));
     expect(onRecus).toHaveBeenCalledWith('Hj');
+  });
+
+  it('n’offre pas « Reçu » tant que la mise attend : l’écran des reçus ne la connaît pas encore', async () => {
+    // `Recus` ne lit que le journal du serveur. Sur une mise gardée il dirait
+    // « Cet écran demande le réseau. », ou montrerait une liste sans ce reçu.
+    enregistrerMise.mockResolvedValue(ECRITE);
+    rendre();
+
+    fireEvent.click(bouton());
+
+    // Le numéro, lui, existe déjà : c'est celui de la mise.
+    expect((await lignesEtat())[2]).toBe('Reçu n° ABCDEF12');
+    expect(tampon()).toBe('Gardée');
+    expect(screen.queryByRole('button', { name: 'Reçu' })).toBeNull();
+  });
+
+  it('offre « Reçu » dès que la mise est partie, sur le même écran', async () => {
+    enregistrerMise.mockResolvedValue(ECRITE);
+    const { rerender } = rendre();
+
+    fireEvent.click(bouton());
+    await screen.findByRole('status');
+    expect(screen.queryByRole('button', { name: 'Reçu' })).toBeNull();
+
+    mettreEnvoyee();
+    rerender(ecran());
+
+    expect(screen.getByRole('button', { name: 'Reçu' })).toBeTruthy();
+    expect((await lignesEtat())[2]).toBe('Reçu n° ABCDEF12');
+  });
+
+  it('donne le focus à la ligne d’état : le bouton qui l’avait vient de disparaître', async () => {
+    enregistrerMise.mockResolvedValue(ECRITE);
+    rendre();
+    const b = bouton();
+    b.focus();
+    expect(document.activeElement).toBe(b);
+
+    fireEvent.click(b);
+    const etat = await screen.findByRole('status');
+
+    // Sans ce geste le focus tombe sur <body> : celui qui commande au clavier ou
+    // au lecteur d'écran perd sa place, et la ligne d'état, insérée déjà
+    // remplie, n'est pas annoncée. `waitFor` : l'effet suit l'insertion.
+    await waitFor(() => expect(document.activeElement).toBe(etat));
+  });
+
+  it('pose « Client suivant » au-dessus de la barre du bas, avec la ligne d’état qu’il accompagne', async () => {
+    enregistrerMise.mockResolvedValue(ECRITE);
+    rendre();
+
+    fireEvent.click(bouton());
+    const bloc = (await screen.findByRole('status')).parentElement as HTMLElement;
+
+    for (const classe of BLOC_COLLANT) {
+      expect(bloc.classList.contains(classe), classe).toBe(true);
+    }
+    // Le bloc porte la ligne d'état ET les commandes : elles restent ensemble.
+    expect(within(bloc).getByRole('button', { name: 'Client suivant' })).toBeTruthy();
+  });
+
+  it('date la mise et le tampon de l’instant de l’appui', async () => {
+    // `Date` seul est figé : les minuteurs de Testing Library restent vrais.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const instant = new Date(2026, 4, 17, 8, 5, 31);
+    vi.setSystemTime(instant);
+    enregistrerMise.mockResolvedValue(ECRITE);
+    rendre();
+
+    fireEvent.click(bouton());
+    await screen.findByRole('status');
+
+    expect(enregistrerMise.mock.calls[0]?.[3]).toEqual(instant);
+    expect(document.querySelector('[data-tampon]')?.textContent).toContain(
+      horodatageTampon(instant),
+    );
   });
 });
