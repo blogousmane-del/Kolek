@@ -5218,9 +5218,11 @@ import { formatMontant } from '@kolek/core';
 ```
 
 2. Dans tout le fichier, remplacer `{ name: 'Oui, faire le retrait' }` par
-   `{ name: /^Oui, rendre/ }` (cinq occurrences : deux dans « le retrait
-   attend la file et le réseau », deux dans « les filtres », une dans « la
-   pagination »).
+   `{ name: /^Oui, rendre/ }` (sept occurrences : les cinq d'origine, deux
+   dans « le retrait attend la file et le réseau », deux dans « les filtres »,
+   une dans « la pagination » ; et les deux qu'a ajoutées le correctif de la
+   tâche 11, dans « relie aussi la raison à la confirmation » et dans « la
+   liste en lignes »).
 
 3. Dans « ne laisse pas valider une confirmation ouverte quand une mise de la
    carte entre en file », remplacer
@@ -5387,9 +5389,10 @@ npm test -w @kolek/collecteur -- src/ecrans/Retrait.test.tsx
 ```
 
 Attendu : rouges celles qui cherchent la feuille, « Oui, rendre » ou l'état
-clôturé (« nomme les deux faits », les deux confirmations du §7, les deux
-fermetures de « les filtres » et « la pagination », tout « le décompte » et
-toute « la carte clôturée »). Les autres restent vertes.
+clôturé (« nomme les deux faits », les deux confirmations du §7, « relie aussi
+la raison à la confirmation », les deux fermetures de « les filtres » et « la
+pagination », tout « le décompte » et toute « la carte clôturée »). Les autres
+restent vertes.
 
 - [ ] **Step 6 : La feuille du décompte et la carte clôturée**
 
@@ -5527,7 +5530,7 @@ function DecompteRetrait({
     const retraitBloque = retraitBloquePour(carte.carteId);
     /** Le lien du bouton éteint à sa raison. Dérivé de la carte et non de
         `useId` : cette fonction rend une ligne par carte, un crochet n'y a pas sa
-        place. Une seule ligne est dépliée à la fois, donc l'`id` est unique. */
+        place. L'`id` porte la carte : deux lignes ne peuvent pas le partager. */
     const idRaison = `raison-${carte.carteId}`;
 
     return (
