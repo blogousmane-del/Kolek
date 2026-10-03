@@ -5712,16 +5712,18 @@ par :
               onClick={confirmer}
               disabled={envoi || bloqueConfirmation !== null}
             >
+              {/* Un seul span : `Bouton` est un conteneur flex, et des morceaux
+                  frères y deviendraient des éléments séparés, insécables. */}
               {envoi ? (
                 'Retrait…'
               ) : (
-                <>
+                <span>
                   Oui, rendre{' '}
                   <span className="font-mono font-medium">
                     {formatMontant(aConfirmer.restituable)}
                   </span>{' '}
                   FCFA
-                </>
+                </span>
               )}
             </Bouton>
             <Bouton pleineLargeur variante="contour" onClick={fermerDecompte} disabled={envoi}>
