@@ -381,7 +381,11 @@ cartes » et, si le cycle était complet, « Activer une carte » (le même
 `ActiverCarte` que dans le dépli). Sa phrase d'aujourd'hui (« son solde reste
 dû au client ») serait fausse après un retrait : `ActiverCarte` reçoit une
 propriété facultative, `explication`, et l'écran clôturé y passe « La carte
-précédente est close. La nouvelle repart de la case 1. »
+précédente est close. La nouvelle repart de la case 1. » Une fois la carte
+ouverte, la commande laisse sa place à « Nouvelle carte ouverte. Elle repart
+de la case 1. », qui prend le focus : une seconde touche ouvrirait une seconde
+carte. En arrivant sur l'écran clôturé, la page remonte en haut et la phrase
+« Remets… » prend le focus.
 
 ## Écarts assumés avec les maquettes
 
