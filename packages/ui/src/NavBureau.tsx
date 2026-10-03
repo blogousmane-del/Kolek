@@ -56,9 +56,9 @@ const TOURNEE: Entree[] = [
 ];
 
 const SOIR: Entree[] = [
-  { cle: 'rapprochement', icone: 'refresh-cw', libelle: 'Rapprochement' },
+  { cle: 'rapprochement', icone: 'scale', libelle: 'Rapprochement' },
   { cle: 'bilans', icone: 'bar-chart-2', libelle: 'Bilan' },
-  { cle: 'recus', icone: 'receipt', libelle: 'Reçus' },
+  { cle: 'recus', icone: 'receipt-text', libelle: 'Reçus' },
   { cle: 'alertes', icone: 'bell', libelle: 'Alertes' },
 ];
 
