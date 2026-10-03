@@ -228,8 +228,12 @@ export function Accueil({
                     })
                   }
                 >
-                  Encaisser{' '}
-                  <span className="font-mono font-medium">{formatMontant(carteDuJour.mise)}</span>
+                  {/* Un seul span : `Bouton` est un conteneur flex, et des morceaux
+                      frères y deviendraient des éléments séparés, insécables. */}
+                  <span>
+                    Encaisser{' '}
+                    <span className="font-mono font-medium">{formatMontant(carteDuJour.mise)}</span>
+                  </span>
                 </Bouton>
                 <Bouton
                   variante="contour"

@@ -148,7 +148,7 @@ describe('les commandes sous la carte à finir en premier', () => {
   it('pose le montant de l’encaissement en chiffres de caisse', async () => {
     // Plex Mono pour tout montant qu'on compte : le mot reste dans la police du
     // texte, le nombre seul passe en mono. Le nom accessible ne change pas, il
-    // dit déjà le montant en toutes lettres.
+    // dit déjà le montant.
     chargerTableauCollecteur.mockResolvedValue(TABLEAU);
     rendre();
     await tableauLu();
@@ -160,6 +160,17 @@ describe('les commandes sous la carte à finir en premier', () => {
 
     expect(montant, 'le montant doit être dans un span en Plex Mono').not.toBeNull();
     expect(montant?.textContent).toBe(formatMontant(5000));
+    // `font-medium` : seul le 500 de Plex Mono est livré, et le bouton est en
+    // semi-gras. Sans lui, le navigateur fabrique un faux gras.
+    expect(montant?.className).toContain('font-medium');
+
+    // Le mot et le montant sont dans UN seul élément, pas deux frères dans le
+    // bouton. `Bouton` est un conteneur flex : deux frères y deviennent deux
+    // éléments, le montant (insécable) ne passe plus à la ligne, le bouton ne
+    // peut plus se resserrer et, à 320 px, « Fiche » sort de la carte.
+    const libelle = montant?.parentElement;
+    expect(libelle, 'le mot et le montant doivent partager un même élément').not.toBe(bouton);
+    expect(libelle?.textContent).toBe(`Encaisser ${formatMontant(5000)}`);
     // Le libellé visible reste « Encaisser » + le montant, séparés par une espace.
     expect(bouton.textContent).toBe(`Encaisser ${formatMontant(5000)}`);
   });
