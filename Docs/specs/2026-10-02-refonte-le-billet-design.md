@@ -128,8 +128,7 @@ Trois familles, chacune avec un métier :
 
 La règle tient en une ligne : **un montant qu'on compte est en Plex Mono ; le
 total du jour est en Bricolage, c'est l'affiche.** Jamais une phrase en
-chasse fixe : dans « 23 mises · dernière à 11:42 », seuls `23` et `11:42` le
-sont.
+chasse fixe : dans « Encaissé aujourd'hui · 23 mises », seul `23` l'est.
 
 Les tailles restent celles de l'échelle (`taillesTexte`), avec leur rôle
 documenté : nom sur la carte en `text-xl`, solde de carte en `text-2xl`,
@@ -166,7 +165,8 @@ elle représente un objet : la carte de collecte.
 
 ### La gravure
 
-La signature, et elle se mérite. Trois places, pas une de plus :
+La signature, et elle se mérite. Trois places, pas une de plus (les écrans de
+connexion mis à part, voir plus bas) :
 
 1. **L'en-tête de l'accueil** : rosace en filigrane à droite (`Rosace`,
    22 pétales, excentricité 0,38) et bande `Onde` en pied, or à 15 et 25 %.
@@ -175,7 +175,11 @@ La signature, et elle se mérite. Trois places, pas une de plus :
 3. **Le bord haut de chaque carte de collecte** : `Onde` fine (10 px), vert
    coffre à 30 %. C'est elle qui fait de la carte un billet.
 
-Les écrans secondaires n'en portent pas.
+Les écrans secondaires n'en portent pas. Seuls font exception les trois
+écrans de connexion (`EcranConnexion`, `MotDePasseOublie`,
+`NouveauMotDePasse`) : ils portent déjà la gravure de la vitrine, rosace
+tournante en or à 15 % et onde en or à 10 %, et la gardent jusqu'à leur
+refonte (chantier 2).
 
 ### Icônes
 
@@ -231,10 +235,10 @@ gravure.
 | Composant | Ce qui change | Effet hors collecteur |
 |---|---|---|
 | `CarteCollecte` | Devient le billet : fond `surface`, filet `hairline`, `Onde` en haut, nom en Bricolage, mise et solde en Plex Mono, pastille du cycle quand l'écran le connaît. Cases : payées en `primary`, la prochaine cerclée de 2 px, à venir en `canvas` bordée de `trait`/40. Plus de dégradé, de cercles ni de verre. Mêmes propriétés, même sens de `jourCourant` (les mises encaissées) ; **`cycle` devient facultatif** : l'accueil et l'encaissement écrivaient « Cycle 1 » en dur, ce qui était faux pour un client à sa deuxième carte, et ne le passent plus. En plus, `neuve` (la case qu'on vient de payer, en `positive`), `tampon` et `surtitre` (des nœuds), `etiquetteSolde`, et `close` (une carte clôturée ne cercle plus de prochaine case). Le libellé « Mise / jour » et le montant qui le suit restent frères : la fiche les lit. Le compteur devient `29/31`, d'un seul tenant. Le format réduit garde ses huit colonnes sous 240 px. | **Vitrine** : le téléphone du hero montre le billet. Rien d'autre n'y bouge. **Fiche client** (chantier 2) : son carrousel montre déjà le billet. |
-| `NavMobile` | Cinq entrées à plat. « Encaisser » devient une **touche** dans la barre (rectangle `primary`, rayon `lg`, icône `banknote`), plus un rond qui flotte. Onglet actif : encre `primary` et filet de 2 px au-dessus, `aria-current="page"`. | Aucun |
+| `NavMobile` | Cinq entrées à plat. « Encaisser » devient une **touche** dans la barre (rectangle `primary`, rayon `lg`, icône `banknote`), plus un rond qui flotte. Onglet actif : encre `primary` et filet de 2 px collé sous le bord haut de la barre, hors du flux, `aria-current="page"`. | Aucun |
 | `NavBureau` | Icône `banknote` | Aucun |
-| **`Outils`** (nouveau) | La grille des outils de l'accueil : deux colonnes de boutons neutres (`surface`, `hairline`, rayon `lg`, 52 px), icône `primary` à gauche, libellé. Remplace `ActionsRapides` sur l'accueil du collecteur ; `ActionsRapides` ne bouge pas, l'administration s'en sert. | Aucun |
-| `Bouton` | Cinq propriétés facultatives. `nomAccessible` (posée en `aria-label`, et qui contient le libellé visible) : le bouton « Encaisser 2 000 » de la carte doit dire sur quelle carte il agit. `grand` (56 px, `text-lg`) : le geste d'un écran qui fait bouger l'argent ; une hauteur passée par `className` se disputerait avec `min-h-11`. `decritPar` (posée en `aria-describedby`) : la raison d'un bouton éteint, quand cette phrase est déjà à l'écran (« Reçu » tant que la mise n'est que gardée) ; `title` reste l'infobulle. `deplie` et `panneau` (posées en `aria-expanded` et `aria-controls`) : un bouton qui ouvre un panneau dit son état et le désigne, comme « Activer une carte ». `Bouton` est un conteneur flex (`gap-2`) : un libellé qui mêle du texte et un montant en Plex Mono tient dans un seul `<span>`, sans quoi ses morceaux deviennent des éléments insécables qui débordent à 320 px. Variantes inchangées. | Aucun (rien ne les passe) |
+| **`Outils`** (nouveau) | La grille des outils de l'accueil : deux colonnes, quatre avec la barre latérale (`lg`), de boutons neutres (`surface`, `hairline`, rayon `lg`, 52 px), icône `primary` à gauche, libellé. Remplace `ActionsRapides` sur l'accueil du collecteur ; `ActionsRapides` ne bouge pas, l'administration s'en sert. | Aucun |
+| `Bouton` | Cinq propriétés facultatives. `nomAccessible` (posée en `aria-label`, et qui contient le libellé visible) : le bouton « Encaisser 2 000 » de la carte doit dire sur quelle carte il agit. `grand` (56 px, `text-lg`) : le geste d'un écran qui fait bouger l'argent ; une hauteur passée par `className` se disputerait avec `min-h-11`. `decritPar` (posée en `aria-describedby`) : la raison d'un bouton éteint, quand cette phrase est déjà à l'écran (« Reçu » tant que la mise n'est que gardée) ; `title` reste l'infobulle. `deplie` et `panneau` (posées en `aria-expanded` et `aria-controls`) : un bouton qui ouvre un panneau dit son état et le désigne, comme « Activer une carte ». `Bouton` est un conteneur flex (`gap-2`) : un libellé qui mêle du texte et un montant en Plex Mono tient dans un seul `<span>`, sans quoi ses morceaux deviennent des éléments séparés ; le montant, insécable, ne passe plus à la ligne, le bouton ne se resserre plus et, à 320 px, « Fiche » sort de la carte de l'accueil. Variantes inchangées. | Aucun (rien ne les passe) |
 | `Icone` | `banknote`, `scale`, `receipt-text` | Les trois fronts : quelques centaines d'octets |
 | `Feuille` | Rayon `xl` en haut, poignée, voile `darkCanvas` à 48 %. Elle sert désormais au décompte du retrait. | Aucun |
 | **`Tampon`** (nouveau) | Voir plus haut | Aucun |
@@ -315,10 +319,11 @@ vidée) et **« Reçu »** (les reçus de ce client, par le chemin `allerAuxRecu
 qui existe). « Reçu » est là dès que la mise est écrite, mais éteint tant
 qu'elle n'est que gardée sur le téléphone : l'écran des reçus ne lit que le
 journal du serveur, qui ne la connaît pas encore. Il s'allume quand la mise
-est partie, et disparaît si le serveur la refuse. Sa place n'apparaît jamais
-sous le pouce : l'envoi arrive un aller-retour après l'appui, quand le pouce
-vise « Client suivant ». Les deux commandes sont dans un bloc collant
-au-dessus de la barre, comme le bloc de caisse. Après le succès, le bouton
+est partie, et disparaît si le serveur la refuse. Il ne surgit jamais sous le
+pouce : sa place est prise d'avance, car l'envoi arrive un aller-retour après
+l'appui, quand le pouce vise « Client suivant ». Les deux commandes sont dans
+un bloc collant au-dessus de la barre, comme le bloc de caisse. Après le
+succès, le bouton
 « Encaisser » n'est plus rendu du tout : le serveur accepte deux mises le même
 jour sur une carte, et l'écran ne doit pas en offrir une seconde. Le focus
 qu'avait le bouton passe à la ligne d'état. Les erreurs gardent leur forme et
@@ -425,7 +430,8 @@ blanc translucide des écrans) ; `--font-mono` et `--color-trait` dans
 - `Decompte` : lignes, total, montants par `formatMontant`.
 - `NavMobile` : cinq entrées, la touche dans la barre (plus de `-mt-5`),
   icône `banknote`, `aria-current` sur l'entrée active.
-- `Outils` : deux colonnes, aucune classe `tuile`, un bouton par outil.
+- `Outils` : deux colonnes, quatre avec la barre latérale (`lg`), aucune classe
+  `tuile`, un bouton par outil.
 - `Bouton` : `nomAccessible` devient l'`aria-label`, et son absence n'en pose
   aucun.
 

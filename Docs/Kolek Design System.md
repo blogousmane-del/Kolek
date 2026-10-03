@@ -44,22 +44,27 @@ L'image fournie est la **maquette de représentation de notre Dashboard Admin** 
 **Ce qu'on concrétise pour Kolek** (la maquette reste la cible ; on remplace seulement le placeholder)
 - Le **`$` devient FCFA** (et on retire les centimes — le franc CFA n'a pas de sous-unité).
 - Contenu réel : **nos données** (collecteurs, clients, cartes, mises) et **le français**, à la place des noms, marques et montants de démonstration.
-- **Aucun or dans les applications** : l'admin et le collecteur collent strictement à la maquette (vert profond, neutres, vert/corail sémantiques, pastels de graphique). Décision actée.
-- **L'or est une couleur de marque, pas une couleur d'interface.** `--color-or` et `--color-or-doux` n'existent que pour le logo, le favicon, l'image Open Graph et la vitrine — les surfaces qui *vendent* Kolek. Les surfaces qui *manipulent l'argent* n'en portent pas une trace. La distinction n'est pas cosmétique : sur un écran d'encaissement, l'or désignerait une valeur, et aucune valeur de ce produit n'est or.
+- **Dans les applications, l'or est la pièce du logo et la gravure sur fond sombre, rien d'autre.** L'admin et le collecteur collent pour le reste strictement à la maquette (vert profond, neutres, vert/corail sémantiques, pastels de graphique). Jamais sur un montant, jamais sur un état. L'histoire de la règle reste lisible : « Aucun or dans l'interface » était une décision actée, reprise par la v2 (2026-08-16) ; elle a été précisée le 2026-09-02 en « aucun or dans les applications » (l'or est de la marque, pas de l'interface), puis amendée par *Le billet* le 2026-10-02, qui donne à l'or une place : la gravure (§4.18).
+- **L'or est une couleur de marque, pas une couleur d'interface.** `--color-or` et `--color-or-doux` servent le logo, le favicon, l'image Open Graph et la vitrine — les surfaces qui *vendent* Kolek — et, depuis *Le billet*, la gravure des applications : sur fond sombre, entre 15 et 30 % d'opacité (§4.18). Ni un montant ni un état n'en portent la moindre trace. La distinction n'est pas cosmétique : posé sur un montant ou sur un état, l'or désignerait une valeur, et aucune valeur de ce produit n'est or.
 - **Les quatre aplats de tuile ne sont pas de l'or, et voici où passe la
   frontière.** `tuileGestion` (`#F1E4C9`) et son encre (`#6A5218`) sont des
   jaunes : la question se pose donc pour de bon. Ce qui les sépare de l'or n'est
   pas la teinte mais l'emploi — l'or *désigne une valeur*, l'aplat *dit à quelle
-  famille une destination appartient*. La règle au-dessus reste entière, aucune
-  surface d'encaissement ne porte d'or, et un test tient l'écart plutôt qu'un
+  famille une destination appartient*. La règle au-dessus tient toujours : l'or
+  ne dit jamais un montant ni un état, et un test tient l'écart plutôt qu'un
   commentaire.
 
   Pourquoi une famille de destination existe à côté de la palette sémantique :
   celle-ci décrit des **états** — succès, erreur, information — et l'accueil du
-  collecteur affiche **dix destinations ensemble**. Tout y ramener rendait
-  *Retrait* et *Bilan* identiques, deux boutons voisins dont l'un sort de
-  l'argent. Un jeton par état, une famille par destination : ce sont deux axes,
-  pas une seule échelle.
+  collecteur affichait **neuf destinations ensemble**, dix pour le titulaire.
+  Tout y ramener rendait *Retrait* et *Bilan* identiques, deux boutons voisins
+  dont l'un sort de l'argent. Un jeton par état, une famille par destination :
+  ce sont deux axes, pas une seule échelle. Depuis *Le billet* (2026-10-02), le
+  collecteur n'en emploie plus : `Outils` pose des boutons neutres, sans couleur
+  par famille (§4.9). Les huit jetons `tuile*` restent pour `ActionsRapides`,
+  que seul le tableau de bord de l'administration emploie encore (quatre
+  raccourcis, en deux familles), jusqu'à la refonte de l'administration
+  (chantier 3).
 
   Pourquoi quatre, et pourquoi dédiées. Quatre familles — ce qui touche à
   l'argent, ce qui touche au client, ce qui regarde en arrière, ce qui range —
@@ -80,8 +85,9 @@ L'image fournie est la **maquette de représentation de notre Dashboard Admin** 
   Ce que ça n'autorise pas : ouvrir une famille par écran. Quatre existent, la
   famille est déclarée par l'écran et non déduite du dessin de l'icône, et une
   cinquième demanderait de montrer d'abord que ces quatre-là ne suffisent plus.
-  « Alertes » n'en est pas une : une tuile rouge en permanence est rouge le jour
-  où il y a trois refus comme le jour où il n'y en a aucun.
+  « Alertes » n'en est pas une : sur l'ancien accueil du collecteur, elle était
+  rangée dans `gestion`, car une tuile rouge en permanence est rouge le jour où
+  il y a trois refus comme le jour où il n'y en a aucun.
 
 ---
 
@@ -92,7 +98,7 @@ L'image fournie est la **maquette de représentation de notre Dashboard Admin** 
 3. **Hors-ligne d'abord.** Chaque écran doit rester lisible et utilisable sans réseau ; un état de synchro est toujours visible.
 4. **Densité maîtrisée.** Aéré côté admin ; compact et à grandes cibles tactiles côté terrain.
 5. **Cohérence absolue.** Les deux applications partagent tokens et composants. Ce qui change, c'est la disposition, pas le langage visuel.
-6. **Palette resserrée.** Vert, neutres, vert/corail sémantiques, pastels de graphique — rien d'autre dans les applications. L'or est réservé à la marque et à la vitrine (§ 1). La discipline fait la cohérence.
+6. **Palette resserrée.** Vert, neutres, vert/corail sémantiques, pastels de graphique — rien d'autre dans les applications. L'or est réservé à la marque, à la vitrine et à la gravure sur fond sombre, jamais sur un montant ni sur un état (§ 1, § 4.18). La discipline fait la cohérence.
 7. **Ne jamais afficher un chiffre qu'on ne sait pas.** Un écran branché sur la base ne montre que ce que la base établit. Un compteur inventé pour remplir une case coûte la confiance de celui qui le lit.
 
 ---
@@ -132,13 +138,14 @@ Deux conséquences pratiques.
 |---|---|---|
 | `--color-ink` / `--color-foreground` | `#171A17` | Texte principal, titres. |
 | `--color-muted-foreground` | `#666B64` | Texte secondaire, étiquettes. Assombri le 2026-08-25 : `#6C716A` ne tenait que 4,33:1 sur `--color-muted`. |
-| `--color-muted` | `#EFEFEA` | **Surface** muette : piste de jauge, en-tête de tableau. |
+| `--color-muted` | `#EEEFEC` | **Surface** muette : piste de jauge, en-tête de tableau. Refroidi le 2026-09-04, de `#EFEFEA` : il tirait au jaune quand `canvas` tire au vert. |
 | `--color-hairline` / `--color-border` | `#E6E3DA` | Bordures, séparateurs (1 px). |
 | `--color-trait` | `#858B81` | Limite de ce qu'on touche : champ de recherche, segments, case à venir de la carte (40 %), points de conduite (50 %). 3,5:1 sur `surface`, 3,2:1 sur `canvas` : les 3:1 que WCAG 1.4.11 demande à la limite d'un contrôle. `hairline` sépare, `trait` délimite. |
 | `--color-canvas` / `--color-background` | `#F4F5F2` | Fond de la zone de contenu. |
 | `--color-surface` / `--color-input` | `#FFFFFF` | Cartes, panneaux, champs. |
-| `--color-paper` | `#FBFAF6` | Fond alternatif chaud (documents, sheets). |
 | `--color-dark-canvas` | `#06140E` | Cadre sombre, écran de connexion. |
+
+`--color-paper` (`#FBFAF6`) est parti le 2026-09-04 : il n'avait qu'un emploi, les trois cartes du produit sur la vitrine, et faisait un troisième fond entre `canvas` et `surface`. Deux fonds suffisent : `canvas` porte la page, `surface` porte ce qui se soulève.
 
 > **`muted` et `muted-foreground` ne sont pas la même chose.** En v1 un seul token `--muted` portait le gris de texte. Tailwind attend `muted` comme surface et `muted-foreground` comme texte ; les confondre donne du gris sur gris sur chaque jauge et chaque en-tête de tableau. La valeur de texte de la v1 est devenue `muted-foreground`.
 >
@@ -174,7 +181,7 @@ Deux conséquences pratiques.
 
 - **Police UI :** `Instrument Sans` (variable, repli `system-ui`) → `--font-body`, classe `font-body`. Texte, boutons, libellés, l'unité « FCFA ».
 - **Police display / marque :** `Bricolage Grotesque` (variable) → `--font-headings`, classe `font-headings`. Titres, nom du client sur la carte, total du jour. Les deux ont remplacé `Plus Jakarta Sans` et `Sora` le 2026-09-17.
-- **Chiffres de caisse :** `IBM Plex Mono` 500 → `--font-mono`, classe `font-mono`. Tout montant qu'on compte (soldes, mises, relevés, décompte, reçus), les compteurs (`29/31`), les heures, les numéros de reçu. **Un montant qu'on compte est en Plex Mono ; le total du jour est en Bricolage, c'est l'affiche.** Jamais une phrase en chasse fixe : dans « 23 mises · dernière à 11:42 », seuls `23` et `11:42` le sont. Le collecteur ne charge que la graisse 500, sous-ensemble latin.
+- **Chiffres de caisse :** `IBM Plex Mono` 500 → `--font-mono`, classe `font-mono`. Tout montant qu'on compte (soldes, mises, relevés, décompte, reçus), les compteurs (`29/31`), les heures, les numéros de reçu. **Un montant qu'on compte est en Plex Mono ; le total du jour est en Bricolage, c'est l'affiche.** Jamais une phrase en chasse fixe : dans « Encaissé aujourd'hui · 23 mises », seul `23` l'est. Le collecteur ne charge que la graisse 500, sous-ensemble latin.
   - **Le repli.** `--font-mono` met `IBM Plex Mono` en tête, puis la liste mono de Tailwind recopiée telle quelle (`polices.mono`, dans `tokens.ts`). Les écrans qui ne chargent pas Plex, l'administration, gardent le rendu qu'ils avaient.
   - **Pas de semi-gras.** Seule la 500 est chargée (`apps/collecteur/src/main.tsx`). Un montant posé dans un contexte en semi-gras, comme l'intérieur d'un bouton, prend `font-medium`, jamais `font-semibold` : le navigateur fabriquerait un faux gras.
 - **Police dramatique — vitrine uniquement :** `Bodoni Moda` → `--font-drama`, classe `font-drama`, déclarée dans `apps/site/src/styles.css` et nulle part ailleurs. Un Didone gravé, c'est-à-dire la typographie des coupures de banque : la vitrine traite le produit comme un billet, et cette police est la seule chose de la page qui vienne littéralement du sujet. Elle a remplacé `Instrument Serif` le 2026-09-02 — celle-ci n'était choisie que pour « faire premium », ce qui n'est pas une raison.
@@ -249,8 +256,10 @@ C'est voulu : les noms restent disponibles, avec les valeurs du produit.
 1. `Telephone.tsx` dessine un châssis d'appareil — 44 px à l'extérieur, 36 px à
    l'intérieur. Ce n'est pas une surface d'interface mais un objet représenté ;
    le ranger dans l'échelle le ferait cesser de ressembler à un téléphone.
-2. Les 31 cases de la carte de collecte miniature font 8 px de haut. À 4 px,
-   `rounded-sm` les arrondirait en stade ; elles gardent 2 px.
+2. Les 31 cases de la carte de collecte font 18 px de haut, 12 px dans le format
+   réduit sous 240 px (`h-4.5` et `@max-[240px]:h-3`, dans `CarteCollecte.tsx`).
+   Elles prennent `rounded-xs`, 2 px : le cran de Tailwind sous `sm`, que
+   l'échelle du produit ne redéfinit pas.
 
 Toute autre valeur arbitraire est un défaut. Si un rôle nouveau apparaît, il
 prend un jeton, pas un `rounded-[…]`.
@@ -262,7 +271,7 @@ prend un jeton, pas un `rounded-[…]`.
 | `--shadow-sm` | `shadow-sm` | `0 1px 2px rgba(20,30,25,.05)` | Cartes posées sur canevas. |
 | `--shadow-md` | `shadow-md` | `0 4px 12px rgba(20,30,25,.08)` | Cartes flottantes, bandeaux de résumé. |
 | `--shadow-lg` | `shadow-lg` | `0 12px 32px rgba(6,20,14,.14)` | Cadre de l'application admin sur fond sombre, écrans de blocage. |
-| `--shadow-action` | `shadow-action` | `0 4px 12px rgba(20,64,44,.25)` | **Uniquement** les commandes d'encaissement : la touche de la barre mobile, le bouton du bloc de caisse et celui de la barre latérale du bureau. |
+| `--shadow-action` | `shadow-action` | `0 4px 12px rgba(20,64,44,.25)` | **Uniquement** les commandes d'encaissement du collecteur : la touche de la barre mobile (`NavMobile`), le bouton du bloc de caisse et le bouton « Encaisser » de `NavBureau`, la barre latérale du collecteur sur écran large (pas celle de l'administration). |
 
 `shadow-action` n'est pas un quatrième niveau d'élévation : c'est une couleur portée. C'est la seule surface du produit qui projette du vert, et elle désigne le geste central du métier.
 
@@ -301,6 +310,7 @@ Tous vivent dans **`packages/ui/src`** et sont partagés par les deux applicatio
 | `BarreLaterale` | `BarreLaterale.tsx` | Navigation admin, entrées à venir grisées. |
 | `BarreHaute` | `BarreHaute.tsx` | Fil d'Ariane + titre + actions en pilules. |
 | `NavMobile` | `NavMobile.tsx` | Barre du bas ; « Encaisser » en touche dans la barre (§4.2). |
+| `NavBureau` | `NavBureau.tsx` | Barre latérale du collecteur à partir de `lg`, à côté de `NavMobile` ; « Encaisser » y est un bouton plein, ombre `shadow-action` (§3.5). |
 | `ActionsRapides` | `ActionsRapides.tsx` | Grille d'icônes rondes, variante compacte. Administration seulement (§4.9). |
 | `BandeauHorsLigne`, `useEnLigne` | `Bandeaux.tsx` | État réseau. |
 | `EcranConnexion` | `EcranConnexion.tsx` | Formulaire de connexion partagé. |
@@ -315,7 +325,7 @@ Tous vivent dans **`packages/ui/src`** et sont partagés par les deux applicatio
 
 ### 4.2 Navigation
 - **Admin (web) — barre latérale gauche.** En-tête de contexte (« Kolek · Admin »). Items icône + label, groupés par overline gris (« Pilotage », « Monétisation », « Système »). **État actif :** fond `bg-white/10`, filet gauche `border-chart-mint`, icône menthe. **Entrée à venir :** contraste réduit, `disabled`, attribut `title`. Pas d'étiquette « à venir » visible — elle volait la largeur du libellé et le faisait passer sur deux lignes. Sortie de session seule en pied : la carte promo de la maquette a été retirée le 2026-09-11, GTCS vendant les paliers et n'en souscrivant aucun.
-- **Collecteur (mobile) — barre du bas.** Cinq onglets à grandes cibles. L'onglet **Encaisser** est une touche dans la barre : rectangle `primary` de 64 × 48 px, rayon `lg`, icône `banknote`, ombre `shadow-action`. L'onglet ouvert prend l'encre `primary` et un filet de 2 px collé sous le bord haut de la barre, hors du flux, comme sur la maquette validée, et porte `aria-current="page"`. La touche, ouverte, se cerne d'un anneau `primary` de 2 px. La barre est `fixed bottom-0` : une liste de clients dépasse la hauteur d'un téléphone, et une barre qui part au défilement oblige à remonter avant chaque encaissement.
+- **Collecteur (mobile) — barre du bas.** Cinq onglets à grandes cibles. L'onglet **Encaisser** est une touche dans la barre : rectangle `primary` de 64 × 48 px, rayon `lg`, icône `banknote`, ombre `shadow-action`. L'onglet ouvert prend l'encre `primary` et un filet de 2 px collé sous le bord haut de la barre, hors du flux, comme sur la maquette validée (`Docs/maquettes/le-billet/`), et porte `aria-current="page"`. La touche, ouverte, se cerne d'un anneau `primary` de 2 px. La barre est `fixed bottom-0` : une liste de clients dépasse la hauteur d'un téléphone, et une barre qui part au défilement oblige à remonter avant chaque encaissement.
   - **La réserve.** La barre mesure environ 77,7 px et sort du flux : le document ne lui garde plus de place. `--reserve-nav` (`packages/core/src/base.css`, 5,25 rem plus la zone de sécurité du bas) est la réserve sous le contenu, écrite une seule fois. `pb-nav` réserve cette hauteur en bas de la colonne ; `bottom-nav` laisse un bloc `sticky` se poser juste au-dessus de la barre.
 
 ### 4.3 Barre supérieure & fil d'Ariane
@@ -339,7 +349,7 @@ Hauteur minimale **44 px** partout, admin compris. Le collecteur tape debout, à
 
 **`decritPar`** : l'identifiant de la phrase qui dit pourquoi le bouton est éteint (`aria-describedby`), quand cette phrase est déjà à l'écran. Un bouton `disabled` ne prend pas le focus : sans ce lien, « Reçu » grisé se lit comme un bouton cassé. `title` reste le canal de l'infobulle. **`deplie`** et **`panneau`** : pour un bouton qui ouvre un panneau, `aria-expanded` (toujours dit, « replié » compris) et `aria-controls` (à donner tant que le panneau est dans la page). Sans `deplie`, le bouton n'annonce aucun état.
 
-**Un libellé mêlé tient dans un seul `<span>`.** `Bouton` est un conteneur flex (`gap-2`) : dans « Encaisser 2 000 », où le montant est en Plex Mono, des morceaux frères deviendraient des éléments séparés, insécables, qui débordent du bouton à 320 px.
+**Un libellé mêlé tient dans un seul `<span>`.** `Bouton` est un conteneur flex (`gap-2`) : dans « Encaisser 2 000 », où le montant est en Plex Mono, des morceaux frères deviendraient des éléments séparés : le montant, insécable, ne passerait plus à la ligne, le bouton ne se resserrerait plus et, à 320 px, « Fiche » sortirait de la carte.
 
 ### 4.6 Pilules de filtre et segments
 Fond blanc, contour `hairline`, texte `ink`, chevron `muted-foreground`. Actif = fond `primary`, texte blanc.
@@ -402,13 +412,13 @@ Le geste qui ne se défait pas laisse une marque, comme au guichet. Cadre double
 
 Une mise refusée ne reçoit **aucun** tampon : un ENCAISSÉ sur un refus mentirait. Dans le doute, GARDÉE, l'état qui ne promet rien. Le tampon est `aria-hidden` : la ligne d'état (`role="status"`) dit la même chose. Il se plaque en `--duree-toucher` (150 ms, échelle 1,15 vers 1) ; sous `prefers-reduced-motion`, il paraît sans mouvement.
 
-**L'écran Encaisser.** Sur un téléphone court, le bloc « Caisse » et le bloc d'après le paiement sont collants au-dessus de la barre (`sticky bottom-nav`, `lg:static`) : le geste n'est jamais dessous. Après le paiement, le focus va à la ligne d'état : le bouton « Encaisser » qui le portait n'est plus rendu. « Reçu » est là dès que la mise est écrite. Éteint tant qu'elle n'est que gardée sur le téléphone, il est décrit par la phrase d'envoi (`decritPar`) : l'écran des reçus ne lit que le journal du serveur, qui ne la connaît pas encore. Il s'allume quand la mise est partie, et il n'est pas rendu si le serveur la refuse. Sa place n'apparaît jamais sous le pouce : l'envoi arrive un aller-retour après l'appui, quand le pouce vise « Client suivant ».
+**L'écran Encaisser.** Sur un téléphone court, le bloc « Caisse » et le bloc d'après le paiement sont collants au-dessus de la barre (`sticky bottom-nav`, `lg:static`) : le geste n'est jamais dessous. Après le paiement, le focus va à la ligne d'état : le bouton « Encaisser » qui le portait n'est plus rendu. « Reçu » est là dès que la mise est écrite. Éteint tant qu'elle n'est que gardée sur le téléphone, il est décrit par la phrase d'envoi (`decritPar`) : l'écran des reçus ne lit que le journal du serveur, qui ne la connaît pas encore. Il s'allume quand la mise est partie, et il n'est pas rendu si le serveur la refuse. Il ne surgit jamais sous le pouce : sa place est prise d'avance, car l'envoi arrive un aller-retour après l'appui, quand le pouce vise « Client suivant ».
 
 ### 4.17 Décompte
 Des lignes « libellé, points de conduite, montant », puis le total sous un double filet `ink`. Les montants en Plex Mono ; une retenue s'écrit `−` (U+2212), espace fine insécable, valeur absolue. Le retrait s'en sert avant le geste : « 31 mises × 1 000 », « Ta commission, case 1 », « À rendre ». Les lignes ne s'affichent que si elles retombent sur le montant du serveur ; sinon le total reste seul.
 
 ### 4.18 Gravure
-La signature, et elle se mérite : trois places, pas une de plus.
+La signature, et elle se mérite : trois places, pas une de plus (les écrans de connexion mis à part, voir la fin de la section).
 
 1. L'en-tête de l'accueil du collecteur : `Rosace` en filigrane (22 pétales, excentricité 0,38) et `Onde` en pied, or à 15 et 25 %. La rosace ne tourne plus.
 2. La bande de l'encaissement : `Onde` seule, or à 30 %.
@@ -416,7 +426,7 @@ La signature, et elle se mérite : trois places, pas une de plus.
 
 Les trois ondes passent `traitFixe` : le trait garde un demi-pixel à l'écran. Sans lui, une bande de 10 à 24 px écrase le trait du `viewBox` entre 0,06 et 0,14 px, et la gravure s'efface.
 
-L'or ne dit jamais un montant ni un état. Les écrans secondaires ne portent pas de gravure.
+L'or ne dit jamais un montant ni un état. Les écrans secondaires ne portent pas de gravure. Seuls font exception les trois écrans de connexion (`EcranConnexion`, `MotDePasseOublie`, `NouveauMotDePasse`) : ils portent déjà celle de la vitrine, `Rosace` tournante en or à 15 % et `Onde` en or à 10 %, et la gardent jusqu'à leur refonte (chantier 2).
 
 ---
 
@@ -430,7 +440,7 @@ Cette maquette **est** notre Dashboard Admin. Son contenu de démonstration se t
 | Carte bancaire VISA | **Carte de collecte** d'un client (progression 31 cases). |
 | Available Balance / Withdraw | **Solde restituable** + action **Retrait / clôture**. |
 | Total Earnings + tendance | **Commissions du mois** (admin) / **Encaissé du jour** (collecteur). |
-| All Activity (actions rapides) | Encaisser · Souscrire · Retrait · Bilan · Rapprochement. |
+| All Activity (actions rapides) | Les **outils** de l'accueil du collecteur (§4.9) : Souscrire · Retrait · Rapprochement · Reçus · Alertes · Avis · Équipe (titulaire seulement) · Plus. « Encaisser » et « Bilan » n'y sont pas : la barre du bas les porte. |
 | Stock Index International | **Top zones / marchés** (encaissé du jour, objectif). |
 | Recently Completed (barres) | **Répartition** encaissements / commissions / restitutions. |
 | Transactions | **Mises & retraits récents** (dépôt vert, commission neutre, sortie corail). |
@@ -486,9 +496,9 @@ Même palette, même typo, mêmes rayons, mêmes badges. On ne redessine jamais 
 
 | Écran | Fichier | Données |
 |---|---|---|
-| Collecteur — Accueil | `apps/collecteur/src/ecrans/Accueil.tsx` | Démonstration (J2a) |
+| Collecteur — Accueil | `apps/collecteur/src/ecrans/Accueil.tsx` | **Supabase** (refondu « Le billet », chantier 1) |
 | Collecteur — Liste clients | `apps/collecteur/src/ecrans/Clients.tsx` | **Supabase** |
-| Collecteur — Encaisser | `apps/collecteur/src/ecrans/Encaisser.tsx` | Démonstration (J2a) |
+| Collecteur — Encaisser | `apps/collecteur/src/ecrans/Encaisser.tsx` | **Supabase** (refondu « Le billet », chantier 1) |
 | Admin — Tableau de bord | `apps/admin/src/ecrans/TableauDeBord.tsx` | Démonstration (J4) |
 | Admin — Collecteurs & Zones | `apps/admin/src/ecrans/Collecteurs.tsx` | Démonstration (J4) |
 | Admin — Détail collecteur | `apps/admin/src/ecrans/DetailCollecteur.tsx` | Démonstration (J4) |
