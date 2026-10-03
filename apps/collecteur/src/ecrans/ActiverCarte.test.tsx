@@ -193,4 +193,41 @@ describe('activer une carte de plus', () => {
     );
     expect(onOuverte).not.toHaveBeenCalled();
   });
+
+  it('dit ce qui reste vrai après un retrait, quand l’écran le lui donne', () => {
+    render(
+      <ActiverCarte
+        collecteurId={COLLECTEUR}
+        clientId={CLIENT}
+        misePreremplie={5000}
+        identifiant="essai"
+        explication="La carte précédente est close. La nouvelle repart de la case 1."
+        onOuverte={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+
+    expect(
+      screen.getByText('La carte précédente est close. La nouvelle repart de la case 1.'),
+    ).toBeTruthy();
+    // « son solde reste dû au client » : faux une fois l'argent rendu.
+    expect(screen.queryByText(/son solde reste dû/)).toBeNull();
+  });
+
+  it('garde sa phrase, vraie en milieu comme en fin de cycle, quand on ne lui en donne pas', () => {
+    render(
+      <ActiverCarte
+        collecteurId={COLLECTEUR}
+        clientId={CLIENT}
+        misePreremplie={5000}
+        identifiant="essai"
+        onOuverte={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+
+    expect(screen.getByText(/son solde reste dû au client/)).toBeTruthy();
+  });
 });

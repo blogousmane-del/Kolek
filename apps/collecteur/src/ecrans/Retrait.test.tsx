@@ -1,3 +1,4 @@
+import { formatMontant } from '@kolek/core';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -204,10 +205,14 @@ describe('vocabulaire de l’écran de retrait', () => {
 
     faireLeRetrait('Hj');
 
-    const texte = screen.getByText(/Confirmer le retrait/).textContent ?? '';
-    expect(texte).toContain('30 000');
-    // La carte se clôture, et c'est définitif. Le taire serait pire que le dire.
-    expect(texte).toContain('clôture');
+    // Ce qu'on rend, dans le titre ; ce que la carte devient, juste dessous. Le
+    // taire serait pire que le dire.
+    const feuille = screen.getByRole('dialog', { name: /^Rendre 30\s000 FCFA\s\?$/ });
+    expect(
+      within(feuille).getByText(
+        'La carte se clôture. C’est définitif : le retrait ne pourra pas être défait.',
+      ),
+    ).toBeTruthy();
   });
 });
 
@@ -344,9 +349,13 @@ describe('le retrait attend la file et le réseau (§7)', () => {
     operationsEnFile = [operationMise(1, { carteId: 'k1' })];
     rerender(<Retrait revision={0} collecteurId="col1" onRetour={vi.fn()} onEcriture={vi.fn()} />);
 
-    const valider = screen.getByRole('button', { name: 'Oui, faire le retrait' }) as HTMLButtonElement;
+    const valider = screen.getByRole('button', { name: /^Oui, rendre/ }) as HTMLButtonElement;
     expect(valider.disabled).toBe(true);
-    expect(screen.getByText('1 mise de cette carte pas encore envoyée.')).toBeTruthy();
+    // Dite deux fois, dans le dépli derrière et dans la feuille : c'est la
+    // feuille qui compte, elle porte le bouton.
+    expect(
+      within(screen.getByRole('dialog')).getByText('1 mise de cette carte pas encore envoyée.'),
+    ).toBeTruthy();
     fireEvent.click(valider);
     expect(cloturerCarte).not.toHaveBeenCalled();
   });
@@ -359,7 +368,7 @@ describe('le retrait attend la file et le réseau (§7)', () => {
       window.dispatchEvent(new Event('offline'));
     });
 
-    const valider = screen.getByRole('button', { name: 'Oui, faire le retrait' }) as HTMLButtonElement;
+    const valider = screen.getByRole('button', { name: /^Oui, rendre/ }) as HTMLButtonElement;
     expect(valider.disabled).toBe(true);
     fireEvent.click(valider);
     expect(cloturerCarte).not.toHaveBeenCalled();
@@ -406,7 +415,7 @@ describe('le retrait attend la file et le réseau (§7)', () => {
     operationsEnFile = [operationMise(1, { carteId: 'k1' })];
     rerender(<Retrait revision={0} collecteurId="col1" onRetour={vi.fn()} onEcriture={vi.fn()} />);
 
-    const valider = screen.getByRole('button', { name: 'Oui, faire le retrait' });
+    const valider = screen.getByRole('button', { name: /^Oui, rendre/ });
     const raison = document.getElementById(valider.getAttribute('aria-describedby') ?? '');
     expect(raison?.textContent).toBe('1 mise de cette carte pas encore envoyée.');
   });
@@ -702,7 +711,7 @@ describe('les filtres', () => {
   it('referme une confirmation ouverte quand la liste change', () => {
     rendre();
     faireLeRetrait('Hj');
-    expect(screen.getByRole('button', { name: 'Oui, faire le retrait' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Oui, rendre/ })).toBeTruthy();
 
     fireEvent.click(puce('En cours'));
     fireEvent.click(puce('Toutes'));
@@ -710,7 +719,7 @@ describe('les filtres', () => {
     // Un geste qui ne se défait pas, à un appui de distance, sur une carte qui
     // vient de reparaître sans qu'on l'ait redemandée. La confirmation se
     // rouvre au doigt, jamais d'elle-même.
-    expect(screen.queryByRole('button', { name: 'Oui, faire le retrait' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Oui, rendre/ })).toBeNull();
   });
 });
 
@@ -814,7 +823,7 @@ describe('la pagination', () => {
     fireEvent.click(suivante());
     fireEvent.click(screen.getByRole('button', { name: 'Page précédente' }));
 
-    expect(screen.queryByRole('button', { name: 'Oui, faire le retrait' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Oui, rendre/ })).toBeNull();
   });
 });
 
@@ -927,7 +936,7 @@ describe('la liste en lignes', () => {
     // Un geste qui ne se défait pas ne se rouvre pas tout seul : revenir sur la
     // ligne rend la première porte, jamais la confirmation d'avant.
     expect(screen.getByRole('button', { name: 'Faire le retrait' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Oui, faire le retrait' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Oui, rendre/ })).toBeNull();
   });
 
   it('referme le dépli quand la recherche change', () => {
@@ -999,5 +1008,146 @@ describe('la liste en lignes', () => {
     ouvrir('Hj');
 
     expect(screen.getByText('Aucune mise encaissée : rien à rendre, rien à garder.')).toBeTruthy();
+  });
+});
+
+/**
+ * Le décompte, avant le geste qui ne se défait pas (2026-10-02).
+ *
+ * La confirmation était une phrase : « Confirmer le retrait de 30 000 FCFA
+ * pour Hj ? ». Elle devient un décompte de caisse, que le collecteur peut lire
+ * au client avant de payer : les mises, la commission, le total sous un double
+ * filet.
+ */
+describe('le décompte', () => {
+  /** « − » puis l'espace fine insécable : la retenue telle que `Decompte` l'écrit. */
+  const MOINS = String.fromCharCode(0x2212, 0x202f);
+
+  function feuille() {
+    return screen.getByRole('dialog', { name: /^Rendre 30\s000 FCFA\s\?$/ });
+  }
+
+  it('compte les mises, retire la commission, et tombe sur le montant du serveur', () => {
+    rendre();
+    faireLeRetrait('Hj');
+
+    expect(within(feuille()).getByText('à Hj')).toBeTruthy();
+    expect(within(feuille()).getAllByRole('term').map((t) => t.textContent)).toEqual([
+      `31 mises × ${formatMontant(1000)}`,
+      'Ta commission, case 1',
+      'À rendre',
+    ]);
+    expect(within(feuille()).getAllByRole('definition').map((d) => d.textContent)).toEqual([
+      formatMontant(31000),
+      `${MOINS}${formatMontant(1000)}`,
+      `${formatMontant(30000)} FCFA`,
+    ]);
+  });
+
+  it('ne montre que le total quand les lignes ne tombent pas juste', () => {
+    // Le serveur a le dernier mot sur le montant. Un décompte qui ne retombe
+    // pas sur lui, lu devant le client, serait pire que pas de décompte.
+    donnees = [{ ...CARTE_PLEINE_HJ, restituable: 29000 }];
+    rendre();
+    faireLeRetrait('Hj');
+
+    const d = screen.getByRole('dialog', { name: /^Rendre 29\s000 FCFA\s\?$/ });
+    expect(within(d).getAllByRole('term').map((t) => t.textContent)).toEqual(['À rendre']);
+  });
+
+  it('répète le montant sur le bouton : on sait ce qu’on confirme', () => {
+    rendre();
+    faireLeRetrait('Hj');
+
+    expect(
+      within(feuille()).getByRole('button', { name: /^Oui, rendre 30\s000 FCFA$/ }),
+    ).toBeTruthy();
+  });
+
+  it('se referme par « Annuler » sans rien écrire', () => {
+    rendre();
+    faireLeRetrait('Hj');
+
+    fireEvent.click(within(feuille()).getByRole('button', { name: 'Annuler' }));
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(cloturerCarte).not.toHaveBeenCalled();
+  });
+
+  it('ne se referme pas pendant que le retrait part', async () => {
+    let repondre: (valeur: unknown) => void = () => {};
+    cloturerCarte.mockReturnValue(new Promise((r) => (repondre = r)));
+    rendre();
+    faireLeRetrait('Hj');
+
+    fireEvent.click(within(feuille()).getByRole('button', { name: /^Oui, rendre/ }));
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    // Fermer ici cacherait la réponse du serveur : le collecteur ne saurait pas
+    // s'il doit rendre l'argent.
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    await act(async () => repondre({ ok: true, montantRestitue: 30000 }));
+  });
+});
+
+/** Clôturée : le tampon, et ce qu'il reste à faire de la main. */
+describe('la carte clôturée', () => {
+  async function retirer(nom: string, rang = 0) {
+    faireLeRetrait(nom, rang);
+    fireEvent.click(screen.getByRole('button', { name: /^Oui, rendre/ }));
+    return screen.findByText(/^Remets/);
+  }
+
+  it('dit ce qu’il reste à faire : remettre l’argent, en main propre', async () => {
+    const onEcriture = vi.fn();
+    rendre({ onEcriture });
+
+    expect((await retirer('Hj')).textContent).toMatch(/^Remets 30\s000 FCFA à Hj, en main propre\.$/);
+    expect(
+      screen.getByText('Le retrait est inscrit au journal. Il ne peut plus être défait.'),
+    ).toBeTruthy();
+    expect(screen.getByText('Carte clôturée')).toBeTruthy();
+    expect(cloturerCarte).toHaveBeenCalledWith('k1');
+    expect(onEcriture).toHaveBeenCalledOnce();
+  });
+
+  it('pose le tampon CLÔTURÉE sur la carte rendue', async () => {
+    rendre();
+    await retirer('Hj');
+
+    expect(document.querySelector('[data-tampon]')?.getAttribute('data-tampon')).toBe('Clôturée');
+    expect(screen.getByText('Rendu au client')).toBeTruthy();
+  });
+
+  it('propose une carte de plus après un cycle complet, avec la phrase d’après le retrait', async () => {
+    rendre();
+    await retirer('Hj');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Activer une carte' }));
+
+    expect(
+      screen.getByText('La carte précédente est close. La nouvelle repart de la case 1.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/son solde reste dû/)).toBeNull();
+  });
+
+  it('ne propose pas de carte de plus après un retrait anticipé, ni de case à venir', async () => {
+    cloturerCarte.mockResolvedValue({ ok: true, montantRestitue: 15000 });
+    rendre();
+    await retirer('Hj', 1);
+
+    expect(screen.queryByRole('button', { name: 'Activer une carte' })).toBeNull();
+    // Close à 4/31 : sa cinquième case n'attend plus rien.
+    expect(document.querySelectorAll('[data-etat]')).toHaveLength(31);
+    expect(document.querySelectorAll('[data-etat="prochaine"]')).toHaveLength(0);
+  });
+
+  it('revient aux cartes', async () => {
+    rendre();
+    await retirer('Hj');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retour aux cartes' }));
+
+    expect(lignes()).toHaveLength(3);
   });
 });

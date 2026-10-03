@@ -1,15 +1,18 @@
 import { MISES_PAR_CYCLE, formatMontant } from '@kolek/core';
 import {
   Bouton,
-  Carte,
+  CarteCollecte,
+  Decompte,
+  Feuille,
   Icone,
   Pagination,
   Segments,
   Squelette,
+  Tampon,
   useEnLigne,
   usePagination,
 } from '@kolek/ui';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import type { ClientCible } from '../Coquille';
 import { useDonnees } from '../cache';
@@ -36,6 +39,57 @@ const FILTRES = ['Toutes', 'Cycle terminé', 'En cours'] as const;
 type Filtre = (typeof FILTRES)[number];
 
 const pluriel = (n: number) => (n > 1 ? 's' : '');
+
+/** L'espace fine insécable (U+202F) d'avant le point d'interrogation, écrite
+    par son code : une séquence d'échappement tapée se perd en route. */
+const FINE = String.fromCharCode(0x202f);
+
+/**
+ * Le décompte d'un retrait, ligne à ligne, quand il se vérifie.
+ *
+ * Le montant à rendre vient du serveur (`restituable`). Les lignes, elles, se
+ * calculent ici, et ne s'affichent que si elles retombent exactement sur ce
+ * montant : un décompte qui ne tombe pas juste, lu devant le client, serait
+ * pire que pas de décompte. Le total reste alors seul.
+ */
+function DecompteRetrait({
+  carte,
+  estCollaborateur,
+}: {
+  carte: CarteCloturable;
+  estCollaborateur: boolean;
+}) {
+  const n = carte.misesEncaissees;
+  if (n === 0) {
+    return (
+      <p className="font-body text-sm text-muted-foreground">
+        Aucune mise encaissée : rien à rendre, rien à garder.
+      </p>
+    );
+  }
+
+  const brut = n * carte.mise;
+  const lignes =
+    brut - carte.mise === carte.restituable
+      ? [
+          {
+            libelle: (
+              <>
+                <span className="font-mono">{n}</span> mise{pluriel(n)} ×{' '}
+                <span className="font-mono">{formatMontant(carte.mise)}</span>
+              </>
+            ),
+            montant: brut,
+          },
+          {
+            libelle: estCollaborateur ? 'Part de ton titulaire, case 1' : 'Ta commission, case 1',
+            montant: -carte.mise,
+          },
+        ]
+      : [];
+
+  return <Decompte lignes={lignes} total={{ libelle: 'À rendre', montant: carte.restituable }} />;
+}
 
 /**
  * Retrait : clôturer une carte et rendre son solde au client.
@@ -106,7 +160,13 @@ export function Retrait({
   // Voir `Recus` : l'escalier ne rejoue pas quand la liste se relit.
   const premier = usePremierRendu();
   const [envoi, setEnvoi] = useState(false);
-  const [fait, setFait] = useState<{ nom: string; montant: number } | null>(null);
+  /** Le retrait inscrit : la carte telle qu'elle était, le montant que le
+      serveur a rendu, et l'heure, celle du tampon. */
+  const [fait, setFait] = useState<{
+    carte: CarteCloturable;
+    montant: number;
+    quand: Date;
+  } | null>(null);
   /** Chaque clôture fait avancer la révision, ce qui périme la liste gardée.
       Après un retrait, la carte clôturée doit disparaître : un affichage
       instantané de l'ancienne liste inviterait à la clôturer deux fois. C'est
@@ -204,7 +264,7 @@ export function Retrait({
     La fermeture est propre à cet écran. Une confirmation ouverte survit au
     changement de liste, puisqu'elle vit dans l'état et non dans la carte : la
     carte masquée par un filtre reparaissait, au retour sur « Toutes », avec
-    « Oui, faire le retrait » sous le doigt — un geste qui ne se défait pas, à
+    « Oui, rendre » sous le doigt — un geste qui ne se défait pas, à
     un appui de distance, sur une carte qu'on n'avait pas redemandée. Le dépli
     suit la même règle, pour la même raison.
 
@@ -239,6 +299,15 @@ export function Retrait({
     setOuverte((o) => (o === carteId ? null : carteId));
     setAConfirmer(null);
   };
+
+  /**
+   * La feuille ne se ferme pas pendant que le retrait part : la fermer
+   * cacherait la réponse du serveur. Stable d'un rendu à l'autre, parce que
+   * `Feuille` reprend le focus chaque fois que cette fonction change.
+   */
+  const fermerDecompte = useCallback(() => {
+    if (!envoi) setAConfirmer(null);
+  }, [envoi]);
 
   /**
    * Ce que la recherche a trouvé, et ce que le filtre en cache.
@@ -339,7 +408,7 @@ export function Retrait({
       return;
     }
 
-    setFait({ nom: aConfirmer.clientNom, montant: resultat.montantRestitue });
+    setFait({ carte: aConfirmer, montant: resultat.montantRestitue, quand: new Date() });
     fermer();
     setTourLocal((t) => t + 1);
     onEcriture();
@@ -357,10 +426,9 @@ export function Retrait({
   function ligne(carte: CarteCloturable, rang: number) {
     const deplie = ouverte === carte.carteId;
     const retraitBloque = retraitBloquePour(carte.carteId);
-    const enConfirmation = aConfirmer?.carteId === carte.carteId;
     /** Le lien du bouton éteint à sa raison. Dérivé de la carte et non de
         `useId` : cette fonction rend une ligne par carte, un crochet n'y a pas sa
-        place. Une seule ligne est dépliée à la fois, donc l'`id` est unique. */
+        place. L'`id` porte la carte : deux lignes ne peuvent pas le partager. */
     const idRaison = `raison-${carte.carteId}`;
 
     return (
@@ -415,97 +483,103 @@ export function Retrait({
           <div id={`depli-${carte.carteId}`} className="space-y-3 px-4 pb-4">
             <p className="font-body text-sm text-muted-foreground">{phraseCommission(carte)}</p>
 
-            {!enConfirmation ? (
-              <div className="flex flex-wrap gap-2">
-                {/* Deux portes, et elles se valent : rendre l'argent, ou le
-                    laisser et repartir sur une carte de plus. Le collecteur est
-                    devant le client quand celui-ci choisit — la seconde ne peut
-                    pas être deux écrans plus loin.
+            {/* Deux portes, et elles se valent : rendre l'argent, ou le laisser
+                et repartir sur une carte de plus. Le collecteur est devant le
+                client quand celui-ci choisit — la seconde ne peut pas être deux
+                écrans plus loin.
 
-                    La seconde n'apparaît que sur une carte terminée. Sur une
-                    carte en cours, elle prélèverait une commission — la
-                    première mise du nouveau cycle — que personne n'a demandée. */}
-                <Bouton
-                  disabled={retraitBloque !== null}
-                  decritPar={retraitBloque ? idRaison : undefined}
-                  onClick={() => setAConfirmer(carte)}
-                >
-                  Faire le retrait
-                </Bouton>
-                {/* La raison suit son bouton, avant la seconde porte : sur un
-                    téléphone étroit les deux portes passent à la ligne, et une
-                    raison lue sous « Activer une carte » serait prise pour la
-                    sienne. `decritPar` la relie au bouton éteint, qui ne prend
-                    pas le focus. */}
-                {retraitBloque && (
-                  <p
-                    id={idRaison}
-                    className="m-0 basis-full font-body text-xs text-muted-foreground"
-                  >
-                    {retraitBloque}
-                  </p>
-                )}
-                {carte.cycleComplet && (
-                  <ActiverCarte
-                    collecteurId={collecteurId}
-                    clientId={carte.clientId}
-                    misePreremplie={carte.mise}
-                    identifiant={`retrait-${carte.carteId}`}
-                    onOuverte={onEcriture}
-                  />
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {/* Les deux faits, et pas un seul : ce qu'on rend, et ce que la
-                    carte devient. */}
-                <p className="rounded-md bg-info-tint p-3 font-body text-sm text-ink">
-                  Confirmer le retrait de <strong>{formatMontant(carte.restituable)} FCFA</strong>{' '}
-                  pour {carte.clientNom} ? La carte se clôture, c’est définitif.
+                La seconde n'apparaît que sur une carte terminée. Sur une carte
+                en cours, elle prélèverait une commission — la première mise du
+                nouveau cycle — que personne n'a demandée. */}
+            <div className="flex flex-wrap gap-2">
+              <Bouton
+                disabled={retraitBloque !== null}
+                decritPar={retraitBloque ? idRaison : undefined}
+                onClick={() => setAConfirmer(carte)}
+              >
+                Faire le retrait
+              </Bouton>
+              {/* La raison suit son bouton, avant la seconde porte : sur un
+                  téléphone étroit les deux portes passent à la ligne, et une
+                  raison lue sous « Activer une carte » serait prise pour la
+                  sienne. `decritPar` la relie au bouton éteint, qui ne prend
+                  pas le focus. */}
+              {retraitBloque && (
+                <p id={idRaison} className="m-0 basis-full font-body text-xs text-muted-foreground">
+                  {retraitBloque}
                 </p>
-                <div className="flex gap-2">
-                  <Bouton
-                    onClick={confirmer}
-                    disabled={envoi || retraitBloque !== null}
-                    decritPar={retraitBloque ? idRaison : undefined}
-                  >
-                    {envoi ? 'Retrait…' : 'Oui, faire le retrait'}
-                  </Bouton>
-                  <Bouton variante="contour" onClick={() => setAConfirmer(null)} disabled={envoi}>
-                    Annuler
-                  </Bouton>
-                </div>
-                {retraitBloque && (
-                  <p id={idRaison} className="m-0 font-body text-xs text-muted-foreground">
-                    {retraitBloque}
-                  </p>
-                )}
-              </div>
-            )}
+              )}
+              {carte.cycleComplet && (
+                <ActiverCarte
+                  collecteurId={collecteurId}
+                  clientId={carte.clientId}
+                  misePreremplie={carte.mise}
+                  identifiant={`retrait-${carte.carteId}`}
+                  onOuverte={onEcriture}
+                />
+              )}
+            </div>
           </div>
         )}
       </li>
     );
   }
 
+  /** Relu à chaque rendu : entre l'ouverture de la feuille et le geste, une
+      mise a pu entrer dans la file, ou le réseau tomber. */
+  const bloqueConfirmation = aConfirmer ? retraitBloquePour(aConfirmer.carteId) : null;
+
   if (fait) {
     return (
-      <div className="flex-1 flex flex-col">
+      <div className="flex flex-1 flex-col">
         <EnTeteEcran titre="Retrait" sousTitre="Carte clôturée" onRetour={onRetour} />
         <CorpsEcran
           enfants={
-            <Carte className="p-5 border-positive">
-              <div className="flex items-center gap-2 mb-3">
-                <Icone nom="check-circle" taille={20} className="text-positive" />
-                <p className="font-headings font-bold text-lg text-ink">Carte clôturée</p>
+            <>
+              {/* La carte rendue, et le tampon du geste : le même que celui de
+                  l'encaissement, parce que c'est la même chose, un geste qui ne
+                  se défait pas. */}
+              <CarteCollecte
+                nomClient={fait.carte.clientNom}
+                misePar={formatMontant(fait.carte.mise)}
+                jourCourant={fait.carte.misesEncaissees}
+                solde={formatMontant(fait.montant)}
+                etiquetteSolde="Rendu au client"
+                close
+                tampon={<Tampon mot="Clôturée" quand={fait.quand} />}
+              />
+
+              {/* Ce qu'il reste à faire de la main : remettre l'argent. */}
+              <div role="status" className="space-y-1">
+                <p className="font-headings text-xl font-bold text-ink">
+                  Remets <span className="font-mono font-medium">{formatMontant(fait.montant)}</span>{' '}
+                  FCFA à {fait.carte.clientNom}, en main propre.
+                </p>
+                <p className="font-body text-sm text-muted-foreground">
+                  Le retrait est inscrit au journal. Il ne peut plus être défait.
+                </p>
               </div>
-              <p className="font-body text-sm text-muted-foreground mb-4">
-                Remets <strong className="text-ink">{formatMontant(fait.montant)} FCFA</strong> à{' '}
-                {fait.nom}, en main propre. Le retrait est déjà inscrit au journal : il ne peut
-                plus être défait.
-              </p>
-              <Bouton onClick={() => setFait(null)}>Retour aux cartes</Bouton>
-            </Carte>
+
+              <div className="space-y-3">
+                <Bouton pleineLargeur onClick={() => setFait(null)}>
+                  Retour aux cartes
+                </Bouton>
+                {/* Le cycle était complet : le client peut repartir sur une
+                    carte de plus, tout de suite. La phrase par défaut du bloc
+                    (« son solde reste dû au client ») serait fausse ici : il
+                    vient d'être rendu. */}
+                {fait.carte.cycleComplet && (
+                  <ActiverCarte
+                    collecteurId={collecteurId}
+                    clientId={fait.carte.clientId}
+                    misePreremplie={fait.carte.mise}
+                    identifiant={`cloturee-${fait.carte.carteId}`}
+                    explication="La carte précédente est close. La nouvelle repart de la case 1."
+                    onOuverte={onEcriture}
+                  />
+                )}
+              </div>
+            </>
           }
         />
       </div>
@@ -715,6 +789,57 @@ export function Retrait({
           </>
         }
       />
+
+      {/* Le décompte, avant le geste qui ne se défait pas. Le titre porte le
+          montant, qui tient sur la ligne tronquée d'une feuille ; le nom du
+          client, qui peut être long, passe dessous. */}
+      {aConfirmer && (
+        <Feuille
+          ouverte
+          titre={`Rendre ${formatMontant(aConfirmer.restituable)} FCFA${FINE}?`}
+          sousTitre={`à ${aConfirmer.clientNom}`}
+          onFermer={fermerDecompte}
+        >
+          <DecompteRetrait carte={aConfirmer} estCollaborateur={estCollaborateur} />
+          <p className="rounded-md bg-info-tint p-3 font-body text-sm text-ink">
+            La carte se clôture. C’est définitif : le retrait ne pourra pas être défait.
+          </p>
+          {bloqueConfirmation && (
+            <p
+              id={`raison-feuille-${aConfirmer.carteId}`}
+              className="m-0 font-body text-xs text-muted-foreground"
+            >
+              {bloqueConfirmation}
+            </p>
+          )}
+          <div className="space-y-2">
+            <Bouton
+              pleineLargeur
+              grand
+              onClick={confirmer}
+              disabled={envoi || bloqueConfirmation !== null}
+              decritPar={bloqueConfirmation ? `raison-feuille-${aConfirmer.carteId}` : undefined}
+            >
+              {/* Un seul span : `Bouton` est un conteneur flex, et des morceaux
+                  frères y deviendraient des éléments séparés, insécables. */}
+              {envoi ? (
+                'Retrait…'
+              ) : (
+                <span>
+                  Oui, rendre{' '}
+                  <span className="font-mono font-medium">
+                    {formatMontant(aConfirmer.restituable)}
+                  </span>{' '}
+                  FCFA
+                </span>
+              )}
+            </Bouton>
+            <Bouton pleineLargeur variante="contour" onClick={fermerDecompte} disabled={envoi}>
+              Annuler
+            </Bouton>
+          </div>
+        </Feuille>
+      )}
     </div>
   );
 }

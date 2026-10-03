@@ -37,6 +37,7 @@ export function ActiverCarte({
   clientId,
   misePreremplie,
   identifiant,
+  explication = "Celle-ci s'ajoute. Ce qui est déjà ouvert ne bouge pas, et son solde reste dû au client.",
   onOuverte,
 }: {
   /**
@@ -54,6 +55,12 @@ export function ActiverCarte({
   misePreremplie: number;
   /** Préfixe des `id` du choix de mise : deux blocs peuvent coexister. */
   identifiant: string;
+  /**
+   * La phrase du bloc déplié. Par défaut, celle qui reste vraie à 12/31 comme
+   * à 31/31 : rien de ce qui est ouvert ne bouge. L'écran de retrait, une fois
+   * la carte rendue, passe la sienne : il n'y a plus de solde dû.
+   */
+  explication?: string;
   onOuverte: () => void;
 }) {
   const [deplie, setDeplie] = useState(false);
@@ -109,9 +116,7 @@ export function ActiverCarte({
           cycle depuis le 2026-09-01. La phrase doit rester vraie à 12/31 comme
           à 31/31 — et dans les deux cas, ce qu'elle rassure est le même : rien
           de ce qui est déjà ouvert ne bouge. */}
-      <p className="font-body text-sm text-ink m-0">
-        Celle-ci s'ajoute. Ce qui est déjà ouvert ne bouge pas, et son solde reste dû au client.
-      </p>
+      <p className="font-body text-sm text-ink m-0">{explication}</p>
 
       <ChoixMise
         mise={mise}

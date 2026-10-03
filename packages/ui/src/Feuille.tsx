@@ -79,15 +79,15 @@ export function Feuille({
         type="button"
         aria-label="Fermer"
         onClick={onFermer}
-        className="anim-voile absolute inset-0 bg-black/50 cursor-default"
+        className="anim-voile absolute inset-0 bg-dark-canvas/48 cursor-default"
       />
 
       {/* `tabIndex={-1}` : le panneau prend le focus à l'ouverture sans entrer
           dans l'ordre de tabulation. `outline-none` n'éteint pas son anneau : la
           règle `:focus-visible` de `base.css` est hors de toute couche, donc
           plus forte que lui. L'anneau se dessine quand la feuille s'ouvre au
-          clavier, et pas quand elle s'ouvre d'un clic ou d'un toucher : c'est
-          voulu. */}
+          clavier, et pas quand son ouvreur est un bouton cliqué ou touché :
+          c'est voulu. */}
       <div
         ref={panneau}
         role="dialog"
@@ -99,7 +99,7 @@ export function Feuille({
         {/* La poignée. Purement visuelle — elle ne se saisit pas — mais elle
             dit d'un coup d'œil que l'objet se referme vers le bas. */}
         <div className="sm:hidden pt-2 pb-1 flex justify-center shrink-0">
-          <span className="w-10 h-1 rounded-pill bg-hairline" />
+          <span className="w-10 h-1 rounded-pill bg-trait/50" />
         </div>
 
         <div className="flex items-start justify-between gap-3 px-5 pt-3 pb-4 shrink-0">
