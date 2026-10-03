@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { formatMontant } from '@kolek/core';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -45,6 +46,11 @@ const horsLigne = (reste: Record<string, unknown> = {}) => ({
 
 vi.mock('../hors-ligne/useHorsLigne', () => ({ useHorsLigne: () => etatHorsLigne }));
 
+// Le profil décide d'un outil (« Équipe ») : il se règle ici plutôt que par
+// une lecture du téléphone que ce banc ne simule pas.
+let estTitulaire = false;
+vi.mock('./commission', () => ({ useEstTitulaire: () => estTitulaire }));
+
 const { Accueil } = await import('./Accueil');
 const { viderCache } = await import('../cache');
 
@@ -52,6 +58,7 @@ const TABLEAU = {
   clients: 3,
   cartesActives: 2,
   encaisseAujourdhui: 5000,
+  misesAujourdhui: 1,
   encoursTotal: 120000,
   carteDuJour: {
     carteId: 'k7',
@@ -66,6 +73,7 @@ const TABLEAU = {
 
 beforeEach(() => {
   etatHorsLigne = horsLigne();
+  estTitulaire = false;
 });
 
 afterEach(() => {
@@ -87,7 +95,6 @@ function rendre(supplement: Record<string, unknown> = {}) {
       onSouscrire={vi.fn()}
       onEncaisser={vi.fn()}
       onOuvrirFiche={vi.fn()}
-      onDeconnexion={vi.fn()}
       {...supplement}
     />,
   );
@@ -99,11 +106,13 @@ describe('les commandes sous la carte à finir en premier', () => {
     const onEncaisser = vi.fn();
     rendre({ onEncaisser });
 
-    // Le nom complet, et non « Encaisser » : la grille de raccourcis porte une
-    // pastille du même libellé, qui ouvre la liste des clients. Deux commandes
-    // homonymes sur un écran, c'est un piège pour le test comme pour l'oreille.
+    // Le nom complet, montant compris : la barre du bas porte une touche
+    // « Encaisser » qui ouvre la liste des cartes. Deux commandes homonymes sur
+    // un écran, c'est un piège pour le test comme pour l'oreille.
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Encaisser sur la carte de Mariam' }),
+      await screen.findByRole('button', {
+        name: /^Encaisser 5\s000 FCFA sur la carte de Mariam$/,
+      }),
     );
 
     expect(onEncaisser).toHaveBeenCalledWith({
@@ -131,7 +140,7 @@ describe('les commandes sous la carte à finir en premier', () => {
     rendre();
 
     expect(await screen.findByText('Aucune carte active.')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /^Encaisser sur la carte/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /sur la carte de/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Ouvrir la fiche/ })).toBeNull();
   });
 });
@@ -205,7 +214,140 @@ describe('ce que l’accueil signale de la file (§8.4, §8.7, §8.8)', () => {
     // Retour sur l'accueil pendant le même lancement.
     cleanup();
     rendre();
-    expect(await screen.findByRole('button', { name: 'Encaisser sur la carte de Mariam' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: /sur la carte de Mariam$/ })).toBeTruthy();
     expect(screen.queryByText(PHRASE)).toBeNull();
+  });
+});
+
+/** Attendre que le tableau soit lu : la carte et ses commandes en dépendent. */
+async function tableauLu() {
+  await screen.findByRole('button', { name: /sur la carte de Mariam$/ });
+}
+
+describe('l’en-tête du billet', () => {
+  it('dit le total du jour et le nombre de mises qui le font', async () => {
+    chargerTableauCollecteur.mockResolvedValue({ ...TABLEAU, misesAujourdhui: 3 });
+    rendre();
+    await tableauLu();
+    expect(screen.getByText(/^Encaissé aujourd’hui/).textContent).toBe(
+      'Encaissé aujourd’hui · 3 mises',
+    );
+  });
+
+  it('accorde « mise » au singulier', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    rendre();
+    await tableauLu();
+    expect(screen.getByText(/^Encaissé aujourd’hui/).textContent).toBe(
+      'Encaissé aujourd’hui · 1 mise',
+    );
+  });
+
+  it('pose les trois chiffres en relevé, nommés', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    rendre();
+    await tableauLu();
+    expect(screen.getAllByRole('term').map((t) => t.textContent)).toEqual([
+      'Clients',
+      'Cartes actives',
+      'Encours, FCFA',
+    ]);
+    expect(screen.getAllByRole('definition').map((d) => d.textContent)).toEqual([
+      '3',
+      '2',
+      formatMontant(120000),
+    ]);
+  });
+
+  it('ne porte plus de bouton de déconnexion : il vit dans le profil', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    rendre();
+    await tableauLu();
+    expect(screen.queryByRole('button', { name: 'Se déconnecter' })).toBeNull();
+  });
+
+  it('mène au profil par l’avatar', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    const onNaviguer = vi.fn();
+    rendre({ onNaviguer });
+    await tableauLu();
+    fireEvent.click(screen.getByRole('button', { name: 'Ouvrir mon profil' }));
+    expect(onNaviguer).toHaveBeenCalledWith('profil');
+  });
+});
+
+describe('la carte à finir en premier', () => {
+  /**
+   * Le titre existe depuis le 2026-08-23 : un collecteur a cru que son compte
+   * appartenait au client affiché. La maquette B l'avait perdu ; il vit
+   * désormais dans la carte, au-dessus du nom.
+   */
+  it('dit ce qu’elle est, pour qu’on ne la prenne pas pour le compte', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    rendre();
+    await tableauLu();
+    expect(screen.getByText(/^À finir en premier/).textContent).toBe(
+      'À finir en premier · la plus avancée de tes 2 cartes actives',
+    );
+  });
+
+  it('mène à toutes les cartes', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    const onNaviguer = vi.fn();
+    rendre({ onNaviguer });
+    await tableauLu();
+    fireEvent.click(screen.getByRole('button', { name: 'Toutes les cartes' }));
+    expect(onNaviguer).toHaveBeenCalledWith('clients');
+  });
+
+  it('ne dit pas de cycle qu’elle ne connaît pas', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    rendre();
+    await tableauLu();
+    expect(screen.queryByText(/^Cycle/)).toBeNull();
+  });
+});
+
+describe('les outils', () => {
+  function outils() {
+    return within(screen.getByRole('region', { name: 'Outils' }))
+      .getAllByRole('button')
+      .map((b) => b.textContent);
+  }
+
+  it('rangent les écrans, sans Encaisser ni Bilan que la barre porte déjà', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    rendre();
+    await tableauLu();
+    expect(outils()).toEqual(['Souscrire', 'Retrait', 'Rapprochement', 'Reçus', 'Alertes', 'Avis', 'Plus']);
+  });
+
+  it('ajoutent l’équipe pour le titulaire', async () => {
+    estTitulaire = true;
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    rendre();
+    await tableauLu();
+    expect(outils()).toEqual([
+      'Souscrire',
+      'Retrait',
+      'Rapprochement',
+      'Reçus',
+      'Alertes',
+      'Avis',
+      'Équipe',
+      'Plus',
+    ]);
+  });
+
+  it('mènent où on les touche', async () => {
+    chargerTableauCollecteur.mockResolvedValue(TABLEAU);
+    const onNaviguer = vi.fn();
+    const onSouscrire = vi.fn();
+    rendre({ onNaviguer, onSouscrire });
+    await tableauLu();
+    fireEvent.click(screen.getByRole('button', { name: 'Rapprochement' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Souscrire' }));
+    expect(onNaviguer).toHaveBeenCalledWith('rapprochement');
+    expect(onSouscrire).toHaveBeenCalledOnce();
   });
 });

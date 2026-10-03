@@ -338,7 +338,6 @@ export function Coquille({
           }}
           onEncaisser={encaisserSur}
           onOuvrirFiche={ouvrirFiche}
-          onDeconnexion={deconnecter}
         />
       )}
       {page === 'clients' && (

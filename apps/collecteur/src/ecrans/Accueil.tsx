@@ -1,19 +1,16 @@
 import { formatMontant } from '@kolek/core';
 import {
-  ActionsCarte,
-  ActionsRapides,
   Avatar,
   BandeauHorsLigne,
+  Bouton,
   Carte,
   CarteCollecte,
-  EnteteSection,
-  Icone,
-  LienBloc,
+  Onde,
+  Outils,
   Rosace,
   Squelette,
-  SqueletteKPI,
   useEnLigne,
-  type ActionRapide,
+  type Outil,
 } from '@kolek/ui';
 import { useEffect, useState } from 'react';
 
@@ -33,20 +30,30 @@ import { useEstTitulaire } from './commission';
 let stockageDejaSignale = false;
 
 /**
- * Écran d'accueil du collecteur.
+ * Écran d'accueil du collecteur, dans le dessin du billet (2026-10-02).
  *
- * Il a porté les chiffres de la maquette — « 48 500 FCFA encaissés
- * aujourd'hui », « +8 % vs hier », « Mariam Koné, jour 18/31 » — au motif qu'un
- * écran de zéros serait « moins informatif qu'une maquette assumée ». L'argument
- * tenait tant que rien ne s'écrivait en base. Depuis que le collecteur encaisse
- * pour de vrai, un montant inventé sur cet écran est un montant qu'il peut
- * prendre pour sa recette du jour, et confronter à sa caisse le soir.
+ * ## Ce qu'il montre, dans l'ordre
  *
- * Tout vient donc de la base, et ce qui n'est pas calculable a disparu : la
- * comparaison « vs hier » demanderait de retenir le total d'hier, que rien
- * n'enregistre. Les colonnes « Visités » et « Retards » aussi — la première
- * suppose une tournée planifiée, la seconde un rythme attendu, et ni l'une ni
- * l'autre n'existe dans le schéma.
+ * L'en-tête sombre de la vitrine — la nuit d'un coffre, la rosace en
+ * filigrane, l'onde en pied — porte la journée : le total encaissé, le nombre
+ * de mises qui le font, et trois chiffres de référence en relevé. La carte à
+ * finir en premier vient se poser dessus, avec ses deux commandes. Puis les
+ * messages de la file, puis les outils.
+ *
+ * Ce qu'on fait avant ce qu'on a fait : l'historique est dans « Reçus ».
+ *
+ * ## Ce qui en est parti
+ *
+ * Les neuf tuiles pastel (`ActionsRapides`), les trois chiffres en trois cases
+ * égales, la rosace qui tournait sans rien dire, et le bouton de déconnexion :
+ * il vit dans le profil, où l'avatar mène.
+ *
+ * ## Ce qui ne change pas
+ *
+ * Tout vient de la tournée du téléphone, et ce qui n'est pas calculable n'est
+ * pas affiché. L'écran a porté les chiffres de la maquette ; depuis que le
+ * collecteur encaisse pour de vrai, un montant inventé ici est un montant
+ * qu'il peut prendre pour sa recette du jour.
  */
 export function Accueil({
   nomCollecteur,
@@ -55,7 +62,6 @@ export function Accueil({
   onSouscrire,
   onEncaisser,
   onOuvrirFiche,
-  onDeconnexion,
 }: {
   nomCollecteur: string | null;
   revision: number;
@@ -65,7 +71,6 @@ export function Accueil({
   onEncaisser: (carte: CarteChoisie) => void;
   /** Ouvrir la fiche du client de la carte affichée. */
   onOuvrirFiche: (clientId: string) => void;
-  onDeconnexion: () => void;
 }) {
   const enLigne = useEnLigne();
   const estTitulaire = useEstTitulaire();
@@ -73,295 +78,165 @@ export function Accueil({
   const attenteLongue = phraseAttenteLongue(file, Date.now());
   const refusees = file?.refusees ?? 0;
   const [avisStockage, setAvisStockage] = useState(false);
+
   useEffect(() => {
     if (stockage !== 'non_garanti' || stockageDejaSignale) return;
     stockageDejaSignale = true;
     setAvisStockage(true);
   }, [stockage]);
+
   const { donnees: tableau, erreur } = useDonnees('accueil', chargerTableauCollecteur, {
     revision,
-    messageErreur: 'Chiffres indisponibles sur ce téléphone. Connecte-toi une fois au réseau pour charger ta tournée.',
+    messageErreur:
+      'Chiffres indisponibles sur ce téléphone. Connecte-toi une fois au réseau pour charger ta tournée.',
   });
 
-  /** Extraite une fois : les commandes posées sous la carte s'y réfèrent
-      quatre fois, et `tableau?.carteDuJour!` à chaque ligne se lirait comme
-      une supposition, alors que c'est la condition d'affichage du bloc. */
   const carteDuJour = tableau?.carteDuJour ?? null;
+  const premier = usePremierRendu();
+  const nom = nomCollecteur ?? 'Collecteur';
+  const chiffre = (valeur: number | undefined) => (tableau ? formatMontant(valeur ?? 0) : '—');
+  const actives = tableau?.cartesActives ?? 0;
+  const s = (n: number) => (n > 1 ? 's' : '');
 
-  // Les huit mènent quelque part depuis le 2026-08-20. Six étaient grises,
-  // faute d'écran derrière : `ActionsRapides` désactive toute action sans
-  // `onActiver`, ce qui était honnête tant que rien n'existait, mais illisible
-  // pour qui n'a pas lu le code — six pastilles éteintes se lisent comme une
-  // application cassée, pas comme une application en cours de construction.
-  //
-  // La `famille` dit ce que la destination fait, et c'est l'écran qui le sait —
-  // pas le composant, et surtout pas le dessin de l'icône. Voir le commentaire
-  // de `FamilleAction` dans `@kolek/ui` : quatre familles s'apprennent, neuf
-  // couleurs ne se mémorisent pas.
-  const actions: ActionRapide[] = [
-    { icone: 'circle-dollar-sign', libelle: 'Encaisser', famille: 'argent', onActiver: () => onNaviguer('clients') },
-    { icone: 'user-plus', libelle: 'Souscrire', famille: 'client', onActiver: onSouscrire },
-    { icone: 'arrow-up-right', libelle: 'Retrait', famille: 'argent', onActiver: () => onNaviguer('retrait') },
-    { icone: 'bar-chart-2', libelle: 'Bilan', famille: 'analyse', onActiver: () => onNaviguer('bilans') },
-    { icone: 'refresh-cw', libelle: 'Rapproch.', famille: 'analyse', onActiver: () => onNaviguer('rapprochement') },
-    { icone: 'receipt', libelle: 'Reçus', famille: 'gestion', onActiver: () => onNaviguer('recus') },
-    { icone: 'bell', libelle: 'Alertes', famille: 'gestion', onActiver: () => onNaviguer('alertes') },
-    { icone: 'message-square', libelle: 'Avis', famille: 'gestion', onActiver: () => onNaviguer('avis') },
-    // Seulement pour un titulaire. Montrer la porte à un collaborateur le
-    // mènerait sur un écran définitivement vide — `equipe_vue()` ne lui rendra
-    // jamais rien — et lui ferait croire à une panne.
+  const outils: Outil[] = [
+    { icone: 'user-plus', libelle: 'Souscrire', onActiver: onSouscrire },
+    { icone: 'arrow-up-right', libelle: 'Retrait', onActiver: () => onNaviguer('retrait') },
+    { icone: 'scale', libelle: 'Rapprochement', onActiver: () => onNaviguer('rapprochement') },
+    { icone: 'receipt-text', libelle: 'Reçus', onActiver: () => onNaviguer('recus') },
+    { icone: 'bell', libelle: 'Alertes', onActiver: () => onNaviguer('alertes') },
+    { icone: 'message-square', libelle: 'Avis', onActiver: () => onNaviguer('avis') },
+    // Seul le titulaire d'un palier illimité a une équipe : pour les autres,
+    // l'outil mènerait à un écran vide.
     ...(estTitulaire
-      ? [
-          {
-            icone: 'users' as const,
-            libelle: 'Équipe',
-            famille: 'client' as const,
-            onActiver: () => onNaviguer('equipe'),
-          },
-        ]
+      ? [{ icone: 'users' as const, libelle: 'Équipe', onActiver: () => onNaviguer('equipe') }]
       : []),
-    { icone: 'more-horizontal', libelle: 'Plus', famille: 'gestion', onActiver: () => onNaviguer('plus') },
+    { icone: 'more-horizontal', libelle: 'Plus', onActiver: () => onNaviguer('plus') },
   ];
 
-  // Voir `Recus` : l'escalier ne rejoue pas quand l'écran se relit après une
-  // écriture. Un menu qui clignote à chaque mise encaissée est une distraction
-  // au pire moment.
-  const premier = usePremierRendu();
-
-  const nom = nomCollecteur ?? 'Collecteur';
-  const chiffre = (valeur: number | undefined) =>
-    tableau ? formatMontant(valeur ?? 0) : '—';
+  const releve: Array<[string, string]> = [
+    ['Clients', tableau ? String(tableau.clients) : '—'],
+    ['Cartes actives', tableau ? String(tableau.cartesActives) : '—'],
+    ['Encours, FCFA', chiffre(tableau?.encoursTotal)],
+  ];
 
   return (
-    <div className="anim-entree flex-1 flex flex-col lg:mx-auto lg:w-full lg:max-w-large">
-      {/*
-        L'en-tête sombre, et c'est désormais un des deux seuls du produit.
-
-        Quatorze écrans le portaient au 2026-09-16 ; il ne reste qu'ici — la
-        journée qui s'ouvre — et sur l'encaissement, le geste qui la paie. Un
-        moment qui se répète quatorze fois n'est plus un moment. Voir le
-        commentaire d'en-tête de `EnTeteEcran`.
-      */}
-      <div className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pt-entete pb-7 shadow-lg lg:rounded-xl lg:pt-6">
-        {/* Rosace décorative en filigrane. Elle ne vit plus que sur cet écran :
-            ailleurs, c'était un motif qui tournait sans rien dire, à 90 s par
-            tour, sur le compositeur d'un téléphone d'entrée de gamme. */}
+    <div className="anim-entree flex flex-1 flex-col lg:mx-auto lg:w-full lg:max-w-large">
+      <header className="relative overflow-hidden bg-[image:var(--degrade-hero)] px-marge pb-16 pt-entete lg:rounded-xl lg:pt-6">
+        {/* La gravure, en or : la seule place de l'or dans cet écran. La rosace
+            ne tourne plus — un filigrane qui bouge n'en est plus un. */}
         <Rosace
-          petales={18}
-          excentricite={0.35}
-          animee
-          className="pointer-events-none absolute -right-[15%] -top-[20%] w-[65vmin] text-or/10 lg:w-96"
+          petales={22}
+          excentricite={0.38}
+          className="pointer-events-none absolute -right-24 -top-10 w-72 text-or/15"
+        />
+        <Onde
+          lignes={10}
+          traitFixe
+          className="pointer-events-none absolute inset-x-0 bottom-10 h-6 w-full text-or/25"
         />
 
-        {/* La pastille « Collecteur actif » et son point vert sont partis le
-            2026-09-17. Le point était vert tous les jours et par tous les temps :
-            il n'encodait aucun état, il décorait. Ce qui reste dit qui tient le
-            téléphone, ce qui est la seule chose que cette ligne apprenait. */}
-        <div className="relative z-10 flex items-center justify-between mb-5">
-          <p className="min-w-0 text-white font-headings font-bold text-2xl truncate tracking-tight">
+        <div className="relative z-10 flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate font-headings text-2xl font-bold tracking-tight text-white">
             {nom}
           </p>
-          <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={onDeconnexion}
-              aria-label="Se déconnecter"
-              className="anim-pression w-10 h-10 rounded-pill bg-white/10 border border-white/15 flex items-center justify-center cursor-pointer"
-            >
-              <Icone nom="log-out" className="text-white" taille={18} />
-            </button>
-            <Avatar nom={nom} className="w-10 h-10 ring-2 ring-white/25" />
-          </div>
+          <button
+            type="button"
+            onClick={() => onNaviguer('profil')}
+            aria-label="Ouvrir mon profil"
+            className="anim-pression shrink-0 cursor-pointer rounded-pill"
+          >
+            <Avatar nom={nom} className="h-10 w-10 ring-2 ring-white/25" />
+          </button>
         </div>
 
-        <div className="relative z-10 mb-2">
-          {/* « ENCAISSÉ AUJOURD'HUI » était en capitales espacées. Le rythme de
-              gabarit en moins, et une ligne de hauteur récupérée sur un écran
-              qui en manque. */}
-          <p className="text-white/70 text-xs font-body font-medium mb-1">Encaissé aujourd’hui</p>
-          <p className="anim-montant font-headings font-bold text-white text-3xl xs:text-4xl leading-[1.1] tabular-nums tracking-tight">
-            {chiffre(tableau?.encaisseAujourdhui)}{' '}
-            {/* L'unité n'est pas un badge : elle ne se clique pas, elle ne
-                change pas d'état, et l'encadrer d'une pastille de verre en
-                faisait un objet de plus à lire avant le nombre. */}
-            <span className="text-base xs:text-lg font-body font-medium text-white/70">FCFA</span>
-          </p>
-        </div>
-
-        <div className="relative z-10 flex items-center gap-2 text-white/60 text-xs font-body">
-          <span className="inline-flex items-center gap-1">
-            {/* Sans teinte : l'icône prend la couleur de sa ligne. Elle portait
-                `chart-mint`, un jeton d'échelle de données employé en
-                ornement. */}
-            <Icone nom="check-circle" taille={14} />
-            {tableau ? `${tableau.cartesActives} carte${tableau.cartesActives > 1 ? 's' : ''} active${tableau.cartesActives > 1 ? 's' : ''}` : 'Chargement…'}
-          </span>
-        </div>
-
-        {/* Toujours rendu : il se tait seul quand la file est vide et le réseau là.
-            En ligne avec une file, il reste — le compteur ne quitte l'accueil
-            qu'une fois tout parti (§8.2). */}
-        <BandeauHorsLigne enLigne={enLigne} compte={file} className="mt-4 relative z-10" />
-      </div>
-
-      {/* Résumé du jour : trois indicateurs.
-
-          Le `backdrop-blur-xs` est parti le 2026-09-17. Il était posé sur
-          `bg-surface`, une surface opaque : rien ne transparaissait, donc il ne
-          floutait rien. Un `backdrop-filter` par-dessus un dégradé fait
-          repeindre la zone à chaque défilement, et celui-ci le faisait pour un
-          effet strictement nul. */}
-      <div className="mx-4 -mt-5 relative z-20 bg-surface rounded-xl border border-hairline p-3.5 xs:p-4 grid grid-cols-3 gap-2 xs:gap-3 shadow-md">
-        <div className="text-center min-w-0">
-          <div className="flex items-center justify-center gap-1 mb-1 text-muted-foreground">
-            <Icone nom="users" taille={13} />
-            <span className="text-[11px] font-body font-medium">Clients</span>
-          </div>
-          {tableau ? (
-            <p className="font-headings font-bold text-xl text-ink tabular-nums tracking-tight">
-              {tableau.clients}
-            </p>
-          ) : (
-            <SqueletteKPI />
+        <p className="relative z-10 mt-6 font-body text-sm text-white/70">
+          Encaissé aujourd’hui
+          {tableau && (
+            <>
+              {' · '}
+              <span className="font-mono">{tableau.misesAujourdhui}</span> mise
+              {s(tableau.misesAujourdhui)}
+            </>
           )}
-        </div>
-
-        <div className="text-center border-x border-hairline min-w-0">
-          <div className="flex items-center justify-center gap-1 mb-1 text-muted-foreground">
-            <Icone nom="circle-dollar-sign" taille={13} className="text-accent" />
-            <span className="text-[11px] font-body font-medium">Actives</span>
-          </div>
-          {tableau ? (
-            <p className="font-headings font-bold text-xl text-ink tabular-nums tracking-tight">
-              {tableau.cartesActives}
-            </p>
-          ) : (
-            <SqueletteKPI />
-          )}
-        </div>
-
-        <div className="text-center min-w-0">
-          <div className="flex items-center justify-center gap-1 mb-1 text-muted-foreground">
-            <Icone nom="bar-chart-2" taille={13} className="text-info" />
-            <span className="text-[11px] font-body font-medium">Encours</span>
-          </div>
-          {tableau ? (
-            <p className="font-headings font-bold text-base xs:text-lg text-ink tabular-nums tracking-tight truncate">
-              {chiffre(tableau.encoursTotal)}
-            </p>
-          ) : (
-            <SqueletteKPI />
-          )}
-        </div>
-      </div>
-
-      {erreur && (
-        <p role="alert" className="mx-4 mt-3 text-sm font-body text-negative">
-          {erreur}
         </p>
-      )}
+        <p className="anim-montant relative z-10 mt-2 font-headings text-4xl font-bold leading-none tracking-tight text-white tabular-nums xs:text-total">
+          {chiffre(tableau?.encaisseAujourdhui)}{' '}
+          <span className="font-body text-base font-medium tracking-normal text-white/70">FCFA</span>
+        </p>
 
-      {/* Ce que la file demande au collecteur. Rien ici ne bloque un geste : un
-          refus se lit dans les alertes, l'attente longue et le stockage se
-          règlent en retrouvant du réseau (spec J2b §8.4, §8.7, §8.8). */}
-      {(attenteLongue || refusees > 0 || avisStockage) && (
-        <div className="mx-4 mt-3 space-y-2">
-          {attenteLongue && (
-            <p role="alert" className="rounded-md bg-negative-tint p-3 text-sm font-body text-negative">
-              {attenteLongue}
-            </p>
-          )}
-          {refusees > 0 && (
-            <button
-              type="button"
-              onClick={() => onNaviguer('alertes')}
-              className="anim-pression w-full cursor-pointer rounded-md border border-negative bg-surface p-3 text-left text-sm font-body font-medium text-negative"
+        {/* Le relevé : trois chiffres de référence, alignés à gauche, séparés
+            par des filets. Plus trois cases égales : elles faisaient lire trois
+            fois la même importance à trois chiffres qui n'en ont pas. */}
+        <dl className="relative z-10 mt-5 flex border-t border-white/15 pt-3">
+          {releve.map(([terme, valeur], rang) => (
+            <div
+              key={terme}
+              className={`flex min-w-0 flex-col-reverse ${rang > 0 ? 'ml-3.5 border-l border-white/15 pl-3.5' : ''}`}
             >
-              {`${refusees} opération${refusees > 1 ? 's' : ''} refusée${refusees > 1 ? 's' : ''}, à voir`}
-            </button>
-          )}
-          {avisStockage && (
-            <p className="rounded-md bg-info-tint p-3 text-sm font-body text-info">
-              Ce téléphone peut effacer les données de Kolek s’il manque de place. Garde
-              l’application installée et envoie dès que possible.
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Sur écran large, la carte et l'historique se lisent côte à côte :
-          c'est la comparaison que fait le collecteur en préparant sa tournée. */}
-      <div className="lg:grid lg:grid-cols-2 lg:gap-4 lg:items-start">
-      <div className="mx-4 mt-5 lg:mx-0">
-        {/*
-          « Carte du jour », au singulier, se lisait comme *la* carte du compte.
-          Un collecteur a signalé le 2026-08-23 croire que son compte
-          appartenait au client affiché, les autres n'étant que des noms en bas
-          d'écran.
-
-          Le calcul était juste — c'est la carte active la plus avancée, celle
-          dont le cycle de 31 mises se termine en premier. Le libellé, lui, ne
-          le disait pas. Un titre qui laisse deviner ce qu'il montre finit
-          toujours par être mal deviné.
-        */}
-        <EnteteSection
-          titre="La carte à finir en premier"
-          className="mb-1"
-          action={<LienBloc libelle="Toutes les cartes" onActiver={() => onNaviguer('clients')} />}
-        />
-        {tableau && tableau.cartesActives > 0 && (
-          <p className="text-xs font-body text-muted-foreground mb-2">
-            La plus avancée de tes {tableau.cartesActives} carte
-            {tableau.cartesActives > 1 ? 's' : ''} active
-            {tableau.cartesActives > 1 ? 's' : ''}.
-          </p>
-        )}
-        {carteDuJour ? (
-          <>
-            <CarteCollecte
-              nomClient={carteDuJour.nom}
-              misePar={formatMontant(carteDuJour.mise)}
-              jourCourant={carteDuJour.misesEncaissees}
-              solde={formatMontant(carteDuJour.solde)}
-              cycle="1"
-            />
-            {/* Deux commandes, et elles portent sur la carte au-dessus.
-                Renvoyer vers un écran — « Encaisser » vers la liste des clients
-                — obligeait à y retrouver à la main le client qu'on venait de
-                lire, dans une liste triée autrement. Un bouton posé sous une
-                carte agit sur cette carte, ou n'a rien à y faire.
-
-                Pas de « Retrait » ici, malgré la maquette : rendre son argent à
-                un client est rare, définitif, et se décide devant sa fiche —
-                ses cartes, ses versements, son cycle. L'accueil montre la carte
-                la plus avancée, pas le dossier. */}
-            <div className="mt-3">
-              <ActionsCarte
-                actions={[
-                  {
-                    icone: 'circle-dollar-sign',
-                    libelle: 'Encaisser',
-                    description: `Encaisser sur la carte de ${carteDuJour.nom}`,
-                    onActiver: () =>
-                      onEncaisser({
-                        carteId: carteDuJour.carteId,
-                        clientNom: carteDuJour.nom,
-                        mise: carteDuJour.mise,
-                        misesEncaissees: carteDuJour.misesEncaissees,
-                      }),
-                  },
-                  {
-                    icone: 'user',
-                    libelle: 'Fiche',
-                    description: `Ouvrir la fiche de ${carteDuJour.nom}`,
-                    onActiver: () => onOuvrirFiche(carteDuJour.clientId),
-                  },
-                ]}
-              />
+              <dt className="mt-0.5 font-body text-xs text-white/60">{terme}</dt>
+              <dd className="truncate font-mono text-base font-medium text-white tabular-nums">
+                {valeur}
+              </dd>
             </div>
-          </>
+          ))}
+        </dl>
+
+        {/* Toujours rendu : il se tait seul quand la file est vide et le réseau
+            là (§8.2). */}
+        <BandeauHorsLigne enLigne={enLigne} compte={file} className="relative z-10 mt-4" />
+      </header>
+
+      <div className="relative z-20 mx-4 -mt-12 lg:mx-0">
+        {carteDuJour ? (
+          <CarteCollecte
+            nomClient={carteDuJour.nom}
+            misePar={formatMontant(carteDuJour.mise)}
+            jourCourant={carteDuJour.misesEncaissees}
+            solde={formatMontant(carteDuJour.solde)}
+            surtitre={
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="min-w-0 font-body text-xs font-semibold text-muted-foreground">
+                  À finir en premier · la plus avancée de tes {actives} carte{s(actives)} active
+                  {s(actives)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onNaviguer('clients')}
+                  className="shrink-0 cursor-pointer font-body text-xs font-semibold text-primary underline underline-offset-2"
+                >
+                  Toutes les cartes
+                </button>
+              </div>
+            }
+            action={
+              <div className="flex gap-2">
+                <Bouton
+                  icone="banknote"
+                  className="flex-1"
+                  nomAccessible={`Encaisser ${formatMontant(carteDuJour.mise)} FCFA sur la carte de ${carteDuJour.nom}`}
+                  onClick={() =>
+                    onEncaisser({
+                      carteId: carteDuJour.carteId,
+                      clientNom: carteDuJour.nom,
+                      mise: carteDuJour.mise,
+                      misesEncaissees: carteDuJour.misesEncaissees,
+                    })
+                  }
+                >
+                  Encaisser {formatMontant(carteDuJour.mise)}
+                </Bouton>
+                <Bouton
+                  variante="contour"
+                  nomAccessible={`Ouvrir la fiche de ${carteDuJour.nom}`}
+                  onClick={() => onOuvrirFiche(carteDuJour.clientId)}
+                >
+                  Fiche
+                </Bouton>
+              </div>
+            }
+          />
         ) : !tableau ? (
-          <Carte className="p-5 space-y-3">
+          <Carte className="space-y-3 p-5">
             <div className="flex justify-between">
               <Squelette hauteur="h-5" largeur="w-24" />
               <Squelette hauteur="h-5" largeur="w-20" />
@@ -374,55 +249,56 @@ export function Accueil({
           </Carte>
         ) : (
           <Carte className="p-4">
-            <p className="text-base font-body text-ink m-0">
-              Aucune carte active.
-            </p>
-            <p className="text-sm font-body text-muted-foreground mt-1">
+            <p className="m-0 font-body text-base text-ink">Aucune carte active.</p>
+            <p className="mt-1 font-body text-sm text-muted-foreground">
               Inscris un client pour ouvrir sa première carte.
             </p>
           </Carte>
         )}
       </div>
 
-      {/* « Dernières mises » vivait ici jusqu'au 2026-09-17.
-      
-          Cinq lignes d'historique sur l'écran qu'on ouvre pour agir, et un
-          « Tout voir » qui menait à la liste des clients — c'est-à-dire pas
-          à l'historique. Tout le passé est maintenant dans « Reçus », sur une
-          seule frise, avec ses filtres ; la tuile « Reçus » plus bas y mène.
-      
-          Ce que l'accueil garde : la carte du jour, le résumé, et les
-          actions. Ce qu'on fait, et non ce qu'on a fait. */}
+      {erreur && (
+        <p role="alert" className="mx-4 mt-3 font-body text-sm text-negative">
+          {erreur}
+        </p>
+      )}
 
-      </div>
+      {/* Ce que la file demande au collecteur. Rien ici ne bloque un geste : un
+          refus se lit dans les alertes, l'attente longue et le stockage se
+          règlent en retrouvant du réseau (spec J2b §8.4, §8.7, §8.8). */}
+      {(attenteLongue || refusees > 0 || avisStockage) && (
+        <div className="mx-4 mt-3 space-y-2">
+          {attenteLongue && (
+            <p role="alert" className="rounded-md bg-negative-tint p-3 font-body text-sm text-negative">
+              {attenteLongue}
+            </p>
+          )}
+          {refusees > 0 && (
+            <button
+              type="button"
+              onClick={() => onNaviguer('alertes')}
+              className="anim-pression w-full cursor-pointer rounded-md border border-negative bg-surface p-3 text-left font-body text-sm font-medium text-negative"
+            >
+              {`${refusees} opération${s(refusees)} refusée${s(refusees)}, à voir`}
+            </button>
+          )}
+          {avisStockage && (
+            <p className="rounded-md bg-info-tint p-3 font-body text-sm text-info">
+              Ce téléphone peut effacer les données de Kolek s’il manque de place. Garde
+              l’application installée et envoie dès que possible.
+            </p>
+          )}
+        </div>
+      )}
 
-      {/*
-        Les actions passent sous la carte du jour le 2026-08-24, à la demande
-        du collecteur qui utilise l'application.
+      <section aria-labelledby="titre-outils" className="mx-4 mt-6 lg:mx-0">
+        <h2 id="titre-outils" className="mb-3 font-headings text-xl font-bold text-ink">
+          Outils
+        </h2>
+        <Outils outils={outils} anime={premier} />
+      </section>
 
-        L'ordre d'un écran d'accueil dit ce qu'on vient y chercher. Neuf
-        pastilles en tête repoussaient sous la ligne de flottaison la seule
-        information qui change d'heure en heure : quelle carte finit en premier,
-        et ce qui vient d'être encaissé. Le collecteur ouvrait donc son
-        application sur un menu, pas sur son travail.
-
-        En bas, les actions redeviennent ce qu'elles sont — un point de départ
-        vers les autres écrans, consulté une fois qu'on a lu l'essentiel. Elles
-        gagnent au passage un fond de carte : posées à même le canevas, neuf
-        pastilles alignées se lisaient comme un débordement de l'écran
-        précédent plutôt que comme un bloc.
-      */}
-      <div className="mx-4 mt-6 lg:mx-0">
-        <Carte className="p-4 sm:p-5">
-          <EnteteSection titre="Actions" className="mb-1" />
-          <p className="text-xs font-body text-muted-foreground mb-4">
-            Tout ce que tu peux faire depuis ici.
-          </p>
-          <ActionsRapides actions={actions} anime={premier} />
-        </Carte>
-      </div>
-
-      <div className="flex-1 min-h-6" />
+      <div className="min-h-6 flex-1" />
     </div>
   );
 }
